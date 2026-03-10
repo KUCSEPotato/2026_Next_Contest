@@ -3,4 +3,7 @@
 
 # IDE
 .vscode/
-.idea/
+# .idea/
+
+# project folder
+idea/
