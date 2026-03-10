@@ -1,1 +1,5 @@
-./Idea
+.DS_Store
+**/.DS_Store
+EOF
+.vscode/
+.Idea/
