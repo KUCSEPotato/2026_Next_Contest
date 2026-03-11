@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Graveyard - Where unfinished projects find a second life</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="logo">
+                <span class="icon">⚰️</span>
+                <h1>Project Graveyard</h1>
+            </div>
+            <p class="tagline">Every abandoned project deserves a second life</p>
+            <button class="btn btn-primary" id="addProjectBtn">+ Add Your Project</button>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="filters">
+            <div class="filter-group">
+                <label>Tech Stack:</label>
+                <div class="filter-tags" id="techFilters">
+                    <button class="filter-tag active" data-tech="all">All</button>
+                    <button class="filter-tag" data-tech="React">React</button>
+                    <button class="filter-tag" data-tech="Python">Python</button>
+                    <button class="filter-tag" data-tech="AI">AI</button>
+                    <button class="filter-tag" data-tech="Mobile">Mobile</button>
+                    <button class="filter-tag" data-tech="Game">Game</button>
+                </div>
+            </div>
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Search projects..." />
+            </div>
+        </section>
+
+        <section class="projects-grid" id="projectsGrid">
+            <!-- Projects will be dynamically inserted here -->
+        </section>
+    </main>
+
+    <!-- Add Project Modal -->
+    <div class="modal" id="addProjectModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add Abandoned Project</h2>
+                <button class="close-btn" id="closeModalBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="projectForm">
+                    <div class="form-group">
+                        <label for="projectTitle">Project Title *</label>
+                        <input type="text" id="projectTitle" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="projectDescription">Description *</label>
+                        <textarea id="projectDescription" rows="3" required></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="projectTech">Tech Stack *</label>
+                        <input type="text" id="projectTech" placeholder="e.g., React, Node.js, MongoDB" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="projectGithub">GitHub Link</label>
+                        <input type="url" id="projectGithub" placeholder="https://github.com/...">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="projectReason">Reason for Abandonment *</label>
+                        <textarea id="projectReason" rows="2" required></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="projectLessons">Lessons Learned *</label>
+                        <textarea id="projectLessons" rows="2" required></textarea>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Submit Project</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Project Detail Modal -->
+    <div class="modal" id="projectDetailModal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2 id="detailTitle"></h2>
+                <button class="close-btn" id="closeDetailBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="detail-section">
+                    <div class="detail-tech-stack" id="detailTechStack"></div>
+                    <p class="detail-description" id="detailDescription"></p>
+                    
+                    <div class="detail-info">
+                        <div class="info-card">
+                            <h3>❌ Reason for Abandonment</h3>
+                            <p id="detailReason"></p>
+                        </div>
+                        
+                        <div class="info-card">
+                            <h3>💡 Lessons Learned</h3>
+                            <p id="detailLessons"></p>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-actions">
+                        <a href="#" id="detailGithub" class="btn btn-github" target="_blank">
+                            View on GitHub
+                        </a>
+                        <button class="btn btn-adopt" id="adoptBtn">
+                            🚀 Adopt This Project
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

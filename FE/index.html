@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>결정사 - AI 매칭 컨설턴트</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💝 결정사</h1>
+            <p class="subtitle">AI 매칭 컨설턴트가 당신의 운명을 찾아드립니다</p>
+        </div>
+
+        <div class="chat-container" id="chatContainer">
+            <div class="welcome-message">
+                <div class="ai-avatar">🤖</div>
+                <div class="message-content">
+                    <p><strong>AI 컨설턴트</strong></p>
+                    <p>안녕하세요! 결정사의 AI 매칭 컨설턴트입니다. 😊</p>
+                    <p>몇 가지 질문을 통해 당신의 이상형과 결혼관을 파악하여 최적의 매칭을 도와드리겠습니다.</p>
+                    <p>준비되셨다면 아래 버튼을 눌러주세요!</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="input-section" id="inputSection">
+            <button id="startBtn" class="btn btn-start">상담 시작하기</button>
+            <div id="answerInput" class="answer-input" style="display: none;">
+                <input type="text" id="userAnswer" placeholder="답변을 입력하세요..." />
+                <button id="sendBtn" class="btn btn-send">전송</button>
+            </div>
+        </div>
+
+        <div class="profile-section" id="profileSection" style="display: none;">
+            <div class="profile-header">
+                <h2>✨ 당신의 프로필 분석 결과</h2>
+            </div>
+            <div class="profile-content" id="profileContent"></div>
+            <div class="action-buttons">
+                <button id="restartBtn" class="btn btn-primary">다시 시작</button>
+                <button id="matchBtn" class="btn btn-match">매칭 시작</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

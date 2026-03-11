@@ -7,3 +7,12 @@
 
 # project folder
 idea/
+
+# FE
+
+# LLM
+
+# BE
+BE/.venv/
+BE/__pycache__/
+BE/.vscode/
