@@ -190,16 +190,12 @@ docker compose up -d
 
 ## 개발 규칙
 
-브랜치 전략은 `main -> develop -> feature/*` 흐름을 사용합니다.
-작업 전에 `develop` 브랜치에서 feature 브랜치를 생성하고, 기능 단위로 PR을 올립니다.
+개발 규칙은 요약만 유지하고, 상세 기준은 아래 문서를 기준으로 운영합니다.
 
-커밋 메시지는 다음과 같은 규칙을 권장합니다.
-
-- `feat:` 기능 추가
-- `fix:` 버그 수정
-- `refactor:` 구조 개선
-- `docs:` 문서 수정
-- `style:` 코드 스타일 수정
+- 요약 흐름: `main -> develop -> feature/[본인 포지션]`
+- 작업 브랜치: `feature/[본인 포지션]`
+- 머지 흐름: `feature/[본인 포지션] -> develop` (PR)
+- 상세 규칙 문서: [Working_Rule.md](Working_Rule.md)
 
 ## 현재 상태 정리
 
