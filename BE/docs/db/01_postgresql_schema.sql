@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash TEXT,
     github_id VARCHAR(100) UNIQUE,
+    google_id VARCHAR(100) UNIQUE,
     nickname VARCHAR(50) NOT NULL UNIQUE,
     bio TEXT,
     avatar_url TEXT,
@@ -405,6 +406,7 @@ CREATE TABLE IF NOT EXISTS reports (
 -- =========================
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_github_id ON users(github_id);
+CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);
 CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_ideas_author_id ON ideas(author_id);

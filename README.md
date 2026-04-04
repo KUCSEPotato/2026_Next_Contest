@@ -1,178 +1,254 @@
-# 2026_Next_Contest
+# Devory / Next Contest
 
-# GitHub 작업 규칙
+프로젝트 협업과 팀 기반 개발 경험을 관리하기 위한 백엔드 서비스입니다.
+FastAPI, PostgreSQL, Redis, SQLAlchemy를 기반으로 인증, 프로젝트 관리, 팀 매칭, 후기, 알림, 채팅, 구독 기능을 제공합니다.
 
-본 프로젝트는 협업을 위해 Feature Branch 기반의 Git Workflow를 사용합니다.
-모든 팀원은 아래 규칙을 기준으로 작업을 진행해 주세요.
+## 개요
 
----
+이 저장소는 Devory 백엔드와 로컬 개발 인프라를 포함합니다.
+API는 FastAPI로 구성되어 있으며, PostgreSQL을 기본 데이터베이스로 사용하고 Redis를 토큰 revoke 및 임시 토큰 저장소로 사용합니다.
 
-## 1. 브랜치 전략 (Branch Strategy)
+Swagger 문서를 통해 대부분의 API를 바로 테스트할 수 있도록 설계되어 있습니다.
 
-본 프로젝트는 다음과 같은 브랜치를 사용합니다.
+## 주요 기능
 
-- **main 브랜치**
-  - 배포용 브랜치
-  - 안정적으로 동작하는 코드만 포함됩니다.
-- **develop 브랜치**
-  - 통합 개발 브랜치
-  - 여러 기능이 합쳐지는 브랜치입니다.
-- **feature 브랜치**
-  - 각 기능을 개발할 때 사용하는 브랜치
-  - develop 브랜치에서 생성합니다.
+- 회원가입, 로그인, 로그아웃, 비밀번호 재설정
+- OAuth 실서비스 로그인(GitHub/Google authorization code flow)
+- 기존 계정 OAuth 연결/해제(GitHub/Google)
+- Access / Refresh 토큰 관리 및 로그아웃 시 토큰 무효화
+- 아이디어 등록, 수정, 좋아요, 북마크
+- 프로젝트 생성, 참여 신청, 초대, 멤버 관리
+- 마일스톤, 투두, 회고, 실패 경험 기록
+- 리뷰 및 평점 집계
+- 팀/프로젝트 추천 및 검색
+- 구독 플랜, 결제 이벤트, 알림, 채팅, 신고, 관리자 기능
 
----
+## 기술 스택
 
-## 2. 기본 작업 흐름 (Workflow)
+- Backend: FastAPI
+- ORM: SQLAlchemy
+- DB: PostgreSQL
+- Cache / Token Store: Redis
+- Validation: Pydantic
+- Auth: JWT-style token flow
+- Container: Docker, Docker Compose
 
-개발 작업은 다음 순서로 진행됩니다.
+## 프로젝트 구조
 
+```text
+.
+├── BE/
+│   ├── app/
+│   │   ├── api/
+│   │   ├── core/
+│   │   ├── db/
+│   │   ├── dependencies/
+│   │   ├── models/
+│   │   ├── schemas/
+│   │   └── services/
+│   ├── docker/
+│   ├── docs/
+│   ├── migrations/
+│   ├── requirements.txt
+│   └── main.py
+├── README.md
+└── idea/
 ```
-main
- ↑
-develop
- ↑
-feature/*
-```
 
-### 작업 단계
+## 핵심 문서
 
-#### 1️⃣ develop 브랜치에서 feature 브랜치 생성
+- [BE/docs/API_PLAN.md](BE/docs/API_PLAN.md): API 설계 초안
+- [BE/app/api/API_CATALOG.md](BE/app/api/API_CATALOG.md): API 동작 총정리 카탈로그
+- [BE/docs/SWAGGER_TEST_GUIDE.md](BE/docs/SWAGGER_TEST_GUIDE.md): Swagger 테스트 시나리오
+- [BE/docs/db/DOCKER_POSTGRES_GUIDE.md](BE/docs/db/DOCKER_POSTGRES_GUIDE.md): PostgreSQL Docker 실행 가이드
+- [BE/docs/db/README.md](BE/docs/db/README.md): DB 스키마 적용 순서 및 설계 원칙
+- [BE/docs/db/REDIS_GUIDE.md](BE/docs/db/REDIS_GUIDE.md): Redis 사용 가이드
+- [BE/docker/README.md](BE/docker/README.md): Docker 실행 개요
+
+## 로컬 실행 방법
+
+### 1. 환경 파일 준비
 
 ```bash
-git checkout develop
-git pull origin develop
-git checkout -b feature/기능이름
+cd BE
+cp .env.example .env
 ```
 
-**예시**
+### 2. 의존성 설치
 
 ```bash
-git checkout -b feature/login-api
+cd BE
+pip install -r requirements.txt
 ```
 
----
-
-#### 2️⃣ feature 브랜치에서 작업
-
-- 기능 구현
-- 버그 수정
-- 테스트
-
-작업 후 커밋합니다.
+### 3. 서버 실행
 
 ```bash
-git add .
-git commit -m "feat: 로그인 API 구현"
+cd BE
+uvicorn app.main:app --reload
 ```
 
----
+실행 후 아래 주소에서 확인할 수 있습니다.
 
-#### 3️⃣ feature 브랜치를 develop 브랜치로 PR
+- API: http://127.0.0.1:8000
+- Swagger: http://127.0.0.1:8000/docs
+- ReDoc: http://127.0.0.1:8000/redoc
 
-작업이 완료되면 Pull Request(PR) 를 생성합니다.
+## Docker 실행 방법
 
-```
-feature/* → develop
-```
+Docker Compose는 PostgreSQL, Redis, API를 함께 올립니다.
 
-리뷰 후 develop 브랜치로 머지됩니다.
-
----
-
-#### 4️⃣ develop 브랜치를 main으로 머지
-
-개발이 안정화되면 다음 단계로 진행합니다.
-
-```
-develop → main
+```bash
+cd BE/docker
+docker compose up -d --build
 ```
 
-main 브랜치는 배포용 브랜치로 사용됩니다.
+상태 확인:
 
----
-
-## 3. Pull Request 작성 규칙
-
-PR을 생성할 때는 작업 내용과 수정된 부분을 간단하게 작성해 주세요.
-
-**PR 작성 내용**
-
-- 구현한 기능
-- 수정한 부분
-- 테스트 방법 (필요 시)
-
-**예시**
-
-```markdown
-### 변경 내용
-- 로그인 API 구현
-- JWT 인증 로직 추가
-
-### 수정 파일
-- auth/service.py
-- auth/router.py
+```bash
+docker compose ps
 ```
 
----
+로그 확인:
 
-## 4. Commit 메시지 규칙
-
-커밋 메시지는 어떤 작업을 했는지 명확하게 작성해 주세요.
-
-**Commit 메시지 예시**
-
-```
-feat: 로그인 API 구현
-fix: 회원가입 시 이메일 검증 오류 수정
-refactor: 인증 모듈 구조 개선
-docs: README 문서 수정
-style: 코드 포맷 정리
+```bash
+docker compose logs -f api
+docker compose logs -f db
+docker compose logs -f redis
 ```
 
----
+중지 및 초기화:
 
-### Commit Prefix
-
-| Prefix | 의미 |
-|--------|------|
-| feat | 새로운 기능 추가 |
-| fix | 버그 수정 |
-| refactor | 코드 구조 개선 |
-| docs | 문서 수정 |
-| style | 코드 스타일 수정 |
-
----
-
-## 5. 작업 시 유의사항
-
-- 항상 develop 브랜치 기준으로 feature 브랜치를 생성합니다.
-- 작업은 반드시 feature 브랜치에서 진행합니다.
-- PR을 보내기 전에 코드가 정상적으로 동작하는지 확인해 주세요.
-- 커밋은 작은 단위로 나누어 작성하는 것을 권장합니다.
-
----
-
-## 6. 전체 Workflow 요약
-
-1. develop 브랜치에서 feature 브랜치 생성
-2. feature 브랜치에서 기능 개발
-3. feature → develop PR 생성
-4. develop 브랜치에 기능 통합
-5. develop → main 머지 후 배포
-
-```
-main
- ↑
-develop
- ↑
-feature/*
+```bash
+docker compose down -v
 ```
 
-이 구조를 통해 안정적인 배포와 효율적인 협업을 진행합니다.
+## 환경 변수
 
----
-## 7. 기타 사항
-- 작업 중 문제가 발생하면 팀원과 상의하여 해결합니다.
-- Github과 관련하여 문제가 발생하면, 그 즉시 GitHub 관리자에게 연락해주시기 바랍니다.
-- Github 사용과 관련하여 생성형 AI 도구를 사용하되 그 명령어 실행의 결과가 정확한지 반드시 검증해야 합니다. AI 도구가 생성한 코드나 명령어는 오류가 있을 수 있으므로, 사용 전에 반드시 검토해주세요.
+기본적으로 다음 값을 사용합니다.
+
+```env
+DATABASE_URL=postgresql+psycopg2://devory:devory1234@127.0.0.1:5432/devory
+REDIS_URL=redis://127.0.0.1:6379/0
+JWT_SECRET_KEY=change-this-in-production
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+GITHUB_OAUTH_CLIENT_ID=
+GITHUB_OAUTH_CLIENT_SECRET=
+GITHUB_OAUTH_REDIRECT_URI=http://127.0.0.1:3000/auth/github/callback
+GOOGLE_OAUTH_CLIENT_ID=
+GOOGLE_OAUTH_CLIENT_SECRET=
+GOOGLE_OAUTH_REDIRECT_URI=http://127.0.0.1:3000/auth/google/callback
+```
+
+Docker Compose를 사용할 때는 보통 아래처럼 바뀝니다.
+
+```env
+DATABASE_URL=postgresql+psycopg2://devory:devory1234@db:5432/devory
+REDIS_URL=redis://redis:6379/0
+```
+
+OAuth redirect URI는 프론트엔드의 실제 callback URL과 반드시 일치해야 합니다.
+
+## 데이터베이스 운영 방식
+
+- DB 초기 스키마는 [BE/docs/db/01_postgresql_schema.sql](BE/docs/db/01_postgresql_schema.sql) 단일 파일 기준으로 관리합니다.
+- 로컬 재초기화가 필요하면 아래 명령으로 볼륨까지 정리 후 재기동합니다.
+
+```bash
+cd BE/docker
+docker compose down -v --remove-orphans
+docker compose up -d
+```
+
+## Swagger 테스트 순서
+
+1. 회원가입
+2. 로그인
+3. 응답에서 access token / refresh token 확인
+4. Swagger의 Authorize 또는 요청 헤더에 `Bearer <access_token>` 입력
+5. 사용자, 아이디어, 프로젝트, 채팅, 알림 API를 순서대로 테스트
+
+자세한 테스트 예시는 [BE/docs/SWAGGER_TEST_GUIDE.md](BE/docs/SWAGGER_TEST_GUIDE.md)를 참고하세요.
+
+## OAuth 계정 연결/해제
+
+- 연결 상태 조회: GET /api/v1/auth/oauth/links
+- GitHub 연결: POST /api/v1/auth/oauth/link/github
+- Google 연결: POST /api/v1/auth/oauth/link/google
+- GitHub 해제: DELETE /api/v1/auth/oauth/unlink/github
+- Google 해제: DELETE /api/v1/auth/oauth/unlink/google
+
+연결 해제 시 마지막 로그인 수단만 남아 있으면 안전을 위해 해제가 차단됩니다.
+
+## 인증 정책
+
+- Access token은 Bearer 토큰 방식으로 검증합니다.
+- Logout 시 access token과 refresh token을 revoke 처리합니다.
+- Redis를 사용해 revoke 상태와 임시 토큰을 저장합니다.
+- 서버 재시작 후에도 revoke 상태를 유지할 수 있습니다.
+
+## 개발 규칙
+
+브랜치 전략은 `main -> develop -> feature/*` 흐름을 사용합니다.
+작업 전에 `develop` 브랜치에서 feature 브랜치를 생성하고, 기능 단위로 PR을 올립니다.
+
+커밋 메시지는 다음과 같은 규칙을 권장합니다.
+
+- `feat:` 기능 추가
+- `fix:` 버그 수정
+- `refactor:` 구조 개선
+- `docs:` 문서 수정
+- `style:` 코드 스타일 수정
+
+## 현재 상태 정리
+
+- 인증: email/닉네임 + 비밀번호 로그인, GitHub/Google OAuth 로그인, OAuth 연결/해제까지 구현 완료
+- 토큰 정책: 로그아웃 시 access/refresh revoke 처리, Redis 기반 revoke 상태 저장 적용
+- API 문서: Swagger 주석 대폭 보강, API 카탈로그 문서 추가
+- 인프라: PostgreSQL + Redis + API Docker Compose 구성 완료
+- DB 운영: `01_postgresql_schema.sql` 단일 파일 기준으로 스키마 관리
+
+## BE 개발자 TODO
+
+### 1) 인프라/운영
+
+- [ ] 프로덕션 환경에 맞는 `.env` 실값 확정 (OAuth, DB, Redis, JWT)
+- [ ] Docker Compose를 dev/prod로 분리하거나 운영용 compose override 정리
+- [ ] 헬스체크 확장 (`/health`에 DB/Redis 연결 상태 포함)
+
+### 2) 인증/보안
+
+- [ ] OAuth state/PKCE 검증 로직 추가
+- [ ] 비밀번호 해시를 sha256에서 `bcrypt` 또는 `argon2`로 전환
+- [ ] OAuth 계정 연결/해제 이벤트 감사 로그(누가/언제/어떤 provider) 저장
+
+### 3) 데이터/마이그레이션
+
+- [ ] Alembic 기반 정식 마이그레이션 체계 도입
+- [ ] 초기 데이터(seed) 스크립트 작성 (구독 플랜, 기본 스킬)
+- [ ] DB 인덱스 점검 및 주요 쿼리 실행계획 확인
+
+### 4) API 품질
+
+- [ ] dict body를 쓰는 엔드포인트를 Pydantic 스키마로 치환
+- [ ] 공통 에러 코드/메시지 규약 문서화
+- [ ] OpenAPI examples를 요청/응답별로 추가해 Swagger 가독성 강화
+
+### 5) 테스트
+
+- [ ] 인증(Auth/OAuth) 통합 테스트 추가
+- [ ] 프로젝트 핵심 플로우(E2E: 생성→지원→승인→리뷰) 테스트 작성
+- [ ] 토큰 revoke/refresh 정책 회귀 테스트 작성
+
+### 6) 관측성
+
+- [ ] 구조화 로깅(JSON) 적용
+- [ ] 요청 추적 ID(Request ID) 및 예외 로깅 표준화
+- [ ] 주요 도메인 이벤트(가입/리뷰/구독) 메트릭 수집 포인트 추가
+
+## 참고
+
+- 백엔드의 실제 구현은 [BE/app](BE/app) 아래에 있습니다.
+- 데이터베이스 구조는 [BE/docs/db/01_postgresql_schema.sql](BE/docs/db/01_postgresql_schema.sql)에서 확인할 수 있습니다.
+- Docker 관련 파일은 [BE/docker](BE/docker)에 모아두었습니다.
