@@ -28,6 +28,7 @@ pydantic==2.12.5
 pydantic-extra-types==2.11.0
 pydantic-settings==2.13.1
 pydantic_core==2.41.5
+prometheus-fastapi-instrumentator==7.1.0
 psycopg2-binary==2.9.10
 redis==5.2.1
 Pygments==2.19.2

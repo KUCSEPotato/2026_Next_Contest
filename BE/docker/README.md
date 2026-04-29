@@ -5,6 +5,7 @@
 ## 파일
 - `docker-compose.yml`: API + PostgreSQL + Redis 통합 실행
 - `Dockerfile`: FastAPI 애플리케이션 이미지 빌드
+- `monitoring/prometheus.yml`: Prometheus 스크랩 설정
 
 ## 실행 방법
 1. 루트 `BE` 경로에서 환경 파일 준비
@@ -27,7 +28,14 @@ docker compose ps
 ```bash
 docker compose logs -f api
 docker compose logs -f db
+docker compose logs -f prometheus
+docker compose logs -f grafana
 ```
+
+## 모니터링 접속
+- Prometheus: `http://127.0.0.1:9090`
+- Grafana: `http://127.0.0.1:3001`
+- API metrics: `http://127.0.0.1:8000/metrics`
 
 ## 초기화
 ```bash
