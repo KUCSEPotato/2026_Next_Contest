@@ -1,1 +1,0 @@
-"""Devory backend application package."""
