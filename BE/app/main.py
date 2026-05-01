@@ -1,5 +1,10 @@
 from fastapi import FastAPI
 
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator  # pyright: ignore[reportMissingImports]
+except Exception:  # pragma: no cover - optional dependency during local setup
+    Instrumentator = None
+
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.db.base import Base
@@ -92,6 +97,15 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(api_router, prefix="/api/v1")
+
+    # Expose Prometheus metrics at /metrics for runtime monitoring.
+    if Instrumentator is not None:
+        Instrumentator(
+            should_group_status_codes=True,
+            should_ignore_untemplated=True,
+            excluded_handlers=["/metrics", "/docs", "/redoc", "/openapi.json"],
+        ).instrument(app).expose(app, include_in_schema=False, should_gzip=True)
+
     return app
 
 
