@@ -62,6 +62,26 @@ class UserSkill(Base):
     proficiency: Mapped[int | None] = mapped_column(SmallInteger)
 
 
+class Interest(Base):
+    __tablename__ = "interests"
+
+    id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    normalized_name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class UserInterest(Base):
+    __tablename__ = "user_interests"
+    __table_args__ = (UniqueConstraint("user_id", "interest_id", name="user_interests_unique"),)
+
+    id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    interest_id: Mapped[int] = mapped_column(ForeignKey("interests.id", ondelete="CASCADE"), nullable=False)
+    interest_level: Mapped[int | None] = mapped_column(SmallInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Idea(Base):
     __tablename__ = "ideas"
 
@@ -127,6 +147,27 @@ class ProjectMember(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     role_in_project: Mapped[str] = mapped_column(String(50), nullable=False)
     left_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ProjectSkill(Base):
+    __tablename__ = "project_skills"
+    __table_args__ = (UniqueConstraint("project_id", "skill_id", name="project_skills_unique"),)
+
+    id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    skill_id: Mapped[int] = mapped_column(ForeignKey("skills.id", ondelete="CASCADE"), nullable=False)
+    required_level: Mapped[int | None] = mapped_column(SmallInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ProjectInterest(Base):
+    __tablename__ = "project_interests"
+    __table_args__ = (UniqueConstraint("project_id", "interest_id", name="project_interests_unique"),)
+
+    id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    interest_id: Mapped[int] = mapped_column(ForeignKey("interests.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class ProjectMilestone(Base):
