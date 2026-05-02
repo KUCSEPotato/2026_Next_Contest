@@ -23,7 +23,7 @@ OPENAPI_TAGS = [
     },
     {
         "name": "ideas",
-        "description": "아이디어 CRUD, 좋아요, 북마크 기능을 제공합니다.",
+        "description": "아이디어 CRUD, 기술 스택/해시태그, 좋아요, 북마크 기능을 제공합니다.",
     },
     {
         "name": "projects",

@@ -127,6 +127,8 @@ CREATE TABLE IF NOT EXISTS ideas (
     summary TEXT,
     description TEXT NOT NULL,
     domain VARCHAR(50),
+    tech_stack JSON NOT NULL DEFAULT '[]'::json,
+    hashtags JSON NOT NULL DEFAULT '[]'::json,
     difficulty difficulty_level NOT NULL,
     required_members SMALLINT NOT NULL DEFAULT 1,
     is_open BOOLEAN NOT NULL DEFAULT TRUE,

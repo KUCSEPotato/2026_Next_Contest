@@ -71,6 +71,8 @@ class Idea(Base):
     summary: Mapped[str | None] = mapped_column(Text)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     domain: Mapped[str | None] = mapped_column(String(50))
+    tech_stack: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    hashtags: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     difficulty: Mapped[str] = mapped_column(String(20), nullable=False)
     required_members: Mapped[int] = mapped_column(SmallInteger, default=1)
     is_open: Mapped[bool] = mapped_column(Boolean, default=True)

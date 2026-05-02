@@ -43,6 +43,8 @@
 - `POST /ideas/{idea_id}/like` 아이디어 좋아요
 - `DELETE /ideas/{idea_id}/like` 좋아요 취소
 
+아이디어 생성/수정 payload에는 `tech_stack`와 `hashtags` 배열을 포함한다.
+
 ### D. Team Matching / Application
 - `POST /projects/{project_id}/applications` 프로젝트 지원
 - `GET /projects/{project_id}/applications` 지원자 목록 (리더)

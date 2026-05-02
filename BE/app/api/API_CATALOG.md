@@ -40,7 +40,7 @@
 
 ## 3) Ideas
 
-- POST /ideas: 아이디어 생성
+- POST /ideas: 아이디어 생성(tech_stack, hashtags 포함)
 - GET /ideas: 아이디어 목록 조회(필터/페이지네이션)
 - GET /ideas/{idea_id}: 아이디어 상세
 - PATCH /ideas/{idea_id}: 아이디어 수정(작성자)
