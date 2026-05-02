@@ -9,8 +9,10 @@ from app.models import Project
 from app.models import Review
 from app.models import Skill
 from app.models import User
+from app.models import UserInterest
 from app.models import UserRatingAggregate
 from app.models import UserSkill
+from app.models import Interest
 
 router = APIRouter()
 
@@ -35,6 +37,12 @@ async def get_my_profile(
         .filter(UserSkill.user_id == current_user_id)
         .all()
     )
+    interests = (
+        db.query(Interest.name)
+        .join(UserInterest, UserInterest.interest_id == Interest.id)
+        .filter(UserInterest.user_id == current_user_id)
+        .all()
+    )
 
     return success_response(
         data={
@@ -44,6 +52,7 @@ async def get_my_profile(
             "bio": user.bio,
             "avatar_url": user.avatar_url,
             "skills": [name for (name,) in skills],
+            "interests": [name for (name,) in interests],
         },
     )
 
@@ -88,6 +97,13 @@ async def get_user_profile(user_id: int, db: Session = Depends(get_db)) -> dict:
     user = db.get(User, user_id)
     if user is None or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    interests = (
+        db.query(Interest.name)
+        .join(UserInterest, UserInterest.interest_id == Interest.id)
+        .filter(UserInterest.user_id == user_id)
+        .all()
+    )
     return success_response(
         data={
             "id": user.id,
@@ -95,6 +111,7 @@ async def get_user_profile(user_id: int, db: Session = Depends(get_db)) -> dict:
             "bio": user.bio,
             "avatar_url": user.avatar_url,
             "role": user.role,
+            "interests": [name for (name,) in interests],
         },
     )
 
@@ -204,6 +221,58 @@ async def remove_my_skill(
     db.delete(user_skill)
     db.commit()
     return success_response(data={"removed": True, "skill_id": skill_id})
+
+
+@router.post("/me/interests", summary="내 관심 분야 추가", description="관심 분야 이름과 관심 강도를 등록합니다.")
+async def add_my_interest(
+    payload: dict = Body(default={}),
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    """내 관심 분야 추가 API.
+
+    Swagger 테스트 방법:
+    - body 예시: `{ "name": "AI", "interest_level": 4 }`
+    """
+    interest_name = payload.get("name")
+    interest_level = payload.get("interest_level")
+    if not interest_name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="name is required")
+
+    if interest_level is not None:
+        if not isinstance(interest_level, int) or interest_level < 1 or interest_level > 5:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="interest_level must be an integer between 1 and 5")
+
+    normalized = interest_name.strip().lower()
+    interest = db.query(Interest).filter(Interest.normalized_name == normalized).first()
+    if interest is None:
+        interest = Interest(name=interest_name.strip(), normalized_name=normalized)
+        db.add(interest)
+        db.flush()
+
+    exists = db.query(UserInterest).filter(UserInterest.user_id == current_user_id, UserInterest.interest_id == interest.id).first()
+    if exists:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Interest already registered")
+
+    user_interest = UserInterest(user_id=current_user_id, interest_id=interest.id, interest_level=interest_level)
+    db.add(user_interest)
+    db.commit()
+    return success_response(data={"interest_id": interest.id, "name": interest.name, "interest_level": interest_level})
+
+
+@router.delete("/me/interests/{interest_id}", summary="내 관심 분야 삭제", description="등록된 관심 분야 매핑을 제거합니다.")
+async def remove_my_interest(
+    interest_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    user_interest = db.query(UserInterest).filter(UserInterest.user_id == current_user_id, UserInterest.interest_id == interest_id).first()
+    if user_interest is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Interest mapping not found")
+
+    db.delete(user_interest)
+    db.commit()
+    return success_response(data={"removed": True, "interest_id": interest_id})
 
 
 @router.get("/me/reputation", summary="내 신뢰도 조회", description="리뷰 기반 평점 요약을 반환합니다.")

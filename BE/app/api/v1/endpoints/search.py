@@ -45,11 +45,23 @@ async def search_ideas(
     - query `q`로 제목/설명 키워드 검색을 수행합니다.
     """
     query = db.query(Idea)
+    query = query.filter(Idea.deleted_at.is_(None))
     if q:
         keyword = f"%{q}%"
         query = query.filter((Idea.title.ilike(keyword)) | (Idea.description.ilike(keyword)))
     ideas = query.order_by(Idea.created_at.desc()).limit(50).all()
-    return success_response(data=[{"id": i.id, "title": i.title, "difficulty": i.difficulty} for i in ideas])
+    return success_response(
+        data=[
+            {
+                "id": i.id,
+                "title": i.title,
+                "difficulty": i.difficulty,
+                "tech_stack": i.tech_stack,
+                "hashtags": i.hashtags,
+            }
+            for i in ideas
+        ]
+    )
 
 
 @router.get("/users", summary="사용자 검색", description="닉네임/소개 기반 사용자 검색을 수행합니다.")

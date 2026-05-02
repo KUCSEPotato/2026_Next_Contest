@@ -7,6 +7,8 @@ class IdeaCreateRequest(BaseModel):
     difficulty: str
     summary: str | None = None
     domain: str | None = None
+    tech_stack: list[str] = Field(default_factory=list)
+    hashtags: list[str] = Field(default_factory=list)
     required_members: int = Field(default=1, ge=1, le=100)
     is_open: bool = True
 
@@ -17,5 +19,7 @@ class IdeaUpdateRequest(BaseModel):
     difficulty: str | None = None
     summary: str | None = None
     domain: str | None = None
+    tech_stack: list[str] | None = None
+    hashtags: list[str] | None = None
     required_members: int | None = Field(default=None, ge=1, le=100)
     is_open: bool | None = None

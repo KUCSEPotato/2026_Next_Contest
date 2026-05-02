@@ -543,4 +543,29 @@ CREATE TRIGGER trg_reports_updated_at
 BEFORE UPDATE ON reports
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+
+-- =========================
+-- 11) Ideas tech_stack/hashtags backfill (from 03)
+-- =========================
+
+ALTER TABLE ideas ADD COLUMN IF NOT EXISTS tech_stack JSON;
+ALTER TABLE ideas ADD COLUMN IF NOT EXISTS hashtags JSON;
+
+UPDATE ideas
+SET tech_stack = '[]'::json
+WHERE tech_stack IS NULL;
+
+UPDATE ideas
+SET hashtags = '[]'::json
+WHERE hashtags IS NULL;
+
+ALTER TABLE ideas
+    ALTER COLUMN tech_stack SET DEFAULT '[]'::json,
+    ALTER COLUMN hashtags SET DEFAULT '[]'::json;
+
+ALTER TABLE ideas
+    ALTER COLUMN tech_stack SET NOT NULL,
+    ALTER COLUMN hashtags SET NOT NULL;
+
+
 COMMIT;
