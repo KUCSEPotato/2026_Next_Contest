@@ -12,6 +12,8 @@ from app.models.entities import PaymentEvent
 from app.models.entities import Project
 from app.models.entities import ProjectMember
 from app.models.entities import ProjectMilestone
+from app.models.entities import ProjectSkill
+from app.models.entities import ProjectInterest
 from app.models.entities import ProjectRecruitment
 from app.models.entities import Report
 from app.models.entities import Retrospective
@@ -20,9 +22,11 @@ from app.models.entities import Skill
 from app.models.entities import SubscriptionPlan
 from app.models.entities import Todo
 from app.models.entities import User
+from app.models.entities import UserInterest
 from app.models.entities import UserRatingAggregate
 from app.models.entities import UserSkill
 from app.models.entities import UserSubscription
+from app.models.entities import Interest
 
 __all__ = [
 	"AdoptionRequest",
@@ -39,6 +43,8 @@ __all__ = [
 	"Project",
 	"ProjectMember",
 	"ProjectMilestone",
+	"ProjectSkill",
+	"ProjectInterest",
 	"ProjectRecruitment",
 	"Report",
 	"Retrospective",
@@ -47,8 +53,10 @@ __all__ = [
 	"SubscriptionPlan",
 	"Todo",
 	"User",
+	"UserInterest",
 	"UserRatingAggregate",
 	"UserSkill",
 	"UserSubscription",
+	"Interest",
 ]
 """ORM models package."""
