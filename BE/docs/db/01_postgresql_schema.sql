@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash TEXT,
     github_id VARCHAR(100) UNIQUE,
+    google_id VARCHAR(100) UNIQUE,
     nickname VARCHAR(50) NOT NULL UNIQUE,
     bio TEXT,
     avatar_url TEXT,
@@ -116,6 +117,41 @@ CREATE TABLE IF NOT EXISTS user_skills (
     CONSTRAINT user_skills_proficiency_check CHECK (proficiency IS NULL OR (proficiency BETWEEN 1 AND 5))
 );
 
+CREATE TABLE IF NOT EXISTS interests (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE,
+    normalized_name VARCHAR(50) NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS user_interests (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    interest_id BIGINT NOT NULL REFERENCES interests(id) ON DELETE CASCADE,
+    interest_level SMALLINT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT user_interests_unique UNIQUE (user_id, interest_id),
+    CONSTRAINT user_interests_level_check CHECK (interest_level IS NULL OR interest_level BETWEEN 1 AND 5)
+);
+
+CREATE TABLE IF NOT EXISTS project_skills (
+    id BIGSERIAL PRIMARY KEY,
+    project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    skill_id BIGINT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+    required_level SMALLINT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT project_skills_unique UNIQUE (project_id, skill_id),
+    CONSTRAINT project_skills_level_check CHECK (required_level IS NULL OR required_level BETWEEN 1 AND 5)
+);
+
+CREATE TABLE IF NOT EXISTS project_interests (
+    id BIGSERIAL PRIMARY KEY,
+    project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    interest_id BIGINT NOT NULL REFERENCES interests(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT project_interests_unique UNIQUE (project_id, interest_id)
+);
+
 -- =========================
 -- 5) Idea Domain
 -- =========================
@@ -126,6 +162,8 @@ CREATE TABLE IF NOT EXISTS ideas (
     summary TEXT,
     description TEXT NOT NULL,
     domain VARCHAR(50),
+    tech_stack JSON NOT NULL DEFAULT '[]'::json,
+    hashtags JSON NOT NULL DEFAULT '[]'::json,
     difficulty difficulty_level NOT NULL,
     required_members SMALLINT NOT NULL DEFAULT 1,
     is_open BOOLEAN NOT NULL DEFAULT TRUE,
@@ -405,6 +443,7 @@ CREATE TABLE IF NOT EXISTS reports (
 -- =========================
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_github_id ON users(github_id);
+CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);
 CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_ideas_author_id ON ideas(author_id);
