@@ -193,7 +193,7 @@ export async function createIdeaApi(payload) {
   
     return res.json();
   }
-    
+
 */
 // 아래는 마이페이지 목업용임.
 export async function getMyProfileApi() {
@@ -269,6 +269,28 @@ export async function getMyProfileApi() {
   
     if (!res.ok) {
       throw new Error("받은 리뷰 목록을 불러오지 못했습니다.");
+    }
+  
+    return res.json();
+  }
+
+  export async function requestAdoptionApi(projectId, message) {
+    const token = localStorage.getItem("access_token");
+  
+    const res = await fetch(
+      `http://localhost:8000/api/v1/adoptions/projects/${projectId}/request`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ message }),
+      }
+    );
+  
+    if (!res.ok) {
+      throw new Error("이어받기 요청에 실패했습니다.");
     }
   
     return res.json();
