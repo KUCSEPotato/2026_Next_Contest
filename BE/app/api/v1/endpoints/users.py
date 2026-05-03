@@ -275,6 +275,54 @@ async def remove_my_interest(
     return success_response(data={"removed": True, "interest_id": interest_id})
 
 
+@router.get("/me/reviews", summary="내가 받은 리뷰 목록", description="팀원들이 남긴 리뷰 목록을 조회합니다.")
+async def get_my_reviews(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    """내가 받은 리뷰 목록 조회 API (마이페이지용).
+
+    Swagger 테스트 방법:
+    - Authorization 헤더를 설정합니다.
+
+    응답:
+    - 현재 사용자(reviewee)가 받은 모든 리뷰를 최신순으로 반환합니다.
+    - reviewer 정보(닉네임, 아바타)와 프로젝트 정보를 포함합니다.
+    """
+    reviews = (
+        db.query(Review)
+        .filter(Review.reviewee_id == current_user_id)
+        .order_by(Review.created_at.desc())
+        .all()
+    )
+
+    result = []
+    for review in reviews:
+        reviewer = db.get(User, review.reviewer_id)
+        project = db.get(Project, review.project_id)
+        result.append(
+            {
+                "id": review.id,
+                "reviewer": {
+                    "id": reviewer.id,
+                    "nickname": reviewer.nickname,
+                    "avatar_url": reviewer.avatar_url,
+                },
+                "project": {
+                    "id": project.id,
+                    "title": project.title,
+                },
+                "teamwork_score": review.teamwork_score,
+                "contribution_score": review.contribution_score,
+                "responsibility_score": review.responsibility_score,
+                "comment": review.comment,
+                "created_at": review.created_at,
+            }
+        )
+
+    return success_response(data=result)
+
+
 @router.get("/me/reputation", summary="내 신뢰도 조회", description="리뷰 기반 평점 요약을 반환합니다.")
 async def get_my_reputation(
     current_user_id: int = Depends(get_current_user_id),
