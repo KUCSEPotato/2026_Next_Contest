@@ -51,16 +51,20 @@ def generate_mock_users(num=50):
                 role='user'
             )
 
-            db.add(user)
-            created_count += 1
+            try:
+                db.add(user)
+                db.commit()
+                created_count += 1
 
-            if i % 10 == 0:
-                print(f"Created {i+1} users...")
+                if created_count % 10 == 0:
+                    print(f"Created {created_count} users...")
+            except IntegrityError as e:
+                db.rollback()
+                print(f"Skipping user (duplicate): {email}")
 
-        db.commit()
         print(f"Successfully created {created_count} mock users.")
 
-    except IntegrityError as e:
+    except Exception as e:
         db.rollback()
         print(f"Integrity error occurred: {e}. Some users might have duplicate emails or nicknames.")
     except Exception as e:
