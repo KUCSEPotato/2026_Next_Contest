@@ -5,7 +5,9 @@ from sqlalchemy.orm import Session
 from app.api.v1.response import success_response
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
+from app.models import Project
 from app.models import Review
+from app.models import User
 from app.models import UserRatingAggregate
 
 router = APIRouter()
@@ -78,8 +80,31 @@ async def list_project_reviews(project_id: int, db: Session = Depends(get_db)) -
     - path의 `project_id`를 전달합니다.
     - 최신 리뷰부터 반환합니다.
     """
-    reviews = db.query(Review).filter(Review.project_id == project_id).order_by(Review.id.desc()).all()
-    return success_response(data=[{"id": r.id, "reviewer_id": r.reviewer_id, "reviewee_id": r.reviewee_id, "comment": r.comment} for r in reviews])
+    reviews = db.query(Review).filter(Review.project_id == project_id).order_by(Review.created_at.desc()).all()
+    result = []
+    for review in reviews:
+        reviewer = db.get(User, review.reviewer_id)
+        reviewee = db.get(User, review.reviewee_id)
+        result.append(
+            {
+                "id": review.id,
+                "reviewer": {
+                    "id": reviewer.id,
+                    "nickname": reviewer.nickname,
+                    "avatar_url": reviewer.avatar_url,
+                },
+                "reviewee": {
+                    "id": reviewee.id,
+                    "nickname": reviewee.nickname,
+                },
+                "teamwork_score": review.teamwork_score,
+                "contribution_score": review.contribution_score,
+                "responsibility_score": review.responsibility_score,
+                "comment": review.comment,
+                "created_at": review.created_at,
+            }
+        )
+    return success_response(data=result)
 
 
 @router.get("/users/{user_id}", summary="사용자 리뷰 목록", description="특정 사용자가 받은 리뷰 목록을 조회합니다.")
@@ -90,8 +115,39 @@ async def list_user_reviews(user_id: int, db: Session = Depends(get_db)) -> dict
     - path의 `user_id`를 전달합니다.
     - 해당 사용자가 reviewee인 리뷰를 최신순으로 반환합니다.
     """
-    reviews = db.query(Review).filter(Review.reviewee_id == user_id).order_by(Review.id.desc()).all()
-    return success_response(data=[{"id": r.id, "reviewer_id": r.reviewer_id, "comment": r.comment} for r in reviews])
+@router.get("/users/{user_id}", summary="사용자 리뷰 목록", description="특정 사용자가 받은 리뷰 목록을 조회합니다.")
+async def list_user_reviews(user_id: int, db: Session = Depends(get_db)) -> dict:
+    """사용자 수신 리뷰 목록 API.
+
+    Swagger 테스트 방법:
+    - path의 `user_id`를 전달합니다.
+    - 해당 사용자가 reviewee인 리뷰를 최신순으로 반환합니다.
+    """
+    reviews = db.query(Review).filter(Review.reviewee_id == user_id).order_by(Review.created_at.desc()).all()
+    result = []
+    for review in reviews:
+        reviewer = db.get(User, review.reviewer_id)
+        project = db.get(Project, review.project_id)
+        result.append(
+            {
+                "id": review.id,
+                "reviewer": {
+                    "id": reviewer.id,
+                    "nickname": reviewer.nickname,
+                    "avatar_url": reviewer.avatar_url,
+                },
+                "project": {
+                    "id": project.id,
+                    "title": project.title,
+                },
+                "teamwork_score": review.teamwork_score,
+                "contribution_score": review.contribution_score,
+                "responsibility_score": review.responsibility_score,
+                "comment": review.comment,
+                "created_at": review.created_at,
+            }
+        )
+    return success_response(data=result)
 
 
 @router.get("/users/{user_id}/rating", summary="사용자 평점 조회", description="사용자 평점 집계 정보를 조회합니다.")

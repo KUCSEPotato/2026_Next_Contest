@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Body, Depends, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.v1.response import success_response
 from app.db.session import get_db
 from app.models import Project
+from app.models import ProjectMember
 from app.models import User
 
 router = APIRouter()
@@ -25,20 +27,30 @@ async def recommend_projects_llm(
     - 공개 프로젝트를 기준으로 조건 필터 후 최신순 추천 결과를 반환합니다.
     """
     preferred_difficulty = payload.get("difficulty")
-    query = db.query(Project).filter(Project.is_public.is_(True))
+    query = db.query(Project).filter(
+        Project.is_public.is_(True),
+        Project.deleted_at.is_(None)
+    )
     if preferred_difficulty:
         query = query.filter(Project.difficulty == preferred_difficulty)
     projects = query.order_by(Project.created_at.desc()).limit(limit).all()
-    return success_response(
-        data=[
-            {
-                "project_id": p.id,
-                "title": p.title,
-                "reason": f"{p.difficulty} 난이도와 최근 활성 프로젝트 기준 추천",
-            }
-            for p in projects
-        ]
-    )
+    
+    data = []
+    for p in projects:
+        current_members = db.query(func.count(ProjectMember.id)).filter(
+            ProjectMember.project_id == p.id,
+            ProjectMember.left_at.is_(None)
+        ).scalar() or 0
+        data.append({
+            "project_id": p.id,
+            "title": p.title,
+            "difficulty": p.difficulty,
+            "currentMembers": current_members,
+            "maxMembers": p.max_members,
+            "reason": f"{p.difficulty} 난이도와 최근 활성 프로젝트 기준 추천",
+        })
+    
+    return success_response(data=data)
 
 
 @router.post("/teammates", summary="팀원 추천", description="포지션 기반 팀원 후보를 추천합니다.")

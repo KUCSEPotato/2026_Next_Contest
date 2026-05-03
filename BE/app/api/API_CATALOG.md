@@ -34,8 +34,11 @@
 - GET /users/{user_id}/profile: 공개 프로필 조회
 - GET /users/{user_id}/stats: 활동 통계 조회
 - GET /users/{user_id}/projects: 사용자 프로젝트 이력
+- GET /users/me/reviews: **내가 받은 리뷰 목록**(마이페이지용)
 - POST /users/me/skills: 기술 스택 등록
 - DELETE /users/me/skills/{skill_id}: 기술 스택 제거
+- POST /users/me/interests: 관심 분야 등록
+- DELETE /users/me/interests/{interest_id}: 관심 분야 제거
 - GET /users/me/reputation: 리뷰 기반 신뢰도/평점 요약
 
 ## 3) Ideas
@@ -104,8 +107,8 @@
 ## 7) Reviews
 
 - POST /reviews/projects/{project_id}: 프로젝트 컨텍스트 리뷰 작성
-- GET /reviews/projects/{project_id}: 프로젝트 리뷰 목록
-- GET /reviews/users/{user_id}: 사용자 수신 리뷰 목록
+- GET /reviews/projects/{project_id}: 프로젝트 리뷰 목록(reviewer/reviewee/scores/comment 포함)
+- GET /reviews/users/{user_id}: 사용자 수신 리뷰 목록(reviewer 정보/프로젝트 정보 포함)
 - GET /reviews/users/{user_id}/rating: 사용자 평점 집계 조회
 
 ## 8) Search

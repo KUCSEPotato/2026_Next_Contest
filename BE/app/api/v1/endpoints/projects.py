@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
+from math import ceil
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlalchemy import func
@@ -14,6 +15,8 @@ from app.models import Project
 from app.models import ProjectMember
 from app.models import ProjectMilestone
 from app.models import ProjectRecruitment
+from app.models import ProjectSkill
+from app.models import Skill
 from app.models import Retrospective
 from app.models import Review
 from app.models import Todo
@@ -25,10 +28,46 @@ from app.schemas import MilestoneUpdateRequest
 from app.schemas import ProjectCreateRequest
 from app.schemas import ProjectStatusUpdateRequest
 from app.schemas import ProjectUpdateRequest
+from app.schemas import RecruitmentCreateRequest
+from app.schemas import RecruitmentUpdateRequest
 from app.schemas import TodoCreateRequest
 from app.schemas import TodoUpdateRequest
 
 router = APIRouter()
+
+
+def _calculate_days_left(deadline: date | None) -> int | None:
+    """마감일까지 남은 일수를 계산합니다. deadline이 None이면 None 반환."""
+    if deadline is None:
+        return None
+    days = (deadline - date.today()).days
+    return max(0, days)
+
+
+def _is_urgent(deadline: date | None) -> bool:
+    """마감일이 7일 이내면 긴급 표시. deadline이 None이면 False."""
+    if deadline is None:
+        return False
+    days_left = _calculate_days_left(deadline)
+    return 0 <= days_left <= 7
+
+
+def _build_recruitment_response(recruitment: ProjectRecruitment) -> dict:
+    """recruitment 응답을 빌드합니다."""
+    days_left = _calculate_days_left(recruitment.deadline)
+    return {
+        "id": recruitment.id,
+        "position_name": recruitment.position_name,
+        "required_count": recruitment.required_count,
+        "difficulty": recruitment.difficulty,
+        "category": recruitment.category,
+        "summary": recruitment.summary,
+        "status": recruitment.status,
+        "deadline": recruitment.deadline.isoformat() if recruitment.deadline else None,
+        "daysLeft": days_left,
+        "isUrgent": _is_urgent(recruitment.deadline),
+        "description": recruitment.description,
+    }
 
 
 def _get_project_or_404(db: Session, project_id: int) -> Project:
@@ -79,6 +118,7 @@ async def create_project(
         difficulty=payload.difficulty,
         status=payload.status,
         progress_percent=payload.progress_percent,
+        max_members=payload.max_members,
         is_public=payload.is_public,
     )
     db.add(project)
@@ -87,7 +127,7 @@ async def create_project(
     db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
     db.commit()
     db.refresh(project)
-    return success_response(data={"id": project.id, "title": project.title})
+    return success_response(data={"id": project.id, "title": project.title, "max_members": project.max_members})
 
 
 @router.get("", summary="프로젝트 목록", description="프로젝트 목록을 페이지네이션과 상태 필터로 조회합니다.")
@@ -110,18 +150,26 @@ async def list_projects(
 
     total = query.count()
     projects = query.order_by(Project.created_at.desc()).offset((page - 1) * size).limit(size).all()
+    
+    data = []
+    for p in projects:
+        current_members = db.query(func.count(ProjectMember.id)).filter(
+            ProjectMember.project_id == p.id,
+            ProjectMember.left_at.is_(None)
+        ).scalar() or 0
+        data.append({
+            "id": p.id,
+            "title": p.title,
+            "status": p.status,
+            "difficulty": p.difficulty,
+            "progress_percent": float(p.progress_percent),
+            "leader_id": p.leader_id,
+            "currentMembers": current_members,
+            "maxMembers": p.max_members,
+        })
+    
     return success_response(
-        data=[
-            {
-                "id": p.id,
-                "title": p.title,
-                "status": p.status,
-                "difficulty": p.difficulty,
-                "progress_percent": float(p.progress_percent),
-                "leader_id": p.leader_id,
-            }
-            for p in projects
-        ],
+        data=data,
         meta={"page": page, "size": size, "total": total},
     )
 
@@ -136,6 +184,13 @@ async def get_project(project_id: int, db: Session = Depends(get_db)) -> dict:
     """
     project = _get_project_or_404(db, project_id)
     members = db.query(ProjectMember).filter(ProjectMember.project_id == project_id, ProjectMember.left_at.is_(None)).all()
+    
+    # Get tech_stack from project_skills
+    tech_stack = db.query(Skill.name).join(
+        ProjectSkill, ProjectSkill.skill_id == Skill.id
+    ).filter(ProjectSkill.project_id == project_id).all()
+    tech_stack_list = [s[0] for s in tech_stack]
+    
     return success_response(
         data={
             "id": project.id,
@@ -146,6 +201,9 @@ async def get_project(project_id: int, db: Session = Depends(get_db)) -> dict:
             "difficulty": project.difficulty,
             "progress_percent": float(project.progress_percent),
             "leader_id": project.leader_id,
+            "currentMembers": len(members),
+            "maxMembers": project.max_members,
+            "techStack": tech_stack_list,
             "members": [{"user_id": m.user_id, "role_in_project": m.role_in_project} for m in members],
         }
     )
@@ -364,7 +422,7 @@ async def get_project_progress(project_id: int, db: Session = Depends(get_db)) -
 @router.post("/{project_id}/recruitments", summary="재모집 포지션 생성", description="리더가 결원 포지션에 대한 재모집을 생성합니다.")
 async def create_recruitment(
     project_id: int,
-    payload: dict = Body(default={}),
+    payload: RecruitmentCreateRequest,
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -372,30 +430,30 @@ async def create_recruitment(
 
     Swagger 테스트 방법:
     - body `position_name`은 필수입니다.
+    - `deadline`은 선택입니다.
     """
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
-    if not payload.get("position_name"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="position_name is required")
 
     recruitment = ProjectRecruitment(
         project_id=project_id,
-        position_name=payload["position_name"],
-        required_count=payload.get("required_count", 1),
-        status=payload.get("status", "open"),
-        description=payload.get("description"),
+        position_name=payload.position_name,
+        required_count=payload.required_count,
+        status=payload.status,
+        deadline=payload.deadline,
+        description=payload.description,
     )
     db.add(recruitment)
     db.commit()
     db.refresh(recruitment)
-    return success_response(data={"id": recruitment.id, "status": recruitment.status})
+    return success_response(data=_build_recruitment_response(recruitment))
 
 
-@router.patch("/{project_id}/recruitments/{recruitment_id}", summary="재모집 수정", description="재모집의 상태/인원/설명을 갱신합니다.")
+@router.patch("/{project_id}/recruitments/{recruitment_id}", summary="재모집 수정", description="재모집의 상태/인원/설명/마감일을 갱신합니다.")
 async def update_recruitment(
     project_id: int,
     recruitment_id: int,
-    payload: dict = Body(default={}),
+    payload: RecruitmentUpdateRequest,
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -407,12 +465,12 @@ async def update_recruitment(
     if recruitment is None or recruitment.project_id != project_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recruitment not found")
 
-    for field in ("position_name", "required_count", "status", "description"):
-        if field in payload:
-            setattr(recruitment, field, payload[field])
+    for field, value in payload.model_dump(exclude_none=True).items():
+        setattr(recruitment, field, value)
 
     db.commit()
-    return success_response(data={"id": recruitment.id, "updated": True})
+    db.refresh(recruitment)
+    return success_response(data=_build_recruitment_response(recruitment))
 
 
 @router.post("/{project_id}/invite", summary="멤버 초대", description="리더가 특정 유저를 프로젝트로 초대합니다.")
