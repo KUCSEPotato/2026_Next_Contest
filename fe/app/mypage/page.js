@@ -8,12 +8,35 @@ import {
   getUserProjectsApi,
 } from "../../lib/api";
 
+const MOCK_REVIEWS = [
+  {
+    id: 1,
+    projectTitle: "Devory 앱 개발",
+    reviewerName: "팀원 A",
+    teamworkScore: 5,
+    contributionScore: 4,
+    responsibilityScore: 5,
+    comment: "UI 구현을 빠르게 진행했고, 팀원들과 소통도 원활했습니다.",
+  },
+  {
+    id: 2,
+    projectTitle: "AI 코드 리뷰 봇",
+    reviewerName: "팀원 B",
+    teamworkScore: 4,
+    contributionScore: 5,
+    responsibilityScore: 4,
+    comment: "문제 해결 과정에서 적극적으로 의견을 냈습니다.",
+  },
+];
+
 export default function MyPage() {
   const [profile, setProfile] = useState(null);
   const [reputation, setReputation] = useState(null);
   const [stats, setStats] = useState(null);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showReviews, setShowReviews] = useState(false);
+
 
   useEffect(() => {
     async function loadMyPage() {
@@ -100,12 +123,68 @@ export default function MyPage() {
             value={stats?.completed_projects ?? 0}
             description="완료 상태 프로젝트"
           />
-          <StatCard
-            title="받은 리뷰"
-            value={stats?.review_received ?? 0}
-            description="팀원에게 받은 리뷰"
-          />
+
+          <button
+            onClick={() => setShowReviews(!showReviews)}
+            className="rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-50"
+          >
+            <p className="text-sm font-semibold text-slate-500">받은 리뷰</p>
+            <p className="mt-3 text-3xl font-bold text-slate-900">
+              {stats?.review_received ?? 0}
+            </p>
+            <p className="mt-2 text-sm text-slate-500">팀원에게 받은 리뷰</p>
+          </button>
         </section>
+
+        {showReviews && (
+          <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-slate-900">받은 리뷰 목록</h2>
+              <button
+                onClick={() => setShowReviews(false)}
+                className="text-sm font-semibold text-slate-400 hover:text-slate-600"
+              >
+                닫기
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {MOCK_REVIEWS.map((review) => (
+                <div
+                  key={review.id}
+                  className="rounded-xl border border-slate-200 bg-slate-50 p-5"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-semibold text-slate-900">
+                        {review.projectTitle}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        작성자: {review.reviewerName}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                      <span className="rounded-full bg-blue-50 px-2 py-1 text-blue-700">
+                        협업 {review.teamworkScore}
+                      </span>
+                      <span className="rounded-full bg-green-50 px-2 py-1 text-green-700">
+                        기여 {review.contributionScore}
+                      </span>
+                      <span className="rounded-full bg-purple-50 px-2 py-1 text-purple-700">
+                        책임 {review.responsibilityScore}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="mt-4 text-sm leading-6 text-slate-700">
+                    {review.comment}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-bold text-slate-900">신뢰도</h2>
@@ -137,7 +216,9 @@ export default function MyPage() {
                   </span>
                 ))
               ) : (
-                <p className="text-sm text-slate-500">등록된 기술 스택이 없습니다.</p>
+                <p className="text-sm text-slate-500">
+                  등록된 기술 스택이 없습니다.
+                </p>
               )}
             </div>
           </section>
@@ -156,7 +237,9 @@ export default function MyPage() {
                   </span>
                 ))
               ) : (
-                <p className="text-sm text-slate-500">등록된 관심 분야가 없습니다.</p>
+                <p className="text-sm text-slate-500">
+                  등록된 관심 분야가 없습니다.
+                </p>
               )}
             </div>
           </section>
@@ -189,7 +272,9 @@ export default function MyPage() {
                 </div>
               ))
             ) : (
-              <p className="text-sm text-slate-500">아직 프로젝트 이력이 없습니다.</p>
+              <p className="text-sm text-slate-500">
+                아직 프로젝트 이력이 없습니다.
+              </p>
             )}
           </div>
         </section>

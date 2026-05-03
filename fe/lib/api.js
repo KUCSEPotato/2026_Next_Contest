@@ -141,7 +141,7 @@ export async function createIdeaApi(payload) {
   
     return res.json();
   }
-
+/*
   export async function getMyProfileApi() {
     const token = localStorage.getItem("access_token");
   
@@ -193,8 +193,8 @@ export async function createIdeaApi(payload) {
   
     return res.json();
   }
-
-/* 마이페이지 목업용
+*/
+// 마이페이지 목업용
 export async function getMyProfileApi() {
     return {
       success: true,
@@ -256,4 +256,4 @@ export async function getMyProfileApi() {
       ],
     };
   }
-*/
+
