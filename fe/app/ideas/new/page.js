@@ -46,7 +46,7 @@ export default function NewIdeaPage() {
     <main className="min-h-screen bg-slate-50 px-6 py-10">
       <div className="mx-auto w-full max-w-5xl">
         <div className="mb-8">
-          <p className="mb-2 text-sm font-semibold text-blue-600">
+          <p className="mb-2 text-sm font-semibold text-red-600">
             Devory Idea Posting
           </p>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">
@@ -67,7 +67,7 @@ export default function NewIdeaPage() {
                 프로젝트 주제
               </label>
               <input
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="예: Devory 앱 개발"
@@ -80,7 +80,7 @@ export default function NewIdeaPage() {
                 한 줄 요약
               </label>
               <input
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
                 placeholder="아이디어를 짧게 설명해주세요"
@@ -93,7 +93,7 @@ export default function NewIdeaPage() {
                 상세 설명
               </label>
               <textarea
-                className="min-h-40 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                className="min-h-40 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="프로젝트 목적, 주요 기능, 기대 효과를 적어주세요"
@@ -106,7 +106,7 @@ export default function NewIdeaPage() {
                 관련 분야
               </label>
               <select
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
                 value={domain}
                 onChange={(e) => setDomain(e.target.value)}
               >
@@ -124,7 +124,7 @@ export default function NewIdeaPage() {
                 난이도
               </label>
               <select
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
                 value={difficulty}
                 onChange={(e) => setDifficulty(e.target.value)}
               >
@@ -139,7 +139,7 @@ export default function NewIdeaPage() {
                 모집 인원
               </label>
               <input
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
                 type="number"
                 min="1"
                 value={requiredMembers}
@@ -152,7 +152,7 @@ export default function NewIdeaPage() {
                 기술 스택
               </label>
               <input
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
                 value={techStack}
                 onChange={(e) => setTechStack(e.target.value)}
                 placeholder="예: React, FastAPI, PostgreSQL"
@@ -164,7 +164,7 @@ export default function NewIdeaPage() {
                 해시태그
               </label>
               <input
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
                 value={hashtags}
                 onChange={(e) => setHashtags(e.target.value)}
                 placeholder="예: 협업, 초보환영, AI추천"
@@ -185,7 +185,7 @@ export default function NewIdeaPage() {
             </button>
             <button
               type="submit"
-              className="rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-blue-700"
+              className="rounded-xl bg-red-600 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-red-700"
             >
               등록하기
             </button>

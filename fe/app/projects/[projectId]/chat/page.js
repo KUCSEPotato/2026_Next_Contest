@@ -53,7 +53,7 @@ export default function ProjectChatRoomsPage() {
     <main className="min-h-screen bg-slate-50 px-6 py-10">
       <div className="mx-auto w-full max-w-4xl">
         <div className="mb-8">
-          <p className="text-sm font-semibold text-blue-600">
+          <p className="text-sm font-semibold text-red-600">
             Project #{projectId}
           </p>
           <h1 className="mt-2 text-3xl font-bold text-slate-900">
@@ -69,7 +69,7 @@ export default function ProjectChatRoomsPage() {
 
           <div className="mt-4 flex gap-3">
             <input
-              className="flex-1 rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+              className="flex-1 rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
               value={roomName}
               onChange={(e) => setRoomName(e.target.value)}
               placeholder="예: 팀장 문의방"
@@ -77,7 +77,7 @@ export default function ProjectChatRoomsPage() {
 
             <button
               onClick={handleCreateRoom}
-              className="rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white transition hover:bg-blue-700"
+              className="rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
             >
               생성
             </button>
@@ -97,7 +97,7 @@ export default function ProjectChatRoomsPage() {
                 <button
                   key={room.id}
                   onClick={() => router.push(`/chat/${room.id}`)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-left transition hover:border-red-300 hover:bg-red-50"
                 >
                   <div className="flex items-center justify-between">
                     <div>
