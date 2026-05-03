@@ -59,3 +59,85 @@ export async function createIdeaApi(payload) {
   
     return res.json();
   }
+
+  export async function getChatRoomsApi(projectId) {
+    const token = localStorage.getItem("access_token");
+  
+    const res = await fetch(
+      `http://localhost:8000/api/v1/chats/projects/${projectId}/rooms`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+  
+    if (!res.ok) {
+      throw new Error("채팅방 목록을 불러오지 못했습니다.");
+    }
+  
+    return res.json();
+  }
+  
+  export async function createChatRoomApi(projectId, name) {
+    const token = localStorage.getItem("access_token");
+  
+    const res = await fetch(
+      `http://localhost:8000/api/v1/chats/projects/${projectId}/rooms`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name }),
+      }
+    );
+  
+    if (!res.ok) {
+      throw new Error("채팅방 생성에 실패했습니다.");
+    }
+  
+    return res.json();
+  }
+  
+  export async function getMessagesApi(roomId) {
+    const token = localStorage.getItem("access_token");
+  
+    const res = await fetch(
+      `http://localhost:8000/api/v1/chats/rooms/${roomId}/messages`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+  
+    if (!res.ok) {
+      throw new Error("메시지를 불러오지 못했습니다.");
+    }
+  
+    return res.json();
+  }
+  
+  export async function sendMessageApi(roomId, message) {
+    const token = localStorage.getItem("access_token");
+  
+    const res = await fetch(
+      `http://localhost:8000/api/v1/chats/rooms/${roomId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ message }),
+      }
+    );
+  
+    if (!res.ok) {
+      throw new Error("메시지 전송에 실패했습니다.");
+    }
+  
+    return res.json();
+  }
