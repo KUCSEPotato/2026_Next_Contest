@@ -114,7 +114,7 @@ const DIFFICULTY_COLOR = {
 
 // ─── 로그인 상태 (실제 구현 시 NextAuth useSession으로 교체) ───
 const useAuth = () => {
-  const [isLoggedIn] = useState(false) // TODO: useSession()으로 교체
+  const [isLoggedIn] = useState(true) // TODO: useSession()으로 교체
   const userName = isLoggedIn ? '정민' : null
   return { isLoggedIn, userName }
 }
@@ -158,82 +158,6 @@ export default function MainPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-
-      {/* ── 네비게이션 바 ─────────────────────────────────────── */}
-      <nav className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
-          {/* 로고 */}
-          <button
-            onClick={() => router.push('/')}
-            className="flex items-center gap-2 flex-shrink-0"
-          >
-            <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center">
-              <span className="text-white text-xs font-bold">D</span>
-            </div>
-            <span className="font-semibold text-gray-900 text-sm hidden sm:block">Devory</span>
-          </button>
-
-          {/* 검색창 — 클릭 시 검색 페이지로 이동 */}
-          <div className="flex-1 max-w-md relative">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input
-              type="text"
-              placeholder="프로젝트 또는 기술스택 검색"
-              readOnly
-              onClick={() => router.push('/search')}
-              className="w-full pl-9 pr-4 py-2 text-sm bg-gray-100 border border-transparent rounded-xl focus:outline-none focus:border-blue-400 focus:bg-white transition-all cursor-pointer"
-            />
-          </div>
-
-          {/* 우측 버튼 */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {isLoggedIn ? (
-              <>
-                {/* 알림 */}
-                <div className="relative">
-                  <button
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-gray-100 transition relative"
-                  >
-                    <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                    </svg>
-                    {/* 알림 뱃지 */}
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-                  </button>
-                </div>
-                {/* 마이페이지 */}
-                <button
-                  onClick={() => router.push('/mypage')}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-gray-100 transition"
-                >
-                  <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-medium">
-                    {userName?.[0]}
-                  </div>
-                  <span className="text-sm font-medium text-gray-700 hidden sm:block">{userName}</span>
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => router.push('/login')}
-                  className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 transition"
-                >
-                  로그인
-                </button>
-                <button
-                  onClick={() => router.push('/onboarding/step1')}
-                  className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition"
-                >
-                  회원가입
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </nav>
 
       <main className="max-w-6xl mx-auto px-4 pb-16">
 

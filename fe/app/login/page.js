@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { saveToken } from "../../lib/auth";
 
 export default function LoginPage() {
@@ -16,12 +17,23 @@ export default function LoginPage() {
     saveToken(fakeToken);
 
     console.log("로그인:", email, password);
-    router.push("/");
+    router.push("/mainpage");
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-100">
+    <main className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg">
+
+        {/* 🔥 로고 */}
+        <div className="mb-6 flex justify-center">
+          <Image
+            src="/logo_colored.svg"
+            alt="Devory 로고"
+            width={100}
+            height={50}
+            priority
+          />
+        </div>
 
         {/* 제목 */}
         <h1 className="text-2xl font-bold text-slate-900 text-center">
@@ -55,7 +67,7 @@ export default function LoginPage() {
         {/* 버튼 */}
         <button
           onClick={handleLogin}
-          className="mt-6 w-full rounded-lg bg-blue-600 py-2 font-semibold text-white transition hover:bg-blue-700"
+          className="mt-6 w-full rounded-lg bg-red-600 py-2 font-semibold text-white hover:bg-red-700"
         >
           로그인
         </button>
@@ -63,7 +75,10 @@ export default function LoginPage() {
         {/* 추가 링크 */}
         <div className="mt-4 text-center text-sm text-slate-500">
           계정이 없으신가요?{" "}
-          <span className="text-blue-600 hover:underline cursor-pointer">
+          <span
+            onClick={() => router.push("/signup")}
+            className="cursor-pointer text-blue-600 hover:underline"
+          >
             회원가입
           </span>
         </div>
