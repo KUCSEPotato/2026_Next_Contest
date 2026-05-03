@@ -286,6 +286,7 @@ class Review(Base):
     contribution_score: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     responsibility_score: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     comment: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class UserRatingAggregate(Base):
