@@ -61,7 +61,7 @@ export default function ProjectDetailPage() {
       <div className="mx-auto w-full max-w-5xl">
         <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
           <div className="mb-4 flex flex-wrap items-center gap-3">
-            <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-semibold text-blue-700">
+            <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-semibold text-red-700">
               {project.status}
             </span>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
@@ -82,7 +82,7 @@ export default function ProjectDetailPage() {
             </div>
             <div className="h-3 overflow-hidden rounded-full bg-slate-200">
               <div
-                className="h-full rounded-full bg-blue-600"
+                className="h-full rounded-full bg-red-600"
                 style={{ width: `${project.progress_percent}%` }}
               />
             </div>
@@ -137,7 +137,7 @@ export default function ProjectDetailPage() {
               </p>
 
               <textarea
-                className="mt-4 min-h-32 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                className="mt-4 min-h-32 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="예: React와 UI 구현을 맡아 참여하고 싶습니다."
@@ -146,7 +146,7 @@ export default function ProjectDetailPage() {
               <button
                 onClick={handleApply}
                 disabled={isApplying}
-                className="mt-4 w-full rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                className="mt-4 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
               >
                 {isApplying ? "지원 중..." : "지원하기"}
               </button>

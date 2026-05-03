@@ -178,8 +178,8 @@ export default function MainPage() {
                 onClick={() => setSelectedCategory(selectedCategory === cat.label ? null : cat.label)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all
                   ${selectedCategory === cat.label
-                    ? 'bg-blue-600 border-blue-600 text-white'
-                    : 'bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600'
+                    ? 'bg-red-600 border-red-600 text-white'
+                    : 'bg-white border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-600'
                   }`}
               >
                 <span>{cat.emoji}</span>
@@ -197,7 +197,7 @@ export default function MainPage() {
                 {isLoggedIn ? `${userName}님을 위한 추천` : '인기 프로젝트'}
               </span>
               {isLoggedIn && (
-                <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                <span className="text-xs font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
                   AI 추천
                 </span>
               )}
@@ -258,12 +258,12 @@ export default function MainPage() {
         </section>
 
         {/* ── 아이디어 등록 배너 ────────────────────────────────── */}
-        <section className="rounded-2xl bg-blue-600 p-6 sm:p-8 text-white text-center">
+        <section className="rounded-2xl bg-red-600 p-6 sm:p-8 text-white text-center">
           <p className="text-lg sm:text-xl font-bold mb-2">팀이 없어도 괜찮아요</p>
-          <p className="text-sm text-blue-100 mb-5">아이디어만 있으면 Devory가 팀을 만들어드려요</p>
+          <p className="text-sm text-red-100 mb-5">아이디어만 있으면 Devory가 팀을 만들어드려요</p>
           <button
             onClick={() => { if (!handleProtectedAction()) return; router.push('/ideas/new') }}
-            className="px-6 py-2.5 bg-white text-blue-600 rounded-xl text-sm font-semibold hover:bg-blue-50 transition"
+            className="px-6 py-2.5 bg-white text-red-600 rounded-xl text-sm font-semibold hover:bg-red-50 transition"
           >
             아이디어 등록하기 →
           </button>
@@ -299,7 +299,7 @@ function ProjectCard({
     <div
       onClick={onClick}
       className={`
-        bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all cursor-pointer flex-shrink-0 flex flex-col
+        bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-red-200 transition-all cursor-pointer flex-shrink-0 flex flex-col
         ${variant === 'scroll' ? 'w-64 sm:w-72 p-4' : 'w-full p-4'}
       `}
     >
@@ -307,7 +307,7 @@ function ProjectCard({
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex flex-wrap gap-1">
           {/* 카테고리 */}
-          <span className="text-[10px] font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+          <span className="text-[10px] font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
             {project.category}
           </span>
           {/* 마감 임박 뱃지 */}
@@ -349,7 +349,7 @@ function ProjectCard({
         {/* 참여 버튼 */}
         <button
           onClick={onApply}
-          className="px-3 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition"
+          className="px-3 py-1 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition"
         >
           참여하기
         </button>
@@ -366,7 +366,7 @@ function LoginModal({ onClose, onLogin }: { onClose: () => void; onLogin: () => 
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
       {/* 모달 */}
       <div className="relative bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl text-center">
-        <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-4">
+        <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
           <span className="text-2xl">🔒</span>
         </div>
         <h2 className="text-base font-bold text-gray-900 mb-2">로그인이 필요한 서비스예요</h2>
@@ -382,7 +382,7 @@ function LoginModal({ onClose, onLogin }: { onClose: () => void; onLogin: () => 
           </button>
           <button
             onClick={onLogin}
-            className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-sm font-medium text-white transition"
+            className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-medium text-white transition"
           >
             로그인하기
           </button>

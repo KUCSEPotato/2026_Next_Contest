@@ -141,7 +141,7 @@ export async function createIdeaApi(payload) {
   
     return res.json();
   }
-/*
+/* 마이페이지! (목업용 지우고 쓰기)
   export async function getMyProfileApi() {
     const token = localStorage.getItem("access_token");
   
@@ -193,8 +193,9 @@ export async function createIdeaApi(payload) {
   
     return res.json();
   }
+    
 */
-// 마이페이지 목업용
+// 아래는 마이페이지 목업용임.
 export async function getMyProfileApi() {
     return {
       success: true,

@@ -9,7 +9,7 @@ export default function ProjectManagePage() {
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
       <div className="mx-auto w-full max-w-5xl rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-        <p className="text-sm font-semibold text-blue-600">
+        <p className="text-sm font-semibold text-red-600">
           Project #{projectId}
         </p>
         <h1 className="mt-2 text-3xl font-bold text-slate-900">

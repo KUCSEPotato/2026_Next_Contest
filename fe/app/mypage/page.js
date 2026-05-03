@@ -68,7 +68,7 @@ export default function MyPage() {
         {/* 프로필 */}
         <section className="mb-6 rounded-2xl border bg-white p-8 shadow-sm">
           <div className="flex gap-6 items-center">
-            <div className="h-24 w-24 rounded-full bg-blue-100 flex items-center justify-center text-3xl font-bold text-blue-600">
+            <div className="h-24 w-24 rounded-full bg-red-100 flex items-center justify-center text-3xl font-bold text-red-600">
               {profile?.nickname?.[0]}
             </div>
 
@@ -96,7 +96,7 @@ export default function MyPage() {
           {/* 받은 리뷰 클릭 */}
           <button
             onClick={() => setShowReviews(!showReviews)}
-            className="bg-white p-6 rounded-2xl shadow hover:bg-blue-50 text-left"
+            className="bg-white p-6 rounded-2xl shadow hover:bg-red-50 text-left"
           >
             <p className="text-sm text-slate-500">받은 리뷰</p>
             <p className="text-3xl font-bold">
@@ -162,7 +162,7 @@ export default function MyPage() {
                 <button
                     key={project.id}
                     onClick={() => router.push(`/projects/${project.id}`)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-left transition hover:border-red-300 hover:bg-red-50"
                     >
                     <div className="flex items-center justify-between gap-4">
                         <div>
@@ -184,7 +184,7 @@ export default function MyPage() {
                             e.stopPropagation();
                             router.push(`/projects/${project.id}/manage`);
                             }}
-                            className="rounded-lg bg-blue-600 px-3 py-1 text-sm font-semibold text-white hover:bg-blue-700"
+                            className="rounded-lg bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-700"
                         >
                             진행 관리
                         </span>
