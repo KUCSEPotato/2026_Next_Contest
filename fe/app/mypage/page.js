@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   getMyProfileApi,
   getMyReputationApi,
@@ -10,11 +11,14 @@ import {
 } from "../../lib/api";
 
 export default function MyPage() {
+  const router = useRouter();
+
   const [profile, setProfile] = useState(null);
   const [reputation, setReputation] = useState(null);
   const [stats, setStats] = useState(null);
   const [projects, setProjects] = useState([]);
   const [reviews, setReviews] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [showReviews, setShowReviews] = useState(false);
 
@@ -57,254 +61,162 @@ export default function MyPage() {
     );
   }
 
-  if (!profile) {
-    return (
-      <main className="min-h-screen bg-slate-50 px-6 py-10">
-        <p className="text-slate-500">프로필 정보가 없습니다.</p>
-      </main>
-    );
-  }
-
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
       <div className="mx-auto w-full max-w-5xl">
-        <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
-            <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-3xl font-bold text-blue-600">
-              {profile.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  alt="profile"
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                profile.nickname?.[0] || "D"
-              )}
+
+        {/* 프로필 */}
+        <section className="mb-6 rounded-2xl border bg-white p-8 shadow-sm">
+          <div className="flex gap-6 items-center">
+            <div className="h-24 w-24 rounded-full bg-blue-100 flex items-center justify-center text-3xl font-bold text-blue-600">
+              {profile?.nickname?.[0]}
             </div>
 
             <div>
-              <p className="text-sm font-semibold text-blue-600">My Page</p>
-              <h1 className="mt-1 text-3xl font-bold text-slate-900">
-                {profile.nickname || "이름 없는 사용자"}
-              </h1>
-              <p className="mt-2 text-slate-500">{profile.email}</p>
-              <p className="mt-3 max-w-2xl text-slate-700">
-                {profile.bio || "아직 자기소개가 없습니다."}
-              </p>
+              <h1 className="text-3xl font-bold">{profile?.nickname}</h1>
+              <p className="text-slate-500">{profile?.email}</p>
+              <p className="mt-2">{profile?.bio}</p>
             </div>
           </div>
         </section>
 
-        <section className="mb-6 grid gap-4 sm:grid-cols-3">
+        {/* 통계 */}
+        <section className="grid grid-cols-3 gap-4 mb-6">
+
           <StatCard
             title="리드 프로젝트"
-            value={stats?.lead_projects ?? 0}
-            description="내가 리더로 진행한 프로젝트"
+            value={stats?.lead_projects}
           />
 
           <StatCard
             title="완료 프로젝트"
-            value={stats?.completed_projects ?? 0}
-            description="완료 상태 프로젝트"
+            value={stats?.completed_projects}
           />
 
+          {/* 받은 리뷰 클릭 */}
           <button
             onClick={() => setShowReviews(!showReviews)}
-            className="rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-50"
+            className="bg-white p-6 rounded-2xl shadow hover:bg-blue-50 text-left"
           >
-            <p className="text-sm font-semibold text-slate-500">받은 리뷰</p>
-            <p className="mt-3 text-3xl font-bold text-slate-900">
-              {stats?.review_received ?? 0}
-            </p>
-            <p className="mt-2 text-sm text-slate-500">
-              팀원에게 받은 리뷰
+            <p className="text-sm text-slate-500">받은 리뷰</p>
+            <p className="text-3xl font-bold">
+              {stats?.review_received}
             </p>
           </button>
+
         </section>
 
+        {/* 리뷰 목록 */}
         {showReviews && (
-          <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-slate-900">
-                받은 리뷰 목록
-              </h2>
-
-              <button
-                onClick={() => setShowReviews(false)}
-                className="text-sm font-semibold text-slate-400 hover:text-slate-600"
-              >
-                닫기
-              </button>
-            </div>
+          <section className="mb-6 bg-white p-6 rounded-2xl shadow">
+            <h2 className="text-xl font-bold mb-4">받은 리뷰</h2>
 
             {reviews.length === 0 ? (
-              <p className="text-sm text-slate-500">
-                아직 받은 리뷰가 없습니다.
-              </p>
+              <p>리뷰 없음</p>
             ) : (
-              <div className="space-y-3">
-                {reviews.map((review) => (
-                  <div
-                    key={review.id}
-                    className="rounded-xl border border-slate-200 bg-slate-50 p-5"
-                  >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="font-semibold text-slate-900">
-                          {review.project?.title || "프로젝트 정보 없음"}
-                        </p>
+              reviews.map((review) => (
+                <div
+                  key={review.id}
+                  className="border p-4 rounded-xl mb-3"
+                >
+                  <p className="font-bold">
+                    {review.project?.title}
+                  </p>
 
-                        <p className="mt-1 text-sm text-slate-400">
-                          익명 리뷰
-                          {review.created_at
-                            ? ` • ${new Date(
-                                review.created_at
-                              ).toLocaleDateString()}`
-                            : ""}
-                        </p>
-                      </div>
+                  <p className="text-sm text-gray-400">
+                    익명 • {new Date(review.created_at).toLocaleDateString()}
+                  </p>
 
-                      <div className="flex flex-wrap gap-2 text-xs font-semibold">
-                        <span className="rounded-full bg-blue-50 px-2 py-1 text-blue-700">
-                          협업 {review.teamwork_score}
-                        </span>
-                        <span className="rounded-full bg-green-50 px-2 py-1 text-green-700">
-                          기여 {review.contribution_score}
-                        </span>
-                        <span className="rounded-full bg-purple-50 px-2 py-1 text-purple-700">
-                          책임 {review.responsibility_score}
-                        </span>
-                      </div>
-                    </div>
-
-                    <p className="mt-4 text-sm leading-6 text-slate-700">
-                      {review.comment || "작성된 코멘트가 없습니다."}
-                    </p>
+                  <div className="text-sm mt-2">
+                    협업 {review.teamwork_score} / 
+                    기여 {review.contribution_score} / 
+                    책임 {review.responsibility_score}
                   </div>
-                ))}
-              </div>
+
+                  <p className="mt-2">{review.comment}</p>
+                </div>
+              ))
             )}
           </section>
         )}
 
-        <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-bold text-slate-900">신뢰도</h2>
+        {/* 신뢰도 */}
+        <section className="mb-6 bg-white p-6 rounded-2xl shadow">
+          <h2 className="text-xl font-bold mb-4">신뢰도</h2>
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-4">
-            <MiniStat label="종합 점수" value={reputation?.score ?? 0} />
-            <MiniStat label="협업" value={reputation?.avg_teamwork ?? 0} />
-            <MiniStat
-              label="기여도"
-              value={reputation?.avg_contribution ?? 0}
-            />
-            <MiniStat
-              label="책임감"
-              value={reputation?.avg_responsibility ?? 0}
-            />
+          <div className="grid grid-cols-4 gap-4">
+            <MiniStat label="종합" value={reputation?.score} />
+            <MiniStat label="협업" value={reputation?.avg_teamwork} />
+            <MiniStat label="기여" value={reputation?.avg_contribution} />
+            <MiniStat label="책임" value={reputation?.avg_responsibility} />
           </div>
-
-          <p className="mt-4 text-sm text-slate-500">
-            리뷰 수: {reputation?.review_count ?? 0}개
-          </p>
         </section>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-slate-900">기술 스택</h2>
+        {/* 프로젝트 이력 */}
+        <section className="bg-white p-6 rounded-2xl shadow">
+          <h2 className="text-xl font-bold mb-4">프로젝트 이력</h2>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              {profile.skills?.length ? (
-                profile.skills.map((skill) => (
-                  <span
-                    key={skill}
-                    className="rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700"
-                  >
-                    {skill}
-                  </span>
-                ))
-              ) : (
-                <p className="text-sm text-slate-500">
-                  등록된 기술 스택이 없습니다.
-                </p>
-              )}
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-slate-900">관심 분야</h2>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              {profile.interests?.length ? (
-                profile.interests.map((interest) => (
-                  <span
-                    key={interest}
-                    className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700"
-                  >
-                    {interest}
-                  </span>
-                ))
-              ) : (
-                <p className="text-sm text-slate-500">
-                  등록된 관심 분야가 없습니다.
-                </p>
-              )}
-            </div>
-          </section>
-        </div>
-
-        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-bold text-slate-900">프로젝트 이력</h2>
-
-          <div className="mt-4 space-y-3">
+          <div className="space-y-3">
             {projects.length ? (
               projects.map((project) => (
-                <div
-                  key={project.id}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4"
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="font-semibold text-slate-900">
-                        {project.title}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        난이도 {project.difficulty}
-                      </p>
-                    </div>
+                <button
+                    key={project.id}
+                    onClick={() => router.push(`/projects/${project.id}`)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                    >
+                    <div className="flex items-center justify-between gap-4">
+                        <div>
+                        <p className="font-semibold text-slate-900">
+                            {project.title}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                            난이도 {project.difficulty}
+                        </p>
+                        </div>
 
-                    <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-600">
-                      {project.status}
-                    </span>
-                  </div>
-                </div>
+                        <div className="flex items-center gap-2">
+                        <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-600">
+                            {project.status}
+                        </span>
+
+                        <span
+                            onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/projects/${project.id}/manage`);
+                            }}
+                            className="rounded-lg bg-blue-600 px-3 py-1 text-sm font-semibold text-white hover:bg-blue-700"
+                        >
+                            진행 관리
+                        </span>
+                        </div>
+                    </div>
+                    </button>
               ))
             ) : (
-              <p className="text-sm text-slate-500">
-                아직 프로젝트 이력이 없습니다.
-              </p>
+              <p>프로젝트 없음</p>
             )}
           </div>
         </section>
+
       </div>
     </main>
   );
 }
 
-function StatCard({ title, value, description }) {
+function StatCard({ title, value }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <p className="text-sm font-semibold text-slate-500">{title}</p>
-      <p className="mt-3 text-3xl font-bold text-slate-900">{value}</p>
-      <p className="mt-2 text-sm text-slate-500">{description}</p>
+    <div className="bg-white p-6 rounded-2xl shadow">
+      <p className="text-sm text-slate-500">{title}</p>
+      <p className="text-3xl font-bold">{value}</p>
     </div>
   );
 }
 
 function MiniStat({ label, value }) {
   return (
-    <div className="rounded-xl bg-slate-50 p-4">
-      <p className="text-sm text-slate-500">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-slate-900">{value}</p>
+    <div className="bg-gray-100 p-4 rounded-xl">
+      <p className="text-sm">{label}</p>
+      <p className="text-xl font-bold">{value}</p>
     </div>
   );
 }
