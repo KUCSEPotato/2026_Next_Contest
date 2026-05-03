@@ -1,16 +1,4 @@
 export async function createIdeaApi(payload) {
-    // 백엔드가 완전히 준비되기 전까지는 mock으로 처리
-    return {
-      success: true,
-      data: {
-        id: 1,
-        title: payload.title,
-      },
-    };
-  
-    /*
-    나중에 실제 백엔드 연결할 때는 위 mock return을 지우고 아래 사용
-  
     const token = localStorage.getItem("access_token");
   
     const res = await fetch("http://localhost:8000/api/v1/ideas", {
@@ -27,11 +15,9 @@ export async function createIdeaApi(payload) {
     }
   
     return res.json();
-    */
   }
-
+  
   export async function getProjectApi(projectId) {
-    // 백엔드 연결 전 mock 데이터
     return {
       success: true,
       data: {
@@ -50,33 +36,9 @@ export async function createIdeaApi(payload) {
         ],
       },
     };
-  
-    /*
-    나중에 실제 백엔드 연결 시 사용
-  
-    const res = await fetch(`http://localhost:8000/api/v1/projects/${projectId}`);
-  
-    if (!res.ok) {
-      throw new Error("프로젝트 정보를 불러오지 못했습니다.");
-    }
-  
-    return res.json();
-    */
   }
   
   export async function applyProjectApi(projectId, message) {
-    // 백엔드 연결 전 mock 응답
-    return {
-      success: true,
-      data: {
-        id: 1,
-        status: "pending",
-      },
-    };
-  
-    /*
-    나중에 실제 백엔드 연결 시 사용
-  
     const token = localStorage.getItem("access_token");
   
     const res = await fetch(
@@ -96,5 +58,4 @@ export async function createIdeaApi(payload) {
     }
   
     return res.json();
-    */
   }
