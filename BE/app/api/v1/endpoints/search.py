@@ -1,11 +1,13 @@
 from fastapi import APIRouter
 from fastapi import Depends, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.v1.response import success_response
 from app.db.session import get_db
 from app.models import Idea
 from app.models import Project
+from app.models import ProjectMember
 from app.models import Skill
 from app.models import User
 
@@ -31,7 +33,23 @@ async def search_projects(
         keyword = f"%{q}%"
         query = query.filter((Project.title.ilike(keyword)) | (Project.description.ilike(keyword)))
     projects = query.order_by(Project.created_at.desc()).limit(50).all()
-    return success_response(data=[{"id": p.id, "title": p.title, "status": p.status} for p in projects])
+    
+    data = []
+    for p in projects:
+        current_members = db.query(func.count(ProjectMember.id)).filter(
+            ProjectMember.project_id == p.id,
+            ProjectMember.left_at.is_(None)
+        ).scalar() or 0
+        data.append({
+            "id": p.id,
+            "title": p.title,
+            "status": p.status,
+            "difficulty": p.difficulty,
+            "currentMembers": current_members,
+            "maxMembers": p.max_members,
+        })
+    
+    return success_response(data=data)
 
 
 @router.get("/ideas", summary="아이디어 검색", description="키워드 기반 아이디어 검색을 수행합니다.")
