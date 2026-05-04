@@ -30,7 +30,7 @@ export default function Navbar() {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
         <button onClick={() => router.push("/mainpage")}>
           <Image
-            src="/logo_colored.png"
+            src="/logo_colored.svg"
             alt="Devory 로고"
             width={120}
             height={60}
