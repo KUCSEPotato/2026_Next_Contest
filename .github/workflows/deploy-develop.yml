@@ -88,9 +88,18 @@ jobs:
 
             FE_PORT="${DEV_FE_PORT:-3000}"
 
-            if pgrep -f "next start.*${FE_PORT}" >/dev/null 2>&1; then
-              pkill -f "next start.*${FE_PORT}" || true
-              sleep 1
+            echo "Stopping existing frontend on port ${FE_PORT}..."
+            if command -v fuser >/dev/null 2>&1; then
+              fuser -k "${FE_PORT}/tcp" || true
+            else
+              pkill -f "next start" || true
+              pkill -f "npm start" || true
             fi
 
+            sleep 2
+
+            echo "Starting frontend on port ${FE_PORT}..."
             nohup env PORT="${FE_PORT}" NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL}" npm start > fe.log 2>&1 &
+
+            sleep 2
+            tail -n 50 fe.log || true
