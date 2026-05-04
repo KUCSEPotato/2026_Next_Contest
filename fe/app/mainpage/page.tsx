@@ -114,7 +114,7 @@ const DIFFICULTY_COLOR = {
 
 // ─── 로그인 상태 (실제 구현 시 NextAuth useSession으로 교체) ───
 const useAuth = () => {
-  const [isLoggedIn] = useState(false) // TODO: useSession()으로 교체
+  const [isLoggedIn] = useState(true) // TODO: useSession()으로 교체
   const userName = isLoggedIn ? '정민' : null
   return { isLoggedIn, userName }
 }
@@ -159,82 +159,6 @@ export default function MainPage() {
   return (
     <div className="min-h-screen bg-gray-50">
 
-      {/* ── 네비게이션 바 ─────────────────────────────────────── */}
-      <nav className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
-          {/* 로고 */}
-          <button
-            onClick={() => router.push('/')}
-            className="flex items-center gap-2 flex-shrink-0"
-          >
-            <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center">
-              <span className="text-white text-xs font-bold">D</span>
-            </div>
-            <span className="font-semibold text-gray-900 text-sm hidden sm:block">Devory</span>
-          </button>
-
-          {/* 검색창 — 클릭 시 검색 페이지로 이동 */}
-          <div className="flex-1 max-w-md relative">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input
-              type="text"
-              placeholder="프로젝트 또는 기술스택 검색"
-              readOnly
-              onClick={() => router.push('/search')}
-              className="w-full pl-9 pr-4 py-2 text-sm bg-gray-100 border border-transparent rounded-xl focus:outline-none focus:border-blue-400 focus:bg-white transition-all cursor-pointer"
-            />
-          </div>
-
-          {/* 우측 버튼 */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {isLoggedIn ? (
-              <>
-                {/* 알림 */}
-                <div className="relative">
-                  <button
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-gray-100 transition relative"
-                  >
-                    <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                    </svg>
-                    {/* 알림 뱃지 */}
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-                  </button>
-                </div>
-                {/* 마이페이지 */}
-                <button
-                  onClick={() => router.push('/mypage')}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-gray-100 transition"
-                >
-                  <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-medium">
-                    {userName?.[0]}
-                  </div>
-                  <span className="text-sm font-medium text-gray-700 hidden sm:block">{userName}</span>
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => router.push('/login')}
-                  className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 transition"
-                >
-                  로그인
-                </button>
-                <button
-                  onClick={() => router.push('/onboarding/step1')}
-                  className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition"
-                >
-                  회원가입
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </nav>
-
       <main className="max-w-6xl mx-auto px-4 pb-16">
 
         {/* ── 히어로 영역 ───────────────────────────────────────── */}
@@ -254,8 +178,8 @@ export default function MainPage() {
                 onClick={() => setSelectedCategory(selectedCategory === cat.label ? null : cat.label)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all
                   ${selectedCategory === cat.label
-                    ? 'bg-blue-600 border-blue-600 text-white'
-                    : 'bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600'
+                    ? 'bg-red-600 border-red-600 text-white'
+                    : 'bg-white border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-600'
                   }`}
               >
                 <span>{cat.emoji}</span>
@@ -273,7 +197,7 @@ export default function MainPage() {
                 {isLoggedIn ? `${userName}님을 위한 추천` : '인기 프로젝트'}
               </span>
               {isLoggedIn && (
-                <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                <span className="text-xs font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
                   AI 추천
                 </span>
               )}
@@ -334,12 +258,12 @@ export default function MainPage() {
         </section>
 
         {/* ── 아이디어 등록 배너 ────────────────────────────────── */}
-        <section className="rounded-2xl bg-blue-600 p-6 sm:p-8 text-white text-center">
+        <section className="rounded-2xl bg-red-600 p-6 sm:p-8 text-white text-center">
           <p className="text-lg sm:text-xl font-bold mb-2">팀이 없어도 괜찮아요</p>
-          <p className="text-sm text-blue-100 mb-5">아이디어만 있으면 Devory가 팀을 만들어드려요</p>
+          <p className="text-sm text-red-100 mb-5">아이디어만 있으면 Devory가 팀을 만들어드려요</p>
           <button
             onClick={() => { if (!handleProtectedAction()) return; router.push('/ideas/new') }}
-            className="px-6 py-2.5 bg-white text-blue-600 rounded-xl text-sm font-semibold hover:bg-blue-50 transition"
+            className="px-6 py-2.5 bg-white text-red-600 rounded-xl text-sm font-semibold hover:bg-red-50 transition"
           >
             아이디어 등록하기 →
           </button>
@@ -375,7 +299,7 @@ function ProjectCard({
     <div
       onClick={onClick}
       className={`
-        bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all cursor-pointer flex-shrink-0 flex flex-col
+        bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-red-200 transition-all cursor-pointer flex-shrink-0 flex flex-col
         ${variant === 'scroll' ? 'w-64 sm:w-72 p-4' : 'w-full p-4'}
       `}
     >
@@ -383,7 +307,7 @@ function ProjectCard({
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex flex-wrap gap-1">
           {/* 카테고리 */}
-          <span className="text-[10px] font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+          <span className="text-[10px] font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
             {project.category}
           </span>
           {/* 마감 임박 뱃지 */}
@@ -425,7 +349,7 @@ function ProjectCard({
         {/* 참여 버튼 */}
         <button
           onClick={onApply}
-          className="px-3 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition"
+          className="px-3 py-1 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition"
         >
           참여하기
         </button>
@@ -442,7 +366,7 @@ function LoginModal({ onClose, onLogin }: { onClose: () => void; onLogin: () => 
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
       {/* 모달 */}
       <div className="relative bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl text-center">
-        <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-4">
+        <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
           <span className="text-2xl">🔒</span>
         </div>
         <h2 className="text-base font-bold text-gray-900 mb-2">로그인이 필요한 서비스예요</h2>
@@ -458,7 +382,7 @@ function LoginModal({ onClose, onLogin }: { onClose: () => void; onLogin: () => 
           </button>
           <button
             onClick={onLogin}
-            className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-sm font-medium text-white transition"
+            className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-medium text-white transition"
           >
             로그인하기
           </button>

@@ -144,7 +144,7 @@ export async function createIdeaApi(payload) {
   
     return res.json();
   }
-
+/* 마이페이지! (목업용 지우고 쓰기)
   export async function getMyProfileApi() {
     const token = localStorage.getItem("access_token");
   
@@ -197,7 +197,8 @@ export async function createIdeaApi(payload) {
     return res.json();
   }
 
-/* 마이페이지 목업용
+*/
+// 아래는 마이페이지 목업용임.
 export async function getMyProfileApi() {
     return {
       success: true,
@@ -259,4 +260,101 @@ export async function getMyProfileApi() {
       ],
     };
   }
-*/
+
+  export async function getMyReceivedReviewsApi() {
+    const token = localStorage.getItem("access_token");
+  
+    const res = await fetch("http://localhost:8000/api/v1/users/me/reviews", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  
+    if (!res.ok) {
+      throw new Error("받은 리뷰 목록을 불러오지 못했습니다.");
+    }
+  
+    return res.json();
+  }
+
+  export async function requestAdoptionApi(projectId, message) {
+    const token = localStorage.getItem("access_token");
+  
+    const res = await fetch(
+      `http://localhost:8000/api/v1/adoptions/projects/${projectId}/request`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ message }),
+      }
+    );
+  
+    if (!res.ok) {
+      throw new Error("이어받기 요청에 실패했습니다.");
+    }
+  
+    return res.json();
+  }
+
+  export async function updateMyProfileApi(payload) {
+    const token = localStorage.getItem("access_token");
+  
+    const res = await fetch("http://localhost:8000/api/v1/users/me/profile", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+  
+    if (!res.ok) {
+      throw new Error("프로필 수정 실패");
+    }
+  
+    return res.json();
+  }
+  
+  export async function addMySkillApi(name, proficiency = 3) {
+    const token = localStorage.getItem("access_token");
+  
+    const res = await fetch("http://localhost:8000/api/v1/users/me/skills", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ name, proficiency }),
+    });
+  
+    if (!res.ok) {
+      throw new Error("기술 스택 추가 실패");
+    }
+  
+    return res.json();
+  }
+  
+  export async function addMyInterestApi(name, interestLevel = 3) {
+    const token = localStorage.getItem("access_token");
+  
+    const res = await fetch("http://localhost:8000/api/v1/users/me/interests", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        name,
+        interest_level: interestLevel,
+      }),
+    });
+  
+    if (!res.ok) {
+      throw new Error("관심 분야 추가 실패");
+    }
+  
+    return res.json();
+  }
