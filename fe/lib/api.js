@@ -295,3 +295,63 @@ export async function getMyProfileApi() {
   
     return res.json();
   }
+
+  export async function updateMyProfileApi(payload) {
+    const token = localStorage.getItem("access_token");
+  
+    const res = await fetch("http://localhost:8000/api/v1/users/me/profile", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+  
+    if (!res.ok) {
+      throw new Error("프로필 수정 실패");
+    }
+  
+    return res.json();
+  }
+  
+  export async function addMySkillApi(name, proficiency = 3) {
+    const token = localStorage.getItem("access_token");
+  
+    const res = await fetch("http://localhost:8000/api/v1/users/me/skills", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ name, proficiency }),
+    });
+  
+    if (!res.ok) {
+      throw new Error("기술 스택 추가 실패");
+    }
+  
+    return res.json();
+  }
+  
+  export async function addMyInterestApi(name, interestLevel = 3) {
+    const token = localStorage.getItem("access_token");
+  
+    const res = await fetch("http://localhost:8000/api/v1/users/me/interests", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        name,
+        interest_level: interestLevel,
+      }),
+    });
+  
+    if (!res.ok) {
+      throw new Error("관심 분야 추가 실패");
+    }
+  
+    return res.json();
+  }
