@@ -20,6 +20,8 @@ from app.models.entities import Retrospective
 from app.models.entities import Review
 from app.models.entities import Skill
 from app.models.entities import SubscriptionPlan
+from app.models.entities import TodoAssignment
+from app.models.entities import TodoTemplate
 from app.models.entities import Todo
 from app.models.entities import User
 from app.models.entities import UserInterest
@@ -51,6 +53,8 @@ __all__ = [
 	"Review",
 	"Skill",
 	"SubscriptionPlan",
+	"TodoAssignment",
+	"TodoTemplate",
 	"Todo",
 	"User",
 	"UserInterest",
