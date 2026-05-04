@@ -1,0 +1,52 @@
+name: Deploy Develop Server
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Copy files to develop server via SCP
+        uses: appleboy/scp-action@v0.1.5
+        with:
+          host: ${{ secrets.DEV_SSH_HOST }}
+          username: ${{ secrets.DEV_SSH_USER }}
+          key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.DEV_SSH_PORT }}
+          source: "."
+          target: ${{ secrets.DEV_DEPLOY_PATH }}
+          exclude: |
+            .git/
+            .venv/
+            node_modules/
+            .env*
+            .DS_Store
+
+      - name: Run remote deploy commands
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.DEV_SSH_HOST }}
+          username: ${{ secrets.DEV_SSH_USER }}
+          key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.DEV_SSH_PORT }}
+          script: |
+            set -e
+            cd ${{ secrets.DEV_DEPLOY_PATH }} || exit 1
+
+            if [ ! -f .env.develop ]; then
+              echo ".env.develop not found"
+              exit 1
+            fi
+
+            chmod 600 .env.develop
+
+            docker compose --env-file .env.develop pull --ignore-pull-failures || true
+            docker compose --env-file .env.develop up -d --build
+            docker compose --env-file .env.develop exec -T api alembic upgrade head || true
