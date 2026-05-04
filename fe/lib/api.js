@@ -358,3 +358,58 @@ export async function getMyProfileApi() {
   
     return res.json();
   }
+
+  export async function signupApi(email, nickname, password) {
+    const res = await fetch("http://localhost:8000/api/v1/auth/signup", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email,
+        nickname,
+        password,
+      }),
+    });
+  
+    if (!res.ok) {
+      throw new Error("회원가입에 실패했습니다.");
+    }
+  
+    return res.json();
+  }
+  
+  export async function loginApi(loginId, password) {
+    const res = await fetch("http://localhost:8000/api/v1/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        login_id: loginId,
+        password,
+      }),
+    });
+  
+    if (!res.ok) {
+      throw new Error("로그인에 실패했습니다.");
+    }
+  
+    return res.json();
+  }
+  
+  export async function getMyAuthInfoApi() {
+    const token = localStorage.getItem("access_token");
+  
+    const res = await fetch("http://localhost:8000/api/v1/auth/me", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  
+    if (!res.ok) {
+      throw new Error("내 인증 정보를 불러오지 못했습니다.");
+    }
+  
+    return res.json();
+  }
