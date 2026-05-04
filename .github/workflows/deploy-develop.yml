@@ -26,11 +26,16 @@ jobs:
 
       - name: Run remote deploy commands
         uses: appleboy/ssh-action@v0.1.7
+        env:
+          DEV_API_BASE_URL: ${{ secrets.DEV_API_BASE_URL }}
+          DEV_FRONTEND_ORIGIN: ${{ secrets.DEV_FRONTEND_ORIGIN }}
+          DEV_FE_PORT: ${{ secrets.DEV_FE_PORT }}
         with:
           host: ${{ secrets.DEV_SSH_HOST }}
           username: ${{ secrets.DEV_SSH_USER }}
           key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
           port: ${{ secrets.DEV_SSH_PORT }}
+          envs: DEV_API_BASE_URL,DEV_FRONTEND_ORIGIN,DEV_FE_PORT
           script: |
             set -e
 
@@ -72,14 +77,17 @@ jobs:
             export NEXT_PUBLIC_API_BASE_URL="${DEV_API_BASE_URL}"
 
             cd fe
+
             if [ -f package-lock.json ]; then
               npm ci
             else
               npm install
             fi
+
             npm run build
 
             FE_PORT="${DEV_FE_PORT:-3000}"
+
             if pgrep -f "next start.*${FE_PORT}" >/dev/null 2>&1; then
               pkill -f "next start.*${FE_PORT}" || true
               sleep 1
