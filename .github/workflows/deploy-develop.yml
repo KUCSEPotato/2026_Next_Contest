@@ -22,12 +22,7 @@ jobs:
           port: ${{ secrets.DEV_SSH_PORT }}
           source: "."
           target: ${{ secrets.DEV_DEPLOY_PATH }}
-          exclude: |
-            .git/
-            .venv/
-            node_modules/
-            .env*
-            .DS_Store
+          overwrite: true
 
       - name: Run remote deploy commands
         uses: appleboy/ssh-action@v0.1.7
@@ -38,7 +33,8 @@ jobs:
           port: ${{ secrets.DEV_SSH_PORT }}
           script: |
             set -e
-            cd ${{ secrets.DEV_DEPLOY_PATH }} || exit 1
+
+            cd ${{ secrets.DEV_DEPLOY_PATH }}
 
             if [ ! -f .env.develop ]; then
               echo ".env.develop not found"
@@ -47,6 +43,7 @@ jobs:
 
             chmod 600 .env.develop
 
-            docker compose --env-file .env.develop pull --ignore-pull-failures || true
-            docker compose --env-file .env.develop up -d --build
-            docker compose --env-file .env.develop exec -T api alembic upgrade head || true
+            cd BE/docker
+
+            docker compose --env-file ../../.env.develop pull --ignore-pull-failures || true
+            docker compose --env-file ../../.env.develop up -d --build
