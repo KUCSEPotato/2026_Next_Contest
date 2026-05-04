@@ -81,7 +81,9 @@ class MilestoneUpdateRequest(BaseModel):
 class TodoCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     assignee_id: int | None = None
+    assignee_ids: list[int] | None = None
     description: str | None = None
+    stage: str = "planning"
     status: str = "todo"
     priority: int = Field(default=3, ge=1, le=5)
     due_date: date | None = None
@@ -90,7 +92,9 @@ class TodoCreateRequest(BaseModel):
 class TodoUpdateRequest(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     assignee_id: int | None = None
+    assignee_ids: list[int] | None = None
     description: str | None = None
+    stage: str | None = None
     status: str | None = None
     priority: int | None = Field(default=None, ge=1, le=5)
     due_date: date | None = None

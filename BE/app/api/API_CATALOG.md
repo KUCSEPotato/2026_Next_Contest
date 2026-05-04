@@ -81,9 +81,11 @@
 
 ### Todo/회고/리뷰/실패기록
 - POST /projects/{project_id}/todos: Todo 생성
-- GET /projects/{project_id}/todos: Todo 목록
-- PATCH /projects/{project_id}/todos/{todo_id}: Todo 수정
+- GET /projects/{project_id}/todos: Todo 목록(stage, assignments 포함)
+- PATCH /projects/{project_id}/todos/{todo_id}: Todo 수정(배정/단계 포함)
+- PATCH /projects/{project_id}/todos/{todo_id}/done: 현재 사용자 할당분 완료 토글
 - DELETE /projects/{project_id}/todos/{todo_id}: Todo 삭제
+- WS /projects/{project_id}/todos/ws: Todo 실시간 구독(생성/수정/삭제/완료 이벤트)
 - POST /projects/{project_id}/retrospectives: 회고 작성
 - GET /projects/{project_id}/retrospectives: 회고 목록
 - GET /projects/{project_id}/retrospectives/{retrospective_id}: 회고 상세
@@ -138,6 +140,7 @@
 - POST /chats/projects/{project_id}/rooms: 채팅방 생성
 - GET /chats/rooms/{room_id}/messages: 메시지 목록 조회
 - POST /chats/rooms/{room_id}/messages: 메시지 전송
+- WS /chats/projects/{project_id}/rooms/{room_id}/ws: 채팅 메시지 실시간 송수신/구독
 
 ## 12) Notifications
 
