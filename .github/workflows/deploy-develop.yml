@@ -43,7 +43,46 @@ jobs:
 
             chmod 600 .env.develop
 
+            if [ -z "${DEV_API_BASE_URL:-}" ]; then
+              echo "DEV_API_BASE_URL secret is required for frontend deploy"
+              exit 1
+            fi
+
+            if [ -z "${DEV_FRONTEND_ORIGIN:-}" ]; then
+              echo "DEV_FRONTEND_ORIGIN secret is required for backend CORS"
+              exit 1
+            fi
+
+            export FRONTEND_ORIGIN="${DEV_FRONTEND_ORIGIN}"
+
+            echo "Deploying backend..."
             cd BE/docker
 
             docker compose --env-file ../../.env.develop pull --ignore-pull-failures || true
             docker compose --env-file ../../.env.develop up -d --build
+
+            echo "Deploying frontend..."
+            cd ../..
+
+            if [ ! -d fe ]; then
+              echo "fe directory not found"
+              exit 1
+            fi
+
+            export NEXT_PUBLIC_API_BASE_URL="${DEV_API_BASE_URL}"
+
+            cd fe
+            if [ -f package-lock.json ]; then
+              npm ci
+            else
+              npm install
+            fi
+            npm run build
+
+            FE_PORT="${DEV_FE_PORT:-3000}"
+            if pgrep -f "next start.*${FE_PORT}" >/dev/null 2>&1; then
+              pkill -f "next start.*${FE_PORT}" || true
+              sleep 1
+            fi
+
+            nohup env PORT="${FE_PORT}" NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL}" npm start > fe.log 2>&1 &

@@ -1,7 +1,10 @@
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+
 export async function createIdeaApi(payload) {
     const token = localStorage.getItem("access_token");
   
-    const res = await fetch("http://localhost:8000/api/v1/ideas", {
+    const res = await fetch(`${API_BASE_URL}/api/v1/ideas`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -42,7 +45,7 @@ export async function createIdeaApi(payload) {
     const token = localStorage.getItem("access_token");
   
     const res = await fetch(
-      `http://localhost:8000/api/v1/projects/${projectId}/applications`,
+      `${API_BASE_URL}/api/v1/projects/${projectId}/applications`,
       {
         method: "POST",
         headers: {
@@ -64,7 +67,7 @@ export async function createIdeaApi(payload) {
     const token = localStorage.getItem("access_token");
   
     const res = await fetch(
-      `http://localhost:8000/api/v1/chats/projects/${projectId}/rooms`,
+      `${API_BASE_URL}/api/v1/chats/projects/${projectId}/rooms`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -83,7 +86,7 @@ export async function createIdeaApi(payload) {
     const token = localStorage.getItem("access_token");
   
     const res = await fetch(
-      `http://localhost:8000/api/v1/chats/projects/${projectId}/rooms`,
+      `${API_BASE_URL}/api/v1/chats/projects/${projectId}/rooms`,
       {
         method: "POST",
         headers: {
@@ -105,7 +108,7 @@ export async function createIdeaApi(payload) {
     const token = localStorage.getItem("access_token");
   
     const res = await fetch(
-      `http://localhost:8000/api/v1/chats/rooms/${roomId}/messages`,
+      `${API_BASE_URL}/api/v1/chats/rooms/${roomId}/messages`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -124,7 +127,7 @@ export async function createIdeaApi(payload) {
     const token = localStorage.getItem("access_token");
   
     const res = await fetch(
-      `http://localhost:8000/api/v1/chats/rooms/${roomId}/messages`,
+      `${API_BASE_URL}/api/v1/chats/rooms/${roomId}/messages`,
       {
         method: "POST",
         headers: {
@@ -145,7 +148,7 @@ export async function createIdeaApi(payload) {
   export async function getMyProfileApi() {
     const token = localStorage.getItem("access_token");
   
-    const res = await fetch("http://localhost:8000/api/v1/users/me/profile", {
+    const res = await fetch(`${API_BASE_URL}/api/v1/users/me/profile`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -161,7 +164,7 @@ export async function createIdeaApi(payload) {
   export async function getMyReputationApi() {
     const token = localStorage.getItem("access_token");
   
-    const res = await fetch("http://localhost:8000/api/v1/users/me/reputation", {
+    const res = await fetch(`${API_BASE_URL}/api/v1/users/me/reputation`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -175,7 +178,7 @@ export async function createIdeaApi(payload) {
   }
   
   export async function getUserStatsApi(userId) {
-    const res = await fetch(`http://localhost:8000/api/v1/users/${userId}/stats`);
+    const res = await fetch(`${API_BASE_URL}/api/v1/users/${userId}/stats`);
   
     if (!res.ok) {
       throw new Error("사용자 통계를 불러오지 못했습니다.");
@@ -185,7 +188,7 @@ export async function createIdeaApi(payload) {
   }
   
   export async function getUserProjectsApi(userId) {
-    const res = await fetch(`http://localhost:8000/api/v1/users/${userId}/projects`);
+    const res = await fetch(`${API_BASE_URL}/api/v1/users/${userId}/projects`);
   
     if (!res.ok) {
       throw new Error("사용자 프로젝트 이력을 불러오지 못했습니다.");
