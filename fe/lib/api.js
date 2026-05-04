@@ -144,7 +144,7 @@ export async function createIdeaApi(payload) {
   
     return res.json();
   }
-/* 마이페이지! (목업용 지우고 쓰기)
+
   export async function getMyProfileApi() {
     const token = localStorage.getItem("access_token");
   
@@ -197,69 +197,8 @@ export async function createIdeaApi(payload) {
     return res.json();
   }
 
-*/
-// 아래는 마이페이지 목업용임.
-export async function getMyProfileApi() {
-    return {
-      success: true,
-      data: {
-        id: 1,
-        email: "eungyu@example.com",
-        nickname: "한은규",
-        bio: "프론트엔드와 서비스 기획에 관심 있는 개발자입니다.",
-        avatar_url: "",
-        skills: ["React", "Next.js", "FastAPI", "Python"],
-        interests: ["웹/앱", "AI", "협업 플랫폼"],
-      },
-    };
-  }
-  
-  export async function getMyReputationApi() {
-    return {
-      success: true,
-      data: {
-        review_count: 7,
-        avg_teamwork: 4.6,
-        avg_contribution: 4.4,
-        avg_responsibility: 4.8,
-        score: 4.6,
-      },
-    };
-  }
-  
-  export async function getUserStatsApi(userId) {
-    return {
-      success: true,
-      data: {
-        user_id: userId,
-        lead_projects: 3,
-        completed_projects: 1,
-        review_received: 7,
-      },
-    };
-  }
-  
-  export async function getUserProjectsApi(userId) {
-    return {
-      success: true,
-      data: [
-        {
-          id: 1,
-          title: "Devory 앱 개발",
-          status: "in_progress",
-          difficulty: "intermediate",
-          created_at: "2026-04-29T10:00:00",
-        },
-        {
-          id: 2,
-          title: "AI 코드 리뷰 봇",
-          status: "planning",
-          difficulty: "advanced",
-          created_at: "2026-04-20T10:00:00",
-        },
-      ],
-    };
-  }
+
+
 
   export async function getMyReceivedReviewsApi() {
     const token = localStorage.getItem("access_token");
@@ -354,6 +293,61 @@ export async function getMyProfileApi() {
   
     if (!res.ok) {
       throw new Error("관심 분야 추가 실패");
+    }
+  
+    return res.json();
+  }
+
+  export async function signupApi(email, nickname, password) {
+    const res = await fetch("http://localhost:8000/api/v1/auth/signup", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email,
+        nickname,
+        password,
+      }),
+    });
+  
+    if (!res.ok) {
+      throw new Error("회원가입에 실패했습니다.");
+    }
+  
+    return res.json();
+  }
+  
+  export async function loginApi(loginId, password) {
+    const res = await fetch("http://localhost:8000/api/v1/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        login_id: loginId,
+        password,
+      }),
+    });
+  
+    if (!res.ok) {
+      throw new Error("로그인에 실패했습니다.");
+    }
+  
+    return res.json();
+  }
+  
+  export async function getMyAuthInfoApi() {
+    const token = localStorage.getItem("access_token");
+  
+    const res = await fetch("http://localhost:8000/api/v1/auth/me", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  
+    if (!res.ok) {
+      throw new Error("내 인증 정보를 불러오지 못했습니다.");
     }
   
     return res.json();
