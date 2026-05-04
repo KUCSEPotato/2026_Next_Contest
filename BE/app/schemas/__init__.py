@@ -17,6 +17,8 @@ from app.schemas.projects import MilestoneUpdateRequest
 from app.schemas.projects import ProjectCreateRequest
 from app.schemas.projects import ProjectStatusUpdateRequest
 from app.schemas.projects import ProjectUpdateRequest
+from app.schemas.projects import RecruitmentCreateRequest
+from app.schemas.projects import RecruitmentUpdateRequest
 from app.schemas.projects import TodoCreateRequest
 from app.schemas.projects import TodoUpdateRequest
 
@@ -37,6 +39,8 @@ __all__ = [
 	"ProjectCreateRequest",
 	"ProjectStatusUpdateRequest",
 	"ProjectUpdateRequest",
+	"RecruitmentCreateRequest",
+	"RecruitmentUpdateRequest",
 	"ResetPasswordRequest",
 	"SignupRequest",
 	"TodoCreateRequest",
