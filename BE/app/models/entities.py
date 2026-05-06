@@ -34,16 +34,11 @@ class User(Base):
     github_id: Mapped[str | None] = mapped_column(String(100), unique=True)
     google_id: Mapped[str | None] = mapped_column(String(100), unique=True)
     nickname: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
-    name: Mapped[str | None] = mapped_column(String(100))
-    phone_number: Mapped[str | None] = mapped_column(String(20))
     bio: Mapped[str | None] = mapped_column(Text)
     avatar_url: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     role: Mapped[str] = mapped_column(String(20), default="user")
-    coin_balance: Mapped[int] = mapped_column(Integer, default=0)
-    onboarding_step: Mapped[str] = mapped_column(String(20), default="completed")
-    onboarding_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -101,7 +96,6 @@ class Idea(Base):
     difficulty: Mapped[str] = mapped_column(String(20), nullable=False)
     required_members: Mapped[int] = mapped_column(SmallInteger, default=1)
     is_open: Mapped[bool] = mapped_column(Boolean, default=True)
-    converted_to_project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -141,7 +135,6 @@ class Project(Base):
     is_public: Mapped[bool] = mapped_column(Boolean, default=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    max_members: Mapped[int] = mapped_column(SmallInteger, default=10)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -236,40 +229,10 @@ class Todo(Base):
     creator_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
-    stage: Mapped[str] = mapped_column(String(30), default="planning")
     status: Mapped[str] = mapped_column(String(20), default="todo")
     priority: Mapped[int] = mapped_column(SmallInteger, default=3)
     due_date: Mapped[date | None] = mapped_column(Date)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
-
-class TodoAssignment(Base):
-    __tablename__ = "todo_assignments"
-    __table_args__ = (UniqueConstraint("todo_id", "user_id", name="todo_assignments_unique"),)
-
-    id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
-    todo_id: Mapped[int] = mapped_column(ForeignKey("todos.id", ondelete="CASCADE"), nullable=False)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    is_done: Mapped[bool] = mapped_column(Boolean, default=False)
-    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-
-class TodoTemplate(Base):
-    __tablename__ = "todo_templates"
-
-    id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
-    template_key: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
-    title: Mapped[str] = mapped_column(String(200), nullable=False)
-    description: Mapped[str | None] = mapped_column(Text)
-    stage: Mapped[str] = mapped_column(String(30), default="planning")
-    priority: Mapped[int] = mapped_column(SmallInteger, default=3)
-    sort_order: Mapped[int] = mapped_column(Integer, default=0)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class Retrospective(Base):
@@ -407,20 +370,6 @@ class Notification(Base):
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
-class CoinTransaction(Base):
-    __tablename__ = "coin_transactions"
-
-    id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    amount: Mapped[int] = mapped_column(Integer, nullable=False)
-    balance_after: Mapped[int] = mapped_column(Integer, nullable=False)
-    event_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    source_type: Mapped[str | None] = mapped_column(String(50))
-    source_id: Mapped[int | None] = mapped_column(ID_TYPE)
-    note: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-
 class Report(Base):
     __tablename__ = "reports"
 
@@ -432,53 +381,3 @@ class Report(Base):
     status: Mapped[str] = mapped_column(String(20), default="open")
     handled_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     handled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-
-
-class CommunityPost(Base):
-    __tablename__ = "community_posts"
-
-    id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
-    author_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    title: Mapped[str] = mapped_column(String(300), nullable=False)
-    content: Mapped[str] = mapped_column(Text, nullable=False)
-    category: Mapped[str] = mapped_column(String(50), default="general")
-    is_pinned: Mapped[bool] = mapped_column(Boolean, default=False)
-    view_count: Mapped[int] = mapped_column(BigInteger, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-
-
-class CommunityPostComment(Base):
-    __tablename__ = "community_post_comments"
-
-    id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
-    post_id: Mapped[int] = mapped_column(ForeignKey("community_posts.id", ondelete="CASCADE"), nullable=False)
-    author_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    content: Mapped[str] = mapped_column(Text, nullable=False)
-    parent_comment_id: Mapped[int | None] = mapped_column(ForeignKey("community_post_comments.id", ondelete="CASCADE"))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-
-
-class CommunityPostReaction(Base):
-    __tablename__ = "community_post_reactions"
-    __table_args__ = (UniqueConstraint("post_id", "user_id", "reaction_type", name="community_post_reactions_unique"),)
-
-    id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
-    post_id: Mapped[int] = mapped_column(ForeignKey("community_posts.id", ondelete="CASCADE"), nullable=False)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    reaction_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-
-class CommunityCommentReaction(Base):
-    __tablename__ = "community_comment_reactions"
-    __table_args__ = (UniqueConstraint("comment_id", "user_id", "reaction_type", name="community_comment_reactions_unique"),)
-
-    id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
-    comment_id: Mapped[int] = mapped_column(ForeignKey("community_post_comments.id", ondelete="CASCADE"), nullable=False)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    reaction_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

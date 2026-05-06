@@ -12,7 +12,7 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ../docs/db/06_complete_postgresql_schema.sql:/docker-entrypoint-initdb.d/06_complete_postgresql_schema.sql:ro
+      - ../docs/db/01_postgresql_schema.sql:/docker-entrypoint-initdb.d/01_postgresql_schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-devory} -d ${POSTGRES_DB:-devory}"]
       interval: 5s
@@ -48,7 +48,6 @@ services:
       APP_VERSION: ${APP_VERSION:-0.1.0}
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://devory:devory1234@db:5432/devory}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-this-in-production}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
