@@ -58,9 +58,7 @@ export default function ChatRoomPage() {
     <main className="min-h-screen bg-slate-50 px-6 py-10">
       <div className="mx-auto flex h-[80vh] w-full max-w-4xl flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">
         <header className="border-b border-slate-200 p-6">
-          <p className="text-sm font-semibold text-red-600">
-            Room #{roomId}
-          </p>
+          <p className="text-sm font-semibold text-red-600">Room #{roomId}</p>
           <h1 className="mt-1 text-2xl font-bold text-slate-900">
             채팅 메시지
           </h1>
@@ -95,7 +93,13 @@ export default function ChatRoomPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") handleSend();
+                if (
+                  e.key === "Enter" &&
+                  !e.nativeEvent.isComposing &&
+                  !sending
+                ) {
+                  handleSend();
+                }
               }}
               placeholder="메시지를 입력하세요"
             />
