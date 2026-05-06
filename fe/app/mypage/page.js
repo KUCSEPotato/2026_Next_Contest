@@ -51,32 +51,62 @@ export default function MyPage() {
 
         const profileResult = await getMyProfileApi();
         const profileData = profileResult.data;
+
         setProfile(profileData);
         setEditNickname(profileData.nickname || "");
         setEditBio(profileData.bio || "");
         setEditAvatarUrl(profileData.avatar_url || "");
 
-        const reputationResult = await getMyReputationApi();
-        setReputation(reputationResult.data);
+        const [reputationResult, statsResult, projectsResult, reviewsResult] =
+          await Promise.allSettled([
+            getMyReputationApi(),
+            getUserStatsApi(profileData.id),
+            getUserProjectsApi(profileData.id),
+            getMyReceivedReviewsApi(),
+          ]);
 
-        const statsResult = await getUserStatsApi(profileData.id);
-        setStats(statsResult.data);
+        if (reputationResult.status === "fulfilled") {
+          setReputation(reputationResult.value.data);
+        } else {
+          console.error("신뢰도 조회 실패:", reputationResult.reason);
+          setReputation(null);
+        }
 
-        const projectsResult = await getUserProjectsApi(profileData.id);
-        setProjects(projectsResult.data);
+        if (statsResult.status === "fulfilled") {
+          setStats(statsResult.value.data);
+        } else {
+          console.error("통계 조회 실패:", statsResult.reason);
+          setStats({
+            lead_projects: 0,
+            completed_projects: 0,
+            review_received: 0,
+          });
+        }
 
-        const reviewsResult = await getMyReceivedReviewsApi();
-        setReviews(reviewsResult.data);
+        if (projectsResult.status === "fulfilled") {
+          setProjects(projectsResult.value.data || []);
+        } else {
+          console.error("프로젝트 이력 조회 실패:", projectsResult.reason);
+          setProjects([]);
+        }
+
+        if (reviewsResult.status === "fulfilled") {
+          setReviews(reviewsResult.value.data || []);
+        } else {
+          console.error("리뷰 조회 실패:", reviewsResult.reason);
+          setReviews([]);
+        }
       } catch (error) {
-        console.error(error);
-        alert("마이페이지 정보를 불러오지 못했습니다.");
+        console.error("프로필 조회 실패:", error);
+        alert("프로필 정보를 불러오지 못했습니다. 다시 로그인해주세요.");
+        router.push("/login");
       } finally {
         setLoading(false);
       }
     }
 
     loadMyPage();
-  }, []);
+  }, [router]);
 
   const handleUpdateProfile = async () => {
     try {
@@ -228,9 +258,14 @@ export default function MyPage() {
             ) : (
               reviews.map((review) => (
                 <div key={review.id} className="mb-3 rounded-xl border p-4">
-                  <p className="font-bold">{review.project?.title}</p>
+                  <p className="font-bold">
+                    {review.project?.title || "프로젝트"}
+                  </p>
                   <p className="text-sm text-gray-400">
-                    익명 • {new Date(review.created_at).toLocaleDateString()}
+                    익명{" "}
+                    {review.created_at
+                      ? `• ${new Date(review.created_at).toLocaleDateString()}`
+                      : ""}
                   </p>
 
                   <div className="mt-2 text-sm">
@@ -281,10 +316,10 @@ export default function MyPage() {
               {profile?.skills?.length ? (
                 profile.skills.map((skill) => (
                   <span
-                    key={skill}
+                    key={typeof skill === "string" ? skill : skill.id || skill.name}
                     className="rounded-full bg-red-50 px-3 py-1 text-sm font-semibold text-red-700"
                   >
-                    {skill}
+                    {typeof skill === "string" ? skill : skill.name}
                   </span>
                 ))
               ) : (
@@ -318,10 +353,14 @@ export default function MyPage() {
               {profile?.interests?.length ? (
                 profile.interests.map((interest) => (
                   <span
-                    key={interest}
+                    key={
+                      typeof interest === "string"
+                        ? interest
+                        : interest.id || interest.name
+                    }
                     className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700"
                   >
-                    {interest}
+                    {typeof interest === "string" ? interest : interest.name}
                   </span>
                 ))
               ) : (
@@ -350,13 +389,13 @@ export default function MyPage() {
                         {project.title}
                       </p>
                       <p className="mt-1 text-sm text-slate-500">
-                        난이도 {project.difficulty}
+                        난이도 {project.difficulty || "미정"}
                       </p>
                     </div>
 
                     <div className="flex items-center gap-2">
                       <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-600">
-                        {project.status}
+                        {project.status || "상태 없음"}
                       </span>
 
                       <span
