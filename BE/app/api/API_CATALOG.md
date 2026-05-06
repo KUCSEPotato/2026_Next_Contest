@@ -12,7 +12,7 @@
 
 ## 1) Auth
 
-- POST /auth/signup: 이메일/닉네임/비밀번호로 계정 생성
+- POST /auth/signup: 이메일/아이디/이름/전화번호/비밀번호로 계정 생성 + 온보딩 토큰 발급
 - POST /auth/login: login_id(이메일 또는 닉네임) + 비밀번호 로그인
 - POST /auth/oauth/github: GitHub authorization code 기반 로그인/가입
 - POST /auth/oauth/google: Google authorization code 기반 로그인/가입
@@ -25,12 +25,13 @@
 - POST /auth/token/refresh: refresh token으로 access token 재발급
 - POST /auth/password/forgot: 비밀번호 재설정 토큰 발급
 - POST /auth/password/reset: 비밀번호 재설정 적용
-- GET /auth/me: 현재 인증 사용자 기본 정보 조회
+- GET /auth/me: 현재 인증 사용자 기본 정보 조회(온보딩 상태 포함)
 
 ## 2) Users
 
-- GET /users/me/profile: 내 프로필 + 기술 스택 조회
-- PATCH /users/me/profile: 닉네임/소개/아바타 수정
+- GET /users/me/profile: 내 프로필 + 기술 스택 + 선택한 아이디어 조회
+- GET /users/me/onboarding: 회원가입/프로필/아이디어 선택 상태 조회
+- PATCH /users/me/profile: 닉네임/이름/전화번호/소개/아바타 수정
 - GET /users/{user_id}/profile: 공개 프로필 조회
 - GET /users/{user_id}/stats: 활동 통계 조회
 - GET /users/{user_id}/projects: 사용자 프로젝트 이력
@@ -40,6 +41,7 @@
 - DELETE /users/me/skills/{skill_id}: 기술 스택 제거
 - POST /users/me/interests: 관심 분야 등록
 - DELETE /users/me/interests/{interest_id}: 관심 분야 제거
+- POST /users/me/onboarding/ideas: 온보딩 마지막 단계에서 관심 아이디어 선택 및 가입 완료 처리
 - GET /users/me/reputation: 리뷰 기반 신뢰도/평점 요약
 
 ## 3) Ideas
