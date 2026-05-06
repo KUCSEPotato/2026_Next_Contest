@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+# .idea/
+
+# project folder
+idea/
+신청/
+Project_Plan.md
+
+# FE
+
+# LLM
+
+# Personal
+Studying.md
+Personal/
+
+# BE
+BE/.venv/
+BE/__pycache__/
+BE/.vscode/
+
+# pemkey
+pemkey/
