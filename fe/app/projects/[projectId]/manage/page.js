@@ -70,6 +70,13 @@ export default function ProjectManagePage() {
         status,
         role_in_project: "member",
       });
+      const [apps, proj] = await Promise.all([
+        getProjectApplicationsApi(projectId),
+        getProjectApi(projectId),
+      ]);
+      
+      setApplications(apps.data?.data || []);
+      setProject(proj.data?.data || proj.data);
 
       setApplications((prev) =>
         prev.map((application) =>
