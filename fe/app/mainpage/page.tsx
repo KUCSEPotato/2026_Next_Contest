@@ -141,15 +141,31 @@ export default function MainPage() {
     router.push(path);
   };
 
-  const handleProjectClick = (id: number) => {
+  const handleProjectClick = (idea: any) => {
     if (!handleProtectedAction()) return;
-    router.push(`/ideas/${id}`);
+  
+    const projectId =
+      idea.project_id || idea.converted_to_project_id;
+  
+    if (projectId) {
+      router.push(`/projects/${projectId}`);
+    } else {
+      alert("연결된 프로젝트가 없습니다.");
+    }
   };
 
-  const handleApply = (e: React.MouseEvent, id: number) => {
+  const handleApply = (e: React.MouseEvent, idea: any) => {
     e.stopPropagation();
     if (!handleProtectedAction()) return;
-    router.push(`/ideas/${id}`);
+  
+    const projectId =
+      idea.project_id || idea.converted_to_project_id;
+  
+    if (projectId) {
+      router.push(`/projects/${projectId}`);
+    } else {
+      alert("연결된 프로젝트가 없습니다.");
+    }
   };
 
   const filteredProjects = projects.filter((p) => {
