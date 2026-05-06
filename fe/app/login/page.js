@@ -43,7 +43,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg">
         <div className="mb-6 flex justify-center">
           <Image
-            src="/logo_colored.png"
+            src="/logo_colored.svg"
             alt="Devory 로고"
             width={110}
             height={80}
