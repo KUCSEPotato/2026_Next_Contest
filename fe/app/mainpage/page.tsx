@@ -1,186 +1,177 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getIdeasApi } from "../../lib/api";
 
-// ─── 타입 ──────────────────────────────────────────────────────
 interface Project {
-  id: number
-  title: string
-  description: string
-  category: string
-  techStack: string[]
-  currentMembers: number
-  maxMembers: number
-  daysLeft: number
-  difficulty: 'beginner' | 'intermediate' | 'advanced'
-  isUrgent: boolean
+  id: number;
+  title: string;
+  description: string;
+  summary?: string;
+  category: string;
+  techStack: string[];
+  currentMembers: number;
+  maxMembers: number;
+  daysLeft: number;
+  difficulty: "beginner" | "intermediate" | "advanced";
+  isUrgent: boolean;
 }
-
-// ─── 목업 데이터 ───────────────────────────────────────────────
-const MOCK_PROJECTS: Project[] = [
-  {
-    id: 1,
-    title: 'AI 코드 리뷰 봇',
-    description: 'GitHub PR에 자동으로 리뷰 코멘트를 달아주는 AI 봇',
-    category: 'AI/데이터',
-    techStack: ['Python', 'FastAPI', 'OpenAI'],
-    currentMembers: 2,
-    maxMembers: 4,
-    daysLeft: 3,
-    difficulty: 'intermediate',
-    isUrgent: true,
-  },
-  {
-    id: 2,
-    title: '개발자 포트폴리오 생성기',
-    description: 'GitHub 프로필을 분석해 자동으로 포트폴리오를 만들어주는 서비스',
-    category: 'IT/소프트웨어',
-    techStack: ['Next.js', 'TypeScript'],
-    currentMembers: 1,
-    maxMembers: 3,
-    daysLeft: 14,
-    difficulty: 'beginner',
-    isUrgent: false,
-  },
-  {
-    id: 3,
-    title: '스타트업 재무 관리 앱',
-    description: '초기 스타트업을 위한 간편 재무 관리 및 투자자 리포트 자동화',
-    category: '경영/경제',
-    techStack: ['React', 'Node.js', 'PostgreSQL'],
-    currentMembers: 2,
-    maxMembers: 5,
-    daysLeft: 7,
-    difficulty: 'intermediate',
-    isUrgent: true,
-  },
-  {
-    id: 4,
-    title: '헬스케어 챗봇 플랫폼',
-    description: '증상 기반으로 병원을 추천해주는 AI 챗봇',
-    category: '헬스케어',
-    techStack: ['Flutter', 'Python', 'LangChain'],
-    currentMembers: 1,
-    maxMembers: 4,
-    daysLeft: 21,
-    difficulty: 'advanced',
-    isUrgent: false,
-  },
-  {
-    id: 5,
-    title: '로컬 소상공인 커머스',
-    description: '동네 소상공인을 위한 간편 온라인 스토어 개설 플랫폼',
-    category: '커머스/쇼핑',
-    techStack: ['Vue', 'Django', 'AWS'],
-    currentMembers: 3,
-    maxMembers: 5,
-    daysLeft: 5,
-    difficulty: 'intermediate',
-    isUrgent: true,
-  },
-  {
-    id: 6,
-    title: '학습 목표 트래커',
-    description: '팀과 함께 학습 목표를 설정하고 달성률을 공유하는 앱',
-    category: '교육/학습',
-    techStack: ['React Native', 'Firebase'],
-    currentMembers: 2,
-    maxMembers: 3,
-    daysLeft: 30,
-    difficulty: 'beginner',
-    isUrgent: false,
-  },
-]
 
 const CATEGORIES = [
-  { label: 'IT/소프트웨어', emoji: '💻' },
-  { label: '경영/경제', emoji: '📊' },
-  { label: '디자인/UI·UX', emoji: '🎨' },
-  { label: 'AI/데이터', emoji: '🤖' },
-  { label: '교육/학습', emoji: '📚' },
-  { label: '금융/핀테크', emoji: '💳' },
-  { label: '커머스/쇼핑', emoji: '🛒' },
-  { label: '소셜/커뮤니티', emoji: '💬' },
-  { label: '헬스케어', emoji: '❤️' },
-]
+  { label: "IT/소프트웨어", emoji: "💻" },
+  { label: "경영/경제", emoji: "📊" },
+  { label: "디자인/UI·UX", emoji: "🎨" },
+  { label: "AI/데이터", emoji: "🤖" },
+  { label: "교육/학습", emoji: "📚" },
+  { label: "금융/핀테크", emoji: "💳" },
+  { label: "커머스/쇼핑", emoji: "🛒" },
+  { label: "소셜/커뮤니티", emoji: "💬" },
+  { label: "헬스케어", emoji: "❤️" },
+];
 
-const DIFFICULTY_LABEL = { beginner: '입문', intermediate: '중급', advanced: '고급' }
+const DIFFICULTY_LABEL = {
+  beginner: "입문",
+  intermediate: "중급",
+  advanced: "고급",
+};
+
 const DIFFICULTY_COLOR = {
-  beginner: 'text-emerald-600 bg-emerald-50',
-  intermediate: 'text-amber-600 bg-amber-50',
-  advanced: 'text-rose-600 bg-rose-50',
-}
+  beginner: "text-emerald-600 bg-emerald-50",
+  intermediate: "text-amber-600 bg-amber-50",
+  advanced: "text-rose-600 bg-rose-50",
+};
 
-// ─── 로그인 상태 (실제 구현 시 NextAuth useSession으로 교체) ───
 const useAuth = () => {
-  const [isLoggedIn] = useState(true) // TODO: useSession()으로 교체
-  const userName = isLoggedIn ? '정민' : null
-  return { isLoggedIn, userName }
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    setIsLoggedIn(!!token);
+  }, []);
+
+  return { isLoggedIn };
+};
+
+function normalizeIdea(idea: any): Project {
+  return {
+    id: idea.id,
+    title: idea.title || "제목 없음",
+    description: idea.summary || idea.description || "설명이 없습니다.",
+    summary: idea.summary,
+    category: idea.domain || idea.category || "IT/소프트웨어",
+    techStack: idea.tech_stack || idea.techStack || [],
+    currentMembers: idea.currentMembers ?? 1,
+    maxMembers: idea.required_members || idea.maxMembers || 4,
+    daysLeft: idea.daysLeft ?? 30,
+    difficulty: idea.difficulty || "beginner",
+    isUrgent: idea.isUrgent ?? false,
+  };
 }
 
-// ─── 메인 페이지 ──────────────────────────────────────────────
 export default function MainPage() {
-  const router = useRouter()
-  const { isLoggedIn, userName } = useAuth()
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  const [showLoginModal, setShowLoginModal] = useState(false)
-  const [showNotifications, setShowNotifications] = useState(false)
+  const router = useRouter();
+  const { isLoggedIn } = useAuth();
+
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
+  useEffect(() => {
+    async function loadIdeas() {
+      try {
+        setLoading(true);
+        setLoadError("");
+
+        const result = await getIdeasApi({ page: 1, size: 50 });
+        const ideas = result.data || [];
+
+        setProjects(ideas.map(normalizeIdea));
+      } catch (error) {
+        console.error("아이디어 목록 조회 실패:", error);
+        setLoadError("아이디어 목록을 불러오지 못했습니다.");
+        setProjects([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadIdeas();
+  }, []);
 
   const handleProtectedAction = () => {
     if (!isLoggedIn) {
-      setShowLoginModal(true)
-      return false
+      setShowLoginModal(true);
+      return false;
     }
-    return true
-  }
+    return true;
+  };
 
   const handleProjectClick = (id: number) => {
-    if (!handleProtectedAction()) return
-    router.push(`/projects/${id}`)
-  }
+    if (!handleProtectedAction()) return;
+    router.push(`/ideas/${id}`);
+  };
 
   const handleApply = (e: React.MouseEvent, id: number) => {
-    e.stopPropagation()
-    if (!handleProtectedAction()) return
-    router.push(`/projects/${id}`)
-  }
+    e.stopPropagation();
+    if (!handleProtectedAction()) return;
+    router.push(`/ideas/${id}`);
+  };
 
-  const filteredProjects = MOCK_PROJECTS.filter((p) => {
-    const matchCategory = selectedCategory ? p.category === selectedCategory : true
+  const filteredProjects = projects.filter((p) => {
+    const matchCategory = selectedCategory
+      ? p.category === selectedCategory
+      : true;
+
     const matchSearch = searchQuery
       ? p.title.includes(searchQuery) ||
-        p.techStack.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()))
-      : true
-    return matchCategory && matchSearch
-  })
+        p.description.includes(searchQuery) ||
+        p.techStack.some((t) =>
+          t.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      : true;
+
+    return matchCategory && matchSearch;
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
-
-      <main className="max-w-6xl mx-auto px-4 pb-16">
-
-        {/* ── 히어로 영역 ───────────────────────────────────────── */}
-        <section className="py-10 sm:py-14 text-center">
-          <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-3 leading-tight">
-            아이디어를 팀으로,<br className="sm:hidden" /> 팀을 프로젝트로
+      <main className="mx-auto max-w-6xl px-4 pb-16">
+        <section className="py-10 text-center sm:py-14">
+          <h1 className="mb-3 text-2xl font-bold leading-tight text-gray-900 sm:text-4xl">
+            아이디어를 팀으로,
+            <br className="sm:hidden" /> 팀을 프로젝트로
           </h1>
-          <p className="text-sm sm:text-base text-gray-500 mb-6">
+
+          <p className="mb-6 text-sm text-gray-500 sm:text-base">
             AI가 나에게 맞는 프로젝트와 팀원을 연결해드려요
           </p>
 
-          {/* 분야 태그 빠른 선택 */}
-          <div className="flex flex-wrap justify-center gap-2 mt-4">
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="아이디어 제목이나 기술 스택을 검색해보세요"
+            className="mx-auto mb-4 w-full max-w-xl rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-400"
+          />
+
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat.label}
-                onClick={() => setSelectedCategory(selectedCategory === cat.label ? null : cat.label)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all
-                  ${selectedCategory === cat.label
-                    ? 'bg-red-600 border-red-600 text-white'
-                    : 'bg-white border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-600'
-                  }`}
+                onClick={() =>
+                  setSelectedCategory(
+                    selectedCategory === cat.label ? null : cat.label
+                  )
+                }
+                className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                  selectedCategory === cat.label
+                    ? "border-red-600 bg-red-600 text-white"
+                    : "border-gray-200 bg-white text-gray-600 hover:border-red-300 hover:text-red-600"
+                }`}
               >
                 <span>{cat.emoji}</span>
                 <span>{cat.label}</span>
@@ -189,205 +180,215 @@ export default function MainPage() {
           </div>
         </section>
 
-        {/* ── AI 추천 프로젝트 ──────────────────────────────────── */}
         <section className="mb-10">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <span className="text-base font-bold text-gray-900">
-                {isLoggedIn ? `${userName}님을 위한 추천` : '인기 프로젝트'}
-              </span>
-              {isLoggedIn && (
-                <span className="text-xs font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
-                  AI 추천
-                </span>
-              )}
-            </div>
-            <button className="text-xs text-gray-400 hover:text-gray-600 transition">더보기 →</button>
-          </div>
-
-          {/* 가로 스크롤 카드 */}
-          <div className="flex gap-4 overflow-x-auto pb-3 -mx-4 px-4 scrollbar-hide">
-            {MOCK_PROJECTS.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                onClick={() => handleProjectClick(project.id)}
-                onApply={(e) => handleApply(e, project.id)}
-              />
-            ))}
-          </div>
-        </section>
-
-        {/* ── 검색 결과 or 인기 프로젝트 그리드 ───────────────── */}
-        <section className="mb-10">
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4 flex items-center justify-between">
             <span className="text-base font-bold text-gray-900">
               {searchQuery || selectedCategory
                 ? `검색 결과 (${filteredProjects.length})`
-                : '전체 프로젝트'}
+                : "전체 아이디어"}
             </span>
+
             {(searchQuery || selectedCategory) && (
               <button
-                onClick={() => { setSearchQuery(''); setSelectedCategory(null) }}
-                className="text-xs text-gray-400 hover:text-gray-600 transition"
+                onClick={() => {
+                  setSearchQuery("");
+                  setSelectedCategory(null);
+                }}
+                className="text-xs text-gray-400 transition hover:text-gray-600"
               >
                 필터 초기화
               </button>
             )}
           </div>
 
-          {filteredProjects.length === 0 ? (
+          {loading ? (
+            <div className="py-16 text-center text-sm text-gray-500">
+              아이디어 목록을 불러오는 중...
+            </div>
+          ) : loadError ? (
+            <div className="py-16 text-center text-sm text-red-500">
+              {loadError}
+            </div>
+          ) : filteredProjects.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
-              <p className="text-3xl mb-3">🔍</p>
-              <p className="text-sm font-medium text-gray-600 mb-1">해당 검색 결과가 없어요 ππ</p>
-              <p className="text-xs text-gray-400">다른 키워드나 분야로 검색해보세요</p>
+              <p className="mb-3 text-3xl">🔍</p>
+              <p className="mb-1 text-sm font-medium text-gray-600">
+                등록된 아이디어가 없어요
+              </p>
+              <p className="text-xs text-gray-400">
+                직접 첫 아이디어를 등록해보세요
+              </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {filteredProjects.map((project) => (
                 <ProjectCard
                   key={project.id}
                   project={project}
                   onClick={() => handleProjectClick(project.id)}
                   onApply={(e) => handleApply(e, project.id)}
-                  variant="grid"
                 />
               ))}
             </div>
           )}
         </section>
 
-        {/* ── 아이디어 등록 배너 ────────────────────────────────── */}
-        <section className="rounded-2xl bg-red-600 p-6 sm:p-8 text-white text-center">
-          <p className="text-lg sm:text-xl font-bold mb-2">팀이 없어도 괜찮아요</p>
-          <p className="text-sm text-red-100 mb-5">아이디어만 있으면 Devory가 팀을 만들어드려요</p>
+        <section className="rounded-2xl bg-red-600 p-6 text-center text-white sm:p-8">
+          <p className="mb-2 text-lg font-bold sm:text-xl">
+            팀이 없어도 괜찮아요
+          </p>
+          <p className="mb-5 text-sm text-red-100">
+            아이디어만 있으면 Devory가 팀을 만들어드려요
+          </p>
           <button
-            onClick={() => { if (!handleProtectedAction()) return; router.push('/ideas/new') }}
-            className="px-6 py-2.5 bg-white text-red-600 rounded-xl text-sm font-semibold hover:bg-red-50 transition"
+            onClick={() => {
+              if (!handleProtectedAction()) return;
+              router.push("/ideas/new");
+            }}
+            className="rounded-xl bg-white px-6 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
           >
             아이디어 등록하기 →
           </button>
         </section>
       </main>
 
-      {/* ── 로그인 유도 모달 ──────────────────────────────────── */}
       {showLoginModal && (
         <LoginModal
           onClose={() => setShowLoginModal(false)}
-          onLogin={() => router.push('/login')}
+          onLogin={() => router.push("/login")}
         />
       )}
     </div>
-  )
+  );
 }
 
-// ─── 프로젝트 카드 컴포넌트 ────────────────────────────────────
 function ProjectCard({
   project,
   onClick,
   onApply,
-  variant = 'scroll',
 }: {
-  project: Project
-  onClick: () => void
-  onApply: (e: React.MouseEvent) => void
-  variant?: 'scroll' | 'grid'
+  project: Project;
+  onClick: () => void;
+  onApply: (e: React.MouseEvent) => void;
 }) {
-  const isAlmostFull = project.currentMembers >= project.maxMembers - 1
+  const isAlmostFull = project.currentMembers >= project.maxMembers - 1;
 
   return (
     <div
       onClick={onClick}
-      className={`
-        bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-red-200 transition-all cursor-pointer flex-shrink-0 flex flex-col
-        ${variant === 'scroll' ? 'w-64 sm:w-72 p-4' : 'w-full p-4'}
-      `}
+      className="flex w-full cursor-pointer flex-col rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-all hover:border-red-200 hover:shadow-md"
     >
-      {/* 상단 */}
-      <div className="flex items-start justify-between gap-2 mb-2">
+      <div className="mb-2 flex items-start justify-between gap-2">
         <div className="flex flex-wrap gap-1">
-          {/* 카테고리 */}
-          <span className="text-[10px] font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
+          <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-600">
             {project.category}
           </span>
-          {/* 마감 임박 뱃지 */}
+
           {project.isUrgent && (
-            <span className="text-[10px] font-medium text-red-500 bg-red-50 px-2 py-0.5 rounded-full">
+            <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-500">
               🔥 마감 임박
             </span>
           )}
         </div>
-        {/* 난이도 */}
-        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${DIFFICULTY_COLOR[project.difficulty]}`}>
+
+        <span
+          className={`flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+            DIFFICULTY_COLOR[project.difficulty]
+          }`}
+        >
           {DIFFICULTY_LABEL[project.difficulty]}
         </span>
       </div>
 
-      {/* 제목 */}
-      <h3 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-1">{project.title}</h3>
-      <p className="text-xs text-gray-400 mb-3 line-clamp-2 leading-relaxed">{project.description}</p>
+      <h3 className="mb-1 line-clamp-1 text-sm font-semibold text-gray-900">
+        {project.title}
+      </h3>
 
-      {/* 기술스택 */}
-      <div className="flex flex-wrap gap-1 mb-3">
-        {project.techStack.map((t) => (
-          <span key={t} className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-500 rounded-md">
-            {t}
+      <p className="mb-3 line-clamp-2 text-xs leading-relaxed text-gray-400">
+        {project.description}
+      </p>
+
+      <div className="mb-3 flex flex-wrap gap-1">
+        {project.techStack.length ? (
+          project.techStack.map((t) => (
+            <span
+              key={t}
+              className="rounded-md bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500"
+            >
+              {t}
+            </span>
+          ))
+        ) : (
+          <span className="rounded-md bg-gray-100 px-2 py-0.5 text-[10px] text-gray-400">
+            기술 스택 없음
           </span>
-        ))}
+        )}
       </div>
 
-      {/* 하단 */}
-      <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-50">
+      <div className="mt-auto flex items-center justify-between border-t border-gray-50 pt-3">
         <div className="flex items-center gap-3 text-xs text-gray-400">
-          {/* 모집 인원 */}
-          <span className={isAlmostFull ? 'text-red-500 font-medium' : ''}>
+          <span className={isAlmostFull ? "font-medium text-red-500" : ""}>
             👥 {project.currentMembers}/{project.maxMembers}명
           </span>
-          {/* 마감일 */}
           <span>📅 {project.daysLeft}일 남음</span>
         </div>
-        {/* 참여 버튼 */}
+
         <button
           onClick={onApply}
-          className="px-3 py-1 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition"
+          className="rounded-lg bg-red-600 px-3 py-1 text-xs font-medium text-white transition hover:bg-red-700"
         >
           참여하기
         </button>
       </div>
     </div>
-  )
+  );
 }
 
-// ─── 로그인 유도 모달 ──────────────────────────────────────────
-function LoginModal({ onClose, onLogin }: { onClose: () => void; onLogin: () => void }) {
+function LoginModal({
+  onClose,
+  onLogin,
+}: {
+  onClose: () => void;
+  onLogin: () => void;
+}) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* 배경 */}
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      {/* 모달 */}
-      <div className="relative bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl text-center">
-        <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
+      <div
+        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      <div className="relative w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50">
           <span className="text-2xl">🔒</span>
         </div>
-        <h2 className="text-base font-bold text-gray-900 mb-2">로그인이 필요한 서비스예요</h2>
-        <p className="text-sm text-gray-400 mb-6">
-          프로젝트 참여 및 아이디어 등록은<br />로그인 후 이용할 수 있어요.
+
+        <h2 className="mb-2 text-base font-bold text-gray-900">
+          로그인이 필요한 서비스예요
+        </h2>
+
+        <p className="mb-6 text-sm text-gray-400">
+          프로젝트 참여 및 아이디어 등록은
+          <br />
+          로그인 후 이용할 수 있어요.
         </p>
+
         <div className="flex gap-2">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 transition"
+            className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm text-gray-500 transition hover:bg-gray-50"
           >
             취소
           </button>
+
           <button
             onClick={onLogin}
-            className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-medium text-white transition"
+            className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-medium text-white transition hover:bg-red-700"
           >
             로그인하기
           </button>
         </div>
       </div>
     </div>
-  )
+  );
 }
