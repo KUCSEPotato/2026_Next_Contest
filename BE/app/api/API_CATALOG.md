@@ -67,6 +67,7 @@
 - PATCH /projects/{project_id}: 프로젝트 메타데이터 수정(max_members 수정 가능)
 - DELETE /projects/{project_id}: 프로젝트 soft delete
 - PATCH /projects/{project_id}/status: 프로젝트 상태 변경
+- POST /projects/{project_id}/revert-to-idea: **프로젝트 → 아이디어 복원**(프로젝트 실패 시 원본 아이디어로 되돌리기)
 
 ### 지원/초대/멤버
 - POST /projects/{project_id}/applications: 프로젝트 지원
