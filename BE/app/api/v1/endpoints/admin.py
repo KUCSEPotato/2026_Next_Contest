@@ -9,6 +9,7 @@ from app.dependencies.auth import get_current_user_id
 from app.models import Project
 from app.models import Report
 from app.models import User
+from app.services.economy import send_stale_project_notifications
 
 router = APIRouter()
 
@@ -123,3 +124,14 @@ async def process_report(
     report.handled_at = datetime.now(timezone.utc)
     db.commit()
     return success_response(data={"id": report.id, "status": report.status})
+
+
+@router.post("/projects/stale-reminders/run", summary="미진행 프로젝트 알림 배치 실행", description="30일 이상 시작되지 않은 프로젝트에 알림을 생성합니다.")
+async def run_stale_project_reminders(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    _ensure_admin(db, current_user_id)
+    created_count = send_stale_project_notifications(db, stale_days=30)
+    db.commit()
+    return success_response(data={"created_notifications": created_count})
