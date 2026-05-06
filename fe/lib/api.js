@@ -42,11 +42,15 @@ async function handleResponse(res, errorMessage) {
    Auth
 ========================= */
 
-export async function signupApi(payload) {
+export async function signupApi(email, nickname, password) {
   const res = await fetch(`${API_BASE_URL}/api/v1/auth/signup`, {
     method: "POST",
     headers: jsonHeaders(),
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      email,
+      nickname,
+      password,
+    }),
   });
 
   return handleResponse(res, "회원가입에 실패했습니다.");
