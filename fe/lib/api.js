@@ -190,3 +190,27 @@ export async function addMyInterestApi(name, interestLevel = 3) {
 
   return handleResponse(res, "관심 분야 추가 실패");
 }
+
+export async function signupApi(payload) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/auth/signup`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+  
+    return handleResponse(res, "회원가입에 실패했습니다.");
+  }
+
+  export async function loginApi(payload) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+  
+    return handleResponse(res, "로그인에 실패했습니다.");
+  }
