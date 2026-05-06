@@ -2,6 +2,10 @@ from app.models.entities import AdoptionRequest
 from app.models.entities import Application
 from app.models.entities import ChatMessage
 from app.models.entities import ChatRoom
+from app.models.entities import CommunityPost
+from app.models.entities import CommunityPostComment
+from app.models.entities import CommunityPostReaction
+from app.models.entities import CommunityCommentReaction
 from app.models.entities import FailureStory
 from app.models.entities import Idea
 from app.models.entities import IdeaBookmark
@@ -35,6 +39,10 @@ __all__ = [
 	"Application",
 	"ChatMessage",
 	"ChatRoom",
+	"CommunityPost",
+	"CommunityPostComment",
+	"CommunityPostReaction",
+	"CommunityCommentReaction",
 	"FailureStory",
 	"Idea",
 	"IdeaBookmark",
