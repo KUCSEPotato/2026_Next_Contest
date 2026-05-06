@@ -1,34 +1,25 @@
 from datetime import datetime, timezone, date
-from collections import defaultdict
 from math import ceil
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
-from fastapi import WebSocket, WebSocketDisconnect
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.v1.response import success_response
-from app.core.realtime import project_todo_channel
-from app.core.realtime import realtime_hub
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
-from app.dependencies.auth import get_current_user_id_from_token
 from app.models import Application
-from app.models import ChatRoom
 from app.models import FailureStory
-from app.models import Idea
 from app.models import Invitation
 from app.models import Project
 from app.models import ProjectMember
 from app.models import ProjectMilestone
 from app.models import ProjectRecruitment
-from app.models import TodoAssignment
 from app.models import ProjectSkill
 from app.models import Skill
 from app.models import Retrospective
 from app.models import Review
 from app.models import Todo
-from app.models import User
 from app.models import UserRatingAggregate
 from app.schemas import ApplicationCreateRequest
 from app.schemas import ApplicationDecisionRequest
@@ -41,10 +32,6 @@ from app.schemas import RecruitmentCreateRequest
 from app.schemas import RecruitmentUpdateRequest
 from app.schemas import TodoCreateRequest
 from app.schemas import TodoUpdateRequest
-from app.services.economy import reward_project_completed
-from app.services.economy import reward_project_registration
-from app.services.economy import reward_project_recycled
-from app.services.economy import reward_project_started
 
 router = APIRouter()
 
@@ -109,96 +96,6 @@ def _ensure_project_member(db: Session, project_id: int, user_id: int) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Project member permission required")
 
 
-def _get_active_project_member_ids(db: Session, project_id: int) -> set[int]:
-    rows = (
-        db.query(ProjectMember.user_id)
-        .filter(ProjectMember.project_id == project_id, ProjectMember.left_at.is_(None))
-        .all()
-    )
-    return {user_id for (user_id,) in rows}
-
-
-def _normalize_assignee_ids(payload: TodoCreateRequest | TodoUpdateRequest) -> list[int]:
-    if payload.assignee_ids:
-        return list(dict.fromkeys(payload.assignee_ids))
-    if payload.assignee_id is not None:
-        return [payload.assignee_id]
-    return []
-
-
-def _validate_todo_assignees(db: Session, project_id: int, assignee_ids: list[int]) -> None:
-    if not assignee_ids:
-        return
-    member_ids = _get_active_project_member_ids(db, project_id)
-    invalid_ids = [user_id for user_id in assignee_ids if user_id not in member_ids]
-    if invalid_ids:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Todo assignees must be project members")
-
-
-def _sync_todo_assignments(db: Session, todo: Todo, assignee_ids: list[int]) -> None:
-    existing_assignments = db.query(TodoAssignment).filter(TodoAssignment.todo_id == todo.id).all()
-    for assignment in existing_assignments:
-        db.delete(assignment)
-
-    if not assignee_ids:
-        todo.assignee_id = None
-        return
-
-    todo.assignee_id = assignee_ids[0]
-    for user_id in assignee_ids:
-        db.add(TodoAssignment(todo_id=todo.id, user_id=user_id, is_done=False))
-
-
-def _serialize_todo_assignments(db: Session, todo_ids: list[int]) -> dict[int, list[dict]]:
-    if not todo_ids:
-        return {}
-
-    assignments = db.query(TodoAssignment).filter(TodoAssignment.todo_id.in_(todo_ids)).all()
-    user_ids = {assignment.user_id for assignment in assignments}
-    users = {user.id: user for user in db.query(User).filter(User.id.in_(user_ids)).all()} if user_ids else {}
-
-    grouped: dict[int, list[dict]] = defaultdict(list)
-    for assignment in assignments:
-        user = users.get(assignment.user_id)
-        grouped[assignment.todo_id].append(
-            {
-                "id": assignment.id,
-                "user_id": assignment.user_id,
-                "nickname": user.nickname if user else None,
-                "avatar_url": user.avatar_url if user else None,
-                "is_done": assignment.is_done,
-                "done_at": assignment.done_at.isoformat() if assignment.done_at else None,
-            }
-        )
-    return grouped
-
-
-def _build_todo_response(todo: Todo, assignments: list[dict] | None = None) -> dict:
-    return {
-        "id": todo.id,
-        "title": todo.title,
-        "description": todo.description,
-        "stage": todo.stage,
-        "status": todo.status,
-        "priority": todo.priority,
-        "due_date": todo.due_date.isoformat() if todo.due_date else None,
-        "completed_at": todo.completed_at.isoformat() if todo.completed_at else None,
-        "assignee_id": todo.assignee_id,
-        "assignments": assignments or [],
-    }
-
-
-async def _broadcast_todo_snapshot(db: Session, project_id: int, todo: Todo, event_type: str) -> None:
-    assignments = _serialize_todo_assignments(db, [todo.id]).get(todo.id, [])
-    await realtime_hub.broadcast_json(
-        project_todo_channel(project_id),
-        {
-            "type": event_type,
-            "data": _build_todo_response(todo, assignments),
-        },
-    )
-
-
 @router.post("", summary="프로젝트 생성", description="새 프로젝트를 생성하고 생성자를 리더 멤버로 등록합니다.")
 async def create_project(
     payload: ProjectCreateRequest,
@@ -228,7 +125,6 @@ async def create_project(
     db.flush()
 
     db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
-    reward_project_registration(db, project)
     db.commit()
     db.refresh(project)
     return success_response(data={"id": project.id, "title": project.title, "max_members": project.max_members})
@@ -395,18 +291,6 @@ async def decide_application(
         if exists_member is None:
             db.add(ProjectMember(project_id=project_id, user_id=app_obj.applicant_id, role_in_project=payload.role_in_project or "member"))
 
-        default_room = (
-            db.query(ChatRoom)
-            .filter(
-                ChatRoom.project_id == project_id,
-                ChatRoom.name == "team",
-                ChatRoom.is_active.is_(True),
-            )
-            .first()
-        )
-
-    if default_room is None:
-        db.add(ChatRoom(project_id=project_id, name="team", is_active=True))
     db.commit()
     return success_response(data={"id": app_obj.id, "status": app_obj.status})
 
@@ -449,66 +333,9 @@ async def delete_project(
     """
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
-    if project.idea_id is not None and project.status != "completed":
-        reward_project_recycled(db, project)
     project.deleted_at = datetime.now(timezone.utc)
     db.commit()
     return success_response(data={"deleted": True, "id": project_id})
-
-
-@router.post("/{project_id}/revert-to-idea", summary="프로젝트를 아이디어로 되돌리기", description="프로젝트를 아이디어로 되돌립니다(프로젝트 soft delete, 원본 Idea 복원).")
-async def revert_project_to_idea(
-    project_id: int,
-    current_user_id: int = Depends(get_current_user_id),
-    db: Session = Depends(get_db),
-) -> dict:
-    """프로젝트 → 아이디어 되돌리기 API.
-
-    목적:
-    - 프로젝트가 실패하거나 폐기될 때 원본 아이디어로 상태 복원
-    - 프로젝트는 soft delete, 원본 Idea의 converted_to_project_id 제거
-
-    Swagger 테스트 방법:
-    - 리더 계정으로 호출합니다.
-    - path의 `project_id`를 전달합니다.
-
-    권한/검증:
-    - 프로젝트 리더만 가능 (403)
-    - 프로젝트가 없으면 404
-    - 원본 Idea가 없으면 경고만 출력 (프로젝트는 삭제)
-
-    흐름:
-    1. 프로젝트 검증 (존재, 리더 확인)
-    2. 원본 Idea가 있으면 converted_to_project_id 제거
-    3. 프로젝트 soft delete
-    """
-    project = _get_project_or_404(db, project_id)
-    _ensure_project_leader(project, current_user_id)
-    
-    # 원본 Idea 복원 (있으면)
-    idea_reverted = False
-    if project.idea_id is not None:
-        idea = db.get(Idea, project.idea_id)
-        if idea is not None and idea.deleted_at is None:
-            # Idea의 변환 기록 제거
-            idea.converted_to_project_id = None
-            idea_reverted = True
-
-    if project.idea_id is not None:
-        reward_project_recycled(db, project)
-    
-    # 프로젝트 soft delete
-    project.deleted_at = datetime.now(timezone.utc)
-    db.commit()
-    
-    return success_response(
-        data={
-            "reverted": True,
-            "project_id": project_id,
-            "idea_id": project.idea_id,
-            "idea_reverted": idea_reverted,
-        }
-    )
 
 
 @router.patch("/{project_id}/status", summary="프로젝트 상태 변경", description="planning/in_progress/paused/completed 등 상태를 갱신합니다.")
@@ -527,14 +354,7 @@ async def update_project_status(
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
 
-    previous_status = project.status
     project.status = payload.status
-
-    if previous_status != "in_progress" and payload.status == "in_progress":
-        reward_project_started(db, project)
-    if previous_status != "completed" and payload.status == "completed":
-        reward_project_completed(db, project)
-
     db.commit()
     return success_response(data={"id": project.id, "status": project.status})
 
@@ -801,22 +621,14 @@ async def create_todo(
         assignee_id=payload.assignee_id,
         title=payload.title,
         description=payload.description,
-        stage=payload.stage,
         status=payload.status,
         priority=payload.priority,
         due_date=payload.due_date,
     )
     db.add(todo)
-    db.flush()
-
-    assignee_ids = _normalize_assignee_ids(payload)
-    _validate_todo_assignees(db, project_id, assignee_ids)
-    _sync_todo_assignments(db, todo, assignee_ids)
     db.commit()
     db.refresh(todo)
-    await _broadcast_todo_snapshot(db, project_id, todo, "todo.created")
-    assignments = _serialize_todo_assignments(db, [todo.id]).get(todo.id, [])
-    return success_response(data=_build_todo_response(todo, assignments))
+    return success_response(data={"id": todo.id, "status": todo.status})
 
 
 @router.get("/{project_id}/todos", summary="Todo 목록", description="프로젝트 멤버가 Todo 목록을 조회합니다.")
@@ -829,9 +641,17 @@ async def list_todos(
     _get_project_or_404(db, project_id)
     _ensure_project_member(db, project_id, current_user_id)
     todos = db.query(Todo).filter(Todo.project_id == project_id).order_by(Todo.id.desc()).all()
-    assignments_by_todo = _serialize_todo_assignments(db, [todo.id for todo in todos])
     return success_response(
-        data=[_build_todo_response(todo, assignments_by_todo.get(todo.id, [])) for todo in todos]
+        data=[
+            {
+                "id": t.id,
+                "title": t.title,
+                "status": t.status,
+                "priority": t.priority,
+                "assignee_id": t.assignee_id,
+            }
+            for t in todos
+        ]
     )
 
 
@@ -854,89 +674,14 @@ async def update_todo(
     if todo is None or todo.project_id != project_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Todo not found")
 
-    update_data = payload.model_dump(exclude_none=True)
-    assignee_ids = _normalize_assignee_ids(payload)
-
-    for field in ("title", "description", "stage", "status", "priority", "due_date"):
-        if field in update_data:
-            setattr(todo, field, update_data[field])
-
-    if "assignee_id" in update_data or "assignee_ids" in update_data:
-        _validate_todo_assignees(db, project_id, assignee_ids)
-        _sync_todo_assignments(db, todo, assignee_ids)
+    for field, value in payload.model_dump(exclude_none=True).items():
+        setattr(todo, field, value)
 
     if todo.status == "done" and todo.completed_at is None:
         todo.completed_at = datetime.now(timezone.utc)
 
     db.commit()
-    db.refresh(todo)
-    await _broadcast_todo_snapshot(db, project_id, todo, "todo.updated")
-    assignments = _serialize_todo_assignments(db, [todo.id]).get(todo.id, [])
-    return success_response(data=_build_todo_response(todo, assignments))
-
-
-@router.patch("/{project_id}/todos/{todo_id}/done", summary="Todo 완료 토글", description="현재 사용자 할당분의 완료 상태를 토글합니다.")
-async def toggle_todo_assignment_done(
-    project_id: int,
-    todo_id: int,
-    current_user_id: int = Depends(get_current_user_id),
-    db: Session = Depends(get_db),
-) -> dict:
-    """Todo assignment 완료 토글 API.
-
-    Swagger 테스트 방법:
-    - Authorization 헤더를 설정합니다.
-    - path의 project_id, todo_id를 전달합니다.
-
-    동작:
-    - 요청 유저의 todo_assignments.is_done 를 true/false 토글합니다.
-    - done 상태면 done_at 을 현재 시각으로 기록하고, false면 null로 되돌립니다.
-    - 본인 assignment가 없으면 403을 반환합니다.
-    """
-    _get_project_or_404(db, project_id)
-    _ensure_project_member(db, project_id, current_user_id)
-
-    todo = db.get(Todo, todo_id)
-    if todo is None or todo.project_id != project_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Todo not found")
-
-    assignment = (
-        db.query(TodoAssignment)
-        .filter(TodoAssignment.todo_id == todo_id, TodoAssignment.user_id == current_user_id)
-        .first()
-    )
-    if assignment is None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Todo assignment not found")
-
-    assignment.is_done = not assignment.is_done
-    assignment.done_at = datetime.now(timezone.utc) if assignment.is_done else None
-    db.commit()
-    db.refresh(assignment)
-
-    assignments = _serialize_todo_assignments(db, [todo.id]).get(todo.id, [])
-    await realtime_hub.broadcast_json(
-        project_todo_channel(project_id),
-        {
-            "type": "todo.updated",
-            "data": _build_todo_response(todo, assignments),
-            "meta": {
-                "assignment_id": assignment.id,
-                "user_id": current_user_id,
-                "is_done": assignment.is_done,
-                "done_at": assignment.done_at.isoformat() if assignment.done_at else None,
-            },
-        },
-    )
-
-    return success_response(
-        data={
-            "todo_id": todo.id,
-            "assignment_id": assignment.id,
-            "user_id": current_user_id,
-            "is_done": assignment.is_done,
-            "done_at": assignment.done_at.isoformat() if assignment.done_at else None,
-        }
-    )
+    return success_response(data={"id": todo.id, "updated": True})
 
 
 @router.delete("/{project_id}/todos/{todo_id}", summary="Todo 삭제", description="프로젝트 멤버가 Todo를 삭제합니다.")
@@ -954,76 +699,7 @@ async def delete_todo(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Todo not found")
     db.delete(todo)
     db.commit()
-    await realtime_hub.broadcast_json(
-        project_todo_channel(project_id),
-        {
-            "type": "todo.deleted",
-            "data": {"todo_id": todo_id, "project_id": project_id},
-        },
-    )
     return success_response(data={"deleted": True, "todo_id": todo_id})
-
-
-@router.websocket("/{project_id}/todos/ws")
-async def project_todos_websocket(
-    websocket: WebSocket,
-    project_id: int,
-    db: Session = Depends(get_db),
-) -> None:
-    token = websocket.query_params.get("token") or websocket.query_params.get("access_token")
-    if not token:
-        await websocket.close(code=1008)
-        return
-
-    try:
-        current_user_id = get_current_user_id_from_token(token)
-    except HTTPException:
-        await websocket.close(code=1008)
-        return
-
-    project = db.get(Project, project_id)
-    if project is None or project.deleted_at is not None:
-        await websocket.close(code=1008)
-        return
-
-    _ensure_project_member(db, project_id, current_user_id)
-
-    channel = project_todo_channel(project_id)
-    await realtime_hub.connect(channel, websocket)
-    try:
-        todos = db.query(Todo).filter(Todo.project_id == project_id).order_by(Todo.id.desc()).all()
-        assignments_by_todo = _serialize_todo_assignments(db, [todo.id for todo in todos])
-        await websocket.send_json(
-            {
-                "type": "todo.snapshot",
-                "data": [_build_todo_response(todo, assignments_by_todo.get(todo.id, [])) for todo in todos],
-            }
-        )
-
-        while True:
-            payload = await websocket.receive_json()
-            event_type = payload.get("type", "ping")
-
-            if event_type == "ping":
-                await websocket.send_json({"type": "pong"})
-                continue
-
-            if event_type == "todo.refresh":
-                todos = db.query(Todo).filter(Todo.project_id == project_id).order_by(Todo.id.desc()).all()
-                assignments_by_todo = _serialize_todo_assignments(db, [todo.id for todo in todos])
-                await websocket.send_json(
-                    {
-                        "type": "todo.snapshot",
-                        "data": [_build_todo_response(todo, assignments_by_todo.get(todo.id, [])) for todo in todos],
-                    }
-                )
-                continue
-
-            await websocket.send_json({"type": "error", "detail": "Unsupported event type"})
-    except WebSocketDisconnect:
-        pass
-    finally:
-        realtime_hub.disconnect(channel, websocket)
 
 
 @router.post("/{project_id}/retrospectives", summary="회고 작성", description="프로젝트 멤버가 회고를 작성합니다.")
