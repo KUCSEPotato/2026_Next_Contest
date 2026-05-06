@@ -81,25 +81,31 @@ export default function NewIdeaPage() {
         is_open: true,
       };
 
-      const result = await createIdeaApi(payload);
-
-      alert("아이디어가 등록되었습니다.");
-
-      const ideaId = result?.data?.id;
-      if (projectId) {
-        router.push(`/projects/${projectId}`);
-      } else if (ideaId) {
-        router.push(`/ideas/${ideaId}`);
-      } else {
-        router.push("/mainpage");
+      try {
+        setIsSubmitting(true);
+      
+        // payload 만드는 코드 그대로
+      
+        const result = await createIdeaApi(payload);
+      
+        const ideaId = result?.data?.id;
+        const projectId =
+          result?.data?.project_id ||
+          result?.data?.converted_to_project_id;
+      
+        alert("아이디어가 등록되었습니다.");
+      
+        if (projectId) {
+          router.push(`/projects/${projectId}`);
+        } else {
+          router.push("/mainpage");
+        }
+      } catch (error) {
+        console.error(error);
+        alert("아이디어 등록에 실패했습니다.");
+      } finally {
+        setIsSubmitting(false);
       }
-    } catch (error) {
-      console.error(error);
-      alert("아이디어 등록에 실패했습니다.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
