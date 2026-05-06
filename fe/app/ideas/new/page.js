@@ -4,15 +4,29 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createIdeaApi } from "../../../lib/api";
 
+const CATEGORIES = [
+  "IT/소프트웨어",
+  "경영/경제",
+  "디자인/UI·UX",
+  "AI/데이터",
+  "교육/학습",
+  "금융/핀테크",
+  "커머스/쇼핑",
+  "소셜/커뮤니티",
+  "헬스케어",
+];
+
 export default function NewIdeaPage() {
   const router = useRouter();
 
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [description, setDescription] = useState("");
-  const [domain, setDomain] = useState("웹/앱");
+  const [domain, setDomain] = useState("IT/소프트웨어");
   const [difficulty, setDifficulty] = useState("intermediate");
   const [requiredMembers, setRequiredMembers] = useState(3);
+  const [expectedPeriod, setExpectedPeriod] = useState("");
+  const [preferredMembers, setPreferredMembers] = useState("");
   const [techStackText, setTechStackText] = useState("");
   const [hashtagsText, setHashtagsText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -39,10 +53,20 @@ export default function NewIdeaPage() {
     try {
       setIsSubmitting(true);
 
+      const fullDescription = [
+        description.trim(),
+        expectedPeriod.trim()
+          ? `\n\n[예상 진행 기간]\n${expectedPeriod.trim()}`
+          : "",
+        preferredMembers.trim()
+          ? `\n\n[이런 분과 함께하고 싶어요]\n${preferredMembers.trim()}`
+          : "",
+      ].join("");
+
       const payload = {
         title: title.trim(),
         summary: summary.trim(),
-        description: description.trim(),
+        description: fullDescription,
         domain,
         difficulty,
         required_members: Number(requiredMembers),
@@ -122,21 +146,18 @@ export default function NewIdeaPage() {
           <div className="grid gap-6 md:grid-cols-2">
             <div>
               <label className="mb-2 block text-sm font-semibold text-slate-700">
-                관련 분야
+                프로젝트 유형
               </label>
               <select
                 value={domain}
                 onChange={(e) => setDomain(e.target.value)}
                 className={inputClassName}
               >
-                <option value="웹/앱">웹/앱</option>
-                <option value="AI/데이터">AI/데이터</option>
-                <option value="교육/학습">교육/학습</option>
-                <option value="커머스/쇼핑">커머스/쇼핑</option>
-                <option value="소셜/커뮤니티">소셜/커뮤니티</option>
-                <option value="헬스케어">헬스케어</option>
-                <option value="경영/경제">경영/경제</option>
-                <option value="기타">기타</option>
+                {CATEGORIES.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -164,6 +185,7 @@ export default function NewIdeaPage() {
               <input
                 type="number"
                 min="1"
+                max="100"
                 value={requiredMembers}
                 onChange={(e) => setRequiredMembers(e.target.value)}
                 className={inputClassName}
@@ -172,15 +194,42 @@ export default function NewIdeaPage() {
 
             <div>
               <label className="mb-2 block text-sm font-semibold text-slate-700">
-                기술 스택
+                예상 진행 기간
               </label>
               <input
-                value={techStackText}
-                onChange={(e) => setTechStackText(e.target.value)}
-                placeholder="예: React, FastAPI, PostgreSQL"
+                value={expectedPeriod}
+                onChange={(e) => setExpectedPeriod(e.target.value)}
+                placeholder="예: 3개월, 한 학기, 2026년 3월까지"
                 className={inputClassName}
               />
             </div>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              이런 분과 함께하고 싶어요
+            </label>
+            <textarea
+              value={preferredMembers}
+              onChange={(e) => setPreferredMembers(e.target.value)}
+              placeholder="예: 백엔드 경험이 있는 분, 주 1회 이상 회의 가능한 분, 꾸준히 소통 가능한 분"
+              className="min-h-28 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              기술 스택
+            </label>
+            <input
+              value={techStackText}
+              onChange={(e) => setTechStackText(e.target.value)}
+              placeholder="예: React, FastAPI, PostgreSQL"
+              className={inputClassName}
+            />
+            <p className="mt-2 text-sm text-slate-500">
+              쉼표로 구분해서 입력해주세요.
+            </p>
           </div>
 
           <div>
