@@ -6,6 +6,8 @@ import { getIdeasApi } from "../../lib/api";
 
 interface Project {
   id: number;
+  project_id?: number | null;
+  converted_to_project_id?: number | null;
   title: string;
   description: string;
   summary?: string;
@@ -77,6 +79,8 @@ const useAuth = () => {
 function normalizeIdea(idea: any): Project {
   return {
     id: idea.id,
+    project_id: idea.project_id,
+    converted_to_project_id: idea.converted_to_project_id,
     title: idea.title || "제목 없음",
     description: idea.summary || idea.description || "설명이 없습니다.",
     summary: idea.summary,
@@ -143,10 +147,10 @@ export default function MainPage() {
 
   const handleProjectClick = (idea: any) => {
     if (!handleProtectedAction()) return;
-  
+
     const projectId =
       idea.project_id || idea.converted_to_project_id;
-  
+
     if (projectId) {
       router.push(`/projects/${projectId}`);
     } else {
@@ -157,10 +161,10 @@ export default function MainPage() {
   const handleApply = (e: React.MouseEvent, idea: any) => {
     e.stopPropagation();
     if (!handleProtectedAction()) return;
-  
+
     const projectId =
       idea.project_id || idea.converted_to_project_id;
-  
+
     if (projectId) {
       router.push(`/projects/${projectId}`);
     } else {
@@ -326,8 +330,8 @@ export default function MainPage() {
                 <ProjectCard
                   key={project.id}
                   project={project}
-                  onClick={() => handleProjectClick(project.id)}
-                  onApply={(e) => handleApply(e, project.id)}
+                  onClick={() => handleProjectClick(project)}
+                  onApply={(e) => handleApply(e, project)}
                 />
               ))}
             </div>
