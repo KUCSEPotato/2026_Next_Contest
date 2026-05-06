@@ -1,18 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   getProjectApi,
   applyProjectApi,
   requestAdoptionApi,
+  getMyProfileApi,
 } from "../../../lib/api";
 
 export default function ProjectDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const projectId = params.projectId;
 
   const [project, setProject] = useState(null);
+  const [myProfile, setMyProfile] = useState(null);
   const [message, setMessage] = useState("");
   const [isApplying, setIsApplying] = useState(false);
 
@@ -25,8 +28,13 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     async function fetchProject() {
       try {
-        const result = await getProjectApi(projectId);
-        setProject(result.data);
+        const [projectResult, profileResult] = await Promise.all([
+          getProjectApi(projectId),
+          getMyProfileApi(),
+        ]);
+
+        setProject(projectResult.data);
+        setMyProfile(profileResult.data);
       } catch (error) {
         console.error(error);
         alert("프로젝트 정보를 불러오지 못했습니다.");
@@ -35,6 +43,8 @@ export default function ProjectDetailPage() {
 
     fetchProject();
   }, [projectId]);
+
+  const isLeader = project?.leader_id === myProfile?.id;
 
   const handleApply = async () => {
     if (!message.trim()) {
@@ -157,30 +167,49 @@ export default function ProjectDetailPage() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-900">
-                프로젝트 지원하기
-              </h2>
+            {isLeader ? (
+              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-bold text-slate-900">
+                  지원자 관리
+                </h2>
 
-              <p className="mt-2 text-sm text-slate-500">
-                팀장에게 보낼 간단한 소개와 참여 의지를 적어주세요.
-              </p>
+                <p className="mt-2 text-sm text-slate-500">
+                  이 프로젝트에 지원한 사람들을 확인하고 팀원을 확정할 수 있습니다.
+                </p>
 
-              <textarea
-                className={textareaClassName}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="예: React와 UI 구현을 맡아 참여하고 싶습니다."
-              />
+                <button
+                  onClick={() => router.push(`/projects/${projectId}/manage`)}
+                  className="mt-4 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
+                >
+                  지원자 관리하기
+                </button>
+              </section>
+            ) : (
+              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-bold text-slate-900">
+                  프로젝트 지원하기
+                </h2>
 
-              <button
-                onClick={handleApply}
-                disabled={isApplying}
-                className="mt-4 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-              >
-                {isApplying ? "지원 중..." : "지원하기"}
-              </button>
-            </section>
+                <p className="mt-2 text-sm text-slate-500">
+                  팀장에게 보낼 간단한 소개와 참여 의지를 적어주세요.
+                </p>
+
+                <textarea
+                  className={textareaClassName}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="예: React와 UI 구현을 맡아 참여하고 싶습니다."
+                />
+
+                <button
+                  onClick={handleApply}
+                  disabled={isApplying}
+                  className="mt-4 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                >
+                  {isApplying ? "지원 중..." : "지원하기"}
+                </button>
+              </section>
+            )}
 
             <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-bold text-slate-900">
