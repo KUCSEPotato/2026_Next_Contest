@@ -101,7 +101,7 @@ def create_app() -> FastAPI:
 
     allowed_origins = [
         origin.strip()
-        for origin in [settings.frontend_origin, "http://localhost:3000", "http://127.0.0.1:3000"]
+        for origin in [settings.frontend_origin, "http://localhost:3000", "http://127.0.0.1:3000", "http://3.37.87.121:3000", ]
         if origin
     ]
     if allowed_origins:
