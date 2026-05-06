@@ -83,13 +83,15 @@ export default function NewIdeaPage() {
 
       const result = await createIdeaApi(payload);
 
+      const ideaId = result?.data?.id;
+      const projectId =
+        result?.data?.project_id ||
+        result?.data?.converted_to_project_id;
+
       alert("아이디어가 등록되었습니다.");
 
-      const ideaId = result?.data?.id;
       if (projectId) {
         router.push(`/projects/${projectId}`);
-      } else if (ideaId) {
-        router.push(`/ideas/${ideaId}`);
       } else {
         router.push("/mainpage");
       }
@@ -201,7 +203,7 @@ export default function NewIdeaPage() {
               <input
                 value={expectedPeriod}
                 onChange={(e) => setExpectedPeriod(e.target.value)}
-                placeholder="예: 3개월, 한 학기, 2026년 3월까지"
+                placeholder="예: 3개월, 한 학기"
                 className={inputClassName}
               />
             </div>
@@ -214,45 +216,14 @@ export default function NewIdeaPage() {
             <textarea
               value={preferredMembers}
               onChange={(e) => setPreferredMembers(e.target.value)}
-              placeholder="예: 백엔드 경험이 있는 분, 주 1회 이상 회의 가능한 분, 꾸준히 소통 가능한 분"
               className="min-h-28 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
             />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-700">
-              기술 스택
-            </label>
-            <input
-              value={techStackText}
-              onChange={(e) => setTechStackText(e.target.value)}
-              placeholder="예: React, FastAPI, PostgreSQL"
-              className={inputClassName}
-            />
-            <p className="mt-2 text-sm text-slate-500">
-              쉼표로 구분해서 입력해주세요.
-            </p>
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-700">
-              해시태그
-            </label>
-            <input
-              value={hashtagsText}
-              onChange={(e) => setHashtagsText(e.target.value)}
-              placeholder="예: 협업, 초보환영, AI추천"
-              className={inputClassName}
-            />
-            <p className="mt-2 text-sm text-slate-500">
-              쉼표로 구분해서 입력해주세요.
-            </p>
           </div>
 
           <div className="flex justify-end gap-3 pt-4">
             <button
               onClick={() => router.back()}
-              className="rounded-xl border border-slate-300 px-6 py-3 font-semibold text-slate-600 transition hover:bg-slate-100"
+              className="rounded-xl border px-6 py-3"
             >
               취소
             </button>
@@ -260,7 +231,7 @@ export default function NewIdeaPage() {
             <button
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="rounded-xl bg-red-600 px-6 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+              className="rounded-xl bg-red-600 px-6 py-3 text-white"
             >
               {isSubmitting ? "등록 중..." : "등록하기"}
             </button>
