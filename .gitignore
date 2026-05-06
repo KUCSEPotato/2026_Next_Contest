@@ -16,8 +16,12 @@ Project_Plan.md
 
 # Personal
 Studying.md
+Personal/
 
 # BE
 BE/.venv/
 BE/__pycache__/
 BE/.vscode/
+
+# pemkey
+pemkey/

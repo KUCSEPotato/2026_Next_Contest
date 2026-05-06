@@ -118,6 +118,8 @@
   "difficulty": "intermediate",
   "summary": "협업 매칭",
   "domain": "web",
+  "tech_stack": ["FastAPI", "PostgreSQL", "React"],
+  "hashtags": ["#matching", "#teamwork"],
   "required_members": 3,
   "is_open": true
 }
@@ -130,6 +132,8 @@
 ```json
 {
   "summary": "협업 매칭 + 회고",
+  "tech_stack": ["FastAPI", "Redis"],
+  "hashtags": ["#matching", "#retrospective"],
   "is_open": false
 }
 ```

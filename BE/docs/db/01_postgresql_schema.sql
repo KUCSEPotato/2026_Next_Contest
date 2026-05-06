@@ -162,6 +162,8 @@ CREATE TABLE IF NOT EXISTS ideas (
     summary TEXT,
     description TEXT NOT NULL,
     domain VARCHAR(50),
+    tech_stack JSON NOT NULL DEFAULT '[]'::json,
+    hashtags JSON NOT NULL DEFAULT '[]'::json,
     difficulty difficulty_level NOT NULL,
     required_members SMALLINT NOT NULL DEFAULT 1,
     is_open BOOLEAN NOT NULL DEFAULT TRUE,
@@ -201,13 +203,15 @@ CREATE TABLE IF NOT EXISTS projects (
     difficulty difficulty_level NOT NULL,
     status project_status NOT NULL DEFAULT 'planning',
     progress_percent NUMERIC(5,2) NOT NULL DEFAULT 0,
+    max_members SMALLINT NOT NULL DEFAULT 10,
     is_public BOOLEAN NOT NULL DEFAULT TRUE,
     started_at TIMESTAMPTZ,
     ended_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     deleted_at TIMESTAMPTZ,
-    CONSTRAINT projects_progress_check CHECK (progress_percent >= 0 AND progress_percent <= 100)
+    CONSTRAINT projects_progress_check CHECK (progress_percent >= 0 AND progress_percent <= 100),
+    CONSTRAINT projects_max_members_check CHECK (max_members BETWEEN 1 AND 100)
 );
 
 CREATE TABLE IF NOT EXISTS project_members (
@@ -238,6 +242,10 @@ CREATE TABLE IF NOT EXISTS project_recruitments (
     position_name VARCHAR(100) NOT NULL,
     required_count SMALLINT NOT NULL DEFAULT 1,
     status recruitment_status NOT NULL DEFAULT 'open',
+    difficulty difficulty_level,
+    category VARCHAR(50),
+    summary TEXT,
+    deadline DATE,
     description TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -278,6 +286,7 @@ CREATE TABLE IF NOT EXISTS todos (
     creator_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     title VARCHAR(200) NOT NULL,
     description TEXT,
+    stage VARCHAR(30) NOT NULL DEFAULT 'planning',
     status todo_status NOT NULL DEFAULT 'todo',
     priority SMALLINT NOT NULL DEFAULT 3,
     due_date DATE,
@@ -285,6 +294,29 @@ CREATE TABLE IF NOT EXISTS todos (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT todos_priority_check CHECK (priority BETWEEN 1 AND 5)
+);
+
+CREATE TABLE IF NOT EXISTS todo_assignments (
+    id BIGSERIAL PRIMARY KEY,
+    todo_id BIGINT NOT NULL REFERENCES todos(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    is_done BOOLEAN NOT NULL DEFAULT FALSE,
+    done_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT todo_assignments_unique UNIQUE (todo_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS todo_templates (
+    id BIGSERIAL PRIMARY KEY,
+    template_key VARCHAR(100) NOT NULL UNIQUE,
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    stage VARCHAR(30) NOT NULL DEFAULT 'planning',
+    priority SMALLINT NOT NULL DEFAULT 3,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS retrospectives (

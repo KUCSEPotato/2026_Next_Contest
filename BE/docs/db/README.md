@@ -5,11 +5,22 @@
 ## 파일 구성
 - 01_postgresql_schema.sql: 테이블, enum, 제약조건, 인덱스, 트리거를 포함한 실행 가능한 DDL
 - 02_erd.md: 핵심 테이블 관계 ERD(mermaid)
+- 03_add_idea_tech_stack_hashtags.sql: 기존 ideas 테이블에 tech_stack/hashtags 컬럼을 추가하는 보정 스크립트
+- 04_postgresql_schema_with_idea_tech_stack_hashtags_backfill.sql: 01+03 통합 버전(전체 스키마 + ideas tech_stack/hashtags 보정)
+- 05_add_todo_assignments_stage_templates.sql: todos.stage, todo_assignments, todo_templates 보정 스크립트
+- 06_complete_postgresql_schema.sql: 04+05를 한 번에 실행하는 완전 통합 진입점
 
 ## 적용 순서
 1. PostgreSQL 데이터베이스 생성
 2. 01_postgresql_schema.sql 실행
-3. 02_erd.md로 구조 검토
+3. 기존 DB가 있으면 03_add_idea_tech_stack_hashtags.sql 실행
+4. 02_erd.md로 구조 검토
+
+### 통합 실행 옵션
+- 전체 스키마와 ideas tech_stack/hashtags 보정을 한 번에 적용하려면 04_postgresql_schema_with_idea_tech_stack_hashtags_backfill.sql을 실행
+- 이 옵션은 01/03을 대체하기 위한 것이 아니라, 통합 실행 편의를 위한 보조 스크립트
+- 전체 스키마 + ideas 보정 + todo 관련 변경까지 한 번에 적용하려면 06_complete_postgresql_schema.sql을 실행
+- 이 파일은 04와 05를 묶은 단일 진입점이다
 
 ## 설계 원칙
 - soft delete: 주요 테이블에 deleted_at 컬럼

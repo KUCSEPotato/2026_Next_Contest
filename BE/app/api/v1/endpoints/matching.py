@@ -1,10 +1,12 @@
 from fastapi import APIRouter
 from fastapi import Depends, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.v1.response import success_response
 from app.db.session import get_db
 from app.models import Project
+from app.models import ProjectMember
 from app.models import User
 
 router = APIRouter()
@@ -37,10 +39,24 @@ async def recommend_projects(
     동작:
     - 공개 프로젝트를 최신순으로 조회해 추천 후보를 반환합니다.
     """
-    projects = db.query(Project).filter(Project.is_public.is_(True)).order_by(Project.created_at.desc()).limit(limit).all()
-    return success_response(
-        data=[
-            {"id": p.id, "title": p.title, "difficulty": p.difficulty, "status": p.status}
-            for p in projects
-        ]
-    )
+    projects = db.query(Project).filter(
+        Project.is_public.is_(True),
+        Project.deleted_at.is_(None)
+    ).order_by(Project.created_at.desc()).limit(limit).all()
+    
+    data = []
+    for p in projects:
+        current_members = db.query(func.count(ProjectMember.id)).filter(
+            ProjectMember.project_id == p.id,
+            ProjectMember.left_at.is_(None)
+        ).scalar() or 0
+        data.append({
+            "id": p.id,
+            "title": p.title,
+            "difficulty": p.difficulty,
+            "status": p.status,
+            "currentMembers": current_members,
+            "maxMembers": p.max_members,
+        })
+    
+    return success_response(data=data)

@@ -1,4 +1,10 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator  # pyright: ignore[reportMissingImports]
+except Exception:  # pragma: no cover - optional dependency during local setup
+    Instrumentator = None
 
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -18,7 +24,7 @@ OPENAPI_TAGS = [
     },
     {
         "name": "ideas",
-        "description": "아이디어 CRUD, 좋아요, 북마크 기능을 제공합니다.",
+        "description": "아이디어 CRUD, 기술 스택/해시태그, 좋아요, 북마크 기능을 제공합니다.",
     },
     {
         "name": "projects",
@@ -92,6 +98,29 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(api_router, prefix="/api/v1")
+
+    allowed_origins = [
+        origin.strip()
+        for origin in [settings.frontend_origin, "http://localhost:3000", "http://127.0.0.1:3000", "http://3.37.87.121:3000", ]
+        if origin
+    ]
+    if allowed_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=allowed_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
+    # Expose Prometheus metrics at /metrics for runtime monitoring.
+    if Instrumentator is not None:
+        Instrumentator(
+            should_group_status_codes=True,
+            should_ignore_untemplated=True,
+            excluded_handlers=["/metrics", "/docs", "/redoc", "/openapi.json"],
+        ).instrument(app).expose(app, include_in_schema=False, should_gzip=True)
+
     return app
 
 
