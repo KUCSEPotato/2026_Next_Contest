@@ -9,6 +9,7 @@
 -- 3. 07_add_max_members_to_projects.sql
 -- 4. 08_add_community_forum.sql
 -- 5. 09_add_idea_to_project_conversion.sql
+-- 8. 12_add_user_onboarding_fields.sql
 --
 -- Use `psql` so relative includes resolve from this file's directory.
 
@@ -17,3 +18,4 @@
 \ir 07_add_max_members_to_projects.sql
 \ir 08_add_community_forum.sql
 \ir 09_add_idea_to_project_conversion.sql
+\ir 12_add_user_onboarding_fields.sql
