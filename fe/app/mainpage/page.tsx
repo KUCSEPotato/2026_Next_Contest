@@ -190,6 +190,21 @@ export default function MainPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <header className="mx-auto flex max-w-6xl items-center justify-end gap-3 px-4 py-4">
+        <button
+          onClick={() => router.push("/notifications")}
+          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-red-300 hover:text-red-600"
+        >
+          알림
+        </button>
+
+        <button
+          onClick={() => router.push("/chat")}
+          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-red-300 hover:text-red-600"
+        >
+          채팅
+        </button>
+      </header>
       <main className="mx-auto max-w-6xl px-4 pb-16">
         <section className="py-10 text-center sm:py-14">
           <h1 className="mb-3 text-2xl font-bold leading-tight text-gray-900 sm:text-4xl">
