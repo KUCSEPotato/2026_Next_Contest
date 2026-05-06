@@ -6,6 +6,8 @@ import { getIdeasApi } from "../../lib/api";
 
 interface Project {
   id: number;
+  project_id?: number | null;
+  converted_to_project_id?: number | null;
   title: string;
   description: string;
   summary?: string;
@@ -77,6 +79,8 @@ const useAuth = () => {
 function normalizeIdea(idea: any): Project {
   return {
     id: idea.id,
+    project_id: idea.project_id,
+    converted_to_project_id: idea.converted_to_project_id,
     title: idea.title || "제목 없음",
     description: idea.summary || idea.description || "설명이 없습니다.",
     summary: idea.summary,
@@ -141,15 +145,31 @@ export default function MainPage() {
     router.push(path);
   };
 
-  const handleProjectClick = (id: number) => {
+  const handleProjectClick = (idea: any) => {
     if (!handleProtectedAction()) return;
-    router.push(`/ideas/${id}`);
+
+    const projectId =
+      idea.project_id || idea.converted_to_project_id;
+
+    if (projectId) {
+      router.push(`/projects/${projectId}`);
+    } else {
+      alert("연결된 프로젝트가 없습니다.");
+    }
   };
 
-  const handleApply = (e: React.MouseEvent, id: number) => {
+  const handleApply = (e: React.MouseEvent, idea: any) => {
     e.stopPropagation();
     if (!handleProtectedAction()) return;
-    router.push(`/ideas/${id}`);
+
+    const projectId =
+      idea.project_id || idea.converted_to_project_id;
+
+    if (projectId) {
+      router.push(`/projects/${projectId}`);
+    } else {
+      alert("연결된 프로젝트가 없습니다.");
+    }
   };
 
   const filteredProjects = projects.filter((p) => {
@@ -170,6 +190,21 @@ export default function MainPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <header className="mx-auto flex max-w-6xl items-center justify-end gap-3 px-4 py-4">
+        <button
+          onClick={() => router.push("/notifications")}
+          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-red-300 hover:text-red-600"
+        >
+          알림
+        </button>
+
+        <button
+          onClick={() => router.push("/chat")}
+          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-red-300 hover:text-red-600"
+        >
+          채팅
+        </button>
+      </header>
       <main className="mx-auto max-w-6xl px-4 pb-16">
         <section className="py-10 text-center sm:py-14">
           <h1 className="mb-3 text-2xl font-bold leading-tight text-gray-900 sm:text-4xl">
@@ -310,8 +345,8 @@ export default function MainPage() {
                 <ProjectCard
                   key={project.id}
                   project={project}
-                  onClick={() => handleProjectClick(project.id)}
-                  onApply={(e) => handleApply(e, project.id)}
+                  onClick={() => handleProjectClick(project)}
+                  onApply={(e) => handleApply(e, project)}
                 />
               ))}
             </div>

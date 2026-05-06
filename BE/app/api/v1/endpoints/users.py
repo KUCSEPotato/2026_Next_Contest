@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from app.api.v1.response import success_response
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
+from app.models import Idea
+from app.models import IdeaBookmark
 from app.models import Application
 from app.models import Project
 from app.models import ProjectMember
@@ -15,6 +17,8 @@ from app.models import UserInterest
 from app.models import UserRatingAggregate
 from app.models import UserSkill
 from app.models import Interest
+from app.schemas.users import OnboardingIdeaSelectionRequest
+from app.schemas.users import UserProfileUpdateRequest
 
 router = APIRouter()
 
@@ -45,23 +49,35 @@ async def get_my_profile(
         .filter(UserInterest.user_id == current_user_id)
         .all()
     )
+    selected_idea_ids = (
+        db.query(IdeaBookmark.idea_id)
+        .filter(IdeaBookmark.user_id == current_user_id)
+        .order_by(IdeaBookmark.id.asc())
+        .all()
+    )
 
     return success_response(
         data={
             "id": user.id,
             "email": user.email,
             "nickname": user.nickname,
+            "name": user.name,
+            "phone_number": user.phone_number,
+            "coin_balance": user.coin_balance,
             "bio": user.bio,
             "avatar_url": user.avatar_url,
             "skills": [name for (name,) in skills],
             "interests": [name for (name,) in interests],
+            "selected_idea_ids": [idea_id for (idea_id,) in selected_idea_ids],
+            "onboarding_step": user.onboarding_step,
+            "onboarding_completed_at": user.onboarding_completed_at,
         },
     )
 
 
 @router.patch("/me/profile", summary="내 프로필 수정", description="닉네임/소개/아바타 URL을 수정합니다.")
 async def update_my_profile(
-    payload: dict = Body(default={}),
+    payload: UserProfileUpdateRequest,
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -74,14 +90,59 @@ async def update_my_profile(
     if user is None or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    for field in ("nickname", "bio", "avatar_url"):
-        if field in payload:
-            setattr(user, field, payload[field])
+    if payload.nickname is not None and payload.nickname != user.nickname:
+        duplicate = db.query(User).filter(User.nickname == payload.nickname, User.id != user.id, User.deleted_at.is_(None)).first()
+        if duplicate:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nickname already exists")
+
+    for field in ("nickname", "name", "phone_number", "bio", "avatar_url"):
+        value = getattr(payload, field)
+        if value is not None:
+            setattr(user, field, value)
+
+    if user.onboarding_step == "profile_pending" and user.name and user.phone_number:
+        user.onboarding_step = "ideas_pending"
 
     db.commit()
     db.refresh(user)
     return success_response(
-        data={"id": user.id, "nickname": user.nickname, "bio": user.bio, "avatar_url": user.avatar_url},
+        data={
+            "id": user.id,
+            "nickname": user.nickname,
+            "name": user.name,
+            "phone_number": user.phone_number,
+            "coin_balance": user.coin_balance,
+            "bio": user.bio,
+            "avatar_url": user.avatar_url,
+            "onboarding_step": user.onboarding_step,
+        },
+    )
+
+
+@router.get("/me/onboarding", summary="내 온보딩 상태 조회", description="회원가입/프로필/관심 아이디어 선택 진행 상태를 조회합니다.")
+async def get_my_onboarding_state(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    user = db.get(User, current_user_id)
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    selected_idea_ids = (
+        db.query(IdeaBookmark.idea_id)
+        .filter(IdeaBookmark.user_id == current_user_id)
+        .order_by(IdeaBookmark.id.asc())
+        .all()
+    )
+
+    return success_response(
+        data={
+            "onboarding_step": user.onboarding_step,
+            "profile_ready": bool(user.name and user.phone_number),
+            "completed": user.onboarding_step == "completed",
+            "selected_idea_ids": [idea_id for (idea_id,) in selected_idea_ids],
+            "onboarding_completed_at": user.onboarding_completed_at,
+        },
     )
 
 
@@ -260,6 +321,48 @@ async def add_my_interest(
     db.add(user_interest)
     db.commit()
     return success_response(data={"interest_id": interest.id, "name": interest.name, "interest_level": interest_level})
+
+
+@router.post("/me/onboarding/ideas", summary="온보딩 관심 아이디어 선택", description="회원가입 마지막 단계에서 관심 있는 아이디어를 선택하고 온보딩을 완료합니다.")
+async def select_onboarding_ideas(
+    payload: OnboardingIdeaSelectionRequest,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    user = db.get(User, current_user_id)
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if not user.name or not user.phone_number:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Complete profile before selecting ideas")
+
+    selected_idea_ids = []
+    created_bookmarks = 0
+    for idea_id in payload.idea_ids:
+        idea = db.get(Idea, idea_id)
+        if idea is None or idea.deleted_at is not None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Idea not found: {idea_id}")
+
+        bookmark = db.query(IdeaBookmark).filter(IdeaBookmark.user_id == current_user_id, IdeaBookmark.idea_id == idea_id).first()
+        if bookmark is None:
+            bookmark = IdeaBookmark(user_id=current_user_id, idea_id=idea_id)
+            db.add(bookmark)
+            created_bookmarks += 1
+        selected_idea_ids.append(idea_id)
+
+    user.onboarding_step = "completed"
+    user.onboarding_completed_at = datetime.now(timezone.utc)
+    db.commit()
+
+    return success_response(
+        data={
+            "completed": True,
+            "selected_idea_ids": selected_idea_ids,
+            "bookmarks_created": created_bookmarks,
+            "onboarding_step": user.onboarding_step,
+            "onboarding_completed_at": user.onboarding_completed_at,
+        },
+    )
 
 
 @router.delete("/me/interests/{interest_id}", summary="내 관심 분야 삭제", description="등록된 관심 분야 매핑을 제거합니다.")

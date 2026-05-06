@@ -34,71 +34,73 @@ export default function NewIdeaPage() {
   const inputClassName =
     "w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100";
 
-  const handleSubmit = async () => {
-    if (!title.trim()) {
-      alert("프로젝트 주제를 입력해주세요.");
-      return;
-    }
-
-    if (!summary.trim()) {
-      alert("한 줄 요약을 입력해주세요.");
-      return;
-    }
-
-    if (!description.trim()) {
-      alert("상세 설명을 입력해주세요.");
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-
-      const fullDescription = [
-        description.trim(),
-        expectedPeriod.trim()
-          ? `\n\n[예상 진행 기간]\n${expectedPeriod.trim()}`
-          : "",
-        preferredMembers.trim()
-          ? `\n\n[이런 분과 함께하고 싶어요]\n${preferredMembers.trim()}`
-          : "",
-      ].join("");
-
-      const payload = {
-        title: title.trim(),
-        summary: summary.trim(),
-        description: fullDescription,
-        domain,
-        difficulty,
-        required_members: Number(requiredMembers),
-        tech_stack: techStackText
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
-        hashtags: hashtagsText
-          .split(",")
-          .map((item) => item.trim().replace(/^#/, ""))
-          .filter(Boolean),
-        is_open: true,
-      };
-
-      const result = await createIdeaApi(payload);
-
-      alert("아이디어가 등록되었습니다.");
-
-      const ideaId = result?.data?.id;
-      if (ideaId) {
-        router.push(`/ideas/${ideaId}`);
-      } else {
-        router.push("/mainpage");
+    const handleSubmit = async () => {
+      if (!title.trim()) {
+        alert("프로젝트 주제를 입력해주세요.");
+        return;
       }
-    } catch (error) {
-      console.error(error);
-      alert("아이디어 등록에 실패했습니다.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
+    
+      if (!summary.trim()) {
+        alert("한 줄 요약을 입력해주세요.");
+        return;
+      }
+    
+      if (!description.trim()) {
+        alert("상세 설명을 입력해주세요.");
+        return;
+      }
+    
+      try {
+        setIsSubmitting(true);
+    
+        const fullDescription = [
+          description.trim(),
+          expectedPeriod.trim()
+            ? `\n\n[예상 진행 기간]\n${expectedPeriod.trim()}`
+            : "",
+          preferredMembers.trim()
+            ? `\n\n[이런 분과 함께하고 싶어요]\n${preferredMembers.trim()}`
+            : "",
+        ].join("");
+    
+        const payload = {
+          title: title.trim(),
+          summary: summary.trim(),
+          description: fullDescription,
+          domain,
+          difficulty,
+          required_members: Number(requiredMembers),
+          tech_stack: techStackText
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean),
+          hashtags: hashtagsText
+            .split(",")
+            .map((item) => item.trim().replace(/^#/, ""))
+            .filter(Boolean),
+          is_open: true,
+        };
+    
+        const result = await createIdeaApi(payload);
+    
+        const projectId =
+          result?.data?.project_id ||
+          result?.data?.converted_to_project_id;
+    
+        alert("아이디어가 등록되었습니다.");
+    
+        if (projectId) {
+          router.push(`/projects/${projectId}`);
+        } else {
+          router.push("/mainpage");
+        }
+      } catch (error) {
+        console.error(error);
+        alert("아이디어 등록에 실패했습니다.");
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
       <div className="mx-auto w-full max-w-5xl rounded-2xl bg-white p-8 shadow">

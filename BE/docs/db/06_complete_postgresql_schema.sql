@@ -9,6 +9,10 @@
 -- 3. 07_add_max_members_to_projects.sql
 -- 4. 08_add_community_forum.sql
 -- 5. 09_add_idea_to_project_conversion.sql
+-- 6. 10_add_idea_comments.sql
+-- 7. 11_emergency_sync_ideas_table.sql
+-- 8. 12_add_user_onboarding_fields.sql
+-- 9. 13_add_coin_wallet_and_project_reminders.sql
 --
 -- Use `psql` so relative includes resolve from this file's directory.
 
@@ -17,3 +21,7 @@
 \ir 07_add_max_members_to_projects.sql
 \ir 08_add_community_forum.sql
 \ir 09_add_idea_to_project_conversion.sql
+\ir 10_add_idea_comments.sql
+\ir 11_emergency_sync_ideas_table.sql
+\ir 12_add_user_onboarding_fields.sql
+\ir 13_add_coin_wallet_and_project_reminders.sql
