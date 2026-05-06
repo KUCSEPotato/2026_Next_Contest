@@ -126,6 +126,13 @@ export default function ProjectDetailPage() {
               />
             </div>
           </div>
+
+          <button
+            onClick={() => router.push(`/projects/${projectId}/chat`)}
+            className="mt-6 w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800"
+          >
+            팀 채팅방 들어가기
+          </button>
         </section>
 
         <div className="grid gap-6 lg:grid-cols-3">
