@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Body, Depends, HTTPException, status
+from datetime import datetime, timezone
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -74,6 +75,26 @@ async def get_my_profile(
         },
     )
 
+def _build_discard_candidate(project: Project, current_members: int) -> dict:
+    age_days = max((datetime.now(timezone.utc) - project.created_at).days, 0)
+    can_discard = age_days >= 30 or current_members >= 2
+    discard_reasons = []
+    if age_days >= 30:
+        discard_reasons.append("30일 이상 경과")
+    if current_members >= 2:
+        discard_reasons.append("팀 결성 완료")
+    return {
+        "id": project.id,
+        "title": project.title,
+        "status": project.status,
+        "created_at": project.created_at,
+        "age_days": age_days,
+        "current_members": current_members,
+        "max_members": project.max_members,
+        "can_discard": can_discard,
+        "discard_reasons": discard_reasons,
+    }
+
 
 @router.patch("/me/profile", summary="내 프로필 수정", description="닉네임/소개/아바타 URL을 수정합니다.")
 async def update_my_profile(
@@ -144,6 +165,29 @@ async def get_my_onboarding_state(
             "onboarding_completed_at": user.onboarding_completed_at,
         },
     )
+
+
+@router.get("/me/projects", summary="내 프로젝트 목록", description="내가 리더인 프로젝트와 버리기 가능 여부를 반환합니다.")
+async def get_my_projects(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    user = db.get(User, current_user_id)
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    projects = db.query(Project).filter(Project.leader_id == current_user_id, Project.deleted_at.is_(None)).order_by(Project.created_at.desc()).all()
+    result = []
+    for project in projects:
+        current_members = (
+            db.query(func.count(ProjectMember.id))
+            .filter(ProjectMember.project_id == project.id, ProjectMember.left_at.is_(None))
+            .scalar()
+            or 0
+        )
+        result.append(_build_discard_candidate(project, current_members))
+
+    return success_response(data=result)
 
 
 @router.get("/{user_id}/profile", summary="공개 프로필 조회", description="특정 사용자의 공개 프로필을 조회합니다.")
@@ -228,7 +272,6 @@ async def get_user_projects(user_id: int, db: Session = Depends(get_db)) -> dict
             for project in projects
         ],
     )
-
 
 @router.post("/me/skills", summary="내 기술 스택 추가", description="기술 이름과 숙련도를 등록합니다.")
 async def add_my_skill(

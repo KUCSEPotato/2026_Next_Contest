@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models import CoinTransaction
+from app.models import Idea
 from app.models import Notification
 from app.models import Project
 from app.models import User
@@ -55,6 +56,41 @@ def award_coins(
     transaction = CoinTransaction(
         user_id=user_id,
         amount=amount,
+        balance_after=user.coin_balance,
+        event_type=event_type,
+        source_type=source_type,
+        source_id=source_id,
+        note=note,
+    )
+    db.add(transaction)
+    return user.coin_balance
+
+
+def spend_coins(
+    db: Session,
+    *,
+    user_id: int,
+    amount: int,
+    event_type: str,
+    source_type: str | None = None,
+    source_id: int | None = None,
+    note: str | None = None,
+) -> int:
+    if amount <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Coin amount must be positive")
+
+    user = db.get(User, user_id)
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    current_balance = int(user.coin_balance or 0)
+    if current_balance < amount:
+        raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Not enough coins")
+
+    user.coin_balance = current_balance - amount
+    transaction = CoinTransaction(
+        user_id=user_id,
+        amount=-amount,
         balance_after=user.coin_balance,
         event_type=event_type,
         source_type=source_type,
@@ -130,6 +166,18 @@ def reward_project_recycled(db: Session, project: Project) -> int:
         source_type="project",
         source_id=project.id,
         note=f"Project recycled to idea for {project.title}",
+    )
+
+
+def reward_idea_adopted(db: Session, idea: Idea, project: Project) -> int:
+    return award_coins(
+        db,
+        user_id=idea.author_id,
+        amount=20,
+        event_type="idea.adopted",
+        source_type="idea",
+        source_id=idea.id,
+        note=f"Idea adopted into project {project.title}",
     )
 
 

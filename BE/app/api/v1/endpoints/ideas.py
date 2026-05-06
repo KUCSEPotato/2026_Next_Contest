@@ -17,7 +17,9 @@ from app.models import Skill
 from app.schemas import IdeaCreateRequest
 from app.schemas import IdeaUpdateRequest
 from app.schemas import ProjectCreateRequest
+from app.services.economy import reward_idea_adopted
 from app.services.economy import reward_project_registration
+from app.services.economy import spend_coins
 
 router = APIRouter()
 
@@ -151,8 +153,12 @@ async def list_ideas(
     )
 
 
-@router.get("/{idea_id}", summary="아이디어 상세", description="아이디어 상세 정보를 조회합니다.")
-async def get_idea(idea_id: int, db: Session = Depends(get_db)) -> dict:
+@router.get("/{idea_id}", summary="아이디어 상세", description="아이디어 상세 정보를 조회합니다. 열람 시 1코인이 차감됩니다.")
+async def get_idea(
+    idea_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
     """아이디어 상세 조회 API.
 
     Swagger 테스트 방법:
@@ -164,6 +170,17 @@ async def get_idea(idea_id: int, db: Session = Depends(get_db)) -> dict:
     idea = db.get(Idea, idea_id)
     if idea is None or idea.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Idea not found")
+
+    spend_coins(
+        db,
+        user_id=current_user_id,
+        amount=1,
+        event_type="idea.view",
+        source_type="idea",
+        source_id=idea.id,
+        note=f"View idea detail: {idea.title}",
+    )
+    db.commit()
     return success_response(
         data={
             "id": idea.id,
@@ -389,6 +406,7 @@ async def convert_idea_to_project(
     db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
     _sync_project_skills_from_idea(db, project.id, list(idea.tech_stack or []))
     idea.converted_to_project_id = project.id
+    reward_idea_adopted(db, idea, project)
     
     db.commit()
     db.refresh(project)

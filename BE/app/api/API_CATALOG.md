@@ -32,6 +32,7 @@
 
 - GET /users/me/profile: 내 프로필 + 기술 스택 + 선택한 아이디어 조회
 - GET /users/me/onboarding: 회원가입/프로필/아이디어 선택 상태 조회
+- GET /users/me/projects: 내가 리더인 프로젝트 목록 + 버리기 가능 여부(can_discard)
 - PATCH /users/me/profile: 닉네임/이름/전화번호/소개/아바타 수정
 - GET /users/{user_id}/profile: 공개 프로필 조회
 - GET /users/{user_id}/stats: 활동 통계 조회
@@ -50,8 +51,7 @@
 
 - POST /ideas: 아이디어 생성 + 프로젝트 자동 생성(tech_stack, hashtags 포함)
 - GET /ideas: 아이디어 목록 조회(필터/페이지네이션)
-- GET /ideas/{idea_id}: 아이디어 상세
-- POST /admin/projects/stale-reminders/run: 30일 이상 시작되지 않은 프로젝트에 알림 생성 배치 실행
+- GET /ideas/{idea_id}: 아이디어 상세 열람(1코인 차감)
 - PATCH /ideas/{idea_id}: 아이디어 수정(작성자)
 - DELETE /ideas/{idea_id}: 아이디어 삭제(soft delete)
 - POST /ideas/{idea_id}/bookmark: 북마크 추가
@@ -59,6 +59,7 @@
 - POST /ideas/{idea_id}/like: 좋아요 추가
 - DELETE /ideas/{idea_id}/like: 좋아요 취소
 - POST /ideas/{idea_id}/convert-to-project: **아이디어 → 프로젝트 전환**(인원 모임 후 프로젝트화)
+- 채택된 아이디어는 원 작성자에게 보너스 코인이 적립됩니다.
 
 ## 4) Projects
 
@@ -188,6 +189,7 @@
 - GET /admin/projects: 전체 프로젝트 목록 조회(관리자)
 - GET /admin/reports: 신고 목록 조회(관리자)
 - PATCH /admin/reports/{report_id}: 신고 처리 상태 변경(관리자)
+- POST /admin/projects/stale-reminders/run: 30일 이상 시작되지 않은 프로젝트에 알림 생성 배치 실행
 
 ## 참고 문서
 
