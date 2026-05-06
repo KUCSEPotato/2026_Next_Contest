@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -9,13 +10,64 @@ from app.dependencies.auth import get_current_user_id
 from app.models import Idea
 from app.models import IdeaBookmark
 from app.models import IdeaLike
+from app.models import Project
+from app.models import ProjectMember
+from app.models import ProjectSkill
+from app.models import Skill
 from app.schemas import IdeaCreateRequest
 from app.schemas import IdeaUpdateRequest
+from app.schemas import ProjectCreateRequest
+from app.services.economy import reward_project_registration
 
 router = APIRouter()
 
 
-@router.post("", summary="아이디어 생성", description="새로운 프로젝트 아이디어를 등록합니다.")
+def _normalize_skill_name(skill_name: str) -> str:
+    return re.sub(r"\s+", " ", skill_name.strip()).lower()
+
+
+def _sync_project_skills_from_idea(db: Session, project_id: int, tech_stack: list[str]) -> None:
+    existing_skill_ids = {
+        skill_id
+        for (skill_id,) in db.query(ProjectSkill.skill_id).filter(ProjectSkill.project_id == project_id).all()
+    }
+    for skill_name in tech_stack:
+        normalized_name = _normalize_skill_name(skill_name)
+        skill = db.query(Skill).filter(Skill.normalized_name == normalized_name).first()
+        if skill is None:
+            skill = Skill(name=skill_name.strip(), normalized_name=normalized_name)
+            db.add(skill)
+            db.flush()
+
+        if skill.id not in existing_skill_ids:
+            db.add(ProjectSkill(project_id=project_id, skill_id=skill.id))
+            existing_skill_ids.add(skill.id)
+
+
+def _create_project_from_idea(db: Session, idea: Idea, current_user_id: int) -> Project:
+    project = Project(
+        idea_id=idea.id,
+        leader_id=current_user_id,
+        title=idea.title,
+        summary=idea.summary,
+        description=idea.description,
+        category=idea.domain,
+        difficulty=idea.difficulty,
+        status="planning",
+        progress_percent=0,
+        max_members=max(int(idea.required_members or 1), 1),
+        is_public=idea.is_open,
+    )
+    db.add(project)
+    db.flush()
+    db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
+    _sync_project_skills_from_idea(db, project.id, list(idea.tech_stack or []))
+    idea.converted_to_project_id = project.id
+    reward_project_registration(db, project)
+    return project
+
+
+@router.post("", summary="아이디어 생성", description="아이디어를 등록하면 즉시 프로젝트도 함께 생성합니다.")
 async def create_idea(
     payload: IdeaCreateRequest,
     current_user_id: int = Depends(get_current_user_id),
@@ -25,7 +77,8 @@ async def create_idea(
 
     Swagger 테스트 방법:
     - Authorization 헤더를 설정합니다.
-    - body에 제목/설명/난이도를 포함해 호출합니다.
+    - body에 제목/설명/난이도/기술스택/해시태그를 포함해 호출합니다.
+    - 생성 성공 시 Idea와 Project가 동시에 만들어집니다.
     """
     idea = Idea(
         author_id=current_user_id,
@@ -40,9 +93,22 @@ async def create_idea(
         is_open=payload.is_open,
     )
     db.add(idea)
+    db.flush()
+
+    project = _create_project_from_idea(db, idea, current_user_id)
+
     db.commit()
     db.refresh(idea)
-    return success_response(data={"id": idea.id, "title": idea.title})
+    db.refresh(project)
+    return success_response(
+        data={
+            "idea_id": idea.id,
+            "project_id": project.id,
+            "title": idea.title,
+            "project_title": project.title,
+            "converted": True,
+        }
+    )
 
 
 @router.get("", summary="아이디어 목록", description="페이지네이션과 난이도 필터를 지원하는 아이디어 목록 조회 API입니다.")
@@ -70,15 +136,17 @@ async def list_ideas(
     return success_response(
         data=[
             {
-                "id": idea.id,
-                "title": idea.title,
-                "summary": idea.summary,
-                "tech_stack": idea.tech_stack,
-                "hashtags": idea.hashtags,
-                "difficulty": idea.difficulty,
-                "is_open": idea.is_open,
-                "created_at": idea.created_at,
-            }
+            "id": idea.id,
+            "project_id": idea.converted_to_project_id,
+            "converted_to_project_id": idea.converted_to_project_id,
+            "title": idea.title,
+            "summary": idea.summary,
+            "tech_stack": idea.tech_stack,
+            "hashtags": idea.hashtags,
+            "difficulty": idea.difficulty,
+            "is_open": idea.is_open,
+            "created_at": idea.created_at,
+        }
             for idea in ideas
         ],
         meta={"page": page, "size": size, "total": total},
@@ -263,3 +331,77 @@ async def unlike_idea(
     db.delete(like)
     db.commit()
     return success_response(data={"liked": False, "idea_id": idea_id})
+
+
+@router.post("/{idea_id}/convert-to-project", summary="아이디어를 프로젝트로 전환", description="인원이 모인 아이디어를 프로젝트로 전환합니다. 작성자만 가능합니다.")
+async def convert_idea_to_project(
+    idea_id: int,
+    payload: ProjectCreateRequest,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    """아이디어 → 프로젝트 전환 API.
+
+    목적:
+    - 아이디어 등록 후 인원이 모이면 프로젝트로 전환하는 워크플로우 지원
+    - 원본 Idea는 converted_to_project_id로 추적
+
+    Swagger 테스트 방법:
+    - Authorization 헤더를 설정합니다.
+    - path의 `idea_id`를 전달하고 ProjectCreateRequest body를 전달합니다.
+
+    권한/검증:
+    - 아이디어 작성자만 변환 가능 (403)
+    - 아이디어가 없으면 404
+    - 이미 전환된 아이디어면 409
+
+    흐름:
+    1. 아이디어 검증 (존재, 미삭제, 소유권)
+    2. 프로젝트 생성 (title, description은 Idea에서 복사 가능)
+    3. 전환 기록 (Idea.converted_to_project_id 설정)
+    4. 리더 멤버 자동 등록
+    """
+    # 아이디어 검증
+    idea = db.get(Idea, idea_id)
+    if idea is None or idea.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Idea not found")
+    
+    if idea.author_id != current_user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only idea author can convert to project")
+    
+    if idea.converted_to_project_id is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This idea has already been converted to a project")
+    
+    # 프로젝트 생성 및 기술 스택 동기화
+    project = Project(
+        idea_id=idea_id,
+        leader_id=current_user_id,
+        title=payload.title,
+        summary=payload.summary,
+        description=payload.description,
+        category=payload.category,
+        difficulty=payload.difficulty,
+        status=payload.status,
+        progress_percent=payload.progress_percent,
+        max_members=payload.max_members,
+        is_public=payload.is_public,
+    )
+    db.add(project)
+    db.flush()
+    db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
+    _sync_project_skills_from_idea(db, project.id, list(idea.tech_stack or []))
+    idea.converted_to_project_id = project.id
+    
+    db.commit()
+    db.refresh(project)
+    db.refresh(idea)
+    
+    return success_response(
+        data={
+            "project_id": project.id,
+            "project_title": project.title,
+            "idea_id": idea.id,
+            "idea_title": idea.title,
+            "converted": True,
+        }
+    )

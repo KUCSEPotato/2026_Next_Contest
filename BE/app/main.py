@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 try:
     from prometheus_fastapi_instrumentator import Instrumentator  # pyright: ignore[reportMissingImports]
@@ -97,6 +98,20 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(api_router, prefix="/api/v1")
+
+    allowed_origins = [
+        origin.strip()
+        for origin in [settings.frontend_origin, "http://localhost:3000", "http://127.0.0.1:3000", "http://3.37.87.121:3000", ]
+        if origin
+    ]
+    if allowed_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=allowed_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
     # Expose Prometheus metrics at /metrics for runtime monitoring.
     if Instrumentator is not None:

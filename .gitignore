@@ -22,3 +22,6 @@ Personal/
 BE/.venv/
 BE/__pycache__/
 BE/.vscode/
+
+# pemkey
+pemkey/
