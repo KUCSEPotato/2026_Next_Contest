@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getMyChatRoomsApi } from "../../lib/api";
+import { getMyChatRoomsApi } from "../lib/api";
 
 export default function MyChatRoomsPage() {
   const router = useRouter();
