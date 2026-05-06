@@ -40,6 +40,10 @@ from app.schemas import RecruitmentCreateRequest
 from app.schemas import RecruitmentUpdateRequest
 from app.schemas import TodoCreateRequest
 from app.schemas import TodoUpdateRequest
+from app.services.economy import reward_project_completed
+from app.services.economy import reward_project_registration
+from app.services.economy import reward_project_recycled
+from app.services.economy import reward_project_started
 
 router = APIRouter()
 
@@ -223,6 +227,7 @@ async def create_project(
     db.flush()
 
     db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
+    reward_project_registration(db, project)
     db.commit()
     db.refresh(project)
     return success_response(data={"id": project.id, "title": project.title, "max_members": project.max_members})
@@ -431,6 +436,8 @@ async def delete_project(
     """
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
+    if project.idea_id is not None and project.status != "completed":
+        reward_project_recycled(db, project)
     project.deleted_at = datetime.now(timezone.utc)
     db.commit()
     return success_response(data={"deleted": True, "id": project_id})
@@ -473,6 +480,9 @@ async def revert_project_to_idea(
             # Idea의 변환 기록 제거
             idea.converted_to_project_id = None
             idea_reverted = True
+
+    if project.idea_id is not None:
+        reward_project_recycled(db, project)
     
     # 프로젝트 soft delete
     project.deleted_at = datetime.now(timezone.utc)
@@ -504,7 +514,14 @@ async def update_project_status(
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
 
+    previous_status = project.status
     project.status = payload.status
+
+    if previous_status != "in_progress" and payload.status == "in_progress":
+        reward_project_started(db, project)
+    if previous_status != "completed" and payload.status == "completed":
+        reward_project_completed(db, project)
+
     db.commit()
     return success_response(data={"id": project.id, "status": project.status})
 

@@ -14,6 +14,7 @@
 
 - POST /auth/signup: 이메일/아이디/이름/전화번호/비밀번호로 계정 생성 + 온보딩 토큰 발급
 - POST /auth/login: login_id(이메일 또는 닉네임) + 비밀번호 로그인
+- 응답 일부에 `coin_balance`가 포함됩니다.
 - POST /auth/oauth/github: GitHub authorization code 기반 로그인/가입
 - POST /auth/oauth/google: Google authorization code 기반 로그인/가입
 - GET /auth/oauth/links: 현재 계정의 OAuth 연결 상태 조회
@@ -41,14 +42,16 @@
 - DELETE /users/me/skills/{skill_id}: 기술 스택 제거
 - POST /users/me/interests: 관심 분야 등록
 - DELETE /users/me/interests/{interest_id}: 관심 분야 제거
+- 프로젝트 생성/시작/완료/재활용 시 코인 보상 이력이 누적됩니다.
 - POST /users/me/onboarding/ideas: 온보딩 마지막 단계에서 관심 아이디어 선택 및 가입 완료 처리
 - GET /users/me/reputation: 리뷰 기반 신뢰도/평점 요약
 
 ## 3) Ideas
 
-- POST /ideas: 아이디어 생성(tech_stack, hashtags 포함)
+- POST /ideas: 아이디어 생성 + 프로젝트 자동 생성(tech_stack, hashtags 포함)
 - GET /ideas: 아이디어 목록 조회(필터/페이지네이션)
 - GET /ideas/{idea_id}: 아이디어 상세
+- POST /admin/projects/stale-reminders/run: 30일 이상 시작되지 않은 프로젝트에 알림 생성 배치 실행
 - PATCH /ideas/{idea_id}: 아이디어 수정(작성자)
 - DELETE /ideas/{idea_id}: 아이디어 삭제(soft delete)
 - POST /ideas/{idea_id}/bookmark: 북마크 추가
@@ -60,16 +63,19 @@
 ## 4) Projects
 
 **두 가지 워크플로우 지원:**
-1. **Idea → Project**: 아이디어 등록 후 인원이 모이면 전환 (POST /ideas/{idea_id}/convert-to-project)
+1. **Auto Project from Idea**: 아이디어 등록 시 즉시 프로젝트도 생성
 2. **Direct Project**: 처음부터 프로젝트 생성하여 기획부터 진행까지 관리
 
-- POST /projects: 프로젝트 생성 + 생성자 리더 등록(max_members: 최대 멤버 수, 기본값 10, idea_id는 선택사항)
+- POST /projects: 직접 프로젝트 생성 + 생성자 리더 등록(max_members: 최대 멤버 수, 기본값 10, idea_id는 선택사항)
 - GET /projects: 프로젝트 목록 조회
 - GET /projects/{project_id}: 프로젝트 상세 + 멤버(현재 멤버 수, 최대 멤버 수, 경쟁률 포함)
 - PATCH /projects/{project_id}: 프로젝트 메타데이터 수정(max_members 수정 가능)
 - DELETE /projects/{project_id}: 프로젝트 soft delete
 - PATCH /projects/{project_id}/status: 프로젝트 상태 변경
 - POST /projects/{project_id}/revert-to-idea: **프로젝트 → 아이디어 복원**(프로젝트 실패 시 원본 아이디어로 되돌리기)
+
+### 참고
+- 아이디어 등록 시 backend가 자동으로 프로젝트를 생성하므로, 일반 사용자 입장에서는 `POST /ideas`가 사실상 프로젝트 시작 버튼 역할을 합니다.
 
 ### 지원/초대/멤버
 - POST /projects/{project_id}/applications: 프로젝트 지원

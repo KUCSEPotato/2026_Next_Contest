@@ -533,6 +533,7 @@ async def get_my_auth_info(
             "nickname": user.nickname,
             "name": user.name,
             "phone_number": user.phone_number,
+            "coin_balance": user.coin_balance,
             "role": user.role,
             "is_verified": user.is_verified,
             "onboarding_step": user.onboarding_step,
