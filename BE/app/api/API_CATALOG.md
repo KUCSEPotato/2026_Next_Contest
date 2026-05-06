@@ -35,6 +35,7 @@
 - GET /users/{user_id}/stats: 활동 통계 조회
 - GET /users/{user_id}/projects: 사용자 프로젝트 이력
 - GET /users/me/reviews: **내가 받은 리뷰 목록**(마이페이지용)
+- GET /users/me/applications: **내가 지원한 프로젝트 목록**(지원현황 조회)
 - POST /users/me/skills: 기술 스택 등록
 - DELETE /users/me/skills/{skill_id}: 기술 스택 제거
 - POST /users/me/interests: 관심 분야 등록
@@ -55,10 +56,10 @@
 
 ## 4) Projects
 
-- POST /projects: 프로젝트 생성 + 생성자 리더 등록
+- POST /projects: 프로젝트 생성 + 생성자 리더 등록(max_members: 최대 멤버 수, 기본값 10)
 - GET /projects: 프로젝트 목록 조회
-- GET /projects/{project_id}: 프로젝트 상세 + 멤버
-- PATCH /projects/{project_id}: 프로젝트 메타데이터 수정
+- GET /projects/{project_id}: 프로젝트 상세 + 멤버(현재 멤버 수, 최대 멤버 수, 경쟁률 포함)
+- PATCH /projects/{project_id}: 프로젝트 메타데이터 수정(max_members 수정 가능)
 - DELETE /projects/{project_id}: 프로젝트 soft delete
 - PATCH /projects/{project_id}/status: 프로젝트 상태 변경
 
@@ -142,12 +143,31 @@
 - POST /chats/rooms/{room_id}/messages: 메시지 전송
 - WS /chats/projects/{project_id}/rooms/{room_id}/ws: 채팅 메시지 실시간 송수신/구독
 
-## 12) Notifications
+## 12) Community (커뮤니티 게시판)
+
+### 게시물
+- POST /community: 새 게시물 작성
+- GET /community: 게시물 목록 조회(카테고리 필터, 페이지네이션, 핀 우선)
+- GET /community/{post_id}: 게시물 상세(조회수 자동 증가, 반응 통계 포함)
+- PATCH /community/{post_id}: 게시물 수정(작성자만)
+- DELETE /community/{post_id}: 게시물 삭제(소프트 삭제)
+
+### 댓글(중첩 댓글/대댓글 지원)
+- POST /community/{post_id}/comments: 댓글 작성
+- GET /community/{post_id}/comments: 댓글 목록 조회(페이지네이션)
+- PATCH /community/{post_id}/comments/{comment_id}: 댓글 수정(작성자만)
+- DELETE /community/{post_id}/comments/{comment_id}: 댓글 삭제(소프트 삭제)
+
+### 반응(게시물/댓글에 like, interested, helpful, curious)
+- POST /community/{post_id}/reactions: 게시물 반응 추가/토글
+- POST /community/{post_id}/comments/{comment_id}/reactions: 댓글 반응 추가/토글
+
+## 13) Notifications
 
 - GET /notifications: 알림 목록
 - PATCH /notifications/{notification_id}/read: 읽음 처리
 
-## 13) Admin
+## 14) Admin
 
 - GET /admin/users: 전체 사용자 목록 조회(관리자)
 - PATCH /admin/users/{user_id}/status: 사용자 상태/역할 변경(관리자)
