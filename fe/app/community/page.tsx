@@ -27,15 +27,13 @@ export default function CommunityPage() {
 
   // ── 인증 ────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    setIsLoggedIn(true);
-    setCurrentUser({ id: 0, nickname: "테스트유저" });
-    // const token = localStorage.getItem("access_token");
-    // if (token) {
-    //   setIsLoggedIn(true);
-    //   // TODO: /me API로 교체
-    //   const raw = localStorage.getItem("user");
-    //   if (raw) setCurrentUser(JSON.parse(raw));
-    // }
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      setIsLoggedIn(true);
+      // TODO: /me API로 교체
+      const raw = localStorage.getItem("user");
+      if (raw) setCurrentUser(JSON.parse(raw));
+    }
   }, []);
 
   // ── 게시물 목록 로드 ─────────────────────────────────────────────────────────
