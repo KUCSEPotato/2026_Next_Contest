@@ -136,15 +136,17 @@ async def list_ideas(
     return success_response(
         data=[
             {
-                "id": idea.id,
-                "title": idea.title,
-                "summary": idea.summary,
-                "tech_stack": idea.tech_stack,
-                "hashtags": idea.hashtags,
-                "difficulty": idea.difficulty,
-                "is_open": idea.is_open,
-                "created_at": idea.created_at,
-            }
+            "id": idea.id,
+            "project_id": idea.converted_to_project_id,
+            "converted_to_project_id": idea.converted_to_project_id,
+            "title": idea.title,
+            "summary": idea.summary,
+            "tech_stack": idea.tech_stack,
+            "hashtags": idea.hashtags,
+            "difficulty": idea.difficulty,
+            "is_open": idea.is_open,
+            "created_at": idea.created_at,
+        }
             for idea in ideas
         ],
         meta={"page": page, "size": size, "total": total},
