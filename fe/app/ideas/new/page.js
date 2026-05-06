@@ -86,7 +86,9 @@ export default function NewIdeaPage() {
       alert("아이디어가 등록되었습니다.");
 
       const ideaId = result?.data?.id;
-      if (ideaId) {
+      if (projectId) {
+        router.push(`/projects/${projectId}`);
+      } else if (ideaId) {
         router.push(`/ideas/${ideaId}`);
       } else {
         router.push("/mainpage");
