@@ -39,7 +39,7 @@ export default function ChatRoomPage() {
   }, []);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView({ behavior: "auto" });
   }, [messages]);
 
   const handleSend = async () => {

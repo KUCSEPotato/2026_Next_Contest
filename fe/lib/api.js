@@ -655,3 +655,23 @@ export async function requestAdoptionApi(projectId, message) {
 ========================= */
 
 export const applyIdeaApi = applyProjectApi;
+
+export async function getNotificationsApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/notifications`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "알림 목록을 불러오지 못했습니다.");
+}
+
+export async function readNotificationApi(notificationId) {
+  const res = await fetch(
+    `${API_BASE_URL}/api/v1/notifications/${notificationId}/read`,
+    {
+      method: "PATCH",
+      headers: authHeaders(),
+    }
+  );
+
+  return handleResponse(res, "알림 읽음 처리에 실패했습니다.");
+}
