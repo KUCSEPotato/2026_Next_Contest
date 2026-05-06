@@ -96,6 +96,7 @@ class Idea(Base):
     difficulty: Mapped[str] = mapped_column(String(20), nullable=False)
     required_members: Mapped[int] = mapped_column(SmallInteger, default=1)
     is_open: Mapped[bool] = mapped_column(Boolean, default=True)
+    converted_to_project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

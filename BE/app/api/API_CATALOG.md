@@ -53,10 +53,15 @@
 - DELETE /ideas/{idea_id}/bookmark: 북마크 해제
 - POST /ideas/{idea_id}/like: 좋아요 추가
 - DELETE /ideas/{idea_id}/like: 좋아요 취소
+- POST /ideas/{idea_id}/convert-to-project: **아이디어 → 프로젝트 전환**(인원 모임 후 프로젝트화)
 
 ## 4) Projects
 
-- POST /projects: 프로젝트 생성 + 생성자 리더 등록(max_members: 최대 멤버 수, 기본값 10)
+**두 가지 워크플로우 지원:**
+1. **Idea → Project**: 아이디어 등록 후 인원이 모이면 전환 (POST /ideas/{idea_id}/convert-to-project)
+2. **Direct Project**: 처음부터 프로젝트 생성하여 기획부터 진행까지 관리
+
+- POST /projects: 프로젝트 생성 + 생성자 리더 등록(max_members: 최대 멤버 수, 기본값 10, idea_id는 선택사항)
 - GET /projects: 프로젝트 목록 조회
 - GET /projects/{project_id}: 프로젝트 상세 + 멤버(현재 멤버 수, 최대 멤버 수, 경쟁률 포함)
 - PATCH /projects/{project_id}: 프로젝트 메타데이터 수정(max_members 수정 가능)
