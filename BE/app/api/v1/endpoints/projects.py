@@ -15,6 +15,7 @@ from app.dependencies.auth import get_current_user_id
 from app.dependencies.auth import get_current_user_id_from_token
 from app.models import Application
 from app.models import FailureStory
+from app.models import Idea
 from app.models import Invitation
 from app.models import Project
 from app.models import ProjectMember
@@ -433,6 +434,58 @@ async def delete_project(
     project.deleted_at = datetime.now(timezone.utc)
     db.commit()
     return success_response(data={"deleted": True, "id": project_id})
+
+
+@router.post("/{project_id}/revert-to-idea", summary="프로젝트를 아이디어로 되돌리기", description="프로젝트를 아이디어로 되돌립니다(프로젝트 soft delete, 원본 Idea 복원).")
+async def revert_project_to_idea(
+    project_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    """프로젝트 → 아이디어 되돌리기 API.
+
+    목적:
+    - 프로젝트가 실패하거나 폐기될 때 원본 아이디어로 상태 복원
+    - 프로젝트는 soft delete, 원본 Idea의 converted_to_project_id 제거
+
+    Swagger 테스트 방법:
+    - 리더 계정으로 호출합니다.
+    - path의 `project_id`를 전달합니다.
+
+    권한/검증:
+    - 프로젝트 리더만 가능 (403)
+    - 프로젝트가 없으면 404
+    - 원본 Idea가 없으면 경고만 출력 (프로젝트는 삭제)
+
+    흐름:
+    1. 프로젝트 검증 (존재, 리더 확인)
+    2. 원본 Idea가 있으면 converted_to_project_id 제거
+    3. 프로젝트 soft delete
+    """
+    project = _get_project_or_404(db, project_id)
+    _ensure_project_leader(project, current_user_id)
+    
+    # 원본 Idea 복원 (있으면)
+    idea_reverted = False
+    if project.idea_id is not None:
+        idea = db.get(Idea, project.idea_id)
+        if idea is not None and idea.deleted_at is None:
+            # Idea의 변환 기록 제거
+            idea.converted_to_project_id = None
+            idea_reverted = True
+    
+    # 프로젝트 soft delete
+    project.deleted_at = datetime.now(timezone.utc)
+    db.commit()
+    
+    return success_response(
+        data={
+            "reverted": True,
+            "project_id": project_id,
+            "idea_id": project.idea_id,
+            "idea_reverted": idea_reverted,
+        }
+    )
 
 
 @router.patch("/{project_id}/status", summary="프로젝트 상태 변경", description="planning/in_progress/paused/completed 등 상태를 갱신합니다.")
