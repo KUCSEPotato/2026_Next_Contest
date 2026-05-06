@@ -52,15 +52,18 @@ export async function signupApi(payload) {
   return handleResponse(res, "회원가입에 실패했습니다.");
 }
 
-export async function loginApi(payload) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify(payload),
-  });
-
-  return handleResponse(res, "로그인에 실패했습니다.");
-}
+export async function loginApi(loginId, password) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+      method: "POST",
+      headers: jsonHeaders(),
+      body: JSON.stringify({
+        login_id: loginId,
+        password,
+      }),
+    });
+  
+    return handleResponse(res, "로그인에 실패했습니다.");
+  }
 
 /* =========================
    Ideas
