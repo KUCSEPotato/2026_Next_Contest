@@ -481,7 +481,7 @@ async def revert_project_to_idea(
             idea.converted_to_project_id = None
             idea_reverted = True
 
-    if project.idea_id is not None:
+    if project.idea_id is not None and project.status != "completed":
         reward_project_recycled(db, project)
     
     # 프로젝트 soft delete
