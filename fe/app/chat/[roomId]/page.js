@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { getMessagesApi, sendMessageApi } from "../../../lib/api";
 import { useRef } from "react";
 
 export default function ChatRoomPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const roomId = params.roomId;
+  const projectId = searchParams.get("projectId");
   const bottomRef = useRef(null);
 
   const [messages, setMessages] = useState([]);
@@ -37,6 +39,42 @@ export default function ChatRoomPage() {
     const userId = localStorage.getItem("user_id");
     if (userId) setMyId(Number(userId));
   }, []);
+
+  useEffect(() => {
+    if (!projectId || !roomId) return;
+
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
+
+    const apiBaseUrl =
+      process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+
+    const wsBaseUrl = apiBaseUrl.replace(/^http/, "ws");
+
+    const socket = new WebSocket(
+      `${wsBaseUrl}/api/v1/chats/projects/${projectId}/rooms/${roomId}/ws?token=${token}`
+    );
+
+    socket.onmessage = (event) => {
+      const payload = JSON.parse(event.data);
+
+      if (payload.type === "chat.history") {
+        setMessages(Array.isArray(payload.data) ? payload.data : []);
+      }
+
+      if (payload.type === "chat.message.created") {
+        setMessages((prev) => [...prev, payload.data]);
+      }
+    };
+
+    socket.onerror = (error) => {
+      console.error(error);
+    };
+
+    return () => {
+      socket.close();
+    };
+  }, [projectId, roomId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "auto" });

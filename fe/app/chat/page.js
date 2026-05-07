@@ -47,7 +47,9 @@ export default function MyChatRoomsPage() {
               {rooms.map((room) => (
                 <button
                   key={room.room_id}
-                  onClick={() => router.push(`/chat/${room.room_id}`)}
+                  onClick={() =>
+                    router.push(`/chat/${room.room_id}?projectId=${room.project_id}`)
+                  }
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-left transition hover:border-red-300 hover:bg-red-50"
                 >
                   <div className="flex items-center justify-between gap-4">
