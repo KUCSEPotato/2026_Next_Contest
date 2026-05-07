@@ -270,6 +270,9 @@ async def list_projects(
         data.append({
             "id": p.id,
             "title": p.title,
+            "summary": p.summary,
+            "description": p.description,
+            "category": p.category,
             "status": p.status,
             "difficulty": p.difficulty,
             "progress_percent": float(p.progress_percent),
