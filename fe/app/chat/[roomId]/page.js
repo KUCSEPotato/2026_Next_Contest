@@ -20,7 +20,7 @@ export default function ChatRoomPage() {
     try {
       setLoading(true);
       const result = await getMessagesApi(roomId);
-      setMessages(result.data);
+      setMessages(Array.isArray(result.data) ? result.data : []);
     } catch (error) {
       console.error(error);
       alert("메시지를 불러오지 못했습니다.");
