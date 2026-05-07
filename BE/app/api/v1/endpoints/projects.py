@@ -14,10 +14,12 @@ from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
 from app.dependencies.auth import get_current_user_id_from_token
 from app.models import Application
+from app.models import ChatMessage
 from app.models import ChatRoom
 from app.models import FailureStory
 from app.models import Idea
 from app.models import Invitation
+from app.models import Notification
 from app.models import Project
 from app.models import ProjectMember
 from app.models import ProjectMilestone
@@ -45,6 +47,9 @@ from app.services.economy import reward_project_completed
 from app.services.economy import reward_project_registration
 from app.services.economy import reward_project_recycled
 from app.services.economy import reward_project_started
+from app.core.realtime import project_todo_channel
+from app.core.realtime import chat_room_channel
+from app.core.realtime import realtime_hub
 
 router = APIRouter()
 
@@ -222,6 +227,7 @@ async def create_project(
         status=payload.status,
         progress_percent=payload.progress_percent,
         max_members=payload.max_members,
+        min_members=payload.min_members,
         is_public=payload.is_public,
     )
     db.add(project)
@@ -391,9 +397,23 @@ async def decide_application(
     app_obj.decided_at = datetime.now(timezone.utc)
 
     if decision == "accepted":
-        exists_member = db.query(ProjectMember).filter(ProjectMember.project_id == project_id, ProjectMember.user_id == app_obj.applicant_id).first()
+        exists_member = (
+            db.query(ProjectMember)
+            .filter(
+                ProjectMember.project_id == project_id,
+                ProjectMember.user_id == app_obj.applicant_id,
+            )
+            .first()
+        )
+
         if exists_member is None:
-            db.add(ProjectMember(project_id=project_id, user_id=app_obj.applicant_id, role_in_project=payload.role_in_project or "member"))
+            db.add(
+                ProjectMember(
+                    project_id=project_id,
+                    user_id=app_obj.applicant_id,
+                    role_in_project=payload.role_in_project or "member",
+                )
+            )
 
         default_room = (
             db.query(ChatRoom)
@@ -405,9 +425,16 @@ async def decide_application(
             .first()
         )
 
-    if default_room is None:
-        db.add(ChatRoom(project_id=project_id, name="team", is_active=True))
-    db.commit()
+        if default_room is None:
+            db.add(
+                ChatRoom(
+                    project_id=project_id,
+                    name="team",
+                    is_active=True,
+                )
+            )
+
+    db.commit() 
     return success_response(data={"id": app_obj.id, "status": app_obj.status})
 
 
@@ -1268,3 +1295,73 @@ async def list_project_reviews(
             for r in reviews
         ]
     )
+
+
+@router.post("/{project_id}/complete-team", summary="팀 결성 완료", description="리더가 팀 결성을 완료하고 프로젝트를 시작합니다.")
+async def complete_team(
+    project_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    """팀 결성 완료 API(리더 전용).
+
+    동작:
+    - 리더 권한 확인
+    - 현재 활성 ProjectMember 수가 min_members 이상인지 확인
+    - 부족하면 400 반환
+    - 충분하면 project.status를 in_progress로 변경
+    - 팀원들에게 알림 생성
+    - 해당 프로젝트의 team 채팅방에 시스템 메시지 추가
+
+    Swagger 테스트 방법:
+    - 리더 계정으로 호출합니다.
+    """
+    project = _get_project_or_404(db, project_id)
+    _ensure_project_leader(project, current_user_id)
+
+    active_members = _get_active_project_member_ids(db, project_id)
+    if len(active_members) < project.min_members:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Not enough members to complete team")
+
+    project.status = "in_progress"
+
+    # 팀원들에게 알림 생성
+    for member_id in active_members:
+        notification = Notification(
+            user_id=member_id,
+            type="project_started",
+            title="팀 결성이 완료되었습니다",
+            body=f"프로젝트 '{project.title}'의 팀 결성이 완료되어 프로젝트가 시작되었습니다.",
+            data={"project_id": project_id}
+        )
+        db.add(notification)
+
+    # 해당 프로젝트의 team 채팅방에 시스템 메시지 추가
+    team_room = db.query(ChatRoom).filter(ChatRoom.project_id == project_id, ChatRoom.name == "team", ChatRoom.is_active.is_(True)).first()
+    if team_room:
+        system_message = ChatMessage(
+            room_id=team_room.id,
+            sender_id=None,  # 시스템 메시지
+            message="팀 결성이 완료되었습니다! 인사를 나누고 프로젝트를 시작하세요."
+        )
+        db.add(system_message)
+        db.flush()
+        
+        await realtime_hub.broadcast_json(
+            chat_room_channel(team_room.id),
+            {
+                "type": "chat.message.created",
+                "data": {
+                    "id": system_message.id,
+                    "room_id": system_message.room_id,
+                    "sender_id": None,
+                    "sender_nickname": "시스템",
+                    "sender_avatar_url": None,
+                    "message": system_message.message,
+                    "created_at": system_message.created_at.isoformat() if system_message.created_at else None,
+                },
+            }
+        )
+
+    db.commit()
+    return success_response(data={"project_id": project_id, "status": "in_progress"})

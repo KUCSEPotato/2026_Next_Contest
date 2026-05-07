@@ -25,3 +25,4 @@
 \ir 11_emergency_sync_ideas_table.sql
 \ir 12_add_user_onboarding_fields.sql
 \ir 13_add_coin_wallet_and_project_reminders.sql
+\ir 15_add_project_min_members.sql
