@@ -507,5 +507,15 @@ async def get_my_auth_info(
             "nickname": user.nickname,
             "role": user.role,
             "is_verified": user.is_verified,
+            "name": getattr(user, "name", None),
+            "phone_number": getattr(user, "phone_number", None),
+            "onboarding_step": getattr(user, "onboarding_step", None),
+            "onboarding_completed_at": (
+                getattr(user, "onboarding_completed_at", None).isoformat()
+                if getattr(user, "onboarding_completed_at", None)
+                else None
+            ),
+            "coin_balance": getattr(user, "coin_balance", None),
+            "avatar_url": user.avatar_url,
         },
     )
