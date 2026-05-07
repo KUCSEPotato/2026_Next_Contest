@@ -33,3 +33,27 @@ def get_current_user_id(authorization: str | None = Header(default=None)) -> int
             detail="Invalid subject",
         )
     return int(sub)
+
+
+def get_current_user_id_from_token(token: str) -> int:
+    """Extract and verify an access token passed directly as a string."""
+    if is_access_token_revoked(token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Access token revoked",
+        )
+
+    payload = decode_token(token)
+    if payload.get("type") != "access":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token type",
+        )
+
+    sub = payload.get("sub")
+    if not sub or not str(sub).isdigit():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid subject",
+        )
+    return int(sub)
