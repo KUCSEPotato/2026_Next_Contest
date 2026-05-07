@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 // ─── 타입 ──────────────────────────────────────────────────────
@@ -129,6 +129,14 @@ const DIFFICULTY_COLOR = {
 
 // ─── 검색 페이지 ──────────────────────────────────────────────
 export default function SearchPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50" />}>
+      <SearchPageContent />
+    </Suspense>
+  )
+}
+
+function SearchPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
