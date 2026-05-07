@@ -12,8 +12,9 @@
 
 ## 1) Auth
 
-- POST /auth/signup: 이메일/닉네임/비밀번호로 계정 생성
+- POST /auth/signup: 이메일/아이디/이름/전화번호/비밀번호로 계정 생성 + 온보딩 토큰 발급
 - POST /auth/login: login_id(이메일 또는 닉네임) + 비밀번호 로그인
+- 응답 일부에 `coin_balance`가 포함됩니다.
 - POST /auth/oauth/github: GitHub authorization code 기반 로그인/가입
 - POST /auth/oauth/google: Google authorization code 기반 로그인/가입
 - GET /auth/oauth/links: 현재 계정의 OAuth 연결 상태 조회
@@ -25,42 +26,57 @@
 - POST /auth/token/refresh: refresh token으로 access token 재발급
 - POST /auth/password/forgot: 비밀번호 재설정 토큰 발급
 - POST /auth/password/reset: 비밀번호 재설정 적용
-- GET /auth/me: 현재 인증 사용자 기본 정보 조회
+- GET /auth/me: 현재 인증 사용자 기본 정보 조회(온보딩 상태 포함)
 
 ## 2) Users
 
-- GET /users/me/profile: 내 프로필 + 기술 스택 조회
-- PATCH /users/me/profile: 닉네임/소개/아바타 수정
+- GET /users/me/profile: 내 프로필 + 기술 스택 + 선택한 아이디어 조회
+- GET /users/me/onboarding: 회원가입/프로필/아이디어 선택 상태 조회
+- GET /users/me/projects: 내가 리더인 프로젝트 목록 + 버리기 가능 여부(can_discard)
+- PATCH /users/me/profile: 닉네임/이름/전화번호/소개/아바타 수정
 - GET /users/{user_id}/profile: 공개 프로필 조회
 - GET /users/{user_id}/stats: 활동 통계 조회
 - GET /users/{user_id}/projects: 사용자 프로젝트 이력
 - GET /users/me/reviews: **내가 받은 리뷰 목록**(마이페이지용)
+- GET /users/me/applications: **내가 지원한 프로젝트 목록**(지원현황 조회)
 - POST /users/me/skills: 기술 스택 등록
 - DELETE /users/me/skills/{skill_id}: 기술 스택 제거
 - POST /users/me/interests: 관심 분야 등록
 - DELETE /users/me/interests/{interest_id}: 관심 분야 제거
+- 프로젝트 생성/시작/완료/재활용 시 코인 보상 이력이 누적됩니다.
+- POST /users/me/onboarding/ideas: 온보딩 마지막 단계에서 관심 아이디어 선택 및 가입 완료 처리
 - GET /users/me/reputation: 리뷰 기반 신뢰도/평점 요약
 
 ## 3) Ideas
 
-- POST /ideas: 아이디어 생성(tech_stack, hashtags 포함)
+- POST /ideas: 아이디어 생성 + 프로젝트 자동 생성(tech_stack, hashtags 포함)
 - GET /ideas: 아이디어 목록 조회(필터/페이지네이션)
-- GET /ideas/{idea_id}: 아이디어 상세
+- GET /ideas/{idea_id}: 아이디어 상세 열람(1코인 차감)
 - PATCH /ideas/{idea_id}: 아이디어 수정(작성자)
 - DELETE /ideas/{idea_id}: 아이디어 삭제(soft delete)
 - POST /ideas/{idea_id}/bookmark: 북마크 추가
 - DELETE /ideas/{idea_id}/bookmark: 북마크 해제
 - POST /ideas/{idea_id}/like: 좋아요 추가
 - DELETE /ideas/{idea_id}/like: 좋아요 취소
+- POST /ideas/{idea_id}/convert-to-project: **아이디어 → 프로젝트 전환**(인원 모임 후 프로젝트화)
+- 채택된 아이디어는 원 작성자에게 보너스 코인이 적립됩니다.
 
 ## 4) Projects
 
-- POST /projects: 프로젝트 생성 + 생성자 리더 등록
+**두 가지 워크플로우 지원:**
+1. **Auto Project from Idea**: 아이디어 등록 시 즉시 프로젝트도 생성
+2. **Direct Project**: 처음부터 프로젝트 생성하여 기획부터 진행까지 관리
+
+- POST /projects: 직접 프로젝트 생성 + 생성자 리더 등록(max_members: 최대 멤버 수, 기본값 10, idea_id는 선택사항)
 - GET /projects: 프로젝트 목록 조회
-- GET /projects/{project_id}: 프로젝트 상세 + 멤버
-- PATCH /projects/{project_id}: 프로젝트 메타데이터 수정
+- GET /projects/{project_id}: 프로젝트 상세 + 멤버(현재 멤버 수, 최대 멤버 수, 경쟁률 포함)
+- PATCH /projects/{project_id}: 프로젝트 메타데이터 수정(max_members 수정 가능)
 - DELETE /projects/{project_id}: 프로젝트 soft delete
 - PATCH /projects/{project_id}/status: 프로젝트 상태 변경
+- POST /projects/{project_id}/revert-to-idea: **프로젝트 → 아이디어 복원**(프로젝트 실패 시 원본 아이디어로 되돌리기)
+
+### 참고
+- 아이디어 등록 시 backend가 자동으로 프로젝트를 생성하므로, 일반 사용자 입장에서는 `POST /ideas`가 사실상 프로젝트 시작 버튼 역할을 합니다.
 
 ### 지원/초대/멤버
 - POST /projects/{project_id}/applications: 프로젝트 지원
@@ -81,9 +97,11 @@
 
 ### Todo/회고/리뷰/실패기록
 - POST /projects/{project_id}/todos: Todo 생성
-- GET /projects/{project_id}/todos: Todo 목록
-- PATCH /projects/{project_id}/todos/{todo_id}: Todo 수정
+- GET /projects/{project_id}/todos: Todo 목록(stage, assignments 포함)
+- PATCH /projects/{project_id}/todos/{todo_id}: Todo 수정(배정/단계 포함)
+- PATCH /projects/{project_id}/todos/{todo_id}/done: 현재 사용자 할당분 완료 토글
 - DELETE /projects/{project_id}/todos/{todo_id}: Todo 삭제
+- WS /projects/{project_id}/todos/ws: Todo 실시간 구독(생성/수정/삭제/완료 이벤트)
 - POST /projects/{project_id}/retrospectives: 회고 작성
 - GET /projects/{project_id}/retrospectives: 회고 목록
 - GET /projects/{project_id}/retrospectives/{retrospective_id}: 회고 상세
@@ -138,19 +156,40 @@
 - POST /chats/projects/{project_id}/rooms: 채팅방 생성
 - GET /chats/rooms/{room_id}/messages: 메시지 목록 조회
 - POST /chats/rooms/{room_id}/messages: 메시지 전송
+- WS /chats/projects/{project_id}/rooms/{room_id}/ws: 채팅 메시지 실시간 송수신/구독
 
-## 12) Notifications
+## 12) Community (커뮤니티 게시판)
+
+### 게시물
+- POST /community: 새 게시물 작성
+- GET /community: 게시물 목록 조회(카테고리 필터, 페이지네이션, 핀 우선)
+- GET /community/{post_id}: 게시물 상세(조회수 자동 증가, 반응 통계 포함)
+- PATCH /community/{post_id}: 게시물 수정(작성자만)
+- DELETE /community/{post_id}: 게시물 삭제(소프트 삭제)
+
+### 댓글(중첩 댓글/대댓글 지원)
+- POST /community/{post_id}/comments: 댓글 작성
+- GET /community/{post_id}/comments: 댓글 목록 조회(페이지네이션)
+- PATCH /community/{post_id}/comments/{comment_id}: 댓글 수정(작성자만)
+- DELETE /community/{post_id}/comments/{comment_id}: 댓글 삭제(소프트 삭제)
+
+### 반응(게시물/댓글에 like, interested, helpful, curious)
+- POST /community/{post_id}/reactions: 게시물 반응 추가/토글
+- POST /community/{post_id}/comments/{comment_id}/reactions: 댓글 반응 추가/토글
+
+## 13) Notifications
 
 - GET /notifications: 알림 목록
 - PATCH /notifications/{notification_id}/read: 읽음 처리
 
-## 13) Admin
+## 14) Admin
 
 - GET /admin/users: 전체 사용자 목록 조회(관리자)
 - PATCH /admin/users/{user_id}/status: 사용자 상태/역할 변경(관리자)
 - GET /admin/projects: 전체 프로젝트 목록 조회(관리자)
 - GET /admin/reports: 신고 목록 조회(관리자)
 - PATCH /admin/reports/{report_id}: 신고 처리 상태 변경(관리자)
+- POST /admin/projects/stale-reminders/run: 30일 이상 시작되지 않은 프로젝트에 알림 생성 배치 실행
 
 ## 참고 문서
 
