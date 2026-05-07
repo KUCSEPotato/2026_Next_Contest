@@ -13,6 +13,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Clean remote production source directories
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.PROD_SSH_PORT }}
+          script: |
+            set -e
+            mkdir -p ${{ secrets.PROD_DEPLOY_PATH }}
+            rm -rf ${{ secrets.PROD_DEPLOY_PATH }}/BE
+            rm -rf ${{ secrets.PROD_DEPLOY_PATH }}/fe
+
       - name: Copy files to production server via SCP
         uses: appleboy/scp-action@v0.1.5
         with:
