@@ -15,7 +15,7 @@ export default function MyChatRoomsPage() {
       try {
         setLoading(true);
         const result = await getMyChatRoomsApi();
-        setRooms(result.data || []);
+        setRooms(Array.isArray(result.data) ? result.data : []);
       } catch (error) {
         console.error(error);
         // alert("채팅방 목록을 불러오지 못했습니다.");
