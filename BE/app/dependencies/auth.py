@@ -4,7 +4,15 @@ from app.core.security import decode_token
 from app.core.token_store import is_access_token_revoked
 
 
-def get_current_user_id_from_token(token: str) -> int:
+def get_current_user_id(authorization: str | None = Header(default=None)) -> int:
+    """Extract and verify Bearer access token."""
+    if authorization is None or not authorization.lower().startswith("bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Bearer token",
+        )
+
+    token = authorization.split(" ", 1)[1].strip()
     if is_access_token_revoked(token):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -25,15 +33,3 @@ def get_current_user_id_from_token(token: str) -> int:
             detail="Invalid subject",
         )
     return int(sub)
-
-
-def get_current_user_id(authorization: str | None = Header(default=None)) -> int:
-    """Extract and verify Bearer access token."""
-    if authorization is None or not authorization.lower().startswith("bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing Bearer token",
-        )
-
-    token = authorization.split(" ", 1)[1].strip()
-    return get_current_user_id_from_token(token)

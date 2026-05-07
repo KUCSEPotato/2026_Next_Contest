@@ -2,11 +2,6 @@ from app.models.entities import AdoptionRequest
 from app.models.entities import Application
 from app.models.entities import ChatMessage
 from app.models.entities import ChatRoom
-from app.models.entities import CommunityPost
-from app.models.entities import CommunityPostComment
-from app.models.entities import CommunityPostReaction
-from app.models.entities import CommunityCommentReaction
-from app.models.entities import CoinTransaction
 from app.models.entities import FailureStory
 from app.models.entities import Idea
 from app.models.entities import IdeaBookmark
@@ -25,8 +20,6 @@ from app.models.entities import Retrospective
 from app.models.entities import Review
 from app.models.entities import Skill
 from app.models.entities import SubscriptionPlan
-from app.models.entities import TodoAssignment
-from app.models.entities import TodoTemplate
 from app.models.entities import Todo
 from app.models.entities import User
 from app.models.entities import UserInterest
@@ -40,11 +33,6 @@ __all__ = [
 	"Application",
 	"ChatMessage",
 	"ChatRoom",
-	"CommunityPost",
-	"CommunityPostComment",
-	"CommunityPostReaction",
-	"CommunityCommentReaction",
-	"CoinTransaction",
 	"FailureStory",
 	"Idea",
 	"IdeaBookmark",
@@ -63,8 +51,6 @@ __all__ = [
 	"Review",
 	"Skill",
 	"SubscriptionPlan",
-	"TodoAssignment",
-	"TodoTemplate",
 	"Todo",
 	"User",
 	"UserInterest",
