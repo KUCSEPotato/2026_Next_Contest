@@ -19,7 +19,7 @@ jobs:
           username: ${{ secrets.DEV_SSH_USER }}
           key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
           port: ${{ secrets.DEV_SSH_PORT }}
-          source: "."
+          source: "BE,fe,.env.develop"
           target: ${{ secrets.DEV_DEPLOY_PATH }}
           overwrite: true
 
