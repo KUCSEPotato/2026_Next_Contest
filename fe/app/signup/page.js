@@ -30,6 +30,16 @@ function validatePassword(pw) {
   };
 }
 
+// ─── [추가] FastAPI 에러 응답 파싱 헬퍼 ──────────────────────────────────────
+function parseApiError(data, fallback = "요청 처리 중 오류가 발생했습니다.") {
+  if (!data?.detail) return fallback;
+  if (typeof data.detail === "string") return data.detail;
+  if (Array.isArray(data.detail)) {
+    return data.detail.map((e) => e.msg).join("\n");
+  }
+  return fallback;
+}
+
 // ─── Step 인디케이터 ──────────────────────────────────────────────────────────
 function StepIndicator({ current }) {
   const steps = ["기본 정보", "스택 & 관심 분야", "완료"];
@@ -129,7 +139,6 @@ export default function SignupPage() {
 
   // ── GitHub OAuth ─────────────────────────────────────────────────────────
   const handleGithubLogin = () => {
-    // 백엔드에서 GitHub OAuth URL을 받거나 환경 변수로 설정
     const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
     const redirectUri = encodeURIComponent(
       process.env.NEXT_PUBLIC_GITHUB_REDIRECT_URI
@@ -137,18 +146,38 @@ export default function SignupPage() {
     window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=user:email`;
   };
 
-
-
   // ── Step 1 제출 ───────────────────────────────────────────────────────────
   const handleStep1Submit = async () => {
+    // ── [추가] 프론트 유효성 검사 ──────────────────────────────────────────
     if (!email || !realName || !nickname || !phoneNumber || !password) {
       alert("모든 항목을 입력해주세요.");
       return;
     }
+
+    // [추가] 이메일 형식 검사 — Pydantic EmailStr 검증 전에 프론트에서 차단
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      alert("올바른 이메일 형식을 입력해주세요.");
+      return;
+    }
+
+    // [추가] 닉네임 길이 검사 (백엔드 min_length=2, max_length=50)
+    if (nickname.length < 2 || nickname.length > 50) {
+      alert("닉네임은 2자 이상 50자 이하로 입력해주세요.");
+      return;
+    }
+
+    // [추가] 전화번호 길이 검사 (백엔드 min_length=5, max_length=20)
+    if (phoneNumber.length < 5 || phoneNumber.length > 20) {
+      alert("올바른 전화번호를 입력해주세요.");
+      return;
+    }
+
     if (!pwValid) {
       alert("비밀번호 조건을 확인해주세요.");
       return;
     }
+    // ─────────────────────────────────────────────────────────────────────
 
     try {
       setIsSubmitting(true);
@@ -164,7 +193,9 @@ export default function SignupPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "회원가입 실패");
+
+      // [수정] detail이 문자열/배열 모두 처리
+      if (!res.ok) throw new Error(parseApiError(data, "회원가입 실패"));
 
       const token = data.data?.access_token || data.data?.onboarding_token;
       setAccessToken(token);
@@ -232,6 +263,8 @@ export default function SignupPage() {
       setStep(3);
       setShowCompletionModal(true);
     } catch (err) {
+      // [수정] 에러 내용을 콘솔에 출력해 디버깅 용이하게 변경
+      console.error("Step2 error:", err);
       alert("프로필 저장 중 오류가 발생했습니다.");
     } finally {
       setIsSavingProfile(false);
