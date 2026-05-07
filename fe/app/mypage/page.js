@@ -6,7 +6,7 @@ import {
   getMyProfileApi,
   getMyReputationApi,
   getUserStatsApi,
-  getUserProjectsApi,
+  getMyProjectsApi,
   getMyReceivedReviewsApi,
   updateMyProfileApi,
   addMySkillApi,
@@ -65,7 +65,7 @@ export default function MyPage() {
             getMyReputationApi(),
             getUserStatsApi(profileData.id),
             // GET /users/me/projects — can_discard 필드 포함
-            getUserProjectsApi(),
+            getMyProjectsApi(),
             getMyReceivedReviewsApi(),
           ]);
 
