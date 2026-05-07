@@ -391,9 +391,23 @@ async def decide_application(
     app_obj.decided_at = datetime.now(timezone.utc)
 
     if decision == "accepted":
-        exists_member = db.query(ProjectMember).filter(ProjectMember.project_id == project_id, ProjectMember.user_id == app_obj.applicant_id).first()
+        exists_member = (
+            db.query(ProjectMember)
+            .filter(
+                ProjectMember.project_id == project_id,
+                ProjectMember.user_id == app_obj.applicant_id,
+            )
+            .first()
+        )
+
         if exists_member is None:
-            db.add(ProjectMember(project_id=project_id, user_id=app_obj.applicant_id, role_in_project=payload.role_in_project or "member"))
+            db.add(
+                ProjectMember(
+                    project_id=project_id,
+                    user_id=app_obj.applicant_id,
+                    role_in_project=payload.role_in_project or "member",
+                )
+            )
 
         default_room = (
             db.query(ChatRoom)
@@ -405,9 +419,16 @@ async def decide_application(
             .first()
         )
 
-    if default_room is None:
-        db.add(ChatRoom(project_id=project_id, name="team", is_active=True))
-    db.commit()
+        if default_room is None:
+            db.add(
+                ChatRoom(
+                    project_id=project_id,
+                    name="team",
+                    is_active=True,
+                )
+            )
+
+    db.commit() 
     return success_response(data={"id": app_obj.id, "status": app_obj.status})
 
 
