@@ -15,10 +15,10 @@ export default function MyChatRoomsPage() {
       try {
         setLoading(true);
         const result = await getMyChatRoomsApi();
-        setRooms(result.data || []);
+        setRooms(Array.isArray(result.data) ? result.data : []);
       } catch (error) {
         console.error(error);
-        // alert("채팅방 목록을 불러오지 못했습니다.");
+        alert("채팅방 목록을 불러오지 못했습니다.");
       } finally {
         setLoading(false);
       }
@@ -46,32 +46,43 @@ export default function MyChatRoomsPage() {
             <div className="space-y-3">
               {rooms.map((room) => (
                 <button
-                  key={room.room_id || room.id}
-                  onClick={() => router.push(`/chat/${room.room_id || room.id}`)}
+                  key={room.room_id}
+                  onClick={() =>
+                    router.push(`/chat/${room.room_id}?projectId=${room.project_id}`)
+                  }
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-left transition hover:border-red-300 hover:bg-red-50"
                 >
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <p className="font-semibold text-slate-900">
-                        {room.room_name || room.name || "팀 채팅방"}
+                        {room.room_name || "팀 채팅방"}
                       </p>
 
                       <p className="mt-1 text-sm text-slate-500">
-                        {room.project_title
-                          ? `프로젝트: ${room.project_title}`
-                          : `Project #${room.project_id}`}
+                        프로젝트: {room.project_title || `Project #${room.project_id}`}
                       </p>
 
-                      {room.last_message && (
+                      {room.last_message ? (
                         <p className="mt-2 line-clamp-1 text-sm text-slate-600">
-                          {room.last_message}
+                          {room.last_message_sender_nickname
+                            ? `${room.last_message_sender_nickname}: ${room.last_message}`
+                            : room.last_message}
+                        </p>
+                      ) : (
+                        <p className="mt-2 text-sm text-slate-400">
+                          아직 메시지가 없습니다.
                         </p>
                       )}
                     </div>
 
-                    {room.unread_count > 0 && (
-                      <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold text-white">
-                        {room.unread_count}
+                    {room.last_message_at && (
+                      <span className="shrink-0 text-xs text-slate-400">
+                        {new Date(room.last_message_at).toLocaleString("ko-KR", {
+                          month: "numeric",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </span>
                     )}
                   </div>

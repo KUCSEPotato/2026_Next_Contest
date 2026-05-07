@@ -7,6 +7,7 @@ import {
   getProjectApplicationsApi,
   decideProjectApplicationApi,
   getMyProfileApi,
+  completeTeamApi,
 } from "../../../../lib/api";
 
 export default function ProjectManagePage() {
@@ -19,6 +20,7 @@ export default function ProjectManagePage() {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
+  const [isCompletingTeam, setIsCompletingTeam] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -70,11 +72,12 @@ export default function ProjectManagePage() {
         status,
         role_in_project: "member",
       });
+
       const [apps, proj] = await Promise.all([
         getProjectApplicationsApi(projectId),
         getProjectApi(projectId),
       ]);
-      
+
       setApplications(apps.data?.data || []);
       setProject(proj.data?.data || proj.data);
 
@@ -92,6 +95,28 @@ export default function ProjectManagePage() {
       alert("지원 상태 변경에 실패했습니다.");
     } finally {
       setProcessingId(null);
+    }
+  };
+
+  const handleCompleteTeam = async () => {
+    if (!confirm("팀 결성을 완료하고 프로젝트를 시작할까요?")) {
+      return;
+    }
+
+    try {
+      setIsCompletingTeam(true);
+
+      await completeTeamApi(projectId);
+
+      const proj = await getProjectApi(projectId);
+      setProject(proj.data?.data || proj.data);
+
+      alert("팀 결성이 완료되었습니다.");
+    } catch (error) {
+      console.error(error);
+      alert("팀 결성에 실패했습니다.");
+    } finally {
+      setIsCompletingTeam(false);
     }
   };
 
@@ -129,9 +154,11 @@ export default function ProjectManagePage() {
           <p className="text-sm font-semibold text-red-600">
             Project #{projectId}
           </p>
+
           <h1 className="mt-2 text-3xl font-bold text-slate-900">
             {project?.title || "프로젝트"} 지원자 관리
           </h1>
+
           <p className="mt-3 text-slate-500">
             지원자의 프로필과 지원 메시지를 확인하고 팀원을 확정하세요.
           </p>
@@ -139,6 +166,22 @@ export default function ProjectManagePage() {
           <div className="mt-6 rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
             확정 인원: {acceptedCount} / {maxMembers || "제한 없음"}
           </div>
+
+          <button
+            onClick={handleCompleteTeam}
+            disabled={
+              isCompletingTeam ||
+              project?.status === "in_progress" ||
+              acceptedCount === 0
+            }
+            className="mt-4 w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+          >
+            {project?.status === "in_progress"
+              ? "이미 팀 결성이 완료되었습니다"
+              : isCompletingTeam
+              ? "팀 결성 중..."
+              : "팀 결성"}
+          </button>
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">

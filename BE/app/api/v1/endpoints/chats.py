@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Body, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
+from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
 from app.api.v1.response import success_response
@@ -222,3 +223,80 @@ async def chat_room_websocket(
         pass
     finally:
         realtime_hub.disconnect(channel, websocket)
+
+
+@router.get("/my/rooms", summary="내 채팅방 목록", description="현재 사용자가 속한 프로젝트의 채팅방 목록을 조회합니다.")
+async def get_my_chat_rooms(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    """내 채팅방 목록 조회 API.
+
+    사용자가 ProjectMember로 참여 중인 모든 프로젝트의 채팅방을 조회합니다.
+    각 채팅방의 최신 메시지 정보를 포함합니다.
+
+    Swagger 테스트 방법:
+    - Authorization 헤더에 Bearer access token을 넣습니다.
+    
+    응답:
+    - room_id: 채팅방 ID
+    - room_name: 채팅방 이름
+    - project_id: 프로젝트 ID
+    - project_title: 프로젝트 제목
+    - last_message: 마지막 메시지 텍스트
+    - last_message_at: 마지막 메시지 시간
+    - last_message_sender_nickname: 마지막 메시지 발송자 닉네임
+    """
+    # 사용자가 속한 프로젝트 찾기 (left_at이 None인 활성 멤버만)
+    project_members = (
+        db.query(ProjectMember)
+        .filter(
+            ProjectMember.user_id == current_user_id,
+            ProjectMember.left_at.is_(None),
+        )
+        .all()
+    )
+
+    project_ids = [pm.project_id for pm in project_members]
+    if not project_ids:
+        return success_response(data=[])
+
+    # 각 프로젝트의 ChatRoom 찾기
+    rooms = db.query(ChatRoom).filter(ChatRoom.project_id.in_(project_ids)).all()
+
+    # 프로젝트 정보 미리 로드
+    projects = db.query(Project).filter(Project.id.in_(project_ids)).all()
+    project_map = {p.id: p for p in projects}
+
+    # 응답 데이터 구성
+    response_data = []
+    for room in rooms:
+        project = project_map.get(room.project_id)
+        if not project:
+            continue
+
+        # 각 ChatRoom의 최신 메시지 찾기
+        latest_message = (
+            db.query(ChatMessage)
+            .filter(ChatMessage.room_id == room.id)
+            .order_by(desc(ChatMessage.created_at))
+            .first()
+        )
+
+        last_message_sender = None
+        if latest_message and latest_message.sender_id:
+            last_message_sender = db.get(User, latest_message.sender_id)
+
+        response_data.append(
+            {
+                "room_id": room.id,
+                "room_name": room.name,
+                "project_id": room.project_id,
+                "project_title": project.title,
+                "last_message": latest_message.message if latest_message else None,
+                "last_message_at": latest_message.created_at.isoformat() if latest_message else None,
+                "last_message_sender_nickname": last_message_sender.nickname if last_message_sender else None,
+            }
+        )
+
+    return success_response(data=response_data)
