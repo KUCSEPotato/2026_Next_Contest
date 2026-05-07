@@ -51,6 +51,57 @@ def _create_chat_message(db: Session, room_id: int, sender_id: int, message_text
     return message
 
 
+def _serialize_room_summary(db: Session, room: ChatRoom) -> dict:
+    project = db.get(Project, room.project_id)
+    last_message = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.room_id == room.id)
+        .order_by(ChatMessage.id.desc())
+        .first()
+    )
+    return {
+        "room_id": room.id,
+        "room_name": room.name,
+        "project_id": room.project_id,
+        "project_title": project.title if project else None,
+        "last_message": last_message.message if last_message else None,
+        "last_message_at": last_message.created_at.isoformat() if last_message and last_message.created_at else None,
+    }
+
+
+@router.get("/my/rooms", summary="내 채팅방 목록", description="현재 사용자가 참여 중인 모든 프로젝트의 채팅방을 모아 반환합니다.")
+async def list_my_chat_rooms(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    """내 채팅방 목록 조회 API.
+
+    Swagger 테스트 방법:
+    - Authorization 헤더를 설정합니다.
+
+    응답:
+    - 현재 사용자가 ProjectMember로 참여 중인 프로젝트들의 채팅방을 모두 반환합니다.
+    - room_id, room_name, project_id, project_title, last_message, last_message_at 포함
+    """
+    member_project_ids = (
+        db.query(ProjectMember.project_id)
+        .filter(ProjectMember.user_id == current_user_id, ProjectMember.left_at.is_(None))
+        .distinct()
+        .all()
+    )
+    project_ids = [project_id for (project_id,) in member_project_ids]
+    if not project_ids:
+        return success_response(data=[])
+
+    rooms = (
+        db.query(ChatRoom)
+        .filter(ChatRoom.project_id.in_(project_ids))
+        .order_by(ChatRoom.id.asc())
+        .all()
+    )
+    return success_response(data=[_serialize_room_summary(db, room) for room in rooms])
+
+
 @router.get("/projects/{project_id}/rooms", summary="채팅방 목록", description="프로젝트 멤버가 프로젝트 채팅방 목록을 조회합니다.")
 async def list_project_chat_rooms(
     project_id: int,

@@ -351,11 +351,40 @@ async def list_applications(
     """
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
-    apps = db.query(Application).filter(Application.project_id == project_id).order_by(Application.id.desc()).all()
+    apps = (
+        db.query(Application)
+        .filter(Application.project_id == project_id)
+        .order_by(Application.id.desc())
+        .all()
+    )
+
+    applicant_ids = [application.applicant_id for application in apps]
+    users = (
+        {user.id: user for user in db.query(User).filter(User.id.in_(applicant_ids)).all()}
+        if applicant_ids
+        else {}
+    )
+
     return success_response(
         data=[
-            {"id": a.id, "applicant_id": a.applicant_id, "message": a.message, "status": a.status}
-            for a in apps
+            {
+                "id": application.id,
+                "applicant_id": application.applicant_id,
+                "message": application.message,
+                "status": application.status,
+                "applicant": (
+                    {
+                        "id": users[application.applicant_id].id,
+                        "nickname": users[application.applicant_id].nickname,
+                        "email": users[application.applicant_id].email,
+                        "bio": users[application.applicant_id].bio,
+                        "avatar_url": users[application.applicant_id].avatar_url,
+                    }
+                    if users.get(application.applicant_id)
+                    else None
+                ),
+            }
+            for application in apps
         ]
     )
 
