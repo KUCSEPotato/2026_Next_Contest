@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getIdeasApi } from "../../lib/api";
+import { getProjectsApi } from "../../lib/api";
 
 interface Project {
   id: number;
@@ -15,7 +15,7 @@ interface Project {
   techStack: string[];
   currentMembers: number;
   maxMembers: number;
-  daysLeft: number;
+  status: string;
   difficulty: "beginner" | "intermediate" | "advanced";
   isUrgent: boolean;
 }
@@ -76,21 +76,21 @@ const useAuth = () => {
   return { isLoggedIn };
 };
 
-function normalizeIdea(idea: any): Project {
+function normalizeProject(project: any): Project {
   return {
-    id: idea.id,
-    project_id: idea.project_id,
-    converted_to_project_id: idea.converted_to_project_id,
-    title: idea.title || "제목 없음",
-    description: idea.summary || idea.description || "설명이 없습니다.",
-    summary: idea.summary,
-    category: idea.domain || idea.category || "IT/소프트웨어",
-    techStack: idea.tech_stack || idea.techStack || [],
-    currentMembers: idea.currentMembers ?? 1,
-    maxMembers: idea.required_members || idea.maxMembers || 4,
-    daysLeft: idea.daysLeft ?? 30,
-    difficulty: idea.difficulty || "beginner",
-    isUrgent: idea.isUrgent ?? false,
+    id: project.id,
+    project_id: project.id,
+    converted_to_project_id: project.id,
+    title: project.title || "제목 없음",
+    description: project.summary || project.description || "설명이 없습니다.",
+    summary: project.summary,
+    category: project.category || "IT/소프트웨어",
+    techStack: project.tech_stack || project.techStack || [],
+    currentMembers: project.currentMembers ?? project.current_members ?? 0,
+    maxMembers: project.maxMembers ?? project.max_members ?? 0,
+    status: project.status || "planning",
+    difficulty: project.difficulty || "beginner",
+    isUrgent: false,
   };
 }
 
@@ -107,25 +107,25 @@ export default function MainPage() {
   const [showLoginModal, setShowLoginModal] = useState(false);
 
   useEffect(() => {
-    async function loadIdeas() {
+    async function loadProjects() {
       try {
         setLoading(true);
         setLoadError("");
 
-        const result = await getIdeasApi({ page: 1, size: 50 });
-        const ideas = result.data || [];
+        const result = await getProjectsApi({ page: 1, size: 50 });
+        const projects = result.data || [];
 
-        setProjects(ideas.map(normalizeIdea));
+        setProjects(projects.map(normalizeProject));
       } catch (error) {
-        console.error("아이디어 목록 조회 실패:", error);
-        setLoadError("아이디어 목록을 불러오지 못했습니다.");
+        console.error("프로젝트 목록 조회 실패:", error);
+        setLoadError("프로젝트 목록을 불러오지 못했습니다.");
         setProjects([]);
       } finally {
         setLoading(false);
       }
     }
 
-    loadIdeas();
+    loadProjects();
   }, []);
 
   const handleProtectedAction = () => {
@@ -145,25 +145,10 @@ export default function MainPage() {
     router.push(path);
   };
 
-  const handleProjectClick = (idea: any) => {
+  const handleProjectClick = (project: Project) => {
     if (!handleProtectedAction()) return;
 
-    const projectId =
-      idea.project_id || idea.converted_to_project_id;
-
-    if (projectId) {
-      router.push(`/projects/${projectId}`);
-    } else {
-      alert("연결된 프로젝트가 없습니다.");
-    }
-  };
-
-  const handleApply = (e: React.MouseEvent, idea: any) => {
-    e.stopPropagation();
-    if (!handleProtectedAction()) return;
-
-    const projectId =
-      idea.project_id || idea.converted_to_project_id;
+    const projectId = project.project_id || project.converted_to_project_id || project.id;
 
     if (projectId) {
       router.push(`/projects/${projectId}`);
@@ -205,6 +190,7 @@ export default function MainPage() {
           채팅
         </button>
       </header>
+
       <main className="mx-auto max-w-6xl px-4 pb-16">
         <section className="py-10 text-center sm:py-14">
           <h1 className="mb-3 text-2xl font-bold leading-tight text-gray-900 sm:text-4xl">
@@ -256,7 +242,7 @@ export default function MainPage() {
             <div>
               <p className="text-lg font-bold text-gray-900">프로젝트 탐색</p>
               <p className="mt-1 text-sm text-gray-500">
-                등록된 아이디어를 살펴보고 함께할 프로젝트를 찾아보세요.
+                등록된 프로젝트를 살펴보고 함께할 팀을 찾아보세요.
               </p>
             </div>
 
@@ -274,7 +260,7 @@ export default function MainPage() {
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="아이디어 제목이나 기술 스택을 검색해보세요"
+            placeholder="프로젝트 제목이나 기술 스택을 검색해보세요"
             className="mb-4 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-400"
           />
 
@@ -305,7 +291,7 @@ export default function MainPage() {
             <span className="text-base font-bold text-gray-900">
               {searchQuery || selectedCategory
                 ? `검색 결과 (${filteredProjects.length})`
-                : "전체 아이디어"}
+                : "전체 프로젝트"}
             </span>
 
             {(searchQuery || selectedCategory) && (
@@ -323,7 +309,7 @@ export default function MainPage() {
 
           {loading ? (
             <div className="py-16 text-center text-sm text-gray-500">
-              아이디어 목록을 불러오는 중...
+              프로젝트 목록을 불러오는 중...
             </div>
           ) : loadError ? (
             <div className="py-16 text-center text-sm text-red-500">
@@ -333,7 +319,7 @@ export default function MainPage() {
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <p className="mb-3 text-3xl">🔍</p>
               <p className="mb-1 text-sm font-medium text-gray-600">
-                등록된 아이디어가 없어요
+                등록된 프로젝트가 없어요
               </p>
               <p className="text-xs text-gray-400">
                 직접 첫 아이디어를 등록해보세요
@@ -346,7 +332,6 @@ export default function MainPage() {
                   key={project.id}
                   project={project}
                   onClick={() => handleProjectClick(project)}
-                  onApply={(e) => handleApply(e, project)}
                 />
               ))}
             </div>
@@ -367,13 +352,22 @@ export default function MainPage() {
 function ProjectCard({
   project,
   onClick,
-  onApply,
 }: {
   project: Project;
   onClick: () => void;
-  onApply: (e: React.MouseEvent) => void;
 }) {
-  const isAlmostFull = project.currentMembers >= project.maxMembers - 1;
+  const isAlmostFull =
+    project.maxMembers > 0 && project.currentMembers >= project.maxMembers - 1;
+
+  const isRecruiting =
+    project.status !== "in_progress" &&
+    project.status !== "completed" &&
+    (!project.maxMembers || project.currentMembers < project.maxMembers);
+
+  const competitionRate =
+    isRecruiting && project.maxMembers > 0
+      ? (project.currentMembers / project.maxMembers).toFixed(1)
+      : null;
 
   return (
     <div
@@ -430,17 +424,25 @@ function ProjectCard({
       <div className="mt-auto flex items-center justify-between border-t border-gray-50 pt-3">
         <div className="flex items-center gap-3 text-xs text-gray-400">
           <span className={isAlmostFull ? "font-medium text-red-500" : ""}>
-            👥 {project.currentMembers}/{project.maxMembers}명
+            👥 {project.currentMembers}/{project.maxMembers || "제한 없음"}명
           </span>
-          <span>📅 {project.daysLeft}일 남음</span>
+
+          <span
+            className={
+              isRecruiting
+                ? "font-medium text-red-500"
+                : "font-medium text-gray-500"
+            }
+          >
+            {isRecruiting ? "모집중" : "모집완료"}
+          </span>
         </div>
 
-        <button
-          onClick={onApply}
-          className="rounded-lg bg-red-600 px-3 py-1 text-xs font-medium text-white transition hover:bg-red-700"
-        >
-          참여하기
-        </button>
+        {isRecruiting && competitionRate && (
+          <span className="rounded-full bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-600">
+            경쟁률 {competitionRate}:1
+          </span>
+        )}
       </div>
     </div>
   );
