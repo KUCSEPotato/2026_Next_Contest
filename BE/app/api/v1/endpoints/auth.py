@@ -24,16 +24,16 @@ from app.core.token_store import store_refresh_token
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
 from app.models import User
-from app.schemas import ForgotPasswordRequest
-from app.schemas import LoginRequest
-from app.schemas import LogoutRequest
-from app.schemas import OAuthGithubLoginRequest
-from app.schemas import OAuthGithubLinkRequest
-from app.schemas import OAuthGoogleLoginRequest
-from app.schemas import OAuthGoogleLinkRequest
-from app.schemas import ResetPasswordRequest
-from app.schemas import SignupRequest
-from app.schemas import TokenRefreshRequest
+from app.schemas.auth import ForgotPasswordRequest
+from app.schemas.auth import LoginRequest
+from app.schemas.auth import LogoutRequest
+from app.schemas.auth import OAuthGithubLoginRequest
+from app.schemas.auth import OAuthGithubLinkRequest
+from app.schemas.auth import OAuthGoogleLoginRequest
+from app.schemas.auth import OAuthGoogleLinkRequest
+from app.schemas.auth import ResetPasswordRequest
+from app.schemas.auth import SignupRequest
+from app.schemas.auth import TokenRefreshRequest
 from app.services.oauth import exchange_github_code_for_access_token
 from app.services.oauth import exchange_google_code_for_access_token
 from app.services.oauth import fetch_github_user_profile
@@ -83,31 +83,57 @@ def _load_active_user(db: Session, user_id: int) -> User:
     return user
 
 
-@router.post("/signup", summary="회원가입", description="이메일/닉네임/비밀번호로 계정을 생성합니다.")
+def _serialize_user_onboarding(user: User) -> dict:
+    return {
+        "id": user.id,
+        "email": user.email,
+        "nickname": user.nickname,
+        "name": user.name,
+        "phone_number": user.phone_number,
+        "role": user.role,
+        "is_verified": user.is_verified,
+        "onboarding_step": user.onboarding_step,
+        "onboarding_completed_at": user.onboarding_completed_at,
+    }
+
+
+@router.post("/signup", summary="회원가입", description="이메일/아이디/이름/전화번호/비밀번호로 계정을 생성합니다.")
 async def signup(payload: SignupRequest, db: Session = Depends(get_db)) -> dict:
     """회원가입 API.
 
     Swagger 테스트 방법:
-    - Request body에 `email`, `nickname`, `password`를 입력합니다.
+    - Request body에 `email`, `login_id`, `name`, `phone_number`, `password`를 입력합니다.
     - 동일 이메일/닉네임이 있으면 `409`를 반환합니다.
     """
     email = payload.email
-    nickname = payload.nickname
+    login_id = payload.login_id
+    name = payload.name
+    phone_number = payload.phone_number
     password = payload.password
 
     if db.query(User).filter(User.email == email, User.deleted_at.is_(None)).first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists")
 
-    if db.query(User).filter(User.nickname == nickname, User.deleted_at.is_(None)).first():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nickname already exists")
+    if db.query(User).filter(User.nickname == login_id, User.deleted_at.is_(None)).first():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Login id already exists")
 
-    user = User(email=email, nickname=nickname, password_hash=hash_password(password))
+    user = User(
+        email=email,
+        nickname=login_id,
+        name=name,
+        phone_number=phone_number,
+        password_hash=hash_password(password),
+        onboarding_step="profile_pending",
+    )
     db.add(user)
     db.commit()
     db.refresh(user)
 
     return success_response(
-        data={"id": user.id, "email": user.email, "nickname": user.nickname},
+        data={
+            **_create_auth_tokens(user.id),
+            "user": _serialize_user_onboarding(user),
+        },
     )
 
 
@@ -505,7 +531,12 @@ async def get_my_auth_info(
             "id": user.id,
             "email": user.email,
             "nickname": user.nickname,
+            "name": user.name,
+            "phone_number": user.phone_number,
+            "coin_balance": user.coin_balance,
             "role": user.role,
             "is_verified": user.is_verified,
+            "onboarding_step": user.onboarding_step,
+            "onboarding_completed_at": user.onboarding_completed_at,
         },
     )
