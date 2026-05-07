@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { getIdeasApi, getIdeaDetailApi } from "../../../lib/api";
+import { getIdeasApi, getIdeaApi } from "../../../lib/api";
 
 // ─── 타입 ────────────────────────────────────────────────────────────────────
 interface Idea {
@@ -102,7 +102,7 @@ export default function InspirationWellPage() {
     setCoinModal({ open: false, idea: null });
     try {
       // GET /ideas/{idea_id} 호출 시 1코인 차감됨
-      await getIdeaDetailApi(id);
+      await getIdeaApi(id);
       router.push(`/ideas/${id}`);
     } catch {
       alert("아이디어를 불러오지 못했습니다.");
@@ -153,11 +153,11 @@ export default function InspirationWellPage() {
         </div>
         <h1
           style={{
-            fontFamily: "'Noto Serif KR', 'Nanum Myeongjo', 'Georgia', serif",
-            fontSize: "2.4rem",
+            fontFamily: "inherit",
+            fontSize: "2.2rem",
             fontWeight: 700,
-            letterSpacing: "-0.03em",
-            color: "#1e3a5f",
+            letterSpacing: "-0.02em",
+            color: "#1e293b",
             marginBottom: "8px",
           }}
         >
@@ -174,6 +174,7 @@ export default function InspirationWellPage() {
             alignItems: "center",
             gap: "6px",
             marginTop: "14px",
+            marginBottom: "20px",
             padding: "6px 16px",
             borderRadius: "20px",
             border: "1px solid rgba(202, 150, 30, 0.35)",
@@ -265,7 +266,6 @@ export default function InspirationWellPage() {
 
       {/* 아이디어 목록 */}
       <main className="relative z-10 mx-auto max-w-4xl px-4 pb-20">
-        <WaveDivider />
 
         <div className="mt-1 mb-4 flex items-center justify-between">
           <p className="text-sm font-semibold text-slate-600">
