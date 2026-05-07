@@ -1,6 +1,6 @@
 import { PostSummary, PostDetail, CommentItem, ReactionType } from "../_types";
 
-const BASE = "/api/community";
+const BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"}/api/v1/community`;
 
 function authHeaders(): HeadersInit {
   const token = typeof window !== "undefined"
