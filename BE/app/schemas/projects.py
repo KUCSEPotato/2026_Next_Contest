@@ -32,6 +32,7 @@ class ProjectCreateRequest(CommonProjectRequest):
     status: str = "planning"
     progress_percent: float = Field(default=0, ge=0, le=100)
     max_members: int = Field(default=10, ge=1, le=100)
+    min_members: int = Field(default=1, ge=1, le=100)
     is_public: bool = True
 
 
@@ -39,6 +40,7 @@ class ProjectUpdateRequest(CommonProjectUpdateRequest):
     status: str | None = None
     progress_percent: float | None = Field(default=None, ge=0, le=100)
     max_members: int | None = Field(default=None, ge=1, le=100)
+    min_members: int | None = Field(default=None, ge=1, le=100)
     is_public: bool | None = None
 
 
