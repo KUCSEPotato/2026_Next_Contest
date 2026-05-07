@@ -13,7 +13,6 @@
 -- 7. 11_emergency_sync_ideas_table.sql
 -- 8. 12_add_user_onboarding_fields.sql
 -- 9. 13_add_coin_wallet_and_project_reminders.sql
--- 10. 14_allow_negative_coin_transactions.sql
 --
 -- Use `psql` so relative includes resolve from this file's directory.
 
@@ -26,4 +25,3 @@
 \ir 11_emergency_sync_ideas_table.sql
 \ir 12_add_user_onboarding_fields.sql
 \ir 13_add_coin_wallet_and_project_reminders.sql
-\ir 14_allow_negative_coin_transactions.sql
