@@ -10,6 +10,10 @@ def chat_room_channel(room_id: int) -> str:
     return f"chat.room.{room_id}"
 
 
+def project_todo_channel(project_id: int) -> str:
+    return f"project.todo.{project_id}"
+
+
 class RealtimeHub:
     def __init__(self) -> None:
         self._channels: DefaultDict[str, Set[WebSocket]] = defaultdict(set)
