@@ -12,6 +12,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Clean remote develop source directories
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.DEV_SSH_HOST }}
+          username: ${{ secrets.DEV_SSH_USER }}
+          key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.DEV_SSH_PORT }}
+          script: |
+            set -e
+            mkdir -p ${{ secrets.DEV_DEPLOY_PATH }}
+            rm -rf ${{ secrets.DEV_DEPLOY_PATH }}/BE
+            rm -rf ${{ secrets.DEV_DEPLOY_PATH }}/fe
+
       - name: Copy files to develop server via SCP
         uses: appleboy/scp-action@v0.1.5
         with:
@@ -19,7 +32,7 @@ jobs:
           username: ${{ secrets.DEV_SSH_USER }}
           key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
           port: ${{ secrets.DEV_SSH_PORT }}
-          source: "BE,fe,.env.develop"
+          source: "BE,fe"
           target: ${{ secrets.DEV_DEPLOY_PATH }}
           overwrite: true
 
