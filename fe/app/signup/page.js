@@ -90,6 +90,7 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [realName, setRealName] = useState("");
   const [nickname, setNickname] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -140,7 +141,7 @@ export default function SignupPage() {
 
   // ── Step 1 제출 ───────────────────────────────────────────────────────────
   const handleStep1Submit = async () => {
-    if (!email || !realName || !nickname || !password) {
+    if (!email || !realName || !nickname || !phoneNumber || !password) {
       alert("모든 항목을 입력해주세요.");
       return;
     }
@@ -156,8 +157,9 @@ export default function SignupPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email,
-          nickname,
+          login_id: nickname,
           name: realName,
+          phone_number: phoneNumber,
           password,
         }),
       });
@@ -202,21 +204,21 @@ export default function SignupPage() {
         Authorization: `Bearer ${accessToken}`,
       };
 
-      // 스킬 등록
-      if (selectedSkills.length > 0) {
+      // 스킬 등록 (백엔드가 건당 1개씩 받음)
+      for (const skill of selectedSkills) {
         await fetch(`${API_BASE}/api/v1/users/me/skills`, {
           method: "POST",
           headers,
-          body: JSON.stringify({ skills: selectedSkills }),
+          body: JSON.stringify({ name: skill }),
         });
       }
 
-      // 관심 분야 등록
-      if (selectedInterests.length > 0) {
+      // 관심 분야 등록 (백엔드가 건당 1개씩 받음)
+      for (const interest of selectedInterests) {
         await fetch(`${API_BASE}/api/v1/users/me/interests`, {
           method: "POST",
           headers,
-          body: JSON.stringify({ interests: selectedInterests }),
+          body: JSON.stringify({ name: interest }),
         });
       }
 
@@ -337,6 +339,13 @@ export default function SignupPage() {
                 placeholder="닉네임"
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
+              />
+              <input
+                type="tel"
+                placeholder="전화번호 (예: 01012345678)"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
               />
 
