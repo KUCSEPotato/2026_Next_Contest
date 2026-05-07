@@ -8,22 +8,10 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Clean remote develop source directories
-        uses: appleboy/ssh-action@v0.1.7
-        with:
-          host: ${{ secrets.DEV_SSH_HOST }}
-          username: ${{ secrets.DEV_SSH_USER }}
-          key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
-          port: ${{ secrets.DEV_SSH_PORT }}
-          script: |
-            set -e
-            mkdir -p ${{ secrets.DEV_DEPLOY_PATH }}
-            rm -rf ${{ secrets.DEV_DEPLOY_PATH }}/BE
-            rm -rf ${{ secrets.DEV_DEPLOY_PATH }}/fe
 
       - name: Copy files to develop server via SCP
         uses: appleboy/scp-action@v0.1.5
@@ -32,7 +20,7 @@ jobs:
           username: ${{ secrets.DEV_SSH_USER }}
           key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
           port: ${{ secrets.DEV_SSH_PORT }}
-          source: "BE,fe"
+          source: "."
           target: ${{ secrets.DEV_DEPLOY_PATH }}
           overwrite: true
 
@@ -50,50 +38,56 @@ jobs:
           envs: DEV_API_BASE_URL,DEV_FRONTEND_ORIGIN,DEV_FE_PORT
           script: |
             set -e
+
             cd ${{ secrets.DEV_DEPLOY_PATH }}
-            
+
             if [ ! -f .env.develop ]; then
               echo ".env.develop not found"
               exit 1
             fi
+
             chmod 600 .env.develop
-            
+
             if [ -z "${DEV_API_BASE_URL:-}" ]; then
               echo "DEV_API_BASE_URL secret is required for frontend deploy"
               exit 1
             fi
-            
+
             if [ -z "${DEV_FRONTEND_ORIGIN:-}" ]; then
               echo "DEV_FRONTEND_ORIGIN secret is required for backend CORS"
               exit 1
             fi
-            
+
             export FRONTEND_ORIGIN="${DEV_FRONTEND_ORIGIN}"
-            
+
             echo "Deploying backend..."
             cd BE/docker
+
             docker compose --env-file ../../.env.develop pull --ignore-pull-failures || true
             docker compose --env-file ../../.env.develop up -d --build
-            
+
             echo "Deploying frontend..."
             cd ../..
+
             if [ ! -d fe ]; then
               echo "fe directory not found"
               exit 1
             fi
-            
+
             export NEXT_PUBLIC_API_BASE_URL="${DEV_API_BASE_URL}"
+
             cd fe
-            
+
             if [ -f package-lock.json ]; then
               npm ci
             else
               npm install
             fi
-            
+
             npm run build
-            
+
             FE_PORT="${DEV_FE_PORT:-3000}"
+
             echo "Stopping existing frontend on port ${FE_PORT}..."
             if command -v fuser >/dev/null 2>&1; then
               fuser -k "${FE_PORT}/tcp" || true
@@ -101,9 +95,11 @@ jobs:
               pkill -f "next start" || true
               pkill -f "npm start" || true
             fi
-            
+
             sleep 2
+
             echo "Starting frontend on port ${FE_PORT}..."
             nohup env PORT="${FE_PORT}" NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL}" npm start > fe.log 2>&1 &
+
             sleep 2
             tail -n 50 fe.log || true
