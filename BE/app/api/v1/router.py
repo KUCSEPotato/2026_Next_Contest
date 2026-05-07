@@ -4,7 +4,6 @@ from app.api.v1.endpoints import admin
 from app.api.v1.endpoints import adoptions
 from app.api.v1.endpoints import auth
 from app.api.v1.endpoints import chats
-from app.api.v1.endpoints import community
 from app.api.v1.endpoints import ideas
 from app.api.v1.endpoints import matching
 from app.api.v1.endpoints import notifications
@@ -28,6 +27,5 @@ api_router.include_router(search.router, prefix="/search", tags=["search"])
 api_router.include_router(subscriptions.router, prefix="/subscriptions", tags=["subscriptions"])
 api_router.include_router(recommendations.router, prefix="/recommendations", tags=["recommendations"])
 api_router.include_router(chats.router, prefix="/chats", tags=["chats"])
-api_router.include_router(community.router, prefix="/community", tags=["community"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])

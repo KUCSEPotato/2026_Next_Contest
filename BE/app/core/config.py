@@ -6,7 +6,6 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     database_url: str = "postgresql+psycopg2://devory:devory1234@127.0.0.1:5432/devory"
     redis_url: str = "redis://127.0.0.1:6379/0"
-    frontend_origin: str | None = None
     jwt_secret_key: str = "change-this-in-production"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60

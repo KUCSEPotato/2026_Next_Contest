@@ -3,18 +3,15 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { getMessagesApi, sendMessageApi } from "../../../lib/api";
-import { useRef } from "react";
 
 export default function ChatRoomPage() {
   const params = useParams();
   const roomId = params.roomId;
-  const bottomRef = useRef(null);
 
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [myId, setMyId] = useState(null);
 
   const loadMessages = async () => {
     try {
@@ -32,15 +29,6 @@ export default function ChatRoomPage() {
   useEffect(() => {
     loadMessages();
   }, [roomId]);
-
-  useEffect(() => {
-    const userId = localStorage.getItem("user_id");
-    if (userId) setMyId(Number(userId));
-  }, []);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "auto" });
-  }, [messages]);
 
   const handleSend = async () => {
     if (!input.trim()) {
@@ -88,19 +76,8 @@ export default function ChatRoomPage() {
             <p className="text-slate-500">아직 메시지가 없습니다.</p>
           ) : (
             messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${
-                  message.sender_id === myId ? "justify-end" : "justify-start"
-                }`}
-              >
-                <div
-                  className={`max-w-[70%] rounded-2xl px-4 py-3 text-sm leading-6 ${
-                    message.sender_id === myId
-                      ? "bg-red-500 text-white"
-                      : "bg-slate-100 text-slate-800"
-                  }`}
-                >
+              <div key={message.id} className="flex justify-start">
+                <div className="max-w-[70%] rounded-2xl bg-slate-100 px-4 py-3 text-sm leading-6 text-slate-800">
                   <p>{message.message}</p>
                   <p className="mt-1 text-xs text-slate-400">
                     sender #{message.sender_id}
@@ -109,8 +86,6 @@ export default function ChatRoomPage() {
               </div>
             ))
           )}
-
-          <div ref={bottomRef} />
         </section>
 
         <footer className="border-t border-slate-200 p-4">
@@ -120,9 +95,7 @@ export default function ChatRoomPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.nativeEvent.isComposing && !sending) {
-                  handleSend();
-                }
+                if (e.key === "Enter") handleSend();
               }}
               placeholder="메시지를 입력하세요"
             />
