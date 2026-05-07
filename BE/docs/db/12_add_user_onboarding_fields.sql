@@ -5,7 +5,7 @@ BEGIN;
 ALTER TABLE users
     ADD COLUMN IF NOT EXISTS name VARCHAR(100),
     ADD COLUMN IF NOT EXISTS phone_number VARCHAR(20),
-    ADD COLUMN IF NOT EXISTS onboarding_step VARCHAR(20) NOT NULL DEFAULT 'completed',
+    ADD COLUMN IF NOT EXISTS onboarding_step VARCHAR(20) NOT NULL DEFAULT 'profile_pending',
     ADD COLUMN IF NOT EXISTS onboarding_completed_at TIMESTAMPTZ;
 
 UPDATE users
