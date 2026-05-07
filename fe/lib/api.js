@@ -57,17 +57,17 @@ export async function signupApi(email, nickname, password) {
 }
 
 export async function loginApi(loginId, password) {
-    const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
-      method: "POST",
-      headers: jsonHeaders(),
-      body: JSON.stringify({
-        login_id: loginId,
-        password,
-      }),
-    });
-  
-    return handleResponse(res, "로그인에 실패했습니다.");
-  }
+  const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify({
+      login_id: loginId,
+      password,
+    }),
+  });
+
+  return handleResponse(res, "로그인에 실패했습니다.");
+}
 
 /* =========================
    Ideas
@@ -89,6 +89,8 @@ export async function getIdeasApi(params = {}) {
   if (params.page) query.set("page", params.page);
   if (params.size) query.set("size", params.size);
   if (params.difficulty) query.set("difficulty", params.difficulty);
+  // 영감의 샘: 버려진 아이디어만 조회할 때 사용
+  if (params.discarded !== undefined) query.set("discarded", params.discarded);
 
   const queryString = query.toString();
   const url = queryString
@@ -103,6 +105,16 @@ export async function getIdeasApi(params = {}) {
 }
 
 export async function getIdeaApi(ideaId) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "아이디어 정보를 불러오지 못했습니다.");
+}
+
+// 영감의 샘: 아이디어 상세 열람 (호출 시 코인 1개 자동 차감)
+// GET /api/v1/ideas/{idea_id}
+export async function getIdeaDetailApi(ideaId) {
   const res = await fetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}`, {
     headers: authHeaders(),
   });
@@ -307,6 +319,13 @@ export async function revertProjectToIdeaApi(projectId) {
   );
 
   return handleResponse(res, "프로젝트를 아이디어로 되돌리지 못했습니다.");
+}
+
+// 영감의 샘에 투척하기 — revertProjectToIdeaApi의 명시적 alias
+// POST /api/v1/projects/{project_id}/revert-to-idea
+// 조건: can_discard === true인 프로젝트만 호출
+export async function discardProjectToWellApi(projectId) {
+  return revertProjectToIdeaApi(projectId);
 }
 
 /* =========================
@@ -584,12 +603,23 @@ export async function getUserStatsApi(userId) {
   return handleResponse(res, "사용자 통계를 불러오지 못했습니다.");
 }
 
+// 타인의 프로젝트 이력 조회 — GET /api/v1/users/{user_id}/projects
 export async function getUserProjectsApi(userId) {
   const res = await fetch(`${API_BASE_URL}/api/v1/users/${userId}/projects`, {
     headers: authHeaders(),
   });
 
   return handleResponse(res, "사용자 프로젝트 이력을 불러오지 못했습니다.");
+}
+
+// 내 프로젝트 목록 조회 (can_discard 포함) — GET /api/v1/users/me/projects
+// 마이페이지 전용. getUserProjectsApi(userId)와 다른 엔드포인트입니다.
+export async function getMyProjectsApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/users/me/projects`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "내 프로젝트 목록을 불러오지 못했습니다.");
 }
 
 export async function getMyReceivedReviewsApi() {
@@ -683,6 +713,7 @@ export async function getMyChatRoomsApi() {
 
   return handleResponse(res, "내 채팅방 목록을 불러오지 못했습니다.");
 }
+<<<<<<< Updated upstream
 
 export async function completeTeamApi(projectId) {
   const res = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}/complete-team`, {
@@ -692,3 +723,5 @@ export async function completeTeamApi(projectId) {
 
   return handleResponse(res, "팀 결성에 실패했습니다.");
 }
+=======
+>>>>>>> Stashed changes
