@@ -47,6 +47,9 @@ from app.services.economy import reward_project_completed
 from app.services.economy import reward_project_registration
 from app.services.economy import reward_project_recycled
 from app.services.economy import reward_project_started
+from app.core.realtime import project_todo_channel
+from app.core.realtime import chat_room_channel
+from app.core.realtime import realtime_hub
 
 router = APIRouter()
 
@@ -1342,6 +1345,23 @@ async def complete_team(
             message="팀 결성이 완료되었습니다! 인사를 나누고 프로젝트를 시작하세요."
         )
         db.add(system_message)
+        db.flush()
+        
+        await realtime_hub.broadcast_json(
+            chat_room_channel(team_room.id),
+            {
+                "type": "chat.message.created",
+                "data": {
+                    "id": system_message.id,
+                    "room_id": system_message.room_id,
+                    "sender_id": None,
+                    "sender_nickname": "시스템",
+                    "sender_avatar_url": None,
+                    "message": system_message.message,
+                    "created_at": system_message.created_at.isoformat() if system_message.created_at else None,
+                },
+            }
+        )
 
     db.commit()
     return success_response(data={"project_id": project_id, "status": "in_progress"})
