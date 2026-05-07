@@ -713,3 +713,12 @@ export async function getMyChatRoomsApi() {
 
   return handleResponse(res, "내 채팅방 목록을 불러오지 못했습니다.");
 }
+
+export async function completeTeamApi(projectId) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}/complete-team`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "팀 결성에 실패했습니다.");
+}
