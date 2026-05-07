@@ -6,6 +6,8 @@ import { getIdeasApi } from "../../lib/api";
 
 interface Project {
   id: number;
+  project_id?: number | null;
+  converted_to_project_id?: number | null;
   title: string;
   description: string;
   summary?: string;
@@ -42,6 +44,27 @@ const DIFFICULTY_COLOR = {
   advanced: "text-rose-600 bg-rose-50",
 };
 
+const SERVICE_BLOCKS = [
+  {
+    title: "프로젝트 탐색",
+    description: "진행 중인 아이디어와 프로젝트를 둘러보고 함께할 팀을 찾아보세요.",
+    path: "/mainpage",
+    isActive: true,
+  },
+  {
+    title: "아이디어 줍기",
+    description: "버려진 아이디어를 이어받아 새로운 프로젝트로 발전시켜보세요.",
+    path: "/ideas/pickup",
+    isActive: false,
+  },
+  {
+    title: "자유게시판",
+    description: "팀원 모집, 질문, 회고 등 자유롭게 이야기를 나눠보세요.",
+    path: "/community",
+    isActive: false,
+  },
+];
+
 const useAuth = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
@@ -56,6 +79,8 @@ const useAuth = () => {
 function normalizeIdea(idea: any): Project {
   return {
     id: idea.id,
+    project_id: idea.project_id,
+    converted_to_project_id: idea.converted_to_project_id,
     title: idea.title || "제목 없음",
     description: idea.summary || idea.description || "설명이 없습니다.",
     summary: idea.summary,
@@ -111,15 +136,40 @@ export default function MainPage() {
     return true;
   };
 
-  const handleProjectClick = (id: number) => {
-    if (!handleProtectedAction()) return;
-    router.push(`/ideas/${id}`);
+  const handleServiceClick = (path: string) => {
+    if (path === "/mainpage") {
+      router.push(path);
+      return;
+    }
+
+    router.push(path);
   };
 
-  const handleApply = (e: React.MouseEvent, id: number) => {
+  const handleProjectClick = (idea: any) => {
+    if (!handleProtectedAction()) return;
+
+    const projectId =
+      idea.project_id || idea.converted_to_project_id;
+
+    if (projectId) {
+      router.push(`/projects/${projectId}`);
+    } else {
+      alert("연결된 프로젝트가 없습니다.");
+    }
+  };
+
+  const handleApply = (e: React.MouseEvent, idea: any) => {
     e.stopPropagation();
     if (!handleProtectedAction()) return;
-    router.push(`/ideas/${id}`);
+
+    const projectId =
+      idea.project_id || idea.converted_to_project_id;
+
+    if (projectId) {
+      router.push(`/projects/${projectId}`);
+    } else {
+      alert("연결된 프로젝트가 없습니다.");
+    }
   };
 
   const filteredProjects = projects.filter((p) => {
@@ -140,6 +190,21 @@ export default function MainPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <header className="mx-auto flex max-w-6xl items-center justify-end gap-3 px-4 py-4">
+        <button
+          onClick={() => router.push("/notifications")}
+          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-red-300 hover:text-red-600"
+        >
+          알림
+        </button>
+
+        <button
+          onClick={() => router.push("/chat")}
+          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-red-300 hover:text-red-600"
+        >
+          채팅
+        </button>
+      </header>
       <main className="mx-auto max-w-6xl px-4 pb-16">
         <section className="py-10 text-center sm:py-14">
           <h1 className="mb-3 text-2xl font-bold leading-tight text-gray-900 sm:text-4xl">
@@ -147,18 +212,73 @@ export default function MainPage() {
             <br className="sm:hidden" /> 팀을 프로젝트로
           </h1>
 
-          <p className="mb-6 text-sm text-gray-500 sm:text-base">
-            AI가 나에게 맞는 프로젝트와 팀원을 연결해드려요
+          <p className="mb-8 text-sm text-gray-500 sm:text-base">
+            관심 있는 기능을 선택하고 Devory에서 함께할 팀을 찾아보세요
           </p>
+
+          <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 text-left sm:grid-cols-3">
+            {SERVICE_BLOCKS.map((block) => (
+              <button
+                key={block.title}
+                onClick={() => handleServiceClick(block.path)}
+                className={`rounded-2xl border p-5 shadow-sm transition hover:border-red-300 hover:shadow-md ${
+                  block.isActive
+                    ? "border-red-200 bg-red-50"
+                    : "border-gray-200 bg-white"
+                }`}
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <p
+                    className={`text-base font-bold ${
+                      block.isActive ? "text-red-600" : "text-gray-900"
+                    }`}
+                  >
+                    {block.title}
+                  </p>
+
+                  {block.isActive && (
+                    <span className="rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                      현재
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-sm leading-relaxed text-gray-500">
+                  {block.description}
+                </p>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="mb-8 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-lg font-bold text-gray-900">프로젝트 탐색</p>
+              <p className="mt-1 text-sm text-gray-500">
+                등록된 아이디어를 살펴보고 함께할 프로젝트를 찾아보세요.
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                if (!handleProtectedAction()) return;
+                router.push("/ideas/new");
+              }}
+              className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+            >
+              아이디어 등록하기
+            </button>
+          </div>
 
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="아이디어 제목이나 기술 스택을 검색해보세요"
-            className="mx-auto mb-4 w-full max-w-xl rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-400"
+            className="mb-4 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-400"
           />
 
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <div className="flex flex-wrap gap-2">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat.label}
@@ -225,30 +345,12 @@ export default function MainPage() {
                 <ProjectCard
                   key={project.id}
                   project={project}
-                  onClick={() => handleProjectClick(project.id)}
-                  onApply={(e) => handleApply(e, project.id)}
+                  onClick={() => handleProjectClick(project)}
+                  onApply={(e) => handleApply(e, project)}
                 />
               ))}
             </div>
           )}
-        </section>
-
-        <section className="rounded-2xl bg-red-600 p-6 text-center text-white sm:p-8">
-          <p className="mb-2 text-lg font-bold sm:text-xl">
-            팀이 없어도 괜찮아요
-          </p>
-          <p className="mb-5 text-sm text-red-100">
-            아이디어만 있으면 Devory가 팀을 만들어드려요
-          </p>
-          <button
-            onClick={() => {
-              if (!handleProtectedAction()) return;
-              router.push("/ideas/new");
-            }}
-            className="rounded-xl bg-white px-6 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
-          >
-            아이디어 등록하기 →
-          </button>
         </section>
       </main>
 

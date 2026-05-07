@@ -14,6 +14,7 @@ from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
 from app.dependencies.auth import get_current_user_id_from_token
 from app.models import Application
+from app.models import ChatRoom
 from app.models import FailureStory
 from app.models import Idea
 from app.models import Invitation
@@ -423,6 +424,18 @@ async def decide_application(
         if exists_member is None:
             db.add(ProjectMember(project_id=project_id, user_id=app_obj.applicant_id, role_in_project=payload.role_in_project or "member"))
 
+        default_room = (
+            db.query(ChatRoom)
+            .filter(
+                ChatRoom.project_id == project_id,
+                ChatRoom.name == "team",
+                ChatRoom.is_active.is_(True),
+            )
+            .first()
+        )
+
+    if default_room is None:
+        db.add(ChatRoom(project_id=project_id, name="team", is_active=True))
     db.commit()
     return success_response(data={"id": app_obj.id, "status": app_obj.status})
 

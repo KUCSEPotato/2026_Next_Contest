@@ -40,21 +40,24 @@ export default function Navbar() {
         </button>
 
         <div className="flex items-center gap-3 text-sm font-semibold">
-          <button onClick={() => router.push("/mainpage")}>프로젝트</button>
-          <button onClick={() => router.push("/ideas/new")}>아이디어 등록</button>
-          <button onClick={() => router.push("/mypage")}>마이페이지</button>
+          <button
+            onClick={() => router.push("/mypage")}
+            className="text-slate-700 transition hover:text-red-600"
+          >
+            마이페이지
+          </button>
 
           {token ? (
             <button
               onClick={handleLogout}
-              className="rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+              className="rounded-lg bg-red-600 px-4 py-2 text-white transition hover:bg-red-700"
             >
               로그아웃
             </button>
           ) : (
             <button
               onClick={() => router.push("/login")}
-              className="rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+              className="rounded-lg bg-red-600 px-4 py-2 text-white transition hover:bg-red-700"
             >
               로그인
             </button>

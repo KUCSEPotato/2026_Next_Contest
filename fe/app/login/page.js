@@ -28,6 +28,13 @@ export default function LoginPage() {
       localStorage.setItem("refresh_token", result.data.refresh_token);
       localStorage.setItem("user_id", result.data.user_id);
 
+      const meRes = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"}/auth/me`,
+        { headers: { Authorization: `Bearer ${result.data.access_token}` } }
+      );
+      const me = await meRes.json();
+      localStorage.setItem("user", JSON.stringify(me.data));
+
       alert("로그인되었습니다.");
       router.push("/mainpage");
     } catch (error) {
@@ -43,7 +50,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg">
         <div className="mb-6 flex justify-center">
           <Image
-            src="/logo_colored.png"
+            src="/logo_colored.svg"
             alt="Devory 로고"
             width={110}
             height={80}

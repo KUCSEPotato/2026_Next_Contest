@@ -42,25 +42,32 @@ async function handleResponse(res, errorMessage) {
    Auth
 ========================= */
 
-export async function signupApi(payload) {
+export async function signupApi(email, nickname, password) {
   const res = await fetch(`${API_BASE_URL}/api/v1/auth/signup`, {
     method: "POST",
     headers: jsonHeaders(),
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      email,
+      nickname,
+      password,
+    }),
   });
 
   return handleResponse(res, "회원가입에 실패했습니다.");
 }
 
-export async function loginApi(payload) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify(payload),
-  });
-
-  return handleResponse(res, "로그인에 실패했습니다.");
-}
+export async function loginApi(loginId, password) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+      method: "POST",
+      headers: jsonHeaders(),
+      body: JSON.stringify({
+        login_id: loginId,
+        password,
+      }),
+    });
+  
+    return handleResponse(res, "로그인에 실패했습니다.");
+  }
 
 /* =========================
    Ideas
@@ -648,3 +655,31 @@ export async function requestAdoptionApi(projectId, message) {
 ========================= */
 
 export const applyIdeaApi = applyProjectApi;
+
+export async function getNotificationsApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/notifications`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "알림 목록을 불러오지 못했습니다.");
+}
+
+export async function readNotificationApi(notificationId) {
+  const res = await fetch(
+    `${API_BASE_URL}/api/v1/notifications/${notificationId}/read`,
+    {
+      method: "PATCH",
+      headers: authHeaders(),
+    }
+  );
+
+  return handleResponse(res, "알림 읽음 처리에 실패했습니다.");
+}
+
+export async function getMyChatRoomsApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/chats/my/rooms`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "내 채팅방 목록을 불러오지 못했습니다.");
+}

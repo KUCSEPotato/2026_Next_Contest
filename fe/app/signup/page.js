@@ -41,7 +41,7 @@ export default function SignupPage() {
         {/* 로고 */}
         <div className="mb-6 flex justify-center">
           <Image
-            src="/logo_colored.png"
+            src="/logo_colored.svg"
             alt="Devory 로고"
             width={110}
             height={80}
