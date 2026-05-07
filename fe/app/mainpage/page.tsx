@@ -423,14 +423,14 @@ function ProjectCard({
 
       <div className="mt-auto flex items-center justify-between border-t border-gray-50 pt-3">
         <div className="flex items-center gap-3 text-xs text-gray-400">
-          <span className={isAlmostFull ? "font-medium text-red-500" : ""}>
-            👥 {project.currentMembers}/{project.maxMembers || "제한 없음"}명
+          <span className={isAlmostFull ? "font-medium text-blue-500" : ""}>
+            👥 {project.currentMembers}/{project.maxMembers ? project.maxMembers + 1 : "제한 없음"}명
           </span>
 
           <span
             className={
               isRecruiting
-                ? "font-medium text-red-500"
+                ? "font-medium text-green-500"
                 : "font-medium text-gray-500"
             }
           >
