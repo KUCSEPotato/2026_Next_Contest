@@ -104,6 +104,7 @@ export default function MainPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
 
   useEffect(() => {
@@ -148,7 +149,8 @@ export default function MainPage() {
   const handleProjectClick = (project: Project) => {
     if (!handleProtectedAction()) return;
 
-    const projectId = project.project_id || project.converted_to_project_id || project.id;
+    const projectId =
+      project.project_id || project.converted_to_project_id || project.id;
 
     if (projectId) {
       router.push(`/projects/${projectId}`);
@@ -162,6 +164,10 @@ export default function MainPage() {
       ? p.category === selectedCategory
       : true;
 
+    const matchDifficulty = selectedDifficulty
+      ? p.difficulty === selectedDifficulty
+      : true;
+
     const matchSearch = searchQuery
       ? p.title.includes(searchQuery) ||
         p.description.includes(searchQuery) ||
@@ -170,7 +176,7 @@ export default function MainPage() {
         )
       : true;
 
-    return matchCategory && matchSearch;
+    return matchCategory && matchDifficulty && matchSearch;
   });
 
   return (
@@ -284,21 +290,42 @@ export default function MainPage() {
               </button>
             ))}
           </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {Object.entries(DIFFICULTY_LABEL).map(([value, label]) => (
+              <button
+                key={value}
+                onClick={() =>
+                  setSelectedDifficulty(
+                    selectedDifficulty === value ? null : value
+                  )
+                }
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                  selectedDifficulty === value
+                    ? "border-red-600 bg-red-600 text-white"
+                    : "border-gray-200 bg-white text-gray-600 hover:border-red-300 hover:text-red-600"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </section>
 
         <section className="mb-10">
           <div className="mb-4 flex items-center justify-between">
             <span className="text-base font-bold text-gray-900">
-              {searchQuery || selectedCategory
+              {searchQuery || selectedCategory || selectedDifficulty
                 ? `검색 결과 (${filteredProjects.length})`
                 : "전체 프로젝트"}
             </span>
 
-            {(searchQuery || selectedCategory) && (
+            {(searchQuery || selectedCategory || selectedDifficulty) && (
               <button
                 onClick={() => {
                   setSearchQuery("");
                   setSelectedCategory(null);
+                  setSelectedDifficulty(null);
                 }}
                 className="text-xs text-gray-400 transition hover:text-gray-600"
               >
@@ -366,7 +393,7 @@ function ProjectCard({
 
   const competitionRate =
     isRecruiting && project.maxMembers > 0
-      ? (project.currentMembers / project.maxMembers).toFixed(1)
+      ? (project.currentMembers / project.maxMembers).toFixed(2)
       : null;
 
   return (
@@ -424,7 +451,8 @@ function ProjectCard({
       <div className="mt-auto flex items-center justify-between border-t border-gray-50 pt-3">
         <div className="flex items-center gap-3 text-xs text-gray-400">
           <span className={isAlmostFull ? "font-medium text-blue-500" : ""}>
-            👥 {project.currentMembers}/{project.maxMembers ? project.maxMembers + 1 : "제한 없음"}명
+            👥 {project.currentMembers}/
+            {project.maxMembers ? project.maxMembers + 1 : "제한 없음"}명
           </span>
 
           <span
