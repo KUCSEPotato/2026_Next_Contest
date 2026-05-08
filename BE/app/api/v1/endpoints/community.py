@@ -329,12 +329,20 @@ async def create_comment(
         author_id=current_user_id,
         content=payload.content,
         parent_comment_id=payload.parent_comment_id,
+        is_anonymous=payload.is_anonymous,
     )
     db.add(comment)
     db.commit()
     db.refresh(comment)
 
     author = db.get(User, current_user_id)
+    # 익명인 경우 작성자 정보 숨김
+    author_info = {
+        "id": author.id if not payload.is_anonymous else None,
+        "nickname": "익명" if payload.is_anonymous else author.nickname,
+        "avatar_url": None if payload.is_anonymous else author.avatar_url,
+    }
+    
     return success_response(
         data={
             "id": comment.id,
@@ -342,12 +350,9 @@ async def create_comment(
             "author_id": comment.author_id,
             "content": comment.content,
             "parent_comment_id": comment.parent_comment_id,
+            "is_anonymous": comment.is_anonymous,
             "created_at": comment.created_at,
-            "author": {
-                "id": author.id,
-                "nickname": author.nickname,
-                "avatar_url": author.avatar_url,
-            },
+            "author": author_info,
         },
     )
 
@@ -405,15 +410,16 @@ async def list_comments(
             {
                 "id": comment.id,
                 "post_id": comment.post_id,
-                "author_id": comment.author_id,
+                "author_id": comment.author_id if not comment.is_anonymous else None,
                 "content": comment.content,
                 "parent_comment_id": comment.parent_comment_id,
+                "is_anonymous": comment.is_anonymous,
                 "created_at": comment.created_at,
                 "updated_at": comment.updated_at,
                 "author": {
-                    "id": author.id,
-                    "nickname": author.nickname,
-                    "avatar_url": author.avatar_url,
+                    "id": author.id if not comment.is_anonymous else None,
+                    "nickname": "익명" if comment.is_anonymous else author.nickname,
+                    "avatar_url": None if comment.is_anonymous else author.avatar_url,
                 },
                 "reaction_stats": reaction_stats,
                 "reply_count": reply_count,
