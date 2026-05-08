@@ -692,3 +692,20 @@ export async function completeTeamApi(projectId) {
 
   return handleResponse(res, "팀 결성에 실패했습니다.");
 }
+
+export async function getIdeaDetailApi(ideaId) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res, "아이디어 정보를 불러오지 못했습니다.");
+}
+
+export async function getMyProjectsApi() {
+  const profile = await getMyProfileApi();
+  const userId = profile.data.id;
+  return getUserProjectsApi(userId);
+}
+
+export async function discardProjectToWellApi(projectId) {
+  return revertProjectToIdeaApi(projectId);
+}
