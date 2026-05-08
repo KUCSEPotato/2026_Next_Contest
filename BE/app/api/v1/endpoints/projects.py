@@ -531,8 +531,9 @@ async def revert_project_to_idea(
     if project.idea_id is not None:
         idea = db.get(Idea, project.idea_id)
         if idea is not None and idea.deleted_at is None:
-            # Idea의 변환 기록 제거
+            # Idea의 변환 기록 제거 및 투척 표시
             idea.converted_to_project_id = None
+            idea.is_discarded = True
             idea_reverted = True
 
     if project.idea_id is not None:

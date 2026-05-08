@@ -116,12 +116,16 @@ async def list_ideas(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
     difficulty: str | None = Query(default=None),
+    discarded: bool | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> dict:
     """아이디어 목록 조회 API.
 
     Swagger 테스트 방법:
-    - query `page`, `size`, `difficulty`를 조합해 호출합니다.
+    - query `page`, `size`, `difficulty`, `discarded`를 조합해 호출합니다.
+    - `discarded=true`: 투척된 아이디어만 조회
+    - `discarded=false`: 투척되지 않은 아이디어만 조회
+    - `discarded` 미지정: 모든 아이디어 조회
 
     응답:
     - data에 아이디어 목록, meta에 page/size/total을 반환합니다.
@@ -130,6 +134,8 @@ async def list_ideas(
     query = query.filter(Idea.deleted_at.is_(None))
     if difficulty:
         query = query.filter(Idea.difficulty == difficulty)
+    if discarded is not None:
+        query = query.filter(Idea.is_discarded == discarded)
 
     total = query.count()
     ideas = query.order_by(Idea.created_at.desc()).offset((page - 1) * size).limit(size).all()
@@ -145,6 +151,7 @@ async def list_ideas(
             "hashtags": idea.hashtags,
             "difficulty": idea.difficulty,
             "is_open": idea.is_open,
+            "is_discarded": idea.is_discarded,
             "created_at": idea.created_at,
         }
             for idea in ideas
