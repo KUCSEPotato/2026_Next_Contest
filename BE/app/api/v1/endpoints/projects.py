@@ -262,34 +262,20 @@ async def list_projects(
     projects = query.order_by(Project.created_at.desc()).offset((page - 1) * size).limit(size).all()
     
     data = []
-
     for p in projects:
         current_members = db.query(func.count(ProjectMember.id)).filter(
             ProjectMember.project_id == p.id,
             ProjectMember.left_at.is_(None)
         ).scalar() or 0
-
-        application_count = db.query(func.count(Application.id)).filter(
-            Application.project_id == p.id,
-            Application.status == "pending"
-        ).scalar() or 0
-
-        remaining_slots = max((p.max_members + 1) - current_members, 0)
-
         data.append({
             "id": p.id,
             "title": p.title,
-            "summary": p.summary,
-            "description": p.description,
-            "category": p.category,
             "status": p.status,
             "difficulty": p.difficulty,
             "progress_percent": float(p.progress_percent),
             "leader_id": p.leader_id,
             "currentMembers": current_members,
             "maxMembers": p.max_members,
-            "applicationCount": application_count,
-            "remainingSlots": remaining_slots,
         })
     
     return success_response(

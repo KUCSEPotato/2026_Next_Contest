@@ -18,8 +18,6 @@ interface Project {
   status: string;
   difficulty: "beginner" | "intermediate" | "advanced";
   isUrgent: boolean;
-  applicationCount: number;
-  remainingSlots: number;
 }
 
 const CATEGORIES = [
@@ -93,8 +91,6 @@ function normalizeProject(project: any): Project {
     status: project.status || "planning",
     difficulty: project.difficulty || "beginner",
     isUrgent: false,
-    applicationCount: project.applicationCount ?? 0,
-    remainingSlots: project.remainingSlots ?? 0,
   };
 }
 
@@ -369,8 +365,8 @@ function ProjectCard({
     (!project.maxMembers || project.currentMembers < project.maxMembers);
 
   const competitionRate =
-    project.remainingSlots > 0
-      ? (project.applicationCount / project.remainingSlots).toFixed(2)
+    isRecruiting && project.maxMembers > 0
+      ? (project.currentMembers / project.maxMembers).toFixed(1)
       : null;
 
   return (
