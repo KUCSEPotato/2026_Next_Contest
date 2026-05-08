@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PostSummary, User, ReactionType } from "../_types";
 import { timeAgo } from "../_lib/utils";
@@ -25,10 +25,20 @@ export default function PostCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
   const isOwn = currentUser?.id === post.author_id;
   const totalLikes = post.reaction_stats.like;
+  const isLiked = post.user_reaction === "like";
 
-  // 목록에서는 liked 상태를 알 수 없으므로 상세에서 처리
   const goToDetail = () => router.push(`/community/${post.id}`);
 
   return (
@@ -114,9 +124,11 @@ export default function PostCard({
             if (!currentUser) { onLoginRequired(); return; }
             onReact(post.id, "like");
           }}
-          className="flex items-center gap-1.5 text-sm text-gray-400 transition hover:text-red-400"
+          className={`flex items-center gap-1.5 text-sm transition ${
+            isLiked ? "text-red-500" : "text-gray-400 hover:text-red-400"
+          }`}
         >
-          🤍 <span className="text-xs">{totalLikes}</span>
+          {isLiked ? "❤️" : "🤍"} <span className="text-xs">{totalLikes}</span>
         </button>
 
         <button

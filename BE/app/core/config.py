@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     google_oauth_client_id: str | None = None
     google_oauth_client_secret: str | None = None
     google_oauth_redirect_uri: str | None = None
+    # AWS S3 Configuration
+    aws_access_key_id: str | None = None
+    aws_secret_access_key: str | None = None
+    aws_s3_bucket: str | None = None
+    aws_s3_region: str = "ap-northeast-2"
+    max_file_size_mb: int = 50  # Maximum file size in MB
 
     model_config = {
         "env_file": ".env",

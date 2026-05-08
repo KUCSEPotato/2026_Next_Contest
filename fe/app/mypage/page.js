@@ -6,11 +6,12 @@ import {
   getMyProfileApi,
   getMyReputationApi,
   getUserStatsApi,
-  getUserProjectsApi,
+  getMyProjectsApi,
   getMyReceivedReviewsApi,
   updateMyProfileApi,
   addMySkillApi,
   addMyInterestApi,
+  discardProjectToWellApi,
 } from "../../lib/api";
 
 export default function MyPage() {
@@ -24,6 +25,8 @@ export default function MyPage() {
 
   const [loading, setLoading] = useState(true);
   const [showReviews, setShowReviews] = useState(false);
+  const [discardingId, setDiscardingId] = useState(null);
+  const [discardConfirm, setDiscardConfirm] = useState(null); // project object
 
   const [editNickname, setEditNickname] = useState("");
   const [editBio, setEditBio] = useState("");
@@ -61,7 +64,8 @@ export default function MyPage() {
           await Promise.allSettled([
             getMyReputationApi(),
             getUserStatsApi(profileData.id),
-            getUserProjectsApi(profileData.id),
+            // GET /users/me/projects — can_discard 필드 포함
+            getMyProjectsApi(),
             getMyReceivedReviewsApi(),
           ]);
 
@@ -107,6 +111,21 @@ export default function MyPage() {
 
     loadMyPage();
   }, [router]);
+
+  const handleDiscardToWell = async (project) => {
+    try {
+      setDiscardingId(project.id);
+      await discardProjectToWellApi(project.id);
+      setProjects((prev) => prev.filter((p) => p.id !== project.id));
+      setDiscardConfirm(null);
+      alert(`"${project.title}" 아이디어가 영감의 샘에 투척되었습니다.`);
+    } catch (error) {
+      console.error(error);
+      alert("투척에 실패했습니다. 다시 시도해주세요.");
+    } finally {
+      setDiscardingId(null);
+    }
+  };
 
   const handleUpdateProfile = async () => {
     try {
@@ -398,6 +417,19 @@ export default function MyPage() {
                         {project.status || "상태 없음"}
                       </span>
 
+                      {/* can_discard가 true일 때만 투척하기 버튼 노출 */}
+                      {project.can_discard && (
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDiscardConfirm(project);
+                          }}
+                          className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-600 transition hover:bg-blue-100"
+                        >
+                          💧 영감의 샘에 투척
+                        </span>
+                      )}
+
                       <span
                         onClick={(e) => {
                           e.stopPropagation();
@@ -417,6 +449,49 @@ export default function MyPage() {
           </div>
         </section>
       </div>
+
+      {/* 투척 확인 모달 */}
+      {discardConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+            onClick={() => setDiscardConfirm(null)}
+          />
+          <div className="relative w-full max-w-sm rounded-2xl bg-white p-7 shadow-2xl">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-3xl">
+              💧
+            </div>
+            <h2 className="mb-2 text-center text-base font-bold text-slate-800">
+              영감의 샘에 투척할까요?
+            </h2>
+            <p className="mb-1 text-center text-sm font-semibold text-slate-700 line-clamp-1">
+              "{discardConfirm.title}"
+            </p>
+            <p className="mb-6 text-center text-sm text-slate-400 leading-relaxed">
+              이 아이디어는 프로젝트 상세 페이지에서 사라지고,
+              <br />
+              <span className="font-semibold text-blue-600">영감의 샘</span>으로 이동됩니다.
+              <br />
+              <span className="text-xs text-slate-300 mt-1 block">이 작업은 되돌릴 수 없습니다.</span>
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDiscardConfirm(null)}
+                className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-medium text-slate-500 transition hover:bg-slate-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => handleDiscardToWell(discardConfirm)}
+                disabled={discardingId === discardConfirm.id}
+                className="flex-1 rounded-xl bg-blue-500 py-3 text-sm font-semibold text-white shadow-md shadow-blue-100 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                {discardingId === discardConfirm.id ? "투척 중..." : "투척하기 💧"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

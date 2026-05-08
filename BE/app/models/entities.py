@@ -101,6 +101,7 @@ class Idea(Base):
     difficulty: Mapped[str] = mapped_column(String(20), nullable=False)
     required_members: Mapped[int] = mapped_column(SmallInteger, default=1)
     is_open: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_discarded: Mapped[bool] = mapped_column(Boolean, default=False)
     converted_to_project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -142,6 +143,7 @@ class Project(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     max_members: Mapped[int] = mapped_column(SmallInteger, default=10)
+    min_members: Mapped[int] = mapped_column(SmallInteger, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -457,6 +459,7 @@ class CommunityPostComment(Base):
     author_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     parent_comment_id: Mapped[int | None] = mapped_column(ForeignKey("community_post_comments.id", ondelete="CASCADE"))
+    is_anonymous: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -482,3 +485,33 @@ class CommunityCommentReaction(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     reaction_type: Mapped[str] = mapped_column(String(50), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CommunityPostFile(Base):
+    __tablename__ = "community_post_files"
+
+    id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
+    post_id: Mapped[int] = mapped_column(ForeignKey("community_posts.id", ondelete="CASCADE"), nullable=False)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_size: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    file_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    s3_key: Mapped[str] = mapped_column(String(500), nullable=False)
+    s3_url: Mapped[str] = mapped_column(Text, nullable=False)
+    uploaded_by: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class IdeaFile(Base):
+    __tablename__ = "idea_files"
+
+    id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
+    idea_id: Mapped[int] = mapped_column(ForeignKey("ideas.id", ondelete="CASCADE"), nullable=False)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_size: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    file_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    s3_key: Mapped[str] = mapped_column(String(500), nullable=False)
+    s3_url: Mapped[str] = mapped_column(Text, nullable=False)
+    uploaded_by: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

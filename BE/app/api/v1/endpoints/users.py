@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -55,6 +56,26 @@ async def get_my_profile(
         .order_by(IdeaBookmark.id.asc())
         .all()
     )
+    
+    # 현재 참여중인 프로젝트 (멤버로 참여중인 프로젝트)
+    participating_projects = (
+        db.query(Project)
+        .join(ProjectMember, ProjectMember.project_id == Project.id)
+        .filter(
+            ProjectMember.user_id == current_user_id,
+            Project.deleted_at.is_(None),
+        )
+        .all()
+    )
+    participating_project_list = [
+        {
+            "id": p.id,
+            "title": p.title,
+            "status": p.status,
+            "leader_id": p.leader_id,
+        }
+        for p in participating_projects
+    ]
 
     return success_response(
         data={
@@ -69,6 +90,7 @@ async def get_my_profile(
             "skills": [name for (name,) in skills],
             "interests": [name for (name,) in interests],
             "selected_idea_ids": [idea_id for (idea_id,) in selected_idea_ids],
+            "participating_projects": participating_project_list,
             "onboarding_step": user.onboarding_step,
             "onboarding_completed_at": user.onboarding_completed_at,
         },
@@ -144,6 +166,55 @@ async def get_my_onboarding_state(
             "onboarding_completed_at": user.onboarding_completed_at,
         },
     )
+
+
+@router.get("/me/projects", summary="내가 리더인 프로젝트 목록", description="현재 사용자가 리더인 프로젝트를 반환합니다.")
+async def get_my_projects(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    """내가 리더인 프로젝트 목록 조회 API.
+    
+    각 프로젝트에 can_discard 필드를 포함합니다.
+    can_discard 조건:
+    - 팀 결성이 된 프로젝트 (status가 'started', 'in_progress', 'completed', 'recycled' 중 하나)
+    - 또는 아이디어 생성 후 30일 이상 경과한 프로젝트
+    
+    Swagger 테스트 방법:
+    - Authorization 헤더에 Bearer access token을 넣습니다.
+    """
+    projects = (
+        db.query(Project)
+        .filter(Project.leader_id == current_user_id, Project.deleted_at.is_(None))
+        .order_by(Project.created_at.desc())
+        .all()
+    )
+    
+    response_data = []
+    now = datetime.now(timezone.utc)
+    
+    for project in projects:
+        # 팀 결성 여부: status가 'planning' 이상인 경우
+        team_formed = project.status != "planning"
+        
+        # 아이디어 생성 후 30일 이상 경과 여부
+        days_since_creation = (now - project.created_at.replace(tzinfo=timezone.utc)).days if project.created_at else 0
+        time_elapsed_30_days = days_since_creation >= 30
+        
+        # can_discard 조건: 팀 결성됐거나 30일 이상 경과
+        can_discard = team_formed or time_elapsed_30_days
+        
+        response_data.append({
+            "id": project.id,
+            "title": project.title,
+            "status": project.status,
+            "difficulty": project.difficulty,
+            "category": project.category,
+            "created_at": project.created_at.isoformat() if project.created_at else None,
+            "can_discard": can_discard,
+        })
+    
+    return success_response(data=response_data)
 
 
 @router.get("/{user_id}/profile", summary="공개 프로필 조회", description="특정 사용자의 공개 프로필을 조회합니다.")

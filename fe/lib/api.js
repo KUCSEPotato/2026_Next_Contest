@@ -89,6 +89,7 @@ export async function getIdeasApi(params = {}) {
   if (params.page) query.set("page", params.page);
   if (params.size) query.set("size", params.size);
   if (params.difficulty) query.set("difficulty", params.difficulty);
+  if (params.discarded !== undefined) query.set("discarded", params.discarded);
 
   const queryString = query.toString();
   const url = queryString
@@ -682,4 +683,30 @@ export async function getMyChatRoomsApi() {
   });
 
   return handleResponse(res, "내 채팅방 목록을 불러오지 못했습니다.");
+}
+
+export async function completeTeamApi(projectId) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}/complete-team`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "팀 결성에 실패했습니다.");
+}
+
+export async function getIdeaDetailApi(ideaId) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res, "아이디어 정보를 불러오지 못했습니다.");
+}
+
+export async function getMyProjectsApi() {
+  const profile = await getMyProfileApi();
+  const userId = profile.data.id;
+  return getUserProjectsApi(userId);
+}
+
+export async function discardProjectToWellApi(projectId) {
+  return revertProjectToIdeaApi(projectId);
 }
