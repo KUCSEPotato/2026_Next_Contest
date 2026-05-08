@@ -64,17 +64,17 @@ export default function CommunityPage() {
   const handleReact = async (postId: number, type: ReactionType) => {
     if (!currentUser) { setShowLoginModal(true); return; }
     try {
-      await reactToPost(postId, type);
-      // 낙관적 업데이트: like 수만 토글
+      const result = await reactToPost(postId, type);
       setPosts((prev) =>
         prev.map((p) => {
           if (p.id !== postId) return p;
-          const alreadyLiked = false; // 목록에선 user_reaction 없으므로 단순 +1
+          const isAdded = result.action === "added";
           return {
             ...p,
+            user_reaction: isAdded ? type : null,
             reaction_stats: {
               ...p.reaction_stats,
-              like: p.reaction_stats.like + 1,
+              [type]: p.reaction_stats[type] + (isAdded ? 1 : -1),
             },
           };
         })
@@ -108,14 +108,15 @@ export default function CommunityPage() {
             <p className="text-xs text-gray-400">팀원들과 자유롭게 이야기해요</p>
           </div>
           <div className="flex items-center gap-2">
-            {isLoggedIn && (
-              <button
-                onClick={() => router.push("/community/new")}
-                className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-red-700"
-              >
-                + 글쓰기
-              </button>
-            )}
+            <button
+              onClick={() => {
+                if (!isLoggedIn) { setShowLoginModal(true); return; }
+                router.push("/community/new");
+              }}
+              className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-red-700"
+            >
+              + 글쓰기
+            </button>
             <div className="flex rounded-xl border border-gray-200 bg-white p-1">
               {(["feed", "list"] as const).map((t) => (
                 <button
@@ -216,7 +217,7 @@ export default function CommunityPage() {
                     </p>
                   </div>
                   <div className="flex flex-shrink-0 flex-col items-end gap-1 text-[10px] text-gray-400">
-                    <span>❤️ {post.reaction_stats.like}</span>
+                    <span>{post.user_reaction === "like" ? "❤️" : "🤍"} {post.reaction_stats.like}</span>
                     <span>💬 {post.comment_count}</span>
                   </div>
                 </li>
