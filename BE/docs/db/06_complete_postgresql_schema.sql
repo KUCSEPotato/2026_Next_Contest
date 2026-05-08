@@ -26,3 +26,7 @@
 \ir 12_add_user_onboarding_fields.sql
 \ir 13_add_coin_wallet_and_project_reminders.sql
 \ir 15_add_project_min_members.sql
+\ir 16_add_project_is_public.sql
+\ir 17_add_idea_is_discarded.sql
+\ir 18_add_file_upload_support.sql
+\ir 19_add_community_post_files.sql

@@ -199,8 +199,14 @@ class ProjectRecruitment(Base):
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     position_name: Mapped[str] = mapped_column(String(100), nullable=False)
     required_count: Mapped[int] = mapped_column(SmallInteger, default=1)
+    category: Mapped[str | None] = mapped_column(String(50))
+    difficulty: Mapped[str] = mapped_column(String(20), default="normal")
+    summary: Mapped[str | None] = mapped_column(Text)
+    deadline: Mapped[date | None] = mapped_column(Date)
     status: Mapped[str] = mapped_column(String(20), default="open")
     description: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class Application(Base):
