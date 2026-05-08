@@ -56,6 +56,26 @@ async def get_my_profile(
         .order_by(IdeaBookmark.id.asc())
         .all()
     )
+    
+    # 현재 참여중인 프로젝트 (멤버로 참여중인 프로젝트)
+    participating_projects = (
+        db.query(Project)
+        .join(ProjectMember, ProjectMember.project_id == Project.id)
+        .filter(
+            ProjectMember.user_id == current_user_id,
+            Project.deleted_at.is_(None),
+        )
+        .all()
+    )
+    participating_project_list = [
+        {
+            "id": p.id,
+            "title": p.title,
+            "status": p.status,
+            "leader_id": p.leader_id,
+        }
+        for p in participating_projects
+    ]
 
     return success_response(
         data={
@@ -70,6 +90,7 @@ async def get_my_profile(
             "skills": [name for (name,) in skills],
             "interests": [name for (name,) in interests],
             "selected_idea_ids": [idea_id for (idea_id,) in selected_idea_ids],
+            "participating_projects": participating_project_list,
             "onboarding_step": user.onboarding_step,
             "onboarding_completed_at": user.onboarding_completed_at,
         },

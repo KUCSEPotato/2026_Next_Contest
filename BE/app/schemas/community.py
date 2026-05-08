@@ -51,6 +51,7 @@ class CommentCreateRequest(BaseModel):
     """Create a new comment on a post"""
     content: str = Field(..., min_length=1)
     parent_comment_id: int | None = None
+    is_anonymous: bool = Field(default=False)
 
 
 class CommentUpdateRequest(BaseModel):
