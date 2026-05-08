@@ -1,6 +1,6 @@
 """Community Forum API Endpoints"""
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status, Header
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -73,6 +73,7 @@ async def list_posts(
     page: int = 1,
     page_size: int = 20,
     db: Session = Depends(get_db),
+    authorization: str | None = Header(default=None),
 ) -> dict:
     """게시물 목록 조회 (페이지네이션)"""
     query = db.query(CommunityPost).filter(CommunityPost.deleted_at.is_(None))
@@ -90,6 +91,14 @@ async def list_posts(
     posts = query.offset((page - 1) * page_size).limit(page_size).all()
 
     result = []
+    # determine current user id if Authorization header provided
+    current_user_id: int | None = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+        try:
+            current_user_id = get_current_user_id_from_token(token)
+        except HTTPException:
+            current_user_id = None
     for post in posts:
         author = db.get(User, post.author_id)
         comment_count = (
@@ -117,6 +126,16 @@ async def list_posts(
         for reaction_type, count in reactions:
             reaction_stats[reaction_type] = count
 
+        # determine user's reaction if logged in
+        user_reaction = None
+        if current_user_id:
+            user_reaction_record = db.query(CommunityPostReaction).filter(
+                CommunityPostReaction.post_id == post.id,
+                CommunityPostReaction.user_id == current_user_id,
+            ).first()
+            if user_reaction_record:
+                user_reaction = user_reaction_record.reaction_type
+
         result.append(
             {
                 "id": post.id,
@@ -135,6 +154,7 @@ async def list_posts(
                 },
                 "comment_count": comment_count,
                 "reaction_stats": reaction_stats,
+                "user_reaction": user_reaction,
             }
         )
 
