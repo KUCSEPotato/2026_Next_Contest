@@ -88,6 +88,44 @@ def _build_recruitment_response(recruitment: ProjectRecruitment) -> dict:
     }
 
 
+def _build_recruitment_response_with_competition(db: Session, recruitment: ProjectRecruitment) -> dict:
+    """경쟁률을 포함한 recruitment 응답을 빌드합니다."""
+    # 지원자 수 계산 (pending 상태만)
+    applicant_count = (
+        db.query(func.count(Application.id))
+        .filter(
+            Application.project_id == recruitment.project_id,
+            Application.status == "pending",
+        )
+        .scalar() or 0
+    )
+    
+    # 경쟁률 계산 (모집 인원 0이면 0.0)
+    competition_ratio = (
+        round(applicant_count / recruitment.required_count, 2)
+        if recruitment.required_count > 0
+        else 0.0
+    )
+    
+    days_left = _calculate_days_left(recruitment.deadline)
+    return {
+        "id": recruitment.id,
+        "position_name": recruitment.position_name,
+        "required_count": recruitment.required_count,
+        "applicant_count": applicant_count,
+        "competition_ratio": competition_ratio,
+        "competition_ratio_percent": f"{competition_ratio * 100:.1f}%",
+        "difficulty": recruitment.difficulty,
+        "category": recruitment.category,
+        "summary": recruitment.summary,
+        "status": recruitment.status,
+        "deadline": recruitment.deadline.isoformat() if recruitment.deadline else None,
+        "daysLeft": days_left,
+        "isUrgent": _is_urgent(recruitment.deadline),
+        "description": recruitment.description,
+    }
+
+
 def _get_project_or_404(db: Session, project_id: int) -> Project:
     project = db.get(Project, project_id)
     if project is None or project.deleted_at is not None:
@@ -647,6 +685,9 @@ async def create_recruitment(
         project_id=project_id,
         position_name=payload.position_name,
         required_count=payload.required_count,
+        category=payload.category,
+        difficulty=payload.difficulty,
+        summary=payload.summary,
         status=payload.status,
         deadline=payload.deadline,
         description=payload.description,
@@ -654,7 +695,7 @@ async def create_recruitment(
     db.add(recruitment)
     db.commit()
     db.refresh(recruitment)
-    return success_response(data=_build_recruitment_response(recruitment))
+    return success_response(data=_build_recruitment_response_with_competition(db, recruitment))
 
 
 @router.patch("/{project_id}/recruitments/{recruitment_id}", summary="재모집 수정", description="재모집의 상태/인원/설명/마감일을 갱신합니다.")
@@ -678,7 +719,7 @@ async def update_recruitment(
 
     db.commit()
     db.refresh(recruitment)
-    return success_response(data=_build_recruitment_response(recruitment))
+    return success_response(data=_build_recruitment_response_with_competition(db, recruitment))
 
 
 @router.post("/{project_id}/invite", summary="멤버 초대", description="리더가 특정 유저를 프로젝트로 초대합니다.")
@@ -1366,3 +1407,44 @@ async def complete_team(
 
     db.commit()
     return success_response(data={"project_id": project_id, "status": "in_progress"})
+
+
+# ═══════════════════════════════════════════════════════════════
+# ━━ Recruitment (경쟁률)
+# ═══════════════════════════════════════════════════════════════
+
+@router.get("/{project_id}/recruitments", summary="프로젝트 모집공고 목록 (경쟁률 포함)", description="경쟁률과 함께 프로젝트의 모든 모집공고를 조회합니다.")
+async def list_recruitments(
+    project_id: int,
+    db: Session = Depends(get_db),
+) -> dict:
+    """프로젝트의 모집공고 목록 조회 (경쟁률 포함)"""
+    project = _get_project_or_404(db, project_id)
+    
+    recruitments = db.query(ProjectRecruitment).filter(
+        ProjectRecruitment.project_id == project_id
+    ).all()
+    
+    data = [_build_recruitment_response_with_competition(db, rec) for rec in recruitments]
+    
+    return success_response(data=data)
+
+
+@router.get("/{project_id}/recruitments/{recruitment_id}", summary="모집공고 상세 (경쟁률 포함)", description="경쟁률 정보와 함께 모집공고 상세를 조회합니다.")
+async def get_recruitment(
+    project_id: int,
+    recruitment_id: int,
+    db: Session = Depends(get_db),
+) -> dict:
+    """모집공고 상세 조회 (경쟁률 포함)"""
+    project = _get_project_or_404(db, project_id)
+    
+    recruitment = db.query(ProjectRecruitment).filter(
+        ProjectRecruitment.id == recruitment_id,
+        ProjectRecruitment.project_id == project_id,
+    ).first()
+    
+    if not recruitment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recruitment not found")
+    
+    return success_response(data=_build_recruitment_response_with_competition(db, recruitment))
