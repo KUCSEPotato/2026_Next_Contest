@@ -89,6 +89,7 @@ export async function getIdeasApi(params = {}) {
   if (params.page) query.set("page", params.page);
   if (params.size) query.set("size", params.size);
   if (params.difficulty) query.set("difficulty", params.difficulty);
+  if (params.discarded !== undefined) query.set("discarded", params.discarded);
 
   const queryString = query.toString();
   const url = queryString
