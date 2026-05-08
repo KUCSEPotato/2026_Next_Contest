@@ -29,6 +29,7 @@ export interface PostSummary {
   author: AuthorInfo;
   comment_count: number;
   reaction_stats: ReactionStats;
+  user_reaction: ReactionType | null; // BE 추가 필드
 }
 
 /** GET /community/{post_id} 상세 */
