@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { getIdeasApi, getIdeaApi } from "../../../lib/api";
+import { getIdeasApi, getIdeaDetailApi } from "../../../lib/api";
 
 // ─── 타입 ────────────────────────────────────────────────────────────────────
 interface Idea {
@@ -102,7 +102,7 @@ export default function InspirationWellPage() {
     setCoinModal({ open: false, idea: null });
     try {
       // GET /ideas/{idea_id} 호출 시 1코인 차감됨
-      await getIdeaApi(id);
+      await getIdeaDetailApi(id);
       router.push(`/ideas/${id}`);
     } catch {
       alert("아이디어를 불러오지 못했습니다.");
