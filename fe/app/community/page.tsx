@@ -9,7 +9,15 @@ import Avatar from "./_components/Avatar";
 import PostCard from "./_components/PostCard";
 import LoginModal from "./_components/LoginModal";
 
-const CATEGORIES = ["전체", "IT/소프트웨어", "경영/경제", "디자인", "AI/데이터", "기타"];
+const CATEGORIES = [
+  { label: "전체", value: undefined },
+  { label: "일반", value: "general" },
+  { label: "질문", value: "question" },
+  { label: "아이디어", value: "idea" },
+  { label: "작업 공유", value: "showcase" },
+  { label: "이벤트", value: "event" },
+  { label: "공지", value: "announcement" },
+];
 
 export default function CommunityPage() {
   const router = useRouter();
@@ -20,7 +28,7 @@ export default function CommunityPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [tab, setTab] = useState<"feed" | "list">("feed");
-  const [selectedCategory, setSelectedCategory] = useState("전체");
+  const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -31,8 +39,13 @@ export default function CommunityPage() {
     if (token) {
       setIsLoggedIn(true);
       // TODO: /me API로 교체
-      const raw = localStorage.getItem("user");
-      if (raw) setCurrentUser(JSON.parse(raw));
+      try {
+        const raw = localStorage.getItem("user");
+        if (raw) setCurrentUser(JSON.parse(raw));
+      } catch (e) {
+        console.error("유저 정보 파싱 실패", e);
+        localStorage.removeItem("user");
+      }
     }
   }, []);
 
@@ -42,7 +55,7 @@ export default function CommunityPage() {
     setLoadError("");
     try {
       const res = await getPosts({
-        category: selectedCategory === "전체" ? undefined : selectedCategory,
+        category: selectedCategory,
         page,
         page_size: 20,
       });
@@ -137,15 +150,15 @@ export default function CommunityPage() {
         <div className="mb-5 flex flex-wrap gap-2">
           {CATEGORIES.map((cat) => (
             <button
-              key={cat}
-              onClick={() => { setSelectedCategory(cat); setPage(1); }}
+              key={cat.label}
+              onClick={() => { setSelectedCategory(cat.value); setPage(1); }}
               className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                selectedCategory === cat
+                selectedCategory === cat.value
                   ? "border-red-600 bg-red-600 text-white"
                   : "border-gray-200 bg-white text-gray-600 hover:border-red-300 hover:text-red-500"
               }`}
             >
-              {cat}
+              {cat.label}
             </button>
           ))}
         </div>
