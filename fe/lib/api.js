@@ -702,9 +702,11 @@ export async function getIdeaDetailApi(ideaId) {
 }
 
 export async function getMyProjectsApi() {
-  const profile = await getMyProfileApi();
-  const userId = profile.data.id;
-  return getUserProjectsApi(userId);
+  const res = await fetch(`${API_BASE_URL}/api/v1/users/me/projects`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "내 프로젝트 목록을 불러오지 못했습니다.");
 }
 
 export async function discardProjectToWellApi(projectId) {
