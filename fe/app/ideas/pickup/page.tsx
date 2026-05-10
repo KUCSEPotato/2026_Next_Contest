@@ -157,29 +157,20 @@ export default function InspirationWellPage() {
 
       <WaterSurface />
 
-      <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4">
+      <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-end gap-3 px-4 py-4">
         <button
-          onClick={() => router.push("/mainpage")}
-          className="flex items-center gap-2 rounded-xl border border-blue-100 bg-white/70 px-4 py-2 text-sm font-medium text-slate-600 shadow-sm backdrop-blur-sm transition hover:bg-white"
+          onClick={() => router.push("/notifications")}
+          className="rounded-xl border border-blue-100 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm backdrop-blur-sm transition hover:bg-white"
         >
-          ← 돌아가기
+          알림
         </button>
 
-        <div className="flex gap-2">
-          <button
-            onClick={() => router.push("/notifications")}
-            className="rounded-xl border border-blue-100 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm backdrop-blur-sm transition hover:bg-white"
-          >
-            알림
-          </button>
-
-          <button
-            onClick={() => router.push("/chat")}
-            className="rounded-xl border border-blue-100 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm backdrop-blur-sm transition hover:bg-white"
-          >
-            채팅
-          </button>
-        </div>
+        <button
+          onClick={() => router.push("/chat")}
+          className="rounded-xl border border-blue-100 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm backdrop-blur-sm transition hover:bg-white"
+        >
+          채팅
+        </button>
       </header>
 
       <main className="relative z-10 mx-auto max-w-6xl px-4 pb-20">
