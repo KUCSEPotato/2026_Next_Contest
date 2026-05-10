@@ -745,9 +745,12 @@ export async function discardProjectToWellApi(projectId) {
 }
 
 export async function getUserProfileApi(userId) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/users/${userId}`, {
-    headers: authHeaders(),
-  });
+  const res = await fetch(
+    `${API_BASE_URL}/api/v1/users/${userId}/profile`,
+    {
+      headers: authHeaders(),
+    }
+  );
 
   return handleResponse(res, "사용자 프로필 조회에 실패했습니다.");
 }
