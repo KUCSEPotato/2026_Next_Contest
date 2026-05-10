@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.response import success_response
 from app.db.session import get_db
-from app.dependencies.auth import get_current_user_id
+from app.dependencies.auth import get_current_user_id, get_current_user_id_from_token
 from app.models import (
     CommunityPost,
     CommunityPostComment,
