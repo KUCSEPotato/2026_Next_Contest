@@ -29,11 +29,17 @@ export default function LoginPage() {
       localStorage.setItem("user_id", result.data.user_id);
 
       const meRes = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"}/auth/me`,
+        `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"}/api/v1/auth/me`,
         { headers: { Authorization: `Bearer ${result.data.access_token}` } }
       );
       const me = await meRes.json();
-      localStorage.setItem("user", JSON.stringify(me.data));
+      if (me.data) {
+        localStorage.setItem("user", JSON.stringify(me.data));
+      } else {
+        console.error("/auth/me 응답 이상:", me);
+        alert("로그인에 실패했습니다. 아이디 또는 비밀번호를 확인해주세요.");
+        return;
+      }
 
       alert("로그인되었습니다.");
       router.push("/mainpage");
