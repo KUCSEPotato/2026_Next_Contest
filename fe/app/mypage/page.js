@@ -60,6 +60,9 @@ export default function MyPage() {
 
       const result = await uploadMyAvatarApi(file);
       const avatarUrl = result.data.avatar_url;
+      console.log("업로드 결과:", result);
+      console.log("avatarUrl:", avatarUrl);
+
 
       setProfile((prev) => ({
         ...prev,
