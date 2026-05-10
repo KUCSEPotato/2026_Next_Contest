@@ -166,7 +166,21 @@ export default function ProjectDetailPage() {
                         key={`${member.user_id}-${member.role_in_project}`}
                         className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700"
                       >
-                        User #{member.user_id} · {member.role_in_project}
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/users/${member.user_id}`);
+                            }}
+                            className="font-semibold text-slate-900 transition hover:text-red-600 hover:underline"
+                          >
+                            User #{member.user_id}
+                          </button>
+
+                          <span className="text-slate-500">
+                            · {member.role_in_project}
+                          </span>
+                        </div>
                       </div>
                     ))}
                   </div>
