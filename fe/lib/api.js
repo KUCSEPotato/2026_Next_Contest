@@ -743,3 +743,30 @@ export async function getMyProjectsApi() {
 export async function discardProjectToWellApi(projectId) {
   return revertProjectToIdeaApi(projectId);
 }
+
+export async function getUserProfileApi(userId) {
+  return handleResponse(
+    fetch(`${API_BASE_URL}/api/v1/users/${userId}`, {
+      headers: getAuthHeaders(),
+    }),
+    "사용자 프로필 조회에 실패했습니다."
+  );
+}
+
+export async function getUserProjectsApi(userId) {
+  return handleResponse(
+    fetch(`${API_BASE_URL}/api/v1/users/${userId}/projects`, {
+      headers: getAuthHeaders(),
+    }),
+    "사용자 프로젝트 이력 조회에 실패했습니다."
+  );
+}
+
+export async function getUserReceivedReviewsApi(userId) {
+  return handleResponse(
+    fetch(`${API_BASE_URL}/api/v1/users/${userId}/reviews/received`, {
+      headers: getAuthHeaders(),
+    }),
+    "사용자 리뷰 조회에 실패했습니다."
+  );
+}
