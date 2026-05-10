@@ -15,6 +15,7 @@ import {
   getProjectApi,
   createProjectReviewApi,
   uploadMyAvatarApi,
+  getImageUrl,
 } from "../../lib/api";
 
 export default function MyPage() {
@@ -333,11 +334,20 @@ export default function MyPage() {
           <div className="flex items-center gap-6">
             <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-red-100 text-3xl font-bold text-red-600">
               {profile?.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  alt="profile"
-                  className="h-full w-full object-cover"
-                />
+                <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-red-100 text-3xl font-bold text-red-600">
+                  {profile?.avatar_url ? (
+                    <img
+                      src={getImageUrl(profile.avatar_url)}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    profile?.nickname?.[0] || "D"
+                  )}
+                </div>
               ) : (
                 profile?.nickname?.[0] || "D"
               )}
@@ -371,13 +381,24 @@ export default function MyPage() {
                 프로필 이미지
               </p>
 
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarUpload}
-                disabled={isUploadingAvatar}
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition file:mr-4 file:rounded-lg file:border-0 file:bg-red-50 file:px-4 file:py-2 file:font-semibold file:text-red-600 hover:file:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
-              />
+              <div className="flex items-center gap-3 rounded-xl border border-slate-300 px-4 py-3">
+                <label className="cursor-pointer rounded-lg bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100">
+                  파일 선택
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarUpload}
+                    disabled={isUploadingAvatar}
+                    className="hidden"
+                  />
+                </label>
+
+                <span className="text-sm text-slate-500">
+                  {profile?.avatar_url
+                    ? "변경하시려면 파일을 선택하십시오."
+                    : "선택된 파일 없음"}
+                </span>
+              </div>
 
               <p className="mt-2 text-xs text-slate-400">
                 {isUploadingAvatar
