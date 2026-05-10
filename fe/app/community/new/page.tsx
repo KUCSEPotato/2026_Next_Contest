@@ -6,7 +6,14 @@ import { User } from "../_types";
 import { createPost } from "../_lib/api";
 import MediaPreview, { MediaItem } from "../_components/MediaPreview";
 
-const CATEGORIES = ["IT/소프트웨어", "경영/경제", "디자인", "AI/데이터", "기타"];
+const CATEGORIES = [
+  { label: "일반", value: "general" },
+  { label: "질문", value: "question" },
+  { label: "아이디어", value: "idea" },
+  { label: "작업 공유", value: "showcase" },
+  { label: "이벤트", value: "event" },
+  { label: "공지", value: "announcement" },
+];
 
 const MAX_FILES = 10;
 const MAX_FILE_SIZE_MB = 50;
@@ -42,8 +49,13 @@ export default function NewPostPage() {
   useEffect(() => {
     const token = localStorage.getItem("access_token");
     if (!token) { router.replace("/login"); return; }
-    const raw = localStorage.getItem("user");
-    if (raw) setCurrentUser(JSON.parse(raw));
+    try {
+      const raw = localStorage.getItem("user");
+      if (raw) setCurrentUser(JSON.parse(raw));
+    } catch (e) {
+      console.error("유저 정보 파싱 실패", e);
+      localStorage.removeItem("user");
+    }
   }, [router]);
 
   // ── 파일 선택 ──────────────────────────────────────────────────────────────
@@ -171,15 +183,15 @@ export default function NewPostPage() {
           <div className="flex flex-wrap gap-2">
             {CATEGORIES.map((cat) => (
               <button
-                key={cat}
-                onClick={() => setCategory(category === cat ? "" : cat)}
+                key={cat.value}
+                onClick={() => setCategory(category === cat.value ? "" : cat.value)}
                 className={`rounded-full border px-3 py-1 text-xs transition ${
-                  category === cat
+                  category === cat.value
                     ? "border-red-600 bg-red-600 text-white"
                     : "border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-500"
                 }`}
               >
-                {cat}
+                {cat.label}
               </button>
             ))}
           </div>
