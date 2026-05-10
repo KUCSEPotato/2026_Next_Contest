@@ -33,6 +33,8 @@
 - GET /users/me/profile: 내 프로필 + 기술 스택 + 선택한 아이디어 조회
 - GET /users/me/onboarding: 회원가입/프로필/아이디어 선택 상태 조회
 - PATCH /users/me/profile: 닉네임/이름/전화번호/소개/아바타 수정
+ - PATCH /users/me/profile: 닉네임/이름/전화번호/소개/아바타 수정
+ - POST /users/me/avatar: 아바타(프로필 사진) 파일 업로드 (multipart/form-data, S3에 저장)
 - GET /users/{user_id}/profile: 공개 프로필 조회
 - GET /users/{user_id}/stats: 활동 통계 조회
 - GET /users/{user_id}/projects: 사용자 프로젝트 이력
@@ -51,6 +53,9 @@
 - POST /ideas: 아이디어 생성 + 프로젝트 자동 생성(tech_stack, hashtags 포함)
 - GET /ideas: 아이디어 목록 조회(필터/페이지네이션)
 - GET /ideas/{idea_id}: 아이디어 상세
+- POST /ideas/{idea_id}/files: 아이디어 파일 업로드 (multipart/form-data)
+- GET /ideas/{idea_id}/files: 아이디어 첨부 파일 목록 조회
+- DELETE /ideas/{idea_id}/files/{file_id}: 아이디어 첨부 파일 삭제 (소프트 삭제 + S3 삭제)
 - POST /admin/projects/stale-reminders/run: 30일 이상 시작되지 않은 프로젝트에 알림 생성 배치 실행
 - PATCH /ideas/{idea_id}: 아이디어 수정(작성자)
 - DELETE /ideas/{idea_id}: 아이디어 삭제(soft delete)
@@ -165,6 +170,9 @@
 - GET /community/{post_id}: 게시물 상세(조회수 자동 증가, 반응 통계 포함)
 - PATCH /community/{post_id}: 게시물 수정(작성자만)
 - DELETE /community/{post_id}: 게시물 삭제(소프트 삭제)
+ - POST /community/{post_id}/files: 게시물 첨부 파일 업로드 (multipart/form-data, 최대 50MB)
+ - GET /community/{post_id}/files: 게시물 첨부 파일 목록 조회
+ - DELETE /community/{post_id}/files/{file_id}: 게시물 첨부 파일 삭제 (소프트 삭제 + S3 삭제)
 
 ### 댓글(중첩 댓글/대댓글 지원)
 - POST /community/{post_id}/comments: 댓글 작성

@@ -199,8 +199,14 @@ class ProjectRecruitment(Base):
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     position_name: Mapped[str] = mapped_column(String(100), nullable=False)
     required_count: Mapped[int] = mapped_column(SmallInteger, default=1)
+    category: Mapped[str | None] = mapped_column(String(50))
+    difficulty: Mapped[str] = mapped_column(String(20), default="normal")
+    summary: Mapped[str | None] = mapped_column(Text)
+    deadline: Mapped[date | None] = mapped_column(Date)
     status: Mapped[str] = mapped_column(String(20), default="open")
     description: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class Application(Base):
@@ -459,6 +465,7 @@ class CommunityPostComment(Base):
     author_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     parent_comment_id: Mapped[int | None] = mapped_column(ForeignKey("community_post_comments.id", ondelete="CASCADE"))
+    is_anonymous: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -484,3 +491,33 @@ class CommunityCommentReaction(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     reaction_type: Mapped[str] = mapped_column(String(50), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CommunityPostFile(Base):
+    __tablename__ = "community_post_files"
+
+    id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
+    post_id: Mapped[int] = mapped_column(ForeignKey("community_posts.id", ondelete="CASCADE"), nullable=False)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_size: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    file_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    s3_key: Mapped[str] = mapped_column(String(500), nullable=False)
+    s3_url: Mapped[str] = mapped_column(Text, nullable=False)
+    uploaded_by: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class IdeaFile(Base):
+    __tablename__ = "idea_files"
+
+    id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
+    idea_id: Mapped[int] = mapped_column(ForeignKey("ideas.id", ondelete="CASCADE"), nullable=False)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_size: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    file_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    s3_key: Mapped[str] = mapped_column(String(500), nullable=False)
+    s3_url: Mapped[str] = mapped_column(Text, nullable=False)
+    uploaded_by: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

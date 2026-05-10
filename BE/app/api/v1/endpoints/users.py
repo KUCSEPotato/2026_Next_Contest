@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status, File, UploadFile
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -20,6 +20,7 @@ from app.models import UserSkill
 from app.models import Interest
 from app.schemas.users import OnboardingIdeaSelectionRequest
 from app.schemas.users import UserProfileUpdateRequest
+from app.services.s3_upload import get_s3_service
 
 router = APIRouter()
 
@@ -56,6 +57,26 @@ async def get_my_profile(
         .order_by(IdeaBookmark.id.asc())
         .all()
     )
+    
+    # 현재 참여중인 프로젝트 (멤버로 참여중인 프로젝트)
+    participating_projects = (
+        db.query(Project)
+        .join(ProjectMember, ProjectMember.project_id == Project.id)
+        .filter(
+            ProjectMember.user_id == current_user_id,
+            Project.deleted_at.is_(None),
+        )
+        .all()
+    )
+    participating_project_list = [
+        {
+            "id": p.id,
+            "title": p.title,
+            "status": p.status,
+            "leader_id": p.leader_id,
+        }
+        for p in participating_projects
+    ]
 
     return success_response(
         data={
@@ -70,7 +91,75 @@ async def get_my_profile(
             "skills": [name for (name,) in skills],
             "interests": [name for (name,) in interests],
             "selected_idea_ids": [idea_id for (idea_id,) in selected_idea_ids],
+            "participating_projects": participating_project_list,
             "onboarding_step": user.onboarding_step,
+            "onboarding_completed_at": user.onboarding_completed_at,
+        },
+    )
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    skills = (
+        db.query(Skill.name)
+        .join(UserSkill, UserSkill.skill_id == Skill.id)
+        .filter(UserSkill.user_id == current_user_id)
+        .all()
+    ),
+
+
+@router.post("/me/avatar", summary="아바타 업로드", description="마이페이지에서 사용자 아바타(사진)를 업로드합니다.")
+async def upload_my_avatar(
+    file: UploadFile = File(...),
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+    s3_service = Depends(get_s3_service),
+) -> dict:
+    """사용자 아바타 업로드 API.
+
+    - Accepts image files only (content-type starts with `image/`).
+    - Uploads to S3 under `avatars/` folder and saves the public URL to `user.avatar_url`.
+    """
+    user = db.get(User, current_user_id)
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    content_type = file.content_type or ""
+    if not content_type.startswith("image/"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only image uploads are allowed")
+
+    content = await file.read()
+
+    upload_result = await s3_service.upload_file(content, file.filename, content_type, "avatars")
+
+    user.avatar_url = upload_result["s3_url"]
+    db.commit()
+    db.refresh(user)
+
+    return success_response(data={"avatar_url": user.avatar_url})
+
+
+@router.get("/me/onboarding", summary="내 온보딩 상태 조회", description="회원가입/프로필/관심 아이디어 선택 진행 상태를 조회합니다.")
+async def get_my_onboarding_state(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    user = db.get(User, current_user_id)
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    selected_idea_ids = (
+        db.query(IdeaBookmark.idea_id)
+        .filter(IdeaBookmark.user_id == current_user_id)
+        .order_by(IdeaBookmark.id.asc())
+        .all()
+    )
+
+    return success_response(
+        data={
+            "onboarding_step": user.onboarding_step,
+            "profile_ready": bool(user.name and user.phone_number),
+            "completed": user.onboarding_step == "completed",
+            "selected_idea_ids": [idea_id for (idea_id,) in selected_idea_ids],
             "onboarding_completed_at": user.onboarding_completed_at,
         },
     )

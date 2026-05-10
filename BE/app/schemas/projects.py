@@ -108,6 +108,9 @@ class TodoUpdateRequest(BaseModel):
 class RecruitmentCreateRequest(CommonProjectRequest):
     position_name: str = Field(min_length=1, max_length=100)
     required_count: int = Field(default=1, ge=1, le=20)
+    category: str | None = None
+    difficulty: str = Field(default="normal", pattern="^(easy|normal|hard)$")
+    summary: str | None = Field(default=None, max_length=500)
     deadline: date | None = None
     status: str = "open"
 
@@ -115,5 +118,8 @@ class RecruitmentCreateRequest(CommonProjectRequest):
 class RecruitmentUpdateRequest(CommonProjectUpdateRequest):
     position_name: str | None = Field(default=None, min_length=1, max_length=100)
     required_count: int | None = Field(default=None, ge=1, le=20)
+    category: str | None = None
+    difficulty: str | None = Field(default=None, pattern="^(easy|normal|hard)$")
+    summary: str | None = None
     deadline: date | None = None
     status: str | None = None

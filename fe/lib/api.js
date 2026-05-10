@@ -1,6 +1,20 @@
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
+export function getImageUrl(url) {
+  if (!url) return "";
+
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+
+  if (url.startsWith("/")) {
+    return `${API_BASE_URL}${url}`;
+  }
+
+  return `${API_BASE_URL}/${url}`;
+}
+
 function getToken() {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("access_token");
@@ -634,6 +648,23 @@ export async function addMyInterestApi(name, interestLevel = 3) {
   return handleResponse(res, "관심 분야 추가 실패");
 }
 
+export async function uploadMyAvatarApi(file) {
+  const token = getToken();
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${API_BASE_URL}/api/v1/users/me/avatar`, {
+    method: "POST",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+
+  return handleResponse(res, "프로필 이미지 업로드에 실패했습니다.");
+}
+
 /* =========================
    Adoption
 ========================= */
@@ -702,9 +733,11 @@ export async function getIdeaDetailApi(ideaId) {
 }
 
 export async function getMyProjectsApi() {
-  const profile = await getMyProfileApi();
-  const userId = profile.data.id;
-  return getUserProjectsApi(userId);
+  const res = await fetch(`${API_BASE_URL}/api/v1/users/me/projects`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "내 프로젝트 목록을 불러오지 못했습니다.");
 }
 
 export async function discardProjectToWellApi(projectId) {

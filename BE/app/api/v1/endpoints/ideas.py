@@ -1,7 +1,7 @@
 import re
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile
 from sqlalchemy.orm import Session
 
 from app.api.v1.response import success_response
@@ -9,6 +9,7 @@ from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
 from app.models import Idea
 from app.models import IdeaBookmark
+from app.models import IdeaFile
 from app.models import IdeaLike
 from app.models import Project
 from app.models import ProjectMember
@@ -18,6 +19,7 @@ from app.schemas import IdeaCreateRequest
 from app.schemas import IdeaUpdateRequest
 from app.schemas import ProjectCreateRequest
 from app.services.economy import reward_project_registration
+from app.services.s3_upload import get_s3_service
 
 router = APIRouter()
 
@@ -412,3 +414,123 @@ async def convert_idea_to_project(
             "converted": True,
         }
     )
+
+
+# ═══════════════════════════════════════════════════════════════
+# ━━ File Upload
+# ═══════════════════════════════════════════════════════════════
+
+@router.post("/{idea_id}/files", summary="아이디어에 파일 첨부", description="아이디어에 파일을 업로드합니다. 최대 50MB.")
+async def upload_idea_file(
+    idea_id: int,
+    file: UploadFile = File(...),
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+    s3_service=Depends(get_s3_service),
+) -> dict:
+    """아이디어에 파일 업로드"""
+    idea = db.get(Idea, idea_id)
+    if not idea or idea.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Idea not found")
+
+    # 권한 검증: 아이디어 작성자만 파일 업로드 가능
+    if idea.user_id != current_user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only author can upload files")
+
+    # Read file content
+    file_content = await file.read()
+    
+    # Upload to S3
+    upload_result = await s3_service.upload_file(
+        file_content=file_content,
+        filename=file.filename or "file",
+        file_type=file.content_type or "application/octet-stream",
+        folder="ideas",
+    )
+
+    # Save file record to database
+    file_record = IdeaFile(
+        idea_id=idea_id,
+        filename=file.filename or "file",
+        file_size=upload_result["file_size"],
+        file_type=file.content_type or "application/octet-stream",
+        s3_key=upload_result["s3_key"],
+        s3_url=upload_result["s3_url"],
+        uploaded_by=current_user_id,
+    )
+    db.add(file_record)
+    db.commit()
+    db.refresh(file_record)
+
+    return success_response(
+        data={
+            "id": file_record.id,
+            "idea_id": file_record.idea_id,
+            "filename": file_record.filename,
+            "file_size": file_record.file_size,
+            "file_type": file_record.file_type,
+            "s3_url": file_record.s3_url,
+            "uploaded_at": file_record.created_at,
+        },
+    )
+
+
+@router.get("/{idea_id}/files", summary="아이디어 첨부 파일 조회", description="아이디어의 첨부 파일 목록을 조회합니다.")
+async def list_idea_files(
+    idea_id: int,
+    db: Session = Depends(get_db),
+) -> dict:
+    """아이디어의 모든 첨부 파일 조회"""
+    idea = db.get(Idea, idea_id)
+    if not idea or idea.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Idea not found")
+
+    files = db.query(IdeaFile).filter(
+        IdeaFile.idea_id == idea_id,
+        IdeaFile.deleted_at.is_(None),
+    ).all()
+
+    return success_response(
+        data={
+            "files": [
+                {
+                    "id": f.id,
+                    "filename": f.filename,
+                    "file_size": f.file_size,
+                    "file_type": f.file_type,
+                    "s3_url": f.s3_url,
+                    "uploaded_at": f.created_at,
+                }
+                for f in files
+            ]
+        },
+    )
+
+
+@router.delete("/{idea_id}/files/{file_id}", summary="아이디어 첨부 파일 삭제", description="아이디어의 첨부 파일을 삭제합니다.")
+async def delete_idea_file(
+    idea_id: int,
+    file_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+    s3_service=Depends(get_s3_service),
+) -> dict:
+    """아이디어 첨부 파일 삭제 (소프트 삭제)"""
+    file_record = db.get(IdeaFile, file_id)
+    if not file_record or file_record.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+
+    # 권한 검증: 아이디어 작성자 또는 파일 업로드자만 삭제 가능
+    idea = db.get(Idea, idea_id)
+    if file_record.uploaded_by != current_user_id and idea.user_id != current_user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+
+    # S3에서 파일 삭제
+    await s3_service.delete_file(file_record.s3_key)
+
+    # DB에서 소프트 삭제
+    from sqlalchemy import func
+    file_record.deleted_at = func.now()
+    db.commit()
+
+    return success_response(data={"deleted": True, "file_id": file_id})
