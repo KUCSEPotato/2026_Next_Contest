@@ -453,24 +453,6 @@ async def decide_application(
                 )
             )
 
-        default_room = (
-            db.query(ChatRoom)
-            .filter(
-                ChatRoom.project_id == project_id,
-                ChatRoom.name == "team",
-                ChatRoom.is_active.is_(True),
-            )
-            .first()
-        )
-
-        if default_room is None:
-            db.add(
-                ChatRoom(
-                    project_id=project_id,
-                    name="team",
-                    is_active=True,
-                )
-            )
 
     db.commit() 
     return success_response(data={"id": app_obj.id, "status": app_obj.status})
@@ -1353,61 +1335,86 @@ async def complete_team(
     - 부족하면 400 반환
     - 충분하면 project.status를 in_progress로 변경
     - 팀원들에게 알림 생성
-    - 해당 프로젝트의 team 채팅방에 시스템 메시지 추가
-
-    Swagger 테스트 방법:
-    - 리더 계정으로 호출합니다.
+    - 프로젝트 이름으로 팀 채팅방 생성
+    - 팀 채팅방에 시스템 메시지 추가
     """
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
 
     active_members = _get_active_project_member_ids(db, project_id)
     if len(active_members) < project.min_members:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Not enough members to complete team")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Not enough members to complete team",
+        )
 
     project.status = "in_progress"
 
-    # 팀원들에게 알림 생성
     for member_id in active_members:
         notification = Notification(
             user_id=member_id,
             type="project_started",
             title="팀 결성이 완료되었습니다",
             body=f"프로젝트 '{project.title}'의 팀 결성이 완료되어 프로젝트가 시작되었습니다.",
-            data={"project_id": project_id}
+            data={"project_id": project_id},
         )
         db.add(notification)
 
-    # 해당 프로젝트의 team 채팅방에 시스템 메시지 추가
-    team_room = db.query(ChatRoom).filter(ChatRoom.project_id == project_id, ChatRoom.name == "team", ChatRoom.is_active.is_(True)).first()
-    if team_room:
-        system_message = ChatMessage(
-            room_id=team_room.id,
-            sender_id=None,  # 시스템 메시지
-            message="팀 결성이 완료되었습니다! 인사를 나누고 프로젝트를 시작하세요."
+    team_room = (
+        db.query(ChatRoom)
+        .filter(
+            ChatRoom.project_id == project_id,
+            ChatRoom.name == project.title,
+            ChatRoom.is_active.is_(True),
         )
-        db.add(system_message)
+        .first()
+    )
+
+    if team_room is None:
+        team_room = ChatRoom(
+            project_id=project_id,
+            name=project.title,
+            is_active=True,
+        )
+        db.add(team_room)
         db.flush()
-        
-        await realtime_hub.broadcast_json(
-            chat_room_channel(team_room.id),
-            {
-                "type": "chat.message.created",
-                "data": {
-                    "id": system_message.id,
-                    "room_id": system_message.room_id,
-                    "sender_id": None,
-                    "sender_nickname": "시스템",
-                    "sender_avatar_url": None,
-                    "message": system_message.message,
-                    "created_at": system_message.created_at.isoformat() if system_message.created_at else None,
-                },
-            }
-        )
+
+    system_message = ChatMessage(
+        room_id=team_room.id,
+        sender_id=None,
+        message="팀 결성이 완료되었습니다! 인사를 나누고 프로젝트를 시작하세요.",
+    )
+    db.add(system_message)
+    db.flush()
+
+    await realtime_hub.broadcast_json(
+        chat_room_channel(team_room.id),
+        {
+            "type": "chat.message.created",
+            "data": {
+                "id": system_message.id,
+                "room_id": system_message.room_id,
+                "sender_id": None,
+                "sender_nickname": "시스템",
+                "sender_avatar_url": None,
+                "message": system_message.message,
+                "created_at": system_message.created_at.isoformat()
+                if system_message.created_at
+                else None,
+            },
+        },
+    )
 
     db.commit()
-    return success_response(data={"project_id": project_id, "status": "in_progress"})
 
+    return success_response(
+        data={
+            "project_id": project_id,
+            "status": "in_progress",
+            "chat_room_id": team_room.id,
+            "chat_room_name": team_room.name,
+        }
+    )
 
 # ═══════════════════════════════════════════════════════════════
 # ━━ Recruitment (경쟁률)
