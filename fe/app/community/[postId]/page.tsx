@@ -30,7 +30,14 @@ import Avatar from "../_components/Avatar";
 import CommentItem from "../_components/CommentItem";
 import LoginModal from "../_components/LoginModal";
 
-const CATEGORIES = ["IT/소프트웨어", "경영/경제", "디자인", "AI/데이터", "기타"];
+const CATEGORIES = [
+  { label: "일반", value: "general" },
+  { label: "질문", value: "question" },
+  { label: "아이디어", value: "idea" },
+  { label: "작업 공유", value: "showcase" },
+  { label: "이벤트", value: "event" },
+  { label: "공지", value: "announcement" },
+];
 
 export default function PostDetailPage() {
   const router = useRouter();
@@ -61,8 +68,13 @@ export default function PostDetailPage() {
     const token = localStorage.getItem("access_token");
     if (token) {
       setIsLoggedIn(true);
-      const raw = localStorage.getItem("user");
-      if (raw) setCurrentUser(JSON.parse(raw));
+      try {
+        const raw = localStorage.getItem("user");
+        if (raw) setCurrentUser(JSON.parse(raw));
+      } catch (e) {
+        console.error("유저 정보 파싱 실패", e);
+        localStorage.removeItem("user");
+      }
       // TODO: /me API로 교체
     }
   }, []);
@@ -90,8 +102,6 @@ export default function PostDetailPage() {
     setLoadingComments(true);
     try {
       const res = await getComments(pid, { page_size: 100 });
-      // BE가 최상위 댓글만 내려주므로 대댓글은 별도 처리 필요
-      // 현재 BE는 parent_comment_id가 null인 것만 내려줌 → 대댓글은 reply_count로 표시
       setComments(res.comments.map((c) => ({ ...c, replies: [] })));
     } catch (e) {
       console.error(e);
@@ -168,7 +178,13 @@ export default function PostDetailPage() {
         content: commentText.trim(),
         parent_comment_id: null,
       });
-      setComments((prev) => [...prev, { ...newComment, replies: [] }]);
+      setComments((prev) => [...prev, {
+        ...newComment,
+        replies: [],
+        reply_count: 0,
+        reaction_stats: { like: 0, interested: 0, helpful: 0, curious: 0 },
+        user_reaction: null,
+      }]);
       setCommentText("");
       setPost((p) => p ? { ...p, comment_count: p.comment_count + 1 } : p);
     } catch (e: any) {
@@ -189,7 +205,13 @@ export default function PostDetailPage() {
       setComments((prev) =>
         updateCommentInTree(prev, parentId, (c) => ({
           ...c,
-          replies: [...(c.replies ?? []), { ...newReply, replies: [] }],
+          replies: [...(c.replies ?? []), {
+            ...newReply,
+            replies: [],
+            reply_count: 0,
+            reaction_stats: { like: 0, interested: 0, helpful: 0, curious: 0 },
+            user_reaction: null,
+          }],
           reply_count: c.reply_count + 1,
         }))
       );
@@ -356,15 +378,15 @@ export default function PostDetailPage() {
               <div className="mt-3 flex flex-wrap gap-2">
                 {CATEGORIES.map((cat) => (
                   <button
-                    key={cat}
-                    onClick={() => setEditCategory(editCategory === cat ? "" : cat)}
+                    key={cat.value}
+                    onClick={() => setEditCategory(editCategory === cat.value ? "" : cat.value)}
                     className={`rounded-full border px-2.5 py-1 text-xs transition ${
-                      editCategory === cat
+                      editCategory === cat.value
                         ? "border-red-600 bg-red-600 text-white"
                         : "border-gray-200 text-gray-600 hover:border-red-300"
                     }`}
                   >
-                    {cat}
+                    {cat.label}
                   </button>
                 ))}
               </div>
