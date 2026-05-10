@@ -634,6 +634,23 @@ export async function addMyInterestApi(name, interestLevel = 3) {
   return handleResponse(res, "관심 분야 추가 실패");
 }
 
+export async function uploadMyAvatarApi(file) {
+  const token = getToken();
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${API_BASE_URL}/api/v1/users/me/avatar`, {
+    method: "POST",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+
+  return handleResponse(res, "프로필 이미지 업로드에 실패했습니다.");
+}
+
 /* =========================
    Adoption
 ========================= */

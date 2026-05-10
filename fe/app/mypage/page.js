@@ -14,6 +14,7 @@ import {
   discardProjectToWellApi,
   getProjectApi,
   createProjectReviewApi,
+  uploadMyAvatarApi,
 } from "../../lib/api";
 
 export default function MyPage() {
@@ -40,6 +41,41 @@ export default function MyPage() {
   const [editAvatarUrl, setEditAvatarUrl] = useState("");
   const [newSkill, setNewSkill] = useState("");
   const [newInterest, setNewInterest] = useState("");
+
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("이미지 파일만 업로드할 수 있습니다.");
+      return;
+    }
+
+    try {
+      setIsUploadingAvatar(true);
+
+      const result = await uploadMyAvatarApi(file);
+      const avatarUrl = result.data.avatar_url;
+
+      setProfile((prev) => ({
+        ...prev,
+        avatar_url: avatarUrl,
+      }));
+
+      setEditAvatarUrl(avatarUrl);
+
+      alert("프로필 이미지가 업로드되었습니다.");
+    } catch (error) {
+      console.error(error);
+      alert("프로필 이미지 업로드에 실패했습니다.");
+    } finally {
+      setIsUploadingAvatar(false);
+      e.target.value = "";
+    }
+  };
 
   const inputClassName =
     "w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100";
@@ -231,7 +267,6 @@ export default function MyPage() {
       const result = await updateMyProfileApi({
         nickname: editNickname,
         bio: editBio,
-        avatar_url: editAvatarUrl,
       });
 
       alert("프로필이 수정되었습니다.");
@@ -331,12 +366,25 @@ export default function MyPage() {
               className={inputClassName}
             />
 
-            <input
-              value={editAvatarUrl}
-              onChange={(e) => setEditAvatarUrl(e.target.value)}
-              placeholder="프로필 이미지 URL"
-              className={inputClassName}
-            />
+            <div>
+              <p className="mb-2 text-sm font-semibold text-slate-700">
+                프로필 이미지
+              </p>
+
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                disabled={isUploadingAvatar}
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition file:mr-4 file:rounded-lg file:border-0 file:bg-red-50 file:px-4 file:py-2 file:font-semibold file:text-red-600 hover:file:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+              />
+
+              <p className="mt-2 text-xs text-slate-400">
+                {isUploadingAvatar
+                  ? "이미지를 업로드하는 중입니다..."
+                  : "이미지 파일을 선택하면 자동으로 업로드됩니다."}
+              </p>
+            </div>
 
             <textarea
               value={editBio}
