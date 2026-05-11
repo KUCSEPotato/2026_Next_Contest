@@ -52,8 +52,8 @@ const SERVICE_BLOCKS = [
     isActive: true,
   },
   {
-    title: "아이디어 줍기",
-    description: "버려진 아이디어를 이어받아 새로운 프로젝트로 발전시켜보세요.",
+    title: "영감의 샘",
+    description: "아이디어를 흘려보내고, 새로운 영감을 건져가세요.",
     path: "/ideas/pickup",
     isActive: false,
   },
