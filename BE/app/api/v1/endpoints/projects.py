@@ -1,9 +1,11 @@
+import asyncio
 from datetime import datetime, timezone, date
 from collections import defaultdict
 from math import ceil
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from fastapi import WebSocket, WebSocketDisconnect
+from google import genai
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -49,6 +51,7 @@ from app.schemas import TodoCreateRequest
 from app.schemas import TodoUpdateRequest
 from app.schemas import MemoirCreateRequest
 from app.schemas import MemoirRefineRequest
+from app.schemas import MemoirAiRefineRequest
 from app.services.economy import reward_project_completed
 from app.services.economy import reward_project_registration
 from app.services.economy import reward_project_recycled
@@ -326,6 +329,52 @@ async def _generate_ai_todo_titles(context_text: str, project: Project) -> list[
 
     deduped_titles = list(dict.fromkeys(titles))
     return deduped_titles[:8] or _fallback_ai_todo_titles(project)
+
+
+async def _call_gemini_for_memoir_refine(feelings: str, shortcomings: str) -> str:
+    if not settings.gemini_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Gemini API key is not configured",
+        )
+    return await asyncio.to_thread(_sync_call_gemini_for_memoir_refine, feelings, shortcomings)
+
+
+def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str) -> str:
+    prompt = (
+        "다음 두 항목을 읽고 자연스럽고 매끄러운 한국어 **감성적** 회고 문장으로 정제하세요.\n"
+        "1) 느낀 점\n"
+        "2) 부족했던 점\n"
+        "반드시 의미를 유지하고, 문단을 분리해서 전달합니다.\n"
+        "출력은 오직 정제된 회고 텍스트 하나로만 하고, JSON이나 마크다운 포맷을 포함하지 마세요.\n\n"
+        f"느낀 점:\n{feelings}\n\n"
+        f"부족했던 점:\n{shortcomings}\n"
+    )
+
+    client = genai.Client(api_key=settings.gemini_api_key)
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.1-flash-lite",
+            contents=prompt,
+            config={
+                    "temperature": 0.0,
+                    "max_output_tokens": 512,
+                },
+        )
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Gemini API request failed: {str(error)}",
+        )
+
+    text = getattr(response, "text", None) or getattr(response, "content", None)
+    if not text:
+        candidates = getattr(response, "candidates", None)
+        if isinstance(candidates, list) and len(candidates) > 0:
+            candidate = candidates[0]
+            text = getattr(candidate, "content", None) or getattr(candidate, "output", None) or ""
+
+    return (text or "").strip()
 
 
 def _split_ai_todo_title(raw_title: str) -> tuple[str, str]:
@@ -1442,6 +1491,29 @@ async def create_retrospective(
     db.commit()
     db.refresh(retro)
     return success_response(data={"id": retro.id, "title": retro.title})
+
+
+@router.post(
+    "/{project_id}/memoir/ai-refine",
+    summary="Memoir AI 정제",
+    description="느낀 점과 부족했던 점 텍스트를 AI가 정제해서 반환합니다.",
+)
+async def refine_memoir(
+    project_id: int,
+    payload: MemoirAiRefineRequest,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    _get_project_or_404(db, project_id)
+    _ensure_project_member(db, project_id, current_user_id)
+
+    feelings = payload.feelings.strip()
+    shortcomings = payload.shortcomings.strip()
+    if not feelings or not shortcomings:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="feelings and shortcomings are required")
+
+    refined_text = await _call_gemini_for_memoir_refine(feelings, shortcomings)
+    return success_response(data={"refined_memoir": refined_text})
 
 
 @router.get("/{project_id}/retrospectives", summary="회고 목록", description="프로젝트 멤버가 회고 목록을 조회합니다.")
