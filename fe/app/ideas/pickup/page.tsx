@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { getIdeasApi, pickupIdeaApi } from "../../../lib/api";
+import { getIdeasApi } from "../../../lib/api";
 
 interface Idea {
   id: number;
@@ -12,6 +12,7 @@ interface Idea {
   like_count: number;
   bookmark_count: number;
   domain?: string;
+  difficulty?: string;
   created_at?: string;
 }
 
@@ -26,6 +27,7 @@ interface IdeaListItem {
   bookmark_count?: number;
   domain?: string;
   category?: string;
+  difficulty?: string;
   created_at?: string;
 }
 
@@ -108,6 +110,7 @@ export default function InspirationWellPage() {
             like_count: item.like_count ?? 0,
             bookmark_count: item.bookmark_count ?? 0,
             domain: item.domain || item.category || "IT/소프트웨어",
+            difficulty: item.difficulty,
             created_at: item.created_at,
           }))
         );
@@ -151,18 +154,10 @@ export default function InspirationWellPage() {
 
     try {
       setPickingUp(true);
-      const result = await pickupIdeaApi(id);
-      const projectId = result.data?.project_id;
-
-      if (!projectId) {
-        throw new Error("프로젝트 생성 응답이 올바르지 않습니다.");
-      }
-
-      setIdeas((prev) => prev.filter((idea) => idea.id !== id));
       setCoinModal({ open: false, idea: null });
-      router.push(`/projects/${projectId}`);
+      router.push(`/ideas/pickup/${id}`);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "아이디어를 건져오지 못했습니다.");
+      alert(error instanceof Error ? error.message : "아이디어를 열람하지 못했습니다.");
     } finally {
       setPickingUp(false);
     }
@@ -210,7 +205,7 @@ export default function InspirationWellPage() {
           <p className="mx-auto max-w-md text-sm leading-relaxed text-slate-500">
             버려진 아이디어들이 잠들어 있는 곳.
             <br />
-            당신의 손길로 다시 꽃피울 씨앗을 건져보세요.
+            당신의 손길로 다시 꽃피울 씨앗을 살펴보세요.
           </p>
 
           <div className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50/70 px-4 py-1.5 text-xs font-medium text-amber-700 backdrop-blur-sm">
@@ -258,12 +253,12 @@ export default function InspirationWellPage() {
             <div>
               <p className="text-lg font-bold text-slate-800">영감의 샘</p>
               <p className="mt-1 text-sm text-slate-500">
-                잠들어 있는 아이디어를 다시 프로젝트로 발전시켜보세요.
+                잠들어 있는 아이디어를 열람한 뒤 프로젝트로 이어받아보세요.
               </p>
             </div>
 
             <button
-              onClick={() => alert("아이디어를 클릭하면 코인 1개를 사용해 상세 내용을 확인할 수 있어요. 마음에 드는 아이디어를 발견했다면 건져보기로 이어받아보세요.")}
+              onClick={() => alert("아이디어를 클릭하면 코인 1개를 사용해 상세 내용을 확인할 수 있어요. 마음에 들면 상세 페이지에서 내 프로젝트로 만들 수 있습니다.")}
               className="rounded-xl bg-blue-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-600"
             >
               아이디어 줍기 가이드
@@ -569,7 +564,7 @@ function IdeaCard({
         </div>
 
         <span className="rounded-lg bg-blue-500 px-3 py-1 text-[11px] font-semibold text-white shadow-sm shadow-blue-200 transition group-hover:bg-blue-600">
-          건져보기 🪝
+          건져보기
         </span>
       </div>
     </button>
@@ -616,7 +611,7 @@ function CoinModal({
         </div>
 
         <h2 className="mb-1 text-center text-base font-bold text-slate-800">
-          아이디어를 건져올까요?
+          아이디어를 열람할까요?
         </h2>
 
         <p className="mb-1 line-clamp-1 text-center text-sm font-semibold text-slate-700">
@@ -650,7 +645,7 @@ function CoinModal({
             disabled={isLoading}
             className="flex-1 rounded-2xl bg-blue-500 py-3 text-sm font-semibold text-white shadow-md shadow-blue-200 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
           >
-            {isLoading ? "건지는 중..." : "건져보기 🪝"}
+            {isLoading ? "여는 중..." : "열람하기"}
           </button>
         </div>
       </div>
