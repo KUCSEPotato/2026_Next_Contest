@@ -37,8 +37,6 @@ export default function ProjectDetailPage() {
     difficulty: "",
     category: "",
     status: "",
-    progress_percent: 0,
-    min_members: 1,
     max_members: 10,
     is_public: true,
   });
@@ -68,9 +66,6 @@ export default function ProjectDetailPage() {
           description: projectData.description || "",
           difficulty: projectData.difficulty || "",
           category: projectData.category || "",
-          status: projectData.status || "planning",
-          progress_percent: projectData.progress_percent ?? 0,
-          min_members: projectData.min_members ?? 1,
           max_members: projectData.max_members ?? 10,
           is_public: projectData.is_public ?? true,
         });
@@ -84,6 +79,7 @@ export default function ProjectDetailPage() {
   }, [projectId]);
 
   const isLeader = project?.leader_id === myProfile?.id;
+  const acceptedMemberCount = project?.members?.length || 1;
 
   const handleEditChange = (field, value) => {
     setEditForm((prev) => ({
@@ -103,10 +99,10 @@ export default function ProjectDetailPage() {
       return;
     }
 
-    if (Number(editForm.min_members) > Number(editForm.max_members)) {
-      alert("최소 인원은 최대 인원보다 클 수 없습니다.");
+    if (Number(editForm.max_members) < acceptedMemberCount) {
+      alert(`모집 인원은 현재 수락된 인원 ${acceptedMemberCount}명 이상이어야 합니다.`);
       return;
-    }
+    }   
 
     try {
       setIsSavingEdit(true);
@@ -117,9 +113,6 @@ export default function ProjectDetailPage() {
         description: editForm.description,
         difficulty: editForm.difficulty,
         category: editForm.category,
-        status: editForm.status,
-        progress_percent: Number(editForm.progress_percent),
-        min_members: Number(editForm.min_members),
         max_members: Number(editForm.max_members),
         is_public: editForm.is_public,
       });
@@ -240,104 +233,106 @@ export default function ProjectDetailPage() {
         <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
           {isEditing ? (
             <div className="space-y-4">
-              <h1 className="text-2xl font-bold text-slate-900">
-                프로젝트 수정
-              </h1>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  프로젝트 제목
+                </label>
+                <input
+                  className={inputClassName}
+                  value={editForm.title}
+                  onChange={(e) => handleEditChange("title", e.target.value)}
+                  placeholder="프로젝트 제목"
+                />
+              </div>
 
-              <input
-                className={inputClassName}
-                value={editForm.title}
-                onChange={(e) => handleEditChange("title", e.target.value)}
-                placeholder="프로젝트 제목"
-              />
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  프로젝트 요약
+                </label>
+                <input
+                  className={inputClassName}
+                  value={editForm.summary}
+                  onChange={(e) => handleEditChange("summary", e.target.value)}
+                  placeholder="프로젝트 요약"
+                />
+              </div>
 
-              <input
-                className={inputClassName}
-                value={editForm.summary}
-                onChange={(e) => handleEditChange("summary", e.target.value)}
-                placeholder="프로젝트 요약"
-              />
-
-              <textarea
-                className={textareaClassName}
-                value={editForm.description}
-                onChange={(e) =>
-                  handleEditChange("description", e.target.value)
-                }
-                placeholder="프로젝트 설명"
-              />
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  프로젝트 설명
+                </label>
+                <textarea
+                  className={textareaClassName}
+                  value={editForm.description}
+                  onChange={(e) => handleEditChange("description", e.target.value)}
+                  placeholder="프로젝트 설명"
+                />
+              </div>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <input
-                  className={inputClassName}
-                  value={editForm.difficulty}
-                  onChange={(e) =>
-                    handleEditChange("difficulty", e.target.value)
-                  }
-                  placeholder="난이도"
-                />
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-700">
+                    난이도
+                  </label>
+                  <input
+                    className={inputClassName}
+                    value={editForm.difficulty}
+                    onChange={(e) => handleEditChange("difficulty", e.target.value)}
+                    placeholder="난이도"
+                  />
+                </div>
 
-                <input
-                  className={inputClassName}
-                  value={editForm.category}
-                  onChange={(e) => handleEditChange("category", e.target.value)}
-                  placeholder="카테고리"
-                />
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-700">
+                    카테고리
+                  </label>
+                  <input
+                    className={inputClassName}
+                    value={editForm.category}
+                    onChange={(e) => handleEditChange("category", e.target.value)}
+                    placeholder="카테고리"
+                  />
+                </div>
 
-                <select
-                  className={inputClassName}
-                  value={editForm.status}
-                  onChange={(e) => handleEditChange("status", e.target.value)}
-                >
-                  <option value="planning">planning</option>
-                  <option value="ongoing">ongoing</option>
-                  <option value="completed">completed</option>
-                </select>
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-700">
+                    진행률
+                  </label>
+                  <input
+                    className={inputClassName}
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={editForm.progress_percent}
+                    onChange={(e) => handleEditChange("progress_percent", e.target.value)}
+                    placeholder="진행률"
+                  />
+                </div>
 
-                <input
-                  className={inputClassName}
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={editForm.progress_percent}
-                  onChange={(e) =>
-                    handleEditChange("progress_percent", e.target.value)
-                  }
-                  placeholder="진행률"
-                />
-
-                <input
-                  className={inputClassName}
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={editForm.min_members}
-                  onChange={(e) =>
-                    handleEditChange("min_members", e.target.value)
-                  }
-                  placeholder="최소 인원"
-                />
-
-                <input
-                  className={inputClassName}
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={editForm.max_members}
-                  onChange={(e) =>
-                    handleEditChange("max_members", e.target.value)
-                  }
-                  placeholder="최대 인원"
-                />
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-700">
+                    모집 인원
+                  </label>
+                  <input
+                    className={inputClassName}
+                    type="number"
+                    min={acceptedMemberCount}
+                    max="100"
+                    value={editForm.max_members}
+                    onChange={(e) => handleEditChange("max_members", e.target.value)}
+                    placeholder="모집 인원"
+                  />
+                  <p className="mt-1 text-xs text-slate-500">
+                    현재 수락된 인원: {acceptedMemberCount}명 이상으로만 설정할 수 있습니다.
+                  </p>
+                </div>
               </div>
 
               <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                 <input
                   type="checkbox"
                   checked={editForm.is_public}
-                  onChange={(e) =>
-                    handleEditChange("is_public", e.target.checked)
-                  }
+                  onChange={(e) => handleEditChange("is_public", e.target.checked)}
                 />
                 공개 프로젝트로 설정
               </label>
