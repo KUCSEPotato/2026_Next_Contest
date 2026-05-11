@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
@@ -128,3 +128,44 @@ class RecruitmentUpdateRequest(CommonProjectUpdateRequest):
     summary: str | None = None
     deadline: date | None = None
     status: str | None = None
+
+
+# ============================================
+# 회고(Memoir) 요청 클래스
+# ============================================
+class MemoirCreateRequest(BaseModel):
+    tech_stack: list[str] = Field(default=[], description="선택한 기술 스택")
+    domain: str | None = Field(default=None, max_length=100, description="분야")
+    felt_point: str = Field(min_length=1, description="느낀 점")
+    lacked_point: str = Field(min_length=1, description="부족했던 점")
+
+
+class MemoirUpdateRequest(BaseModel):
+    tech_stack: list[str] | None = None
+    domain: str | None = None
+    felt_point: str | None = None
+    lacked_point: str | None = None
+    ai_refined_felt: str | None = None
+    ai_refined_lacked: str | None = None
+
+
+class MemoirRefineRequest(BaseModel):
+    felt_point: str = Field(min_length=1, description="AI 정제를 위한 느낀 점")
+    lacked_point: str = Field(min_length=1, description="AI 정제를 위한 부족했던 점")
+
+
+class MemoirResponse(BaseModel):
+    id: int
+    project_id: int
+    author_id: int
+    tech_stack: list[str]
+    domain: str | None
+    felt_point: str | None
+    lacked_point: str | None
+    ai_refined_felt: str | None
+    ai_refined_lacked: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

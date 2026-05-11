@@ -9,6 +9,8 @@ from google import genai
 from app.api.v1.response import success_response
 from app.core.config import settings
 from app.schemas.llm import LlmTodoRequest
+from app.schemas.llm import LlmMemoirRefineRequest
+from app.schemas.llm import LlmMemoirRefineResponse
 
 router = APIRouter()
 
@@ -146,3 +148,79 @@ def _extract_json_payload(text: str) -> dict[str, Any]:
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=f"Failed to parse extracted JSON from Gemini output. Raw response: {text[:300]}",
             )
+
+
+@router.post(
+    "/llm/memoir/refine",
+    summary="회고 텍스트 AI 정제",
+    description="느낀 점과 부족했던 점을 AI가 정제하여 반환합니다.",
+    response_model=LlmMemoirRefineResponse,
+)
+async def refine_memoir(payload: LlmMemoirRefineRequest) -> dict[str, Any]:
+    if not settings.gemini_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Gemini API key is not configured",
+        )
+
+    refined_felt = await _call_gemini_for_memoir_refine(payload.felt_point)
+    refined_lacked = await _call_gemini_for_memoir_refine(payload.lacked_point)
+
+    return {
+        "refined_felt": refined_felt,
+        "refined_lacked": refined_lacked,
+    }
+
+
+async def _call_gemini_for_memoir_refine(text: str) -> str:
+    return await asyncio.to_thread(_sync_call_gemini_for_memoir_refine, text)
+
+
+def _sync_call_gemini_for_memoir_refine(text: str) -> str:
+    prompt = _build_memoir_refine_prompt(text)
+    client = genai.Client(api_key=settings.gemini_api_key)
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.1-flash-lite",
+            contents=prompt,
+            config={
+                "temperature": 0.7,
+                "max_output_tokens": 1024,
+            },
+        )
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Gemini API request failed: {str(error)}",
+        )
+
+    text_response = getattr(response, "text", None) or getattr(response, "content", None)
+    if not text_response:
+        candidates = getattr(response, "candidates", None)
+        if isinstance(candidates, list) and len(candidates) > 0:
+            candidate = candidates[0]
+            text_response = getattr(candidate, "content", None) or getattr(candidate, "output", None) or ""
+
+    return text_response or ""
+
+
+def _build_memoir_refine_prompt(text: str) -> str:
+    return (
+        "당신은 프로젝트 회고를 작성하는 데 도움을 주는 AI입니다.\n"
+        "사용자가 작성한 회고 텍스트를 더욱 명확하고 성숙하게 정제해주세요.\n\n"
+
+        "지침:\n"
+        "1. 텍스트의 핵심 의미를 유지하면서 표현을 개선해주세요.\n"
+        "2. 구체적이고 행동 지향적인 표현으로 변경하세요.\n"
+        "3. 문법과 띄어쓰기를 수정하세요.\n"
+        "4. 불필요한 반복을 제거하세요.\n"
+        "5. 전문적이고 이해하기 쉬운 한국어로 작성하세요.\n"
+        "6. 원문보다 더 짧고 명확하게 작성하세요.\n"
+        "7. 정제된 텍스트만 반환하고, 설명이나 추가 문장을 포함하지 마세요.\n\n"
+
+        f"원문:\n{text}\n\n"
+
+        "정제된 텍스트:"
+    )
+
