@@ -28,6 +28,7 @@ export default function MyPage() {
   const [reviews, setReviews] = useState([]);
 
   const [loading, setLoading] = useState(true);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [showReviews, setShowReviews] = useState(false);
   const [discardingId, setDiscardingId] = useState(null);
   const [discardConfirm, setDiscardConfirm] = useState(null);
@@ -282,6 +283,7 @@ export default function MyPage() {
         skills: prev?.skills,
         interests: prev?.interests,
       }));
+      setIsEditingProfile(false);
     } catch (error) {
       console.error(error);
       alert("프로필 수정에 실패했습니다.");
@@ -334,7 +336,8 @@ export default function MyPage() {
     <main className="min-h-screen bg-slate-50 px-6 py-10">
       <div className="mx-auto w-full max-w-5xl">
         <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <div className="flex items-center gap-6">
+          <div className="flex items-center justify-between gap-6">
+            <div className="flex items-center gap-6">
             <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-red-100 text-3xl font-bold text-red-600">
               {profile?.avatar_url ? (
                 <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-red-100 text-3xl font-bold text-red-600">
@@ -365,10 +368,32 @@ export default function MyPage() {
                 {profile?.bio || "아직 자기소개가 없습니다."}
               </p>
             </div>
+            </div>
+
+            <button
+              onClick={() => setIsEditingProfile(true)}
+              className="shrink-0 rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
+            >
+              수정하기
+            </button>
           </div>
         </section>
 
+        {isEditingProfile && (
         <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex justify-end">
+            <button
+              onClick={() => {
+                setEditNickname(profile?.nickname || "");
+                setEditBio(profile?.bio || "");
+                setEditAvatarUrl(profile?.avatar_url || "");
+                setIsEditingProfile(false);
+              }}
+              className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+            >
+              닫기
+            </button>
+          </div>
           <h2 className="text-xl font-bold text-slate-900">프로필 수정</h2>
 
           <div className="mt-4 space-y-4">
@@ -425,6 +450,7 @@ export default function MyPage() {
             </button>
           </div>
         </section>
+        )}
 
         <section className="mb-6 grid grid-cols-3 gap-4">
           <StatCard title="리드 프로젝트" value={stats?.lead_projects ?? 0} />
