@@ -2,7 +2,8 @@ import secrets
 from datetime import datetime, timedelta, timezone
 import re
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status, RedirectResponse
+from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
