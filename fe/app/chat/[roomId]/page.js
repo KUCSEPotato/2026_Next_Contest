@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import {
   createTodoApi,
+  deleteTodoApi,
   generateAITodosApi,
   getMessagesApi,
   getProjectApi,
@@ -305,6 +306,26 @@ export default function ChatRoomPage() {
     } catch (error) {
       console.error(error);
       alert("Todo 순서를 변경하지 못했습니다.");
+    }
+  };
+
+  const handleDeleteTodo = async (todo) => {
+    if (!projectId) return;
+
+    if (!confirm(`"${todo.title}" 항목을 삭제할까요?`)) {
+      return;
+    }
+
+    try {
+      await deleteTodoApi(projectId, todo.id);
+      setExpandedTodoIds((prev) => prev.filter((id) => id !== todo.id));
+      if (editingTodoId === todo.id) {
+        cancelEditingTodo();
+      }
+      await loadProjectTodos();
+    } catch (error) {
+      console.error(error);
+      alert("Todo 삭제에 실패했습니다.");
     }
   };
 
@@ -620,6 +641,13 @@ export default function ChatRoomPage() {
                                 className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 hover:border-red-300 hover:text-red-600"
                               >
                                 수정
+                              </button>
+
+                              <button
+                                onClick={() => handleDeleteTodo(todo)}
+                                className="rounded-lg border border-red-100 px-2 py-1 text-xs font-semibold text-red-500 hover:border-red-300 hover:bg-red-50"
+                              >
+                                삭제
                               </button>
                             </div>
                           </div>
