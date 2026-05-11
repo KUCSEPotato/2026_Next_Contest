@@ -19,6 +19,7 @@ export default function ProjectChatRoomsPage() {
   const [profile, setProfile] = useState(null);
   const [roomName, setRoomName] = useState("");
   const [loading, setLoading] = useState(true);
+  const [selectedMemberIds, setSelectedMemberIds] = useState([]);
 
   const loadRooms = async () => {
     try {
@@ -50,6 +51,25 @@ export default function ProjectChatRoomsPage() {
   const isLeader = project && profile && project.leader_id === profile.id;
   const canCreateRoom = isLeader && project?.status === "in_progress";
 
+  const projectMembers =
+    project?.members ||
+    project?.project_members ||
+    project?.team_members ||
+    [];
+
+  const selectableMembers = projectMembers.filter((member) => {
+    const userId = member.user_id || member.id || member.user?.id;
+    return userId && userId !== profile?.id;
+  });
+
+  const toggleMember = (userId) => {
+    setSelectedMemberIds((prev) =>
+      prev.includes(userId)
+        ? prev.filter((id) => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
   const handleCreateRoom = async () => {
     if (!canCreateRoom) {
       alert("팀 결성 후 프로젝트 리더만 채팅방을 만들 수 있습니다.");
@@ -61,8 +81,21 @@ export default function ProjectChatRoomsPage() {
       return;
     }
 
+    if (selectedMemberIds.length === 0) {
+      alert("채팅방에 추가할 팀원을 선택해주세요.");
+      return;
+    }
+
     try {
-      const result = await createChatRoomApi(projectId, roomName.trim());
+      const finalMemberIds = Array.from(
+        new Set([profile.id, ...selectedMemberIds])
+      );
+
+      const result = await createChatRoomApi(projectId, {
+        name: roomName.trim(),
+        member_ids: finalMemberIds,
+      });
+
       alert("채팅방이 생성되었습니다.");
       router.push(`/chat/${result.data.id}?projectId=${projectId}`);
     } catch (error) {
@@ -112,6 +145,47 @@ export default function ProjectChatRoomsPage() {
               >
                 생성
               </button>
+            </div>
+
+            <div className="mt-5">
+              <p className="text-sm font-semibold text-slate-700">
+                채팅방에 추가할 팀원 선택
+              </p>
+
+              {selectableMembers.length === 0 ? (
+                <p className="mt-3 text-sm text-slate-500">
+                  선택할 수 있는 팀원이 없습니다.
+                </p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {selectableMembers.map((member) => {
+                    const userId = member.user_id || member.id || member.user?.id;
+                    const nickname =
+                      member.nickname ||
+                      member.user?.nickname ||
+                      member.name ||
+                      `User #${userId}`;
+
+                    return (
+                      <label
+                        key={userId}
+                        className="flex cursor-pointer items-center justify-between rounded-xl border border-slate-200 px-4 py-3 transition hover:border-red-300 hover:bg-red-50"
+                      >
+                        <span className="text-sm font-medium text-slate-700">
+                          {nickname}
+                        </span>
+
+                        <input
+                          type="checkbox"
+                          checked={selectedMemberIds.includes(userId)}
+                          onChange={() => toggleMember(userId)}
+                          className="h-4 w-4 accent-red-600"
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </section>
         )}

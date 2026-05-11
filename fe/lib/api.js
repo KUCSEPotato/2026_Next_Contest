@@ -546,13 +546,13 @@ export async function getChatRoomsApi(projectId) {
   return handleResponse(res, "채팅방 목록을 불러오지 못했습니다.");
 }
 
-export async function createChatRoomApi(projectId, name) {
+export async function createChatRoomApi(projectId, payload) {
   const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/chats/projects/${projectId}/rooms`,
     {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ name }),
+      body: JSON.stringify(payload),
     }
   );
 
