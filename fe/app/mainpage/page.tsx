@@ -36,6 +36,12 @@ interface ApiProject {
   current_members?: number;
   maxMembers?: number;
   max_members?: number;
+  applicantCount?: number;
+  applicant_count?: number;
+  remainingSeats?: number;
+  remaining_seats?: number;
+  competitionRatio?: number;
+  competition_ratio?: number;
   status?: string;
   difficulty?: "beginner" | "intermediate" | "advanced";
 }
@@ -104,7 +110,7 @@ const useAuth = () => {
   return { isLoggedIn };
 };
 
-function normalizeProject(project: any): Project {
+function normalizeProject(project: ApiProject): Project {
   return {
     id: project.id,
     project_id: project.id,
@@ -120,7 +126,7 @@ function normalizeProject(project: any): Project {
     remainingSeats: project.remainingSeats ?? project.remaining_seats ?? 0,
     competitionRatio: project.competitionRatio ?? project.competition_ratio ?? 0,
     status: project.status || "planning",
-    difficulty: project.difficulty || "beginner",
+    difficulty: project.difficulty ?? "beginner",
     isUrgent: false,
   };
 }
@@ -388,7 +394,7 @@ function ProjectCard({
   onClick: () => void;
 }) {
   const isAlmostFull =
-    project.maxMembers > 0 && project.currentMembers >= project.maxMembers - 1;
+    project.maxMembers > 0 && project.currentMembers >= project.maxMembers;
 
   const isRecruiting =
     project.status !== "in_progress" &&
@@ -455,7 +461,7 @@ function ProjectCard({
       <div className="mt-auto flex items-center justify-between border-t border-gray-50 pt-3">
         <div className="flex items-center gap-3 text-xs text-gray-400">
           <span className={isAlmostFull ? "font-medium text-blue-500" : ""}>
-            👥 {project.currentMembers}/{project.maxMembers ? project.maxMembers + 1 : "제한 없음"}명
+            👥 {project.currentMembers}/{project.maxMembers ? project.maxMembers : "제한 없음"}명
           </span>
 
           <span

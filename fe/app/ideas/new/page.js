@@ -190,8 +190,12 @@ export default function NewIdeaPage() {
                 max="100"
                 value={requiredMembers}
                 onChange={(e) => setRequiredMembers(e.target.value)}
+                placeholder="예: 리더 포함 4명"
                 className={inputClassName}
               />
+              <p className="mt-2 text-sm text-slate-500">
+                본인을 포함한 프로젝트 전체 인원을 입력해주세요.
+              </p>
             </div>
 
             <div>
