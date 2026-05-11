@@ -58,8 +58,8 @@ const SERVICE_BLOCKS = [
     isActive: false,
   },
   {
-    title: "자유게시판",
-    description: "팀원 모집, 질문, 회고 등 자유롭게 이야기를 나눠보세요.",
+    title: "자유항해",
+    description: "질문, 회고, 팀원 모집까지 — 넓은 바다처럼 자유롭게.",
     path: "/community",
     isActive: false,
   },
