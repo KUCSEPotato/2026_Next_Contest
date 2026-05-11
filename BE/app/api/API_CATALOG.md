@@ -16,6 +16,20 @@
 - POST /auth/login: login_id(이메일 또는 닉네임) + 비밀번호 로그인
 - 응답 일부에 `coin_balance`가 포함됩니다.
 - POST /auth/oauth/github: GitHub authorization code 기반 로그인/가입
+  - 이미 `github_id`로 연결된 계정이 있으면 즉시 로그인 토큰 발급
+  - 신규 GitHub 사용자면 새 계정 생성 후 access/refresh token 발급
+  - GitHub 이메일이 기존 계정과 일치하지만 아직 GitHub가 연결되지 않은 경우 자동 연결하지 않고 아래 형태로 확인 응답 반환
+    - `requires_link_confirmation=true`
+    - `provider="github"`
+    - `email`
+    - `nickname`
+    - `link_token`
+    - `expires_in`(기본 10분)
+- POST /auth/oauth/link-existing/github: 기존 이메일 계정에 GitHub 연결 확정
+  - body: `{ "link_token": "..." }`
+  - `link_token`이 유효하고 GitHub 계정이 다른 사용자에게 연결되어 있지 않으면 기존 계정에 `github_id` 저장
+  - 성공 시 access/refresh token, `user`, `linked_provider="github"` 반환
+  - 만료/위조 토큰이면 `400`, 이미 다른 사용자에게 연결된 GitHub 계정이면 `409`
 - POST /auth/oauth/google: Google authorization code 기반 로그인/가입
 - GET /auth/oauth/links: 현재 계정의 OAuth 연결 상태 조회
 - POST /auth/oauth/link/github: 현재 계정에 GitHub 연결
