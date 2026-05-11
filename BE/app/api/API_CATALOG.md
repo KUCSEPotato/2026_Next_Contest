@@ -104,6 +104,8 @@
 
 - POST /projects: 직접 프로젝트 생성 + 생성자 리더 등록(max_members: 리더 포함 최대 멤버 수, 기본값 10, idea_id는 선택사항)
 - GET /projects: 프로젝트 목록 조회
+  - 응답에 `applicantCount`, `remainingSeats`, `competitionRatio`, `created_at` 포함
+  - `competitionRatio`는 `대기 중 지원자 수(applicantCount) / 남은 자리 수(remainingSeats)` 기준
 - GET /projects/{project_id}: 프로젝트 상세 + 멤버(현재 멤버 수, 최대 멤버 수, 경쟁률 포함)
   - `members` 항목은 `user_id`, `role_in_project`, `nickname`, `name`, `avatar_url`, `user` 객체를 포함합니다.
   - `user` 객체 형식: `{ id, nickname, name, avatar_url }`
@@ -184,7 +186,7 @@
 
 ## 10) Recommendations
 
-- POST /recommendations/projects: 프로젝트 추천
+- POST /recommendations/projects: 프로젝트 추천(로그인 사용자 기술 스택 기반 매칭 우선 정렬)
 - POST /recommendations/teammates: 팀원 추천
 - POST /recommendations/explain: 추천 사유 자연어 설명
 

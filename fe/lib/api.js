@@ -240,6 +240,22 @@ export async function getProjectApi(projectId) {
   return handleResponse(res, "프로젝트 정보를 불러오지 못했습니다.");
 }
 
+export async function getRecommendedProjectsApi(payload = {}, limit = 20) {
+  const query = new URLSearchParams();
+  query.set("limit", limit);
+
+  const res = await authenticatedFetch(
+    `${API_BASE_URL}/api/v1/recommendations/projects?${query.toString()}`,
+    {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    }
+  );
+
+  return handleResponse(res, "추천 프로젝트를 불러오지 못했습니다.");
+}
+
 export async function updateProjectApi(projectId, payload) {
   const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/projects/${projectId}`, {
     method: "PATCH",
