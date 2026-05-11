@@ -137,9 +137,12 @@
 
 ### Todo/회고/리뷰/실패기록
 - POST /projects/{project_id}/todos: Todo 생성
-- POST /projects/{project_id}/todos/ai-generate: 프로젝트 상세와 최근 채팅 기반 AI Todo 생성(Gemini 미설정 시 기본 Todo 생성)
-- GET /projects/{project_id}/todos: Todo 목록(stage, assignments 포함)
-- PATCH /projects/{project_id}/todos/{todo_id}: Todo 수정(배정/단계 포함)
+- POST /projects/{project_id}/todos/ai-generate: 팀장 전용 AI Todo 생성
+  - Request: `{ "room_id": 1, "message_ids": [10, 11], "limit": 14 }`
+  - `message_ids`가 있으면 선택한 채팅만, 없으면 최근 채팅과 프로젝트 상세를 반영합니다.
+  - Gemini 미설정 시에도 기본 Todo를 생성합니다.
+- GET /projects/{project_id}/todos: Todo 목록(stage, assignments 포함, priority 순 정렬)
+- PATCH /projects/{project_id}/todos/{todo_id}: Todo 수정(제목/설명/배정/단계/priority 포함)
 - PATCH /projects/{project_id}/todos/{todo_id}/done: 프로젝트 멤버가 Todo 완료/미완료 토글
 - DELETE /projects/{project_id}/todos/{todo_id}: Todo 삭제
 - WS /projects/{project_id}/todos/ws: Todo 실시간 구독(생성/수정/삭제/완료 이벤트)

@@ -244,10 +244,14 @@ def _build_todo_response(todo: Todo, assignments: list[dict] | None = None) -> d
 
 def _fallback_ai_todo_titles(project: Project) -> list[str]:
     return [
-        f"{project.title} 핵심 기능 범위 정리",
-        "팀원별 역할과 담당 Todo 확정",
-        "첫 번째 실행 가능한 결과물 구현",
-        "진행 상황 공유 및 다음 스프린트 계획",
+        f"기획 - {project.title} 핵심 사용자 흐름과 완료 기준 정리",
+        "기획 - 팀원별 역할, 담당 영역, 리뷰 방식을 문서화",
+        "설계 - 화면/기능 단위로 구현 범위를 세분화하고 우선순위 결정",
+        "설계 - 필요한 API, 데이터 모델, 상태 흐름 목록화",
+        "구현 - 가장 작은 MVP 기능을 먼저 구현하고 팀 리뷰 진행",
+        "구현 - 주요 사용자 액션별 예외 처리와 빈 상태 구현",
+        "검증 - 핵심 플로우를 실제 계정으로 점검하고 수정사항 기록",
+        "검증 - 배포 전 남은 이슈와 다음 스프린트 Todo 정리",
     ]
 
 
@@ -303,6 +307,17 @@ async def _generate_ai_todo_titles(context_text: str, project: Project) -> list[
 
     deduped_titles = list(dict.fromkeys(titles))
     return deduped_titles[:8] or _fallback_ai_todo_titles(project)
+
+
+def _split_ai_todo_title(raw_title: str) -> tuple[str, str]:
+    normalized = raw_title.strip().strip("-• ")
+    if " - " in normalized:
+        stage, title = normalized.split(" - ", 1)
+        return stage.strip()[:30] or "planning", title.strip()[:200]
+    if ":" in normalized:
+        stage, title = normalized.split(":", 1)
+        return stage.strip()[:30] or "planning", title.strip()[:200]
+    return "AI 추천", normalized[:200]
 
 
 async def _broadcast_todo_snapshot(db: Session, project_id: int, todo: Todo, event_type: str) -> None:
@@ -1083,7 +1098,7 @@ async def list_todos(
     """Todo 목록 조회 API(프로젝트 멤버 전용)."""
     _get_project_or_404(db, project_id)
     _ensure_project_member(db, project_id, current_user_id)
-    todos = db.query(Todo).filter(Todo.project_id == project_id).order_by(Todo.id.desc()).all()
+    todos = db.query(Todo).filter(Todo.project_id == project_id).order_by(Todo.priority.asc(), Todo.id.asc()).all()
     assignments_by_todo = _serialize_todo_assignments(db, [todo.id for todo in todos])
     return success_response(
         data=[_build_todo_response(todo, assignments_by_todo.get(todo.id, [])) for todo in todos]
@@ -1138,7 +1153,7 @@ async def generate_project_todos_with_ai(
     db: Session = Depends(get_db),
 ) -> dict:
     project = _get_project_or_404(db, project_id)
-    _ensure_project_member(db, project_id, current_user_id)
+    _ensure_project_leader(project, current_user_id)
 
     members = (
         db.query(ProjectMember)
@@ -1153,33 +1168,55 @@ async def generate_project_todos_with_ai(
     )
 
     room_id = payload.get("room_id")
+    message_ids = payload.get("message_ids") or []
+    limit = min(max(int(payload.get("limit", 12) or 12), 4), 20)
     messages_query = db.query(ChatMessage).join(ChatRoom, ChatRoom.id == ChatMessage.room_id).filter(
         ChatRoom.project_id == project_id,
     )
     if room_id:
         messages_query = messages_query.filter(ChatMessage.room_id == room_id)
-    recent_messages = messages_query.order_by(ChatMessage.created_at.desc()).limit(50).all()
-    recent_messages = list(reversed(recent_messages))
+    if message_ids:
+        messages_query = messages_query.filter(ChatMessage.id.in_(message_ids))
+        recent_messages = messages_query.order_by(ChatMessage.created_at.asc()).all()
+    else:
+        recent_messages = messages_query.order_by(ChatMessage.created_at.desc()).limit(50).all()
+        recent_messages = list(reversed(recent_messages))
 
     context_text = _build_ai_todo_context(project, members, member_users, recent_messages)
-    titles = await _generate_ai_todo_titles(context_text, project)
+    titles = (await _generate_ai_todo_titles(context_text, project))[:limit]
+
+    existing_titles = {
+        title.lower()
+        for (title,) in db.query(Todo.title).filter(Todo.project_id == project_id).all()
+    }
+    max_priority = (
+        db.query(func.max(Todo.priority))
+        .filter(Todo.project_id == project_id)
+        .scalar()
+        or 0
+    )
 
     created_todos: list[Todo] = []
-    for title in titles:
+    for index, raw_title in enumerate(titles, start=1):
+        stage, title = _split_ai_todo_title(raw_title)
+        if title.lower() in existing_titles:
+            continue
+
         todo = Todo(
             project_id=project_id,
             creator_id=current_user_id,
             assignee_id=member_ids[0] if member_ids else None,
-            title=title[:200],
-            description="AI가 프로젝트 정보와 최근 채팅을 바탕으로 생성한 Todo입니다.",
-            stage="planning",
+            title=title,
+            description="AI가 선택한 채팅 범위와 프로젝트 상세 정보를 바탕으로 생성한 Todo입니다.",
+            stage=stage,
             status="todo",
-            priority=3,
+            priority=max_priority + index,
         )
         db.add(todo)
         db.flush()
         _sync_todo_assignments(db, todo, member_ids)
         created_todos.append(todo)
+        existing_titles.add(title.lower())
 
     db.commit()
     for todo in created_todos:
@@ -1317,7 +1354,7 @@ async def project_todos_websocket(
     channel = project_todo_channel(project_id)
     await realtime_hub.connect(channel, websocket)
     try:
-        todos = db.query(Todo).filter(Todo.project_id == project_id).order_by(Todo.id.desc()).all()
+        todos = db.query(Todo).filter(Todo.project_id == project_id).order_by(Todo.priority.asc(), Todo.id.asc()).all()
         assignments_by_todo = _serialize_todo_assignments(db, [todo.id for todo in todos])
         await websocket.send_json(
             {
@@ -1335,7 +1372,7 @@ async def project_todos_websocket(
                 continue
 
             if event_type == "todo.refresh":
-                todos = db.query(Todo).filter(Todo.project_id == project_id).order_by(Todo.id.desc()).all()
+                todos = db.query(Todo).filter(Todo.project_id == project_id).order_by(Todo.priority.asc(), Todo.id.asc()).all()
                 assignments_by_todo = _serialize_todo_assignments(db, [todo.id for todo in todos])
                 await websocket.send_json(
                     {
