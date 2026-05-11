@@ -11,6 +11,7 @@ from app.models import Idea
 from app.models import IdeaBookmark
 from app.models import IdeaFile
 from app.models import IdeaLike
+from app.models import Notification
 from app.models import Project
 from app.models import ProjectMember
 from app.models import ProjectSkill
@@ -46,6 +47,25 @@ def _sync_project_skills_from_idea(db: Session, project_id: int, tech_stack: lis
             existing_skill_ids.add(skill.id)
 
 
+def _project_notification_data(project_id: int) -> dict:
+    return {
+        "project_id": project_id,
+        "url": f"/projects/{project_id}",
+    }
+
+
+def _notify_project_registered(db: Session, project: Project) -> None:
+    db.add(
+        Notification(
+            user_id=project.leader_id,
+            type="project_update",
+            title="프로젝트가 등록되었습니다",
+            body=f"'{project.title}' 프로젝트가 생성되었습니다.",
+            data=_project_notification_data(project.id),
+        )
+    )
+
+
 def _create_project_from_idea(db: Session, idea: Idea, current_user_id: int) -> Project:
     project = Project(
         idea_id=idea.id,
@@ -66,6 +86,7 @@ def _create_project_from_idea(db: Session, idea: Idea, current_user_id: int) -> 
     _sync_project_skills_from_idea(db, project.id, list(idea.tech_stack or []))
     idea.converted_to_project_id = project.id
     reward_project_registration(db, project)
+    _notify_project_registered(db, project)
     return project
 
 
@@ -400,6 +421,7 @@ async def convert_idea_to_project(
     db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
     _sync_project_skills_from_idea(db, project.id, list(idea.tech_stack or []))
     idea.converted_to_project_id = project.id
+    _notify_project_registered(db, project)
     
     db.commit()
     db.refresh(project)

@@ -88,6 +88,13 @@ def _build_recruitment_response(recruitment: ProjectRecruitment) -> dict:
     }
 
 
+def _project_notification_data(project_id: int) -> dict:
+    return {
+        "project_id": project_id,
+        "url": f"/projects/{project_id}",
+    }
+
+
 def _build_recruitment_response_with_competition(db: Session, recruitment: ProjectRecruitment) -> dict:
     """경쟁률을 포함한 recruitment 응답을 빌드합니다."""
     # 지원자 수 계산 (pending 상태만)
@@ -273,6 +280,15 @@ async def create_project(
 
     db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
     reward_project_registration(db, project)
+    db.add(
+        Notification(
+            user_id=current_user_id,
+            type="project_update",
+            title="프로젝트가 등록되었습니다",
+            body=f"'{project.title}' 프로젝트가 생성되었습니다.",
+            data=_project_notification_data(project.id),
+        )
+    )
     db.commit()
     db.refresh(project)
     return success_response(data={"id": project.id, "title": project.title, "max_members": project.max_members})
@@ -397,13 +413,30 @@ async def apply_project(
     - Authorization 헤더를 설정하고 message를 포함해 호출합니다.
     - 동일 프로젝트 중복 지원 시 `409`를 반환합니다.
     """
-    _get_project_or_404(db, project_id)
+    project = _get_project_or_404(db, project_id)
     exists = db.query(Application).filter(Application.project_id == project_id, Application.applicant_id == current_user_id).first()
     if exists:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Application already exists")
 
     app_obj = Application(project_id=project_id, applicant_id=current_user_id, message=payload.message, status="pending")
     db.add(app_obj)
+    db.flush()
+    if project.leader_id != current_user_id:
+        applicant = db.get(User, current_user_id)
+        applicant_name = applicant.nickname if applicant else "새 지원자"
+        db.add(
+            Notification(
+                user_id=project.leader_id,
+                type="application_received",
+                title="새 프로젝트 지원이 도착했습니다",
+                body=f"{applicant_name}님이 '{project.title}' 프로젝트에 지원했습니다.",
+                data={
+                    **_project_notification_data(project_id),
+                    "application_id": app_obj.id,
+                    "applicant_id": current_user_id,
+                },
+            )
+        )
     db.commit()
     db.refresh(app_obj)
     return success_response(data={"id": app_obj.id, "status": app_obj.status})
@@ -480,6 +513,20 @@ async def decide_application(
                 )
             )
 
+    decision_label = "승인" if decision == "accepted" else "거절"
+    db.add(
+        Notification(
+            user_id=app_obj.applicant_id,
+            type="application_decided",
+            title=f"프로젝트 지원이 {decision_label}되었습니다",
+            body=f"'{project.title}' 프로젝트 지원이 {decision_label}되었습니다.",
+            data={
+                **_project_notification_data(project_id),
+                "application_id": app_obj.id,
+                "decision": decision,
+            },
+        )
+    )
 
     db.commit() 
     return success_response(data={"id": app_obj.id, "status": app_obj.status})
@@ -1268,7 +1315,7 @@ async def create_review(
     - reviewee_id 필수, 자기 자신 리뷰는 불가합니다.
     - 중복 리뷰를 방지하며 생성 후 평점 집계를 재계산합니다.
     """
-    _get_project_or_404(db, project_id)
+    project = _get_project_or_404(db, project_id)
     _ensure_project_member(db, project_id, current_user_id)
     reviewee_id = payload.get("reviewee_id")
     if not reviewee_id:
@@ -1294,6 +1341,22 @@ async def create_review(
         comment=payload.get("comment"),
     )
     db.add(review)
+    db.flush()
+    reviewer = db.get(User, current_user_id)
+    reviewer_name = reviewer.nickname if reviewer else "팀원"
+    db.add(
+        Notification(
+            user_id=reviewee_id,
+            type="review_received",
+            title="새 리뷰를 받았습니다",
+            body=f"{reviewer_name}님이 '{project.title}' 프로젝트 리뷰를 남겼습니다.",
+            data={
+                **_project_notification_data(project_id),
+                "review_id": review.id,
+                "reviewer_id": current_user_id,
+            },
+        )
+    )
     db.commit()
     db.refresh(review)
 
@@ -1380,10 +1443,10 @@ async def complete_team(
     for member_id in active_members:
         notification = Notification(
             user_id=member_id,
-            type="project_started",
+            type="project_update",
             title="팀 결성이 완료되었습니다",
             body=f"프로젝트 '{project.title}'의 팀 결성이 완료되어 프로젝트가 시작되었습니다.",
-            data={"project_id": project_id},
+            data=_project_notification_data(project_id),
         )
         db.add(notification)
 

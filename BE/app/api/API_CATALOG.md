@@ -215,8 +215,17 @@
 
 ## 13) Notifications
 
-- GET /notifications: 알림 목록
-- PATCH /notifications/{notification_id}/read: 읽음 처리
+- GET /notifications: 현재 사용자의 알림 목록
+  - 응답에 `data`, `project_id`, `url` 포함
+  - 프론트는 `url` 또는 `project_id`를 사용해 알림 클릭 시 관련 상세 화면으로 이동
+- PATCH /notifications/{notification_id}/read: 읽음 처리(`is_read=true`, `read_at` 기록)
+
+### 알림 생성 지점
+- 프로젝트 등록: 프로젝트 생성자에게 `project_update` 알림 생성, `/projects/{project_id}`로 이동
+- 프로젝트 지원: 프로젝트 리더에게 `application_received` 알림 생성, `/projects/{project_id}`로 이동
+- 지원 승인/거절: 지원자에게 `application_decided` 알림 생성, `/projects/{project_id}`로 이동
+- 프로젝트 리뷰 작성: 리뷰 대상자에게 `review_received` 알림 생성, `/projects/{project_id}`로 이동
+- 커뮤니티 댓글 작성: 게시글 작성자에게 `system` 알림 생성, `/community/{post_id}`로 이동
 
 ## 14) Admin
 

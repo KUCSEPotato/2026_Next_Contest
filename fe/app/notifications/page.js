@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getNotificationsApi, readNotificationApi } from "../../lib/api";
 
@@ -9,11 +9,7 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);
   const [processingId, setProcessingId] = useState(null);
 
-  useEffect(() => {
-    loadNotifications();
-  }, []);
-
-  async function loadNotifications() {
+  const loadNotifications = useCallback(async () => {
     try {
       const result = await getNotificationsApi();
       setNotifications(result.data || []);
@@ -21,7 +17,13 @@ export default function NotificationsPage() {
       console.error(error);
       setNotifications([]);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      loadNotifications();
+    });
+  }, [loadNotifications]);
 
   function formatDate(value) {
     if (!value) return "일시 없음";
@@ -43,7 +45,12 @@ export default function NotificationsPage() {
 
   function getNotificationPath(notification) {
     if (notification.url) return notification.url;
+    if (notification.data?.url) return notification.data.url;
     if (notification.link_url) return notification.link_url;
+    if (notification.project_id) return `/projects/${notification.project_id}`;
+    if (notification.data?.project_id) return `/projects/${notification.data.project_id}`;
+    if (notification.post_id) return `/community/${notification.post_id}`;
+    if (notification.data?.post_id) return `/community/${notification.data.post_id}`;
 
     const type = notification.type || notification.notification_type;
 
