@@ -83,9 +83,13 @@ export default function ProjectDetailPage() {
           summary: projectData.summary || "",
           description: projectData.description || "",
           difficulty: projectData.difficulty || "",
-          category: projectData.category || "",
+          category: projectData.category || projectData.domain || "",
           progress_percent: projectData.progress_percent ?? 0,
-          max_members: projectData.max_members ?? projectData.recruitment_count ?? 10,
+          max_members:
+            projectData.max_members ??
+            projectData.recruitment_count ??
+            projectData.member_limit ??
+            "",
           is_public: projectData.is_public ?? true,
         });
       } catch (error) {
@@ -118,8 +122,13 @@ export default function ProjectDetailPage() {
       return;
     }
 
+    if (!editForm.category) {
+      alert("카테고리를 선택해주세요.");
+      return;
+    }
+
     if (Number(editForm.max_members) < acceptedMemberCount) {
-      alert(`모집 인원은 현재 수락된 인원 ${acceptedMemberCount}명 이상이어야 합니다.`);
+      alert(`현재 팀원수인 ${acceptedMemberCount}명 이상으로만 변경 가능합니다.`);
       return;
     }
 
@@ -337,10 +346,10 @@ export default function ProjectDetailPage() {
                     max="100"
                     value={editForm.max_members}
                     onChange={(e) => handleEditChange("max_members", e.target.value)}
-                    placeholder="모집 인원"
+                    placeholder="모집 인원 (리더 포함)"
                   />
                   <p className="mt-1 text-xs text-slate-500">
-                    현재 수락된 인원: {acceptedMemberCount}명 이상으로만 설정할 수 있습니다.
+                    {acceptedMemberCount}명(현재 팀원수) 이상으로만 설정할 수 있습니다.
                   </p>
                 </div>
               </div>
