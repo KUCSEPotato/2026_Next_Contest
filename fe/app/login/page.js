@@ -70,13 +70,13 @@ export default function LoginPage() {
         </h1>
 
         <p className="mt-2 text-center text-sm text-slate-500">
-          이메일 또는 닉네임으로 로그인하세요
+          이메일로 로그인하세요
         </p>
 
         <div className="mt-6 space-y-4">
           <input
             type="text"
-            placeholder="이메일 또는 닉네임"
+            placeholder="이메일"
             value={loginId}
             onChange={(e) => setLoginId(e.target.value)}
             className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
