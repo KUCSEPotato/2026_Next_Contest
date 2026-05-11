@@ -265,14 +265,14 @@ def _build_memoir_response(memoir: Retrospective) -> dict:
 
 def _fallback_ai_todo_titles(project: Project) -> list[str]:
     return [
-        f"기획 - {project.title} 핵심 사용자 흐름과 완료 기준 정리",
-        "기획 - 팀원별 역할, 담당 영역, 리뷰 방식을 문서화",
-        "설계 - 화면/기능 단위로 구현 범위를 세분화하고 우선순위 결정",
-        "설계 - 필요한 API, 데이터 모델, 상태 흐름 목록화",
-        "구현 - 가장 작은 MVP 기능을 먼저 구현하고 팀 리뷰 진행",
-        "구현 - 주요 사용자 액션별 예외 처리와 빈 상태 구현",
-        "검증 - 핵심 플로우를 실제 계정으로 점검하고 수정사항 기록",
-        "검증 - 배포 전 남은 이슈와 다음 스프린트 Todo 정리",
+        f"기획 단계 - {project.title} 핵심 사용자 흐름 확정하기 :: 프로젝트를 처음 사용하는 사용자가 어떤 순서로 기능을 이용하고, 어떤 상태가 완료 기준인지 문서로 정리한다.",
+        "기획 단계 - 프로젝트 세부 계획과 MVP 범위 결정하기 :: 반드시 구현할 기능, 시간이 남으면 구현할 기능, 제외할 기능을 나누어 팀이 같은 기준으로 개발하도록 한다.",
+        "기획 단계 - 팀원별 역할과 담당 영역 기록하기 :: 프론트엔드, 백엔드, 디자인, 검증 등 담당자를 정하고 각자가 맡을 산출물을 Todo 상세에 남긴다.",
+        "설계 단계 - 화면 단위 기능 목록과 이동 흐름 만들기 :: 주요 페이지별 입력값, 버튼, 빈 상태, 오류 상태를 정리해 구현 순서를 잡는다.",
+        "설계 단계 - API와 데이터 모델 목록 작성하기 :: 필요한 엔드포인트, 요청/응답 필드, 저장해야 할 테이블 또는 컬럼을 기능별로 정리한다.",
+        "개발 단계 - 백엔드 핵심 API 구현하기 :: 프로젝트 생성, 조회, 수정처럼 MVP에 필요한 API를 우선 구현하고 응답 형식을 프론트와 맞춘다.",
+        "개발 단계 - 프론트엔드 주요 화면 구현하기 :: 사용자가 가장 먼저 접하는 목록, 상세, 작성 화면을 연결하고 실제 API 데이터로 렌더링한다.",
+        "검증 단계 - 핵심 플로우 테스트와 수정 사항 기록하기 :: 실제 계정으로 생성부터 완료까지 진행해보고 실패한 케이스와 수정 담당자를 남긴다.",
     ]
 
 
@@ -327,7 +327,7 @@ async def _generate_ai_todo_titles(context_text: str, project: Project) -> list[
                 titles.append(todo.strip())
 
     deduped_titles = list(dict.fromkeys(titles))
-    return deduped_titles[:8] or _fallback_ai_todo_titles(project)
+    return deduped_titles[:18] or _fallback_ai_todo_titles(project)
 
 
 async def _call_gemini_for_memoir_refine(feelings: str, shortcomings: str) -> str:
@@ -387,15 +387,22 @@ def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str) -> str
     return (text or "").strip()
 
 
-def _split_ai_todo_title(raw_title: str) -> tuple[str, str]:
+def _split_ai_todo_item(raw_title: str) -> tuple[str, str, str | None]:
     normalized = raw_title.strip().strip("-• ")
+    detail = None
+    for separator in (" :: ", " - 상세: ", " 상세: "):
+        if separator in normalized:
+            normalized, detail = normalized.split(separator, 1)
+            detail = detail.strip()[:500] or None
+            break
+
     if " - " in normalized:
         stage, title = normalized.split(" - ", 1)
-        return stage.strip()[:30] or "planning", title.strip()[:200]
+        return stage.strip()[:30] or "planning", title.strip()[:200], detail
     if ":" in normalized:
         stage, title = normalized.split(":", 1)
-        return stage.strip()[:30] or "planning", title.strip()[:200]
-    return "AI 추천", normalized[:200]
+        return stage.strip()[:30] or "planning", title.strip()[:200], detail
+    return "AI 추천", normalized[:200], detail
 
 
 async def _broadcast_todo_snapshot(db: Session, project_id: int, todo: Todo, event_type: str) -> None:
@@ -1280,7 +1287,7 @@ async def generate_project_todos_with_ai(
 
     created_todos: list[Todo] = []
     for index, raw_title in enumerate(titles, start=1):
-        stage, title = _split_ai_todo_title(raw_title)
+        stage, title, description = _split_ai_todo_item(raw_title)
         if title.lower() in existing_titles:
             continue
 
@@ -1289,7 +1296,7 @@ async def generate_project_todos_with_ai(
             creator_id=current_user_id,
             assignee_id=member_ids[0] if member_ids else None,
             title=title,
-            description="AI가 선택한 채팅 범위와 프로젝트 상세 정보를 바탕으로 생성한 Todo입니다.",
+            description=description,
             stage=stage,
             status="todo",
             priority=max_priority + index,
