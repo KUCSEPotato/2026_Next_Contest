@@ -453,6 +453,19 @@ export async function toggleTodoDoneApi(projectId, todoId) {
   return handleResponse(res, "Todo 완료 상태 변경에 실패했습니다.");
 }
 
+export async function generateAITodosApi(projectId, payload = {}) {
+  const res = await authenticatedFetch(
+    `${API_BASE_URL}/api/v1/projects/${projectId}/todos/ai-generate`,
+    {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    }
+  );
+
+  return handleResponse(res, "AI Todo 생성에 실패했습니다.");
+}
+
 export async function deleteTodoApi(projectId, todoId) {
   const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/projects/${projectId}/todos/${todoId}`,
