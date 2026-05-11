@@ -1674,6 +1674,14 @@ async def create_review(
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Review already exists")
 
+    raw_comment = (
+        payload.get("comment")
+        or payload.get("message")
+        or payload.get("review_message")
+        or payload.get("content")
+    )
+    comment = raw_comment.strip() if isinstance(raw_comment, str) else raw_comment
+
     review = Review(
         project_id=project_id,
         reviewer_id=current_user_id,
@@ -1681,7 +1689,7 @@ async def create_review(
         teamwork_score=payload.get("teamwork_score", 3),
         contribution_score=payload.get("contribution_score", 3),
         responsibility_score=payload.get("responsibility_score", 3),
-        comment=payload.get("comment"),
+        comment=comment or None,
     )
     db.add(review)
     db.flush()
