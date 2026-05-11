@@ -53,13 +53,13 @@ const SERVICE_BLOCKS = [
   },
   {
     title: "영감의 샘",
-    description: "아이디어를 흘려보내고, 새로운 영감을 건져가세요.",
+    description: "아이디어를 흘려보내고,\n새로운 영감을 건져가세요.",
     path: "/ideas/pickup",
     isActive: false,
   },
   {
     title: "자유항해",
-    description: "질문, 회고, 팀원 모집까지 — 넓은 바다처럼 자유롭게.",
+    description: "질문, 회고, 팀원 모집까지\n넓은 바다처럼 자유롭게.",
     path: "/community",
     isActive: false,
   },
@@ -229,7 +229,7 @@ export default function MainPage() {
                   )}
                 </div>
 
-                <p className="text-sm leading-relaxed text-gray-500">
+                <p className="text-sm leading-relaxed text-gray-500 whitespace-pre-line">
                   {block.description}
                 </p>
               </button>
