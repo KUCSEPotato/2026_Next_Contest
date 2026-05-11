@@ -341,9 +341,20 @@ async def _call_gemini_for_memoir_refine(feelings: str, shortcomings: str) -> st
 
 def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str) -> str:
     prompt = (
+        "당신은 프로젝트 회고를 작성하는 데 도움을 주는 AI입니다.\n"
         "다음 두 항목을 읽고 자연스럽고 매끄러운 한국어 **감성적** 회고 문장으로 정제하세요.\n"
         "1) 느낀 점\n"
-        "2) 부족했던 점\n"
+        "2) 부족했던 점\n\n"
+
+        "지침:\n"
+        "1. 텍스트의 핵심 의미를 유지하면서 표현을 개선해주세요.\n"
+        "2. 구체적이고 행동 지향적인 표현으로 변경하세요.\n"
+        "3. 문법과 띄어쓰기를 수정하세요.\n"
+        "4. 불필요한 반복을 제거하세요.\n"
+        "5. 전문적이고 이해하기 쉬운 한국어로 작성하세요.\n"
+        "6. 원문보다 더 짧고 명확하게 작성하세요.\n"
+        "7. 정제된 텍스트만 반환하고, 설명이나 추가 문장을 포함하지 마세요.\n\n"
+        
         "반드시 의미를 유지하고, 문단을 분리해서 전달합니다.\n"
         "출력은 오직 정제된 회고 텍스트 하나로만 하고, JSON이나 마크다운 포맷을 포함하지 마세요.\n\n"
         f"느낀 점:\n{feelings}\n\n"
@@ -1508,7 +1519,7 @@ async def refine_memoir(
 
     feelings = payload.felt_point.strip()
     shortcomings = payload.lacked_point.strip()
-    if not feelings or not shortcomings:
+    if not feelings and not shortcomings:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="felt_point and lacked_point are required")
 
     refined_text = await _call_gemini_for_memoir_refine(feelings, shortcomings)
@@ -1971,36 +1982,6 @@ async def get_my_memoir(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Memoir not found")
     
     return success_response(data=_build_memoir_response(memoir))
-
-
-@router.post(
-    "/{project_id}/memoir/ai-refine",
-    summary="회고 텍스트 AI 정제",
-    description="느낀 점과 부족했던 점을 AI가 정제합니다.",
-)
-async def refine_memoir_text(
-    project_id: int,
-    payload: MemoirRefineRequest,
-    current_user_id: int = Depends(get_current_user_id),
-    db: Session = Depends(get_db),
-) -> dict:
-    """회고 AI 정제 API."""
-    project = _get_project_or_404(db, project_id)
-    
-    # LLM 서비스 호출
-    from app.api.v1.endpoints.llm import _call_gemini_for_memoir_refine
-    
-    refined_felt = await _call_gemini_for_memoir_refine(payload.felt_point)
-    refined_lacked = await _call_gemini_for_memoir_refine(payload.lacked_point)
-    
-    return success_response(
-        data={
-            "original_felt": payload.felt_point,
-            "refined_felt": refined_felt,
-            "original_lacked": payload.lacked_point,
-            "refined_lacked": refined_lacked,
-        }
-    )
 
 
 @router.get(
