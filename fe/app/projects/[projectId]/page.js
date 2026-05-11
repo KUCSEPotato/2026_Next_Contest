@@ -7,6 +7,9 @@ import {
   applyProjectApi,
   requestAdoptionApi,
   getMyProfileApi,
+  updateProjectApi,
+  deleteProjectApi,
+  revertProjectToIdeaApi,
 } from "../../../lib/api";
 
 export default function ProjectDetailPage() {
@@ -16,14 +19,35 @@ export default function ProjectDetailPage() {
 
   const [project, setProject] = useState(null);
   const [myProfile, setMyProfile] = useState(null);
+
   const [message, setMessage] = useState("");
   const [isApplying, setIsApplying] = useState(false);
 
   const [adoptionMessage, setAdoptionMessage] = useState("");
   const [isRequestingAdoption, setIsRequestingAdoption] = useState(false);
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const [editForm, setEditForm] = useState({
+    title: "",
+    summary: "",
+    description: "",
+    difficulty: "",
+    category: "",
+    status: "",
+    progress_percent: 0,
+    min_members: 1,
+    max_members: 10,
+    is_public: true,
+  });
+
   const textareaClassName =
     "mt-4 min-h-32 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100";
+
+  const inputClassName =
+    "w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100";
 
   useEffect(() => {
     async function fetchProject() {
@@ -33,8 +57,23 @@ export default function ProjectDetailPage() {
           getMyProfileApi(),
         ]);
 
-        setProject(projectResult.data);
+        const projectData = projectResult.data;
+
+        setProject(projectData);
         setMyProfile(profileResult.data);
+
+        setEditForm({
+          title: projectData.title || "",
+          summary: projectData.summary || "",
+          description: projectData.description || "",
+          difficulty: projectData.difficulty || "",
+          category: projectData.category || "",
+          status: projectData.status || "planning",
+          progress_percent: projectData.progress_percent ?? 0,
+          min_members: projectData.min_members ?? 1,
+          max_members: projectData.max_members ?? 10,
+          is_public: projectData.is_public ?? true,
+        });
       } catch (error) {
         console.error(error);
         alert("프로젝트 정보를 불러오지 못했습니다.");
@@ -46,6 +85,109 @@ export default function ProjectDetailPage() {
 
   const isLeader = project?.leader_id === myProfile?.id;
 
+  const handleEditChange = (field, value) => {
+    setEditForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editForm.title.trim()) {
+      alert("프로젝트 제목을 입력해주세요.");
+      return;
+    }
+
+    if (!editForm.description.trim()) {
+      alert("프로젝트 설명을 입력해주세요.");
+      return;
+    }
+
+    if (Number(editForm.min_members) > Number(editForm.max_members)) {
+      alert("최소 인원은 최대 인원보다 클 수 없습니다.");
+      return;
+    }
+
+    try {
+      setIsSavingEdit(true);
+
+      await updateProjectApi(projectId, {
+        title: editForm.title,
+        summary: editForm.summary,
+        description: editForm.description,
+        difficulty: editForm.difficulty,
+        category: editForm.category,
+        status: editForm.status,
+        progress_percent: Number(editForm.progress_percent),
+        min_members: Number(editForm.min_members),
+        max_members: Number(editForm.max_members),
+        is_public: editForm.is_public,
+      });
+
+      const refreshed = await getProjectApi(projectId);
+      setProject(refreshed.data);
+      setIsEditing(false);
+
+      alert("프로젝트 정보가 수정되었습니다.");
+    } catch (error) {
+      console.error(error);
+      alert("프로젝트 수정에 실패했습니다.");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleRevertToIdea = async () => {
+    const ok = window.confirm(
+      "이 프로젝트를 영감의 샘에 흘려보낼까요?\n\n프로젝트는 삭제 처리되고, 원본 아이디어는 다른 사람들이 주울 수 있는 상태로 돌아갑니다."
+    );
+
+    if (!ok) return;
+
+    try {
+      setIsDeleting(true);
+      await revertProjectToIdeaApi(projectId);
+
+      alert("프로젝트가 영감의 샘으로 이동되었습니다.");
+      router.push("/ideas/pickup");
+    } catch (error) {
+      console.error(error);
+      alert("영감의 샘으로 보내는 데 실패했습니다.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    const suggestWell = window.confirm(
+      "정말 삭제하시겠습니까?\n\n그냥 삭제하기보다, 다른 사람들이 이어갈 수 있도록 '영감의 샘'에 흘려보내는 건 어떨까요?\n\n확인: 영감의 샘에 흘려보내기\n취소: 삭제 계속 진행"
+    );
+
+    if (suggestWell) {
+      await handleRevertToIdea();
+      return;
+    }
+
+    const reallyDelete = window.confirm(
+      "영감의 샘에 보내지 않고 정말 삭제하시겠습니까?"
+    );
+
+    if (!reallyDelete) return;
+
+    try {
+      setIsDeleting(true);
+      await deleteProjectApi(projectId);
+
+      alert("프로젝트가 삭제되었습니다.");
+      router.push("/mainpage");
+    } catch (error) {
+      console.error(error);
+      alert("프로젝트 삭제에 실패했습니다.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleApply = async () => {
     if (!message.trim()) {
       alert("지원 메시지를 입력해주세요.");
@@ -54,8 +196,7 @@ export default function ProjectDetailPage() {
 
     try {
       setIsApplying(true);
-      const result = await applyProjectApi(projectId, message);
-      console.log("지원 성공:", result);
+      await applyProjectApi(projectId, message);
       alert("프로젝트 지원이 완료되었습니다.");
       setMessage("");
     } catch (error) {
@@ -74,8 +215,7 @@ export default function ProjectDetailPage() {
 
     try {
       setIsRequestingAdoption(true);
-      const result = await requestAdoptionApi(projectId, adoptionMessage);
-      console.log("이어받기 요청 성공:", result);
+      await requestAdoptionApi(projectId, adoptionMessage);
       alert("이어받기 요청이 완료되었습니다.");
       setAdoptionMessage("");
     } catch (error) {
@@ -98,41 +238,193 @@ export default function ProjectDetailPage() {
     <main className="min-h-screen bg-slate-50 px-6 py-10">
       <div className="mx-auto w-full max-w-5xl">
         <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-semibold text-red-700">
-              {project.status}
-            </span>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
-              난이도 {project.difficulty}
-            </span>
-          </div>
+          {isEditing ? (
+            <div className="space-y-4">
+              <h1 className="text-2xl font-bold text-slate-900">
+                프로젝트 수정
+              </h1>
 
-          <h1 className="text-3xl font-bold text-slate-900">
-            {project.title}
-          </h1>
-
-          <p className="mt-3 text-lg text-slate-600">{project.summary}</p>
-
-          <div className="mt-6">
-            <div className="mb-2 flex justify-between text-sm font-semibold text-slate-700">
-              <span>진행률</span>
-              <span>{project.progress_percent}%</span>
-            </div>
-
-            <div className="h-3 overflow-hidden rounded-full bg-slate-200">
-              <div
-                className="h-full rounded-full bg-red-600"
-                style={{ width: `${project.progress_percent}%` }}
+              <input
+                className={inputClassName}
+                value={editForm.title}
+                onChange={(e) => handleEditChange("title", e.target.value)}
+                placeholder="프로젝트 제목"
               />
-            </div>
-          </div>
 
-          <button
-            onClick={() => router.push(`/projects/${projectId}/chat`)}
-            className="mt-6 w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800"
-          >
-            팀 채팅방 들어가기
-          </button>
+              <input
+                className={inputClassName}
+                value={editForm.summary}
+                onChange={(e) => handleEditChange("summary", e.target.value)}
+                placeholder="프로젝트 요약"
+              />
+
+              <textarea
+                className={textareaClassName}
+                value={editForm.description}
+                onChange={(e) =>
+                  handleEditChange("description", e.target.value)
+                }
+                placeholder="프로젝트 설명"
+              />
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <input
+                  className={inputClassName}
+                  value={editForm.difficulty}
+                  onChange={(e) =>
+                    handleEditChange("difficulty", e.target.value)
+                  }
+                  placeholder="난이도"
+                />
+
+                <input
+                  className={inputClassName}
+                  value={editForm.category}
+                  onChange={(e) => handleEditChange("category", e.target.value)}
+                  placeholder="카테고리"
+                />
+
+                <select
+                  className={inputClassName}
+                  value={editForm.status}
+                  onChange={(e) => handleEditChange("status", e.target.value)}
+                >
+                  <option value="planning">planning</option>
+                  <option value="ongoing">ongoing</option>
+                  <option value="completed">completed</option>
+                </select>
+
+                <input
+                  className={inputClassName}
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={editForm.progress_percent}
+                  onChange={(e) =>
+                    handleEditChange("progress_percent", e.target.value)
+                  }
+                  placeholder="진행률"
+                />
+
+                <input
+                  className={inputClassName}
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={editForm.min_members}
+                  onChange={(e) =>
+                    handleEditChange("min_members", e.target.value)
+                  }
+                  placeholder="최소 인원"
+                />
+
+                <input
+                  className={inputClassName}
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={editForm.max_members}
+                  onChange={(e) =>
+                    handleEditChange("max_members", e.target.value)
+                  }
+                  placeholder="최대 인원"
+                />
+              </div>
+
+              <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={editForm.is_public}
+                  onChange={(e) =>
+                    handleEditChange("is_public", e.target.checked)
+                  }
+                />
+                공개 프로젝트로 설정
+              </label>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={isSavingEdit}
+                  className="flex-1 rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:bg-slate-400"
+                >
+                  {isSavingEdit ? "저장 중..." : "수정 저장하기"}
+                </button>
+
+                <button
+                  onClick={() => setIsEditing(false)}
+                  className="flex-1 rounded-xl border border-slate-200 px-5 py-3 font-semibold text-slate-600 transition hover:bg-slate-50"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="mb-4 flex flex-wrap items-center gap-3">
+                <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-semibold text-red-700">
+                  {project.status}
+                </span>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
+                  난이도 {project.difficulty}
+                </span>
+              </div>
+
+              <h1 className="text-3xl font-bold text-slate-900">
+                {project.title}
+              </h1>
+
+              <p className="mt-3 text-lg text-slate-600">{project.summary}</p>
+
+              <div className="mt-6">
+                <div className="mb-2 flex justify-between text-sm font-semibold text-slate-700">
+                  <span>진행률</span>
+                  <span>{project.progress_percent}%</span>
+                </div>
+
+                <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+                  <div
+                    className="h-full rounded-full bg-red-600"
+                    style={{ width: `${project.progress_percent}%` }}
+                  />
+                </div>
+              </div>
+
+              {isLeader && (
+                <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
+                  >
+                    수정하기
+                  </button>
+
+                  <button
+                    onClick={handleRevertToIdea}
+                    disabled={isDeleting}
+                    className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    영감의 샘에 흘려보내기
+                  </button>
+
+                  <button
+                    onClick={handleDeleteProject}
+                    disabled={isDeleting}
+                    className="rounded-xl border border-red-200 bg-white px-5 py-3 font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    {isDeleting ? "처리 중..." : "삭제하기"}
+                  </button>
+                </div>
+              )}
+
+              <button
+                onClick={() => router.push(`/projects/${projectId}/chat`)}
+                className="mt-6 w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800"
+              >
+                팀 채팅방 들어가기
+              </button>
+            </>
+          )}
         </section>
 
         <div className="grid gap-6 lg:grid-cols-3">
@@ -161,7 +453,7 @@ export default function ProjectDetailPage() {
                   </p>
 
                   <div className="space-y-2">
-                    {project.members.map((member) => (
+                    {(project.members || []).map((member) => (
                       <div
                         key={`${member.user_id}-${member.role_in_project}`}
                         className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700"
@@ -206,56 +498,58 @@ export default function ProjectDetailPage() {
                 </button>
               </section>
             ) : (
-              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-bold text-slate-900">
-                  프로젝트 지원하기
-                </h2>
+              <>
+                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <h2 className="text-lg font-bold text-slate-900">
+                    프로젝트 지원하기
+                  </h2>
 
-                <p className="mt-2 text-sm text-slate-500">
-                  팀장에게 보낼 간단한 소개와 참여 의지를 적어주세요.
-                </p>
+                  <p className="mt-2 text-sm text-slate-500">
+                    팀장에게 보낼 간단한 소개와 참여 의지를 적어주세요.
+                  </p>
 
-                <textarea
-                  className={textareaClassName}
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="예: React와 UI 구현을 맡아 참여하고 싶습니다."
-                />
+                  <textarea
+                    className={textareaClassName}
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="예: React와 UI 구현을 맡아 참여하고 싶습니다."
+                  />
 
-                <button
-                  onClick={handleApply}
-                  disabled={isApplying}
-                  className="mt-4 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-                >
-                  {isApplying ? "지원 중..." : "지원하기"}
-                </button>
-              </section>
+                  <button
+                    onClick={handleApply}
+                    disabled={isApplying}
+                    className="mt-4 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                  >
+                    {isApplying ? "지원 중..." : "지원하기"}
+                  </button>
+                </section>
+
+                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <h2 className="text-lg font-bold text-slate-900">
+                    프로젝트 이어받기
+                  </h2>
+
+                  <p className="mt-2 text-sm text-slate-500">
+                    이 프로젝트를 이어서 진행하고 싶은 이유를 작성해주세요.
+                  </p>
+
+                  <textarea
+                    className={textareaClassName}
+                    value={adoptionMessage}
+                    onChange={(e) => setAdoptionMessage(e.target.value)}
+                    placeholder="예: 기존 아이디어를 발전시켜 완성도 높은 서비스로 이어가고 싶습니다."
+                  />
+
+                  <button
+                    onClick={handleAdoptionRequest}
+                    disabled={isRequestingAdoption}
+                    className="mt-4 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                  >
+                    {isRequestingAdoption ? "요청 중..." : "이어받기 요청하기"}
+                  </button>
+                </section>
+              </>
             )}
-
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-900">
-                프로젝트 이어받기
-              </h2>
-
-              <p className="mt-2 text-sm text-slate-500">
-                이 프로젝트를 이어서 진행하고 싶은 이유를 작성해주세요.
-              </p>
-
-              <textarea
-                className={textareaClassName}
-                value={adoptionMessage}
-                onChange={(e) => setAdoptionMessage(e.target.value)}
-                placeholder="예: 기존 아이디어를 발전시켜 완성도 높은 서비스로 이어가고 싶습니다."
-              />
-
-              <button
-                onClick={handleAdoptionRequest}
-                disabled={isRequestingAdoption}
-                className="mt-4 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-              >
-                {isRequestingAdoption ? "요청 중..." : "이어받기 요청하기"}
-              </button>
-            </section>
           </aside>
         </div>
       </div>
