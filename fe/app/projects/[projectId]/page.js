@@ -30,6 +30,20 @@ const CATEGORY_OPTIONS = [
   "헬스케어",
 ];
 
+const getProjectMemberUserId = (member) => member.user_id || member.id || member.user?.id;
+
+const getProjectMemberDisplayName = (member) => {
+  const userId = getProjectMemberUserId(member);
+
+  return (
+    member.nickname ||
+    member.user?.nickname ||
+    member.name ||
+    member.user?.name ||
+    `User #${userId}`
+  );
+};
+
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -256,6 +270,15 @@ export default function ProjectDetailPage() {
     );
   }
 
+  const projectMembers = project.members || [];
+  const leaderMember = projectMembers.find(
+    (member) => getProjectMemberUserId(member) === project.leader_id
+  );
+  const leaderDisplayName =
+    leaderMember
+      ? getProjectMemberDisplayName(leaderMember)
+      : project.leader?.nickname || project.leader_name || `User #${project.leader_id}`;
+
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
       <div className="mx-auto w-full max-w-5xl">
@@ -456,10 +479,13 @@ export default function ProjectDetailPage() {
 
               <div className="mt-4 space-y-3">
                 <p className="text-sm text-slate-600">
-                  리더 ID:{" "}
-                  <span className="font-semibold text-slate-900">
-                    {project.leader_id}
-                  </span>
+                  리더:{" "}
+                  <button
+                    onClick={() => router.push(`/users/${project.leader_id}`)}
+                    className="font-semibold text-slate-900 transition hover:text-red-600 hover:underline"
+                  >
+                    {leaderDisplayName}
+                  </button>
                 </p>
 
                 <div>
@@ -468,28 +494,32 @@ export default function ProjectDetailPage() {
                   </p>
 
                   <div className="space-y-2">
-                    {(project.members || []).map((member) => (
-                      <div
-                        key={`${member.user_id}-${member.role_in_project}`}
-                        className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700"
-                      >
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              router.push(`/users/${member.user_id}`);
-                            }}
-                            className="font-semibold text-slate-900 transition hover:text-red-600 hover:underline"
-                          >
-                            User #{member.user_id}
-                          </button>
+                    {projectMembers.map((member) => {
+                      const memberUserId = getProjectMemberUserId(member);
 
-                          <span className="text-slate-500">
-                            · {member.role_in_project}
-                          </span>
+                      return (
+                        <div
+                          key={`${memberUserId}-${member.role_in_project}`}
+                          className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700"
+                        >
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/users/${memberUserId}`);
+                              }}
+                              className="font-semibold text-slate-900 transition hover:text-red-600 hover:underline"
+                            >
+                              {getProjectMemberDisplayName(member)}
+                            </button>
+
+                            <span className="text-slate-500">
+                              · {member.role_in_project}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
