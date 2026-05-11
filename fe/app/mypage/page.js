@@ -524,7 +524,7 @@ export default function MyPage() {
             <div>
               <h2 className="text-xl font-bold text-slate-900">신뢰도</h2>
               <p className="mt-1 text-sm text-slate-500">
-                받은 리뷰를 바탕으로 내 강점과 보완 항목을 확인합니다.
+                받은 리뷰를 바탕으로 평점 항목을 확인합니다.
               </p>
             </div>
 
@@ -887,11 +887,6 @@ function RatingSummary({ reputation }) {
       value: reputation?.avg_responsibility,
     },
   ];
-  const rankedItems = [...items].sort(
-    (a, b) => normalizeRating(b.value) - normalizeRating(a.value)
-  );
-  const strongest = rankedItems[0];
-  const weakest = rankedItems[rankedItems.length - 1];
 
   return (
     <div className="mt-5 grid gap-4 lg:grid-cols-[220px_1fr]">
@@ -901,17 +896,6 @@ function RatingSummary({ reputation }) {
           {formatRating(reputation?.score)}
         </p>
         <p className="mt-1 text-sm text-slate-500">5점 만점</p>
-
-        <div className="mt-5 grid grid-cols-2 gap-2 text-sm">
-          <div className="rounded-xl bg-white px-3 py-2">
-            <p className="text-slate-400">강점</p>
-            <p className="font-bold text-slate-800">{strongest.label}</p>
-          </div>
-          <div className="rounded-xl bg-white px-3 py-2">
-            <p className="text-slate-400">보완</p>
-            <p className="font-bold text-slate-800">{weakest.label}</p>
-          </div>
-        </div>
       </div>
 
       <div className="space-y-3 rounded-2xl border border-slate-200 p-5">
