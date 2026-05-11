@@ -620,21 +620,7 @@ export default function ChatRoomPage() {
                             )}
 
                             <div className="flex gap-1">
-                              <button
-                                onClick={() => handleMoveTodo(index, -1)}
-                                disabled={index === 0}
-                                className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500 disabled:opacity-40"
-                              >
-                                위
-                              </button>
-
-                              <button
-                                onClick={() => handleMoveTodo(index, 1)}
-                                disabled={index === todos.length - 1}
-                                className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500 disabled:opacity-40"
-                              >
-                                아래
-                              </button>
+                          
 
                               <button
                                 onClick={() => startEditingTodo(todo)}
