@@ -52,14 +52,14 @@ const SERVICE_BLOCKS = [
     isActive: true,
   },
   {
-    title: "아이디어 줍기",
-    description: "버려진 아이디어를 이어받아 새로운 프로젝트로 발전시켜보세요.",
+    title: "영감의 샘",
+    description: "아이디어를 흘려보내고, 새로운 영감을 건져가세요.",
     path: "/ideas/pickup",
     isActive: false,
   },
   {
-    title: "자유게시판",
-    description: "팀원 모집, 질문, 회고 등 자유롭게 이야기를 나눠보세요.",
+    title: "자유항해",
+    description: "질문, 회고, 팀원 모집까지 — 넓은 바다처럼 자유롭게.",
     path: "/community",
     isActive: false,
   },

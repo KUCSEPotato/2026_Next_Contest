@@ -15,7 +15,7 @@ export default function Navbar() {
     setToken(getToken());
   }, []);
 
-  if (pathname === "/login") {
+  if (pathname === "/login" || pathname === "/signup") {
     return null;
   }
 

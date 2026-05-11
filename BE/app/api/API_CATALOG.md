@@ -170,7 +170,15 @@
 
 ### 게시물
 - POST /community: 새 게시물 작성
-- GET /community: 게시물 목록 조회(카테고리 필터, 페이지네이션, 핀 우선)
+- GET /community: 게시물 목록 조회
+  - 파라미터: `category`, `page`, `page_size`, `sort_by` (newest|views|likes|comments|trending)
+  - `sort_by` 옵션:
+    - `newest` (기본값): 최신순
+    - `views`: 조회수 순
+    - `likes`: 좋아요 순
+    - `comments`: 댓글 순
+    - `trending` 또는 `hot`: 핫게 (조회수×0.1 + 좋아요 + 댓글×0.5)
+  - 핀 된 글은 항상 상단에 표시
 - GET /community/{post_id}: 게시물 상세(조회수 자동 증가, 반응 통계 포함)
 - PATCH /community/{post_id}: 게시물 수정(작성자만)
 - DELETE /community/{post_id}: 게시물 삭제(소프트 삭제)

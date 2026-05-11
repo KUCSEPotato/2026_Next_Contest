@@ -2,7 +2,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 import re
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status, RedirectResponse
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -219,6 +219,83 @@ async def github_oauth_login(payload: OAuthGithubLoginRequest, db: Session = Dep
         db.commit()
 
     return success_response(data=_create_auth_tokens(user.id))
+
+
+@router.get("/github/callback", summary="GitHub OAuth Callback", description="GitHub OAuth 인증 후 리다이렉트 처리")
+async def github_oauth_callback(
+    code: str,
+    state: str | None = None,
+    db: Session = Depends(get_db),
+) -> RedirectResponse:
+    """GitHub OAuth callback 처리.
+    
+    GitHub에서 사용자 승인 후 이 엔드포인트로 리다이렉트됩니다.
+    code를 검증하고 유저를 생성/조회한 후, 프론트엔드로 토큰과 함께 리다이렉트합니다.
+    """
+    try:
+        if not settings.github_oauth_client_id or not settings.github_oauth_client_secret:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="GitHub OAuth is not configured")
+        
+        redirect_uri = settings.github_oauth_redirect_uri
+        access_token = await exchange_github_code_for_access_token(
+            client_id=settings.github_oauth_client_id,
+            client_secret=settings.github_oauth_client_secret,
+            code=code,
+            redirect_uri=redirect_uri,
+        )
+        profile = await fetch_github_user_profile(access_token)
+        
+        github_id = profile.get("provider_id")
+        email = profile["email"]
+        github_login = profile.get("login")
+        avatar_url = profile.get("avatar_url")
+        
+        # 기존 유저 찾기
+        user = None
+        if github_id:
+            user = db.query(User).filter(User.github_id == github_id, User.deleted_at.is_(None)).first()
+        if user is None:
+            user = db.query(User).filter(User.email == email, User.deleted_at.is_(None)).first()
+        
+        # 신규 유저 생성
+        if user is None:
+            final_nickname = _build_unique_nickname(db, github_login, fallback=email.split("@")[0])
+            user = User(
+                email=email,
+                nickname=final_nickname,
+                github_id=github_id,
+                avatar_url=avatar_url,
+                is_verified=True,
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            is_new_user = True
+        else:
+            # 기존 유저 업데이트
+            if github_id and user.github_id != github_id:
+                user.github_id = github_id
+            if avatar_url and not user.avatar_url:
+                user.avatar_url = avatar_url
+            user.is_verified = True
+            db.commit()
+            is_new_user = False
+        
+        # 토큰 발급
+        tokens = _create_auth_tokens(user.id)
+        access_token_value = tokens["access_token"]
+        
+        # 프론트엔드로 리다이렉트
+        frontend_url = settings.frontend_url or "http://localhost:3000"
+        redirect_step = "2" if is_new_user else "profile"
+        redirect_url = f"{frontend_url}/signup?step={redirect_step}&via=github&access_token={access_token_value}&user_id={user.id}"
+        
+        return RedirectResponse(url=redirect_url, status_code=302)
+    
+    except Exception as e:
+        frontend_url = settings.frontend_url or "http://localhost:3000"
+        error_url = f"{frontend_url}/signup?error=oauth_failed&message={str(e)}"
+        return RedirectResponse(url=error_url, status_code=302)
 
 
 @router.post("/oauth/google", summary="Google OAuth 로그인", description="Google authorization code를 서버에서 검증해 로그인/가입을 처리합니다.")

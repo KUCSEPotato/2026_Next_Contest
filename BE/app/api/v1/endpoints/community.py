@@ -74,23 +74,46 @@ async def list_posts(
     category: str | None = None,
     page: int = 1,
     page_size: int = 20,
+    sort_by: str = "newest",
     db: Session = Depends(get_db),
     authorization: str | None = Header(default=None),
 ) -> dict:
-    """게시물 목록 조회 (페이지네이션)"""
+    """게시물 목록 조회 (페이지네이션)
+    
+    sort_by 옵션:
+    - newest (기본값): 최신순 (created_at desc)
+    - views: 조회수 높은 순 (view_count desc)
+    - likes: 좋아요 많은 순
+    - comments: 댓글 많은 순
+    - trending/hot: 핫게 (조회수*0.1 + 좋아요*1.0 + 댓글*0.5)
+    """
     query = db.query(CommunityPost).filter(CommunityPost.deleted_at.is_(None))
 
     if category:
         query = query.filter(CommunityPost.category == category)
 
-    # 핀 된 글 먼저, 그 다음 최신순
-    query = query.order_by(
-        CommunityPost.is_pinned.desc(),
-        CommunityPost.created_at.desc(),
-    )
+    # sort_by에 따른 초기 정렬 설정 (핀 된 글은 항상 먼저)
+    if sort_by == "views":
+        query = query.order_by(
+            CommunityPost.is_pinned.desc(),
+            CommunityPost.view_count.desc(),
+        )
+    elif sort_by in ["likes", "comments", "trending", "hot"]:
+        # likes, comments, trending은 메모리에서 정렬하므로 일단 핀만 먼저
+        query = query.order_by(CommunityPost.is_pinned.desc())
+    else:  # newest (기본값)
+        query = query.order_by(
+            CommunityPost.is_pinned.desc(),
+            CommunityPost.created_at.desc(),
+        )
 
     total = query.count()
-    posts = query.offset((page - 1) * page_size).limit(page_size).all()
+    
+    # 페이지네이션 전에 정렬 (likes, comments, trending은 메모리 정렬이므로)
+    if sort_by in ["likes", "comments", "trending", "hot"]:
+        posts = query.all()  # 모든 데이터를 먼저 가져옴
+    else:
+        posts = query.offset((page - 1) * page_size).limit(page_size).all()
 
     result = []
     # determine current user id if Authorization header provided
@@ -160,9 +183,42 @@ async def list_posts(
             }
         )
 
+    # 메모리에서 정렬 (likes, comments, trending은 계산된 값이므로)
+    if sort_by == "likes":
+        # 좋아요순으로 정렬 (핀 된 글 우선 유지)
+        pinned = [p for p in result if p["is_pinned"]]
+        unpinned = [p for p in result if not p["is_pinned"]]
+        unpinned.sort(key=lambda x: x["reaction_stats"]["like"], reverse=True)
+        result = pinned + unpinned
+    elif sort_by == "comments":
+        # 댓글순으로 정렬 (핀 된 글 우선 유지)
+        pinned = [p for p in result if p["is_pinned"]]
+        unpinned = [p for p in result if not p["is_pinned"]]
+        unpinned.sort(key=lambda x: x["comment_count"], reverse=True)
+        result = pinned + unpinned
+    elif sort_by in ["trending", "hot"]:
+        # 핫게 정렬: 조회수*0.1 + 좋아요*1.0 + 댓글*0.5
+        def calculate_trending_score(post):
+            return (
+                post["view_count"] * 0.1 +
+                post["reaction_stats"]["like"] * 1.0 +
+                post["comment_count"] * 0.5
+            )
+        
+        pinned = [p for p in result if p["is_pinned"]]
+        unpinned = [p for p in result if not p["is_pinned"]]
+        unpinned.sort(key=calculate_trending_score, reverse=True)
+        result = pinned + unpinned
+
+    # 페이지네이션 적용 (likes, comments, trending은 이제 정렬이 완료됨)
+    if sort_by in ["likes", "comments", "trending", "hot"]:
+        paginated_result = result[(page - 1) * page_size : page * page_size]
+    else:
+        paginated_result = result
+
     return success_response(
         data={
-            "posts": result,
+            "posts": paginated_result,
             "total": total,
             "page": page,
             "page_size": page_size,

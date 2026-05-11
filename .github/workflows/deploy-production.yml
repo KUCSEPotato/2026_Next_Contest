@@ -33,7 +33,7 @@ jobs:
           username: ${{ secrets.PROD_SSH_USER }}
           key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
           port: ${{ secrets.PROD_SSH_PORT }}
-          source: "."
+          source: "BE,fe"
           target: ${{ secrets.PROD_DEPLOY_PATH }}
           overwrite: true
 
@@ -87,9 +87,21 @@ jobs:
               exit 1
             fi
 
-            export NEXT_PUBLIC_API_BASE_URL="${PROD_API_BASE_URL}"
-
             cd fe
+
+            if [ -f ../.env.fe.production ]; then
+              echo "Copying frontend env file..."
+              cp ../.env.fe.production .env.production.local
+              chmod 600 .env.production.local
+            else
+              echo ".env.fe.production not found; creating minimal frontend env file..."
+              cat > .env.production.local <<EOF
+            NEXT_PUBLIC_API_BASE_URL=${PROD_API_BASE_URL}
+            EOF
+              chmod 600 .env.production.local
+            fi
+
+            export NEXT_PUBLIC_API_BASE_URL="${PROD_API_BASE_URL}"
 
             if [ -f package-lock.json ]; then
               npm ci
