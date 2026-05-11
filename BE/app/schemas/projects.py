@@ -102,6 +102,11 @@ class TodoUpdateRequest(BaseModel):
     due_date: date | None = None
 
 
+class MemoirAiRefineRequest(BaseModel):
+    feelings: str = Field(min_length=1)
+    shortcomings: str = Field(min_length=1)
+
+
 # ============================================
 # 재모집 요청 클래스 (공통 필드 상속)
 # ============================================

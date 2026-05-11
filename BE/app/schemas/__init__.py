@@ -26,6 +26,7 @@ from app.schemas.projects import RecruitmentCreateRequest
 from app.schemas.projects import RecruitmentUpdateRequest
 from app.schemas.projects import TodoCreateRequest
 from app.schemas.projects import TodoUpdateRequest
+from app.schemas.projects import MemoirAiRefineRequest
 from app.schemas.users import OnboardingIdeaSelectionRequest
 from app.schemas.users import UserProfileUpdateRequest
 
@@ -57,6 +58,7 @@ __all__ = [
 	"SignupRequest",
 	"TodoCreateRequest",
 	"TodoUpdateRequest",
+	"MemoirAiRefineRequest",
 	"TokenRefreshRequest",
 	"OnboardingIdeaSelectionRequest",
 	"UserProfileUpdateRequest",

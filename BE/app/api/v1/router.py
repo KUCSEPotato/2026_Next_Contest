@@ -6,6 +6,7 @@ from app.api.v1.endpoints import auth
 from app.api.v1.endpoints import chats
 from app.api.v1.endpoints import community
 from app.api.v1.endpoints import ideas
+from app.api.v1.endpoints import llm
 from app.api.v1.endpoints import matching
 from app.api.v1.endpoints import notifications
 from app.api.v1.endpoints import projects
@@ -27,6 +28,7 @@ api_router.include_router(reviews.router, prefix="/reviews", tags=["reviews"])
 api_router.include_router(search.router, prefix="/search", tags=["search"])
 api_router.include_router(subscriptions.router, prefix="/subscriptions", tags=["subscriptions"])
 api_router.include_router(recommendations.router, prefix="/recommendations", tags=["recommendations"])
+api_router.include_router(llm.router, prefix="/llm", tags=["llm"])
 api_router.include_router(chats.router, prefix="/chats", tags=["chats"])
 api_router.include_router(community.router, prefix="/community", tags=["community"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
