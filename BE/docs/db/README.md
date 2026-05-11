@@ -19,6 +19,7 @@
 - `17_add_comment_anonymous.sql` — 댓글 익명 처리용 `is_anonymous` 컬럼 추가 및 인덱스 생성.
 - `18_add_file_upload_support.sql` — 게시물/아이디어 파일 추적 테이블 생성(soft-delete, s3_key, s3_url 등).
 - `19_extend_recruitment_fields.sql` — `project_recruitments` 테이블에 `category`, `difficulty`, `summary`, `deadline` 및 인덱스 추가.
+- `20_create_chat_room_members.sql` — 채팅방 참여자 관리용 `chat_room_members` 테이블 생성. 리더가 채팅방 생성 시 특정 멤버만 선택 가능하게 함. 액세스 제어: 메시지 조회/전송, 웹소켓 접근을 `ChatRoomMember`로 제한.
 
 ### 통합 실행 옵션
 - 전체 스키마와 ideas tech_stack/hashtags 보정을 한 번에 적용하려면 04_postgresql_schema_with_idea_tech_stack_hashtags_backfill.sql을 실행
@@ -35,6 +36,7 @@ psql -U <db_user> -h <db_host> -d <db_name> -f BE/docs/db/12_add_user_onboarding
 psql -U <db_user> -h <db_host> -d <db_name> -f BE/docs/db/17_add_comment_anonymous.sql
 psql -U <db_user> -h <db_host> -d <db_name> -f BE/docs/db/18_add_file_upload_support.sql
 psql -U <db_user> -h <db_host> -d <db_name> -f BE/docs/db/19_extend_recruitment_fields.sql
+psql -U <db_user> -h <db_host> -d <db_name> -f BE/migrations/versions/20_create_chat_room_members.sql
 ```
 
 4. 마이그레이션 후 애플리케이션을 재시작하거나 컨테이너를 재배포합니다.

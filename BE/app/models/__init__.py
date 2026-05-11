@@ -2,6 +2,7 @@ from app.models.entities import AdoptionRequest
 from app.models.entities import Application
 from app.models.entities import ChatMessage
 from app.models.entities import ChatRoom
+from app.models.entities import ChatRoomMember
 from app.models.entities import CommunityPost
 from app.models.entities import CommunityPostComment
 from app.models.entities import CommunityPostReaction
@@ -42,6 +43,7 @@ __all__ = [
 	"Application",
 	"ChatMessage",
 	"ChatRoom",
+	"ChatRoomMember",
 	"CommunityPost",
 	"CommunityPostComment",
 	"CommunityPostReaction",

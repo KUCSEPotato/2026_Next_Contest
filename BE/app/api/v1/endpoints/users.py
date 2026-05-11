@@ -519,6 +519,65 @@ async def remove_my_interest(
     return success_response(data={"removed": True, "interest_id": interest_id})
 
 
+@router.get("/{user_id}/reviews", summary="사용자 리뷰 조회", description="특정 사용자가 받은 리뷰 목록을 공개적으로 조회합니다.")
+async def get_user_reviews(
+    user_id: int,
+    db: Session = Depends(get_db),
+) -> dict:
+    """사용자 리뷰 조회 API (공개).
+
+    인증 불필요. 누구나 다른 사용자의 리뷰 기록을 조회할 수 있습니다.
+
+    테스트 방법:
+    - 경로: /api/v1/users/{user_id}/reviews
+    - user_id: 조회할 사용자의 ID
+
+    응답:
+    - 해당 사용자(reviewee)가 받은 모든 리뷰를 최신순으로 반환합니다.
+    - reviewer 정보(id, nickname, avatar_url)와 프로젝트 정보(id, title)를 포함합니다.
+    - 각 리뷰의 점수(teamwork, contribution, responsibility)와 코멘트를 포함합니다.
+    
+    검증:
+    - 사용자가 없으면 `404`
+    """
+    user = db.get(User, user_id)
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    
+    reviews = (
+        db.query(Review)
+        .filter(Review.reviewee_id == user_id)
+        .order_by(Review.created_at.desc())
+        .all()
+    )
+
+    result = []
+    for review in reviews:
+        reviewer = db.get(User, review.reviewer_id)
+        project = db.get(Project, review.project_id)
+        result.append(
+            {
+                "id": review.id,
+                "reviewer": {
+                    "id": reviewer.id,
+                    "nickname": reviewer.nickname,
+                    "avatar_url": reviewer.avatar_url,
+                },
+                "project": {
+                    "id": project.id,
+                    "title": project.title,
+                },
+                "teamwork_score": review.teamwork_score,
+                "contribution_score": review.contribution_score,
+                "responsibility_score": review.responsibility_score,
+                "comment": review.comment,
+                "created_at": review.created_at,
+            }
+        )
+
+    return success_response(data=result)
+
+
 @router.get("/me/reviews", summary="내가 받은 리뷰 목록", description="팀원들이 남긴 리뷰 목록을 조회합니다.")
 async def get_my_reviews(
     current_user_id: int = Depends(get_current_user_id),
