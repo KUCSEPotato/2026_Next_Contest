@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { getIdeasApi, getIdeaDetailApi } from "../../../lib/api";
+import { getIdeasApi, pickupIdeaApi } from "../../../lib/api";
 
 interface Idea {
   id: number;
@@ -12,6 +12,20 @@ interface Idea {
   like_count: number;
   bookmark_count: number;
   domain?: string;
+  created_at?: string;
+}
+
+interface IdeaListItem {
+  id: number;
+  title?: string;
+  summary?: string;
+  description?: string;
+  hashtags?: string[];
+  tech_stack?: string[];
+  like_count?: number;
+  bookmark_count?: number;
+  domain?: string;
+  category?: string;
   created_at?: string;
 }
 
@@ -60,6 +74,7 @@ export default function InspirationWellPage() {
     open: false,
     idea: null,
   });
+  const [pickingUp, setPickingUp] = useState(false);
   const [ripples, setRipples] = useState<{ id: number; x: number; y: number }[]>([]);
   const rippleRef = useRef(0);
 
@@ -82,7 +97,7 @@ export default function InspirationWellPage() {
         setLoading(true);
 
         const result = await getIdeasApi({ page: 1, size: 50, discarded: true });
-        const raw: any[] = result.data || [];
+        const raw: IdeaListItem[] = result.data || [];
 
         setIdeas(
           raw.map((item) => ({
@@ -134,13 +149,22 @@ export default function InspirationWellPage() {
 
     const id = coinModal.idea.id;
 
-    setCoinModal({ open: false, idea: null });
-
     try {
-      await getIdeaDetailApi(id);
-      router.push(`/ideas/${id}`);
-    } catch {
-      alert("아이디어를 불러오지 못했습니다.");
+      setPickingUp(true);
+      const result = await pickupIdeaApi(id);
+      const projectId = result.data?.project_id;
+
+      if (!projectId) {
+        throw new Error("프로젝트 생성 응답이 올바르지 않습니다.");
+      }
+
+      setIdeas((prev) => prev.filter((idea) => idea.id !== id));
+      setCoinModal({ open: false, idea: null });
+      router.push(`/projects/${projectId}`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "아이디어를 건져오지 못했습니다.");
+    } finally {
+      setPickingUp(false);
     }
   };
 
@@ -319,6 +343,7 @@ export default function InspirationWellPage() {
           idea={coinModal.idea}
           onConfirm={handleConfirmView}
           onCancel={() => setCoinModal({ open: false, idea: null })}
+          isLoading={pickingUp}
         />
       )}
 
@@ -571,10 +596,12 @@ function CoinModal({
   idea,
   onConfirm,
   onCancel,
+  isLoading,
 }: {
   idea: Idea;
   onConfirm: () => void;
   onCancel: () => void;
+  isLoading: boolean;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -593,7 +620,7 @@ function CoinModal({
         </h2>
 
         <p className="mb-1 line-clamp-1 text-center text-sm font-semibold text-slate-700">
-          "{idea.title}"
+          &ldquo;{idea.title}&rdquo;
         </p>
 
         <p className="mb-5 text-center text-xs text-slate-400">
@@ -612,6 +639,7 @@ function CoinModal({
         <div className="flex gap-2">
           <button
             onClick={onCancel}
+            disabled={isLoading}
             className="flex-1 rounded-2xl border border-slate-200 py-3 text-sm font-medium text-slate-500 transition hover:bg-slate-50"
           >
             취소
@@ -619,9 +647,10 @@ function CoinModal({
 
           <button
             onClick={onConfirm}
-            className="flex-1 rounded-2xl bg-blue-500 py-3 text-sm font-semibold text-white shadow-md shadow-blue-200 transition hover:bg-blue-600"
+            disabled={isLoading}
+            className="flex-1 rounded-2xl bg-blue-500 py-3 text-sm font-semibold text-white shadow-md shadow-blue-200 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
           >
-            건져보기 🪝
+            {isLoading ? "건지는 중..." : "건져보기 🪝"}
           </button>
         </div>
       </div>

@@ -190,6 +190,15 @@ export async function convertIdeaToProjectApi(ideaId, payload) {
   return handleResponse(res, "아이디어를 프로젝트로 전환하지 못했습니다.");
 }
 
+export async function pickupIdeaApi(ideaId) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}/pickup`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "아이디어를 건져오지 못했습니다.");
+}
+
 /* =========================
    Projects
 ========================= */

@@ -416,6 +416,62 @@ async def convert_idea_to_project(
     )
 
 
+@router.post("/{idea_id}/pickup", summary="버려진 아이디어 줍기", description="영감의 샘에 버려진 아이디어를 다른 사용자가 새 프로젝트로 이어받습니다.")
+async def pickup_discarded_idea(
+    idea_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    """버려진 아이디어 줍기 API.
+
+    목적:
+    - 프로젝트에서 되돌려져 `is_discarded=True`가 된 아이디어를 타인이 재활용
+    - 원작성자는 자기 아이디어를 다시 주울 수 없음
+    - 이미 프로젝트에 연결된 아이디어는 중복으로 주울 수 없음
+
+    Swagger 테스트 방법:
+    - Authorization 헤더를 설정합니다.
+    - path의 `idea_id`를 전달합니다.
+
+    흐름:
+    1. 아이디어 존재/미삭제 검증
+    2. discarded 상태인지 검증
+    3. 프로젝트 미연결 상태인지 검증
+    4. 원작성자가 아닌지 검증
+    5. 새 Project 생성, 현재 사용자를 leader로 등록
+    6. converted_to_project_id 연결 및 is_discarded=False 처리
+    """
+    idea = db.get(Idea, idea_id)
+    if idea is None or idea.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Idea not found")
+
+    if not idea.is_discarded:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only discarded ideas can be picked up")
+
+    if idea.converted_to_project_id is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This idea is already connected to a project")
+
+    if idea.author_id == current_user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot pick up your own idea")
+
+    project = _create_project_from_idea(db, idea, current_user_id)
+    idea.is_discarded = False
+
+    db.commit()
+    db.refresh(project)
+    db.refresh(idea)
+
+    return success_response(
+        data={
+            "project_id": project.id,
+            "project_title": project.title,
+            "idea_id": idea.id,
+            "idea_title": idea.title,
+            "picked_up": True,
+        }
+    )
+
+
 # ═══════════════════════════════════════════════════════════════
 # ━━ File Upload
 # ═══════════════════════════════════════════════════════════════

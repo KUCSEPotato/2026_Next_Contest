@@ -51,8 +51,17 @@
 
 ## 3) Ideas
 
+**아이디어 상태 흐름:**
+- 일반 아이디어는 생성 시 즉시 프로젝트로 연결됩니다.
+- 프로젝트가 `/projects/{project_id}/revert-to-idea`로 되돌려지면 원본 아이디어는 `is_discarded=true`, `converted_to_project_id=null` 상태가 됩니다.
+- discarded 아이디어는 영감의 샘에서 타인이 `/ideas/{idea_id}/pickup`으로 새 프로젝트로 재활용할 수 있습니다.
+
 - POST /ideas: 아이디어 생성 + 프로젝트 자동 생성(tech_stack, hashtags 포함)
 - GET /ideas: 아이디어 목록 조회(필터/페이지네이션)
+  - query: `page`, `size`, `difficulty`, `discarded`
+  - `discarded=true`: 영감의 샘에 버려진 아이디어만 조회
+  - `discarded=false`: 버려지지 않은 아이디어만 조회
+  - `discarded` 미지정: 전체 아이디어 조회
 - GET /ideas/{idea_id}: 아이디어 상세
 - POST /ideas/{idea_id}/files: 아이디어 파일 업로드 (multipart/form-data)
 - GET /ideas/{idea_id}/files: 아이디어 첨부 파일 목록 조회
@@ -65,12 +74,19 @@
 - POST /ideas/{idea_id}/like: 좋아요 추가
 - DELETE /ideas/{idea_id}/like: 좋아요 취소
 - POST /ideas/{idea_id}/convert-to-project: **아이디어 → 프로젝트 전환**(인원 모임 후 프로젝트화)
+- POST /ideas/{idea_id}/pickup: **버려진 아이디어 줍기**(영감의 샘 전용)
+  - 인증 필요
+  - `is_discarded=true`인 아이디어만 가능
+  - 이미 `converted_to_project_id`가 있으면 불가
+  - 원작성자는 자기 아이디어를 다시 주울 수 없음
+  - 성공 시 새 Project 생성, 현재 사용자를 leader로 ProjectMember 등록, `converted_to_project_id` 연결, `is_discarded=false` 처리
 
 ## 4) Projects
 
-**두 가지 워크플로우 지원:**
+**세 가지 워크플로우 지원:**
 1. **Auto Project from Idea**: 아이디어 등록 시 즉시 프로젝트도 생성
 2. **Direct Project**: 처음부터 프로젝트 생성하여 기획부터 진행까지 관리
+3. **Pickup Discarded Idea**: 영감의 샘에 버려진 아이디어를 타인이 새 프로젝트로 이어받음
 
 - POST /projects: 직접 프로젝트 생성 + 생성자 리더 등록(max_members: 최대 멤버 수, 기본값 10, idea_id는 선택사항)
 - GET /projects: 프로젝트 목록 조회
@@ -82,6 +98,7 @@
 
 ### 참고
 - 아이디어 등록 시 backend가 자동으로 프로젝트를 생성하므로, 일반 사용자 입장에서는 `POST /ideas`가 사실상 프로젝트 시작 버튼 역할을 합니다.
+- 프로젝트를 영감의 샘으로 보내는 흐름은 `POST /projects/{project_id}/revert-to-idea`가 담당하고, 영감의 샘에서 다시 프로젝트화하는 흐름은 `POST /ideas/{idea_id}/pickup`이 담당합니다.
 
 ### 지원/초대/멤버
 - POST /projects/{project_id}/applications: 프로젝트 지원
