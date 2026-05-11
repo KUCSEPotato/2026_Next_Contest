@@ -12,6 +12,24 @@ import {
   revertProjectToIdeaApi,
 } from "../../../lib/api";
 
+const DIFFICULTY_OPTIONS = [
+  { value: "beginner", label: "입문" },
+  { value: "intermediate", label: "중급" },
+  { value: "advanced", label: "고급" },
+];
+
+const CATEGORY_OPTIONS = [
+  "IT/소프트웨어",
+  "경영/경제",
+  "디자인/UI·UX",
+  "AI/데이터",
+  "교육/학습",
+  "금융/핀테크",
+  "커머스/쇼핑",
+  "소셜/커뮤니티",
+  "헬스케어",
+];
+
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -36,7 +54,7 @@ export default function ProjectDetailPage() {
     description: "",
     difficulty: "",
     category: "",
-    status: "",
+    progress_percent: 0,
     max_members: 10,
     is_public: true,
   });
@@ -66,7 +84,8 @@ export default function ProjectDetailPage() {
           description: projectData.description || "",
           difficulty: projectData.difficulty || "",
           category: projectData.category || "",
-          max_members: projectData.max_members ?? 10,
+          progress_percent: projectData.progress_percent ?? 0,
+          max_members: projectData.max_members ?? projectData.recruitment_count ?? 10,
           is_public: projectData.is_public ?? true,
         });
       } catch (error) {
@@ -102,7 +121,7 @@ export default function ProjectDetailPage() {
     if (Number(editForm.max_members) < acceptedMemberCount) {
       alert(`모집 인원은 현재 수락된 인원 ${acceptedMemberCount}명 이상이어야 합니다.`);
       return;
-    }   
+    }
 
     try {
       setIsSavingEdit(true);
@@ -113,6 +132,7 @@ export default function ProjectDetailPage() {
         description: editForm.description,
         difficulty: editForm.difficulty,
         category: editForm.category,
+        progress_percent: Number(editForm.progress_percent),
         max_members: Number(editForm.max_members),
         is_public: editForm.is_public,
       });
@@ -274,39 +294,36 @@ export default function ProjectDetailPage() {
                   <label className="mb-1 block text-sm font-semibold text-slate-700">
                     난이도
                   </label>
-                  <input
+                  <select
                     className={inputClassName}
                     value={editForm.difficulty}
                     onChange={(e) => handleEditChange("difficulty", e.target.value)}
-                    placeholder="난이도"
-                  />
+                  >
+                    <option value="">난이도를 선택해주세요</option>
+                    {DIFFICULTY_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
                   <label className="mb-1 block text-sm font-semibold text-slate-700">
                     카테고리
                   </label>
-                  <input
+                  <select
                     className={inputClassName}
                     value={editForm.category}
                     onChange={(e) => handleEditChange("category", e.target.value)}
-                    placeholder="카테고리"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-semibold text-slate-700">
-                    진행률
-                  </label>
-                  <input
-                    className={inputClassName}
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={editForm.progress_percent}
-                    onChange={(e) => handleEditChange("progress_percent", e.target.value)}
-                    placeholder="진행률"
-                  />
+                  >
+                    <option value="">카테고리를 선택해주세요</option>
+                    {CATEGORY_OPTIONS.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -327,15 +344,6 @@ export default function ProjectDetailPage() {
                   </p>
                 </div>
               </div>
-
-              <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={editForm.is_public}
-                  onChange={(e) => handleEditChange("is_public", e.target.checked)}
-                />
-                공개 프로젝트로 설정
-              </label>
 
               <div className="flex gap-3">
                 <button
