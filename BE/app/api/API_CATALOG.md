@@ -16,6 +16,20 @@
 - POST /auth/login: login_id(이메일 또는 닉네임) + 비밀번호 로그인
 - 응답 일부에 `coin_balance`가 포함됩니다.
 - POST /auth/oauth/github: GitHub authorization code 기반 로그인/가입
+  - 이미 `github_id`로 연결된 계정이 있으면 즉시 로그인 토큰 발급
+  - 신규 GitHub 사용자면 새 계정 생성 후 access/refresh token 발급
+  - GitHub 이메일이 기존 계정과 일치하지만 아직 GitHub가 연결되지 않은 경우 자동 연결하지 않고 아래 형태로 확인 응답 반환
+    - `requires_link_confirmation=true`
+    - `provider="github"`
+    - `email`
+    - `nickname`
+    - `link_token`
+    - `expires_in`(기본 10분)
+- POST /auth/oauth/link-existing/github: 기존 이메일 계정에 GitHub 연결 확정
+  - body: `{ "link_token": "..." }`
+  - `link_token`이 유효하고 GitHub 계정이 다른 사용자에게 연결되어 있지 않으면 기존 계정에 `github_id` 저장
+  - 성공 시 access/refresh token, `user`, `linked_provider="github"` 반환
+  - 만료/위조 토큰이면 `400`, 이미 다른 사용자에게 연결된 GitHub 계정이면 `409`
 - POST /auth/oauth/google: Google authorization code 기반 로그인/가입
 - GET /auth/oauth/links: 현재 계정의 OAuth 연결 상태 조회
 - POST /auth/oauth/link/github: 현재 계정에 GitHub 연결
@@ -51,8 +65,17 @@
 
 ## 3) Ideas
 
+**아이디어 상태 흐름:**
+- 일반 아이디어는 생성 시 즉시 프로젝트로 연결됩니다.
+- 프로젝트가 `/projects/{project_id}/revert-to-idea`로 되돌려지면 원본 아이디어는 `is_discarded=true`, `converted_to_project_id=null` 상태가 됩니다.
+- discarded 아이디어는 영감의 샘에서 타인이 `/ideas/{idea_id}/pickup`으로 새 프로젝트로 재활용할 수 있습니다.
+
 - POST /ideas: 아이디어 생성 + 프로젝트 자동 생성(tech_stack, hashtags 포함)
 - GET /ideas: 아이디어 목록 조회(필터/페이지네이션)
+  - query: `page`, `size`, `difficulty`, `discarded`
+  - `discarded=true`: 영감의 샘에 버려진 아이디어만 조회
+  - `discarded=false`: 버려지지 않은 아이디어만 조회
+  - `discarded` 미지정: 전체 아이디어 조회
 - GET /ideas/{idea_id}: 아이디어 상세
 - POST /ideas/{idea_id}/files: 아이디어 파일 업로드 (multipart/form-data)
 - GET /ideas/{idea_id}/files: 아이디어 첨부 파일 목록 조회
@@ -65,16 +88,27 @@
 - POST /ideas/{idea_id}/like: 좋아요 추가
 - DELETE /ideas/{idea_id}/like: 좋아요 취소
 - POST /ideas/{idea_id}/convert-to-project: **아이디어 → 프로젝트 전환**(인원 모임 후 프로젝트화)
+- POST /ideas/{idea_id}/pickup: **버려진 아이디어 줍기**(영감의 샘 전용)
+  - 인증 필요
+  - `is_discarded=true`인 아이디어만 가능
+  - 이미 `converted_to_project_id`가 있으면 불가
+  - 원작성자는 자기 아이디어를 다시 주울 수 없음
+  - 성공 시 새 Project 생성, 현재 사용자를 leader로 ProjectMember 등록, `converted_to_project_id` 연결, `is_discarded=false` 처리
 
 ## 4) Projects
 
-**두 가지 워크플로우 지원:**
+**세 가지 워크플로우 지원:**
 1. **Auto Project from Idea**: 아이디어 등록 시 즉시 프로젝트도 생성
 2. **Direct Project**: 처음부터 프로젝트 생성하여 기획부터 진행까지 관리
+3. **Pickup Discarded Idea**: 영감의 샘에 버려진 아이디어를 타인이 새 프로젝트로 이어받음
 
-- POST /projects: 직접 프로젝트 생성 + 생성자 리더 등록(max_members: 최대 멤버 수, 기본값 10, idea_id는 선택사항)
+- POST /projects: 직접 프로젝트 생성 + 생성자 리더 등록(max_members: 리더 포함 최대 멤버 수, 기본값 10, idea_id는 선택사항)
 - GET /projects: 프로젝트 목록 조회
+  - 응답에 `applicantCount`, `remainingSeats`, `competitionRatio`, `created_at` 포함
+  - `competitionRatio`는 `대기 중 지원자 수(applicantCount) / 남은 자리 수(remainingSeats)` 기준
 - GET /projects/{project_id}: 프로젝트 상세 + 멤버(현재 멤버 수, 최대 멤버 수, 경쟁률 포함)
+  - `members` 항목은 `user_id`, `role_in_project`, `nickname`, `name`, `avatar_url`, `user` 객체를 포함합니다.
+  - `user` 객체 형식: `{ id, nickname, name, avatar_url }`
 - PATCH /projects/{project_id}: 프로젝트 메타데이터 수정(max_members 수정 가능)
 - DELETE /projects/{project_id}: 프로젝트 soft delete
 - PATCH /projects/{project_id}/status: 프로젝트 상태 변경
@@ -82,6 +116,7 @@
 
 ### 참고
 - 아이디어 등록 시 backend가 자동으로 프로젝트를 생성하므로, 일반 사용자 입장에서는 `POST /ideas`가 사실상 프로젝트 시작 버튼 역할을 합니다.
+- 프로젝트를 영감의 샘으로 보내는 흐름은 `POST /projects/{project_id}/revert-to-idea`가 담당하고, 영감의 샘에서 다시 프로젝트화하는 흐름은 `POST /ideas/{idea_id}/pickup`이 담당합니다.
 
 ### 지원/초대/멤버
 - POST /projects/{project_id}/applications: 프로젝트 지원
@@ -102,9 +137,10 @@
 
 ### Todo/회고/리뷰/실패기록
 - POST /projects/{project_id}/todos: Todo 생성
+- POST /projects/{project_id}/todos/ai-generate: 프로젝트 상세와 최근 채팅 기반 AI Todo 생성(Gemini 미설정 시 기본 Todo 생성)
 - GET /projects/{project_id}/todos: Todo 목록(stage, assignments 포함)
 - PATCH /projects/{project_id}/todos/{todo_id}: Todo 수정(배정/단계 포함)
-- PATCH /projects/{project_id}/todos/{todo_id}/done: 현재 사용자 할당분 완료 토글
+- PATCH /projects/{project_id}/todos/{todo_id}/done: 프로젝트 멤버가 Todo 완료/미완료 토글
 - DELETE /projects/{project_id}/todos/{todo_id}: Todo 삭제
 - WS /projects/{project_id}/todos/ws: Todo 실시간 구독(생성/수정/삭제/완료 이벤트)
 - POST /projects/{project_id}/retrospectives: 회고 작성
@@ -151,7 +187,7 @@
 
 ## 10) Recommendations
 
-- POST /recommendations/projects: 프로젝트 추천
+- POST /recommendations/projects: 프로젝트 추천(로그인 사용자 기술 스택 기반 매칭 우선 정렬)
 - POST /recommendations/teammates: 팀원 추천
 - POST /recommendations/explain: 추천 사유 자연어 설명
 
@@ -198,16 +234,28 @@
 
 ## 13) Notifications
 
-- GET /notifications: 알림 목록
-- PATCH /notifications/{notification_id}/read: 읽음 처리
+- GET /notifications: 현재 사용자의 알림 목록
+  - 응답에 `data`, `project_id`, `url` 포함
+  - 프론트는 `url` 또는 `project_id`를 사용해 알림 클릭 시 관련 상세 화면으로 이동
+- PATCH /notifications/{notification_id}/read: 읽음 처리(`is_read=true`, `read_at` 기록)
+
+### 알림 생성 지점
+- 프로젝트 등록: 프로젝트 생성자에게 `project_update` 알림 생성, `/projects/{project_id}`로 이동
+- 프로젝트 지원: 프로젝트 리더에게 `application_received` 알림 생성, `/projects/{project_id}`로 이동
+- 지원 승인/거절: 지원자에게 `application_decided` 알림 생성, `/projects/{project_id}`로 이동
+- 프로젝트 리뷰 작성: 리뷰 대상자에게 `review_received` 알림 생성, `/projects/{project_id}`로 이동
+- 커뮤니티 댓글 작성: 게시글 작성자에게 `system` 알림 생성, `/community/{post_id}`로 이동
 
 ## 14) Admin
 
+- GET /admin/overview: 운영 요약 지표(사용자/프로젝트/미처리 신고/결제 이벤트/활성 구독)
 - GET /admin/users: 전체 사용자 목록 조회(관리자)
 - PATCH /admin/users/{user_id}/status: 사용자 상태/역할 변경(관리자)
 - GET /admin/projects: 전체 프로젝트 목록 조회(관리자)
 - GET /admin/reports: 신고 목록 조회(관리자)
 - PATCH /admin/reports/{report_id}: 신고 처리 상태 변경(관리자)
+- GET /admin/payments: 결제 이벤트 목록 조회(관리자)
+- PATCH /admin/payments/{event_id}: 결제 이벤트 처리/해제(관리자)
 
 ## 참고 문서
 

@@ -1,3 +1,5 @@
+import { authenticatedFetch, getToken } from "./auth";
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -13,11 +15,6 @@ export function getImageUrl(url) {
   }
 
   return `${API_BASE_URL}/${url}`;
-}
-
-function getToken() {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("access_token");
 }
 
 function authHeaders() {
@@ -57,7 +54,7 @@ async function handleResponse(res, errorMessage) {
 ========================= */
 
 export async function signupApi(email, nickname, password) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/auth/signup`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/auth/signup`, {
     method: "POST",
     headers: jsonHeaders(),
     body: JSON.stringify({
@@ -71,7 +68,7 @@ export async function signupApi(email, nickname, password) {
 }
 
 export async function loginApi(loginId, password) {
-    const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+    const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/auth/login`, {
       method: "POST",
       headers: jsonHeaders(),
       body: JSON.stringify({
@@ -88,7 +85,7 @@ export async function loginApi(loginId, password) {
 ========================= */
 
 export async function createIdeaApi(payload) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/ideas`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/ideas`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(payload),
@@ -110,7 +107,7 @@ export async function getIdeasApi(params = {}) {
     ? `${API_BASE_URL}/api/v1/ideas?${queryString}`
     : `${API_BASE_URL}/api/v1/ideas`;
 
-  const res = await fetch(url, {
+  const res = await authenticatedFetch(url, {
     headers: authHeaders(),
   });
 
@@ -118,7 +115,7 @@ export async function getIdeasApi(params = {}) {
 }
 
 export async function getIdeaApi(ideaId) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}`, {
     headers: authHeaders(),
   });
 
@@ -126,7 +123,7 @@ export async function getIdeaApi(ideaId) {
 }
 
 export async function updateIdeaApi(ideaId, payload) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}`, {
     method: "PATCH",
     headers: authHeaders(),
     body: JSON.stringify(payload),
@@ -136,7 +133,7 @@ export async function updateIdeaApi(ideaId, payload) {
 }
 
 export async function deleteIdeaApi(ideaId) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}`, {
     method: "DELETE",
     headers: authHeaders(),
   });
@@ -145,7 +142,7 @@ export async function deleteIdeaApi(ideaId) {
 }
 
 export async function bookmarkIdeaApi(ideaId) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}/bookmark`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}/bookmark`, {
     method: "POST",
     headers: authHeaders(),
   });
@@ -154,7 +151,7 @@ export async function bookmarkIdeaApi(ideaId) {
 }
 
 export async function unbookmarkIdeaApi(ideaId) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}/bookmark`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}/bookmark`, {
     method: "DELETE",
     headers: authHeaders(),
   });
@@ -163,7 +160,7 @@ export async function unbookmarkIdeaApi(ideaId) {
 }
 
 export async function likeIdeaApi(ideaId) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}/like`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}/like`, {
     method: "POST",
     headers: authHeaders(),
   });
@@ -172,7 +169,7 @@ export async function likeIdeaApi(ideaId) {
 }
 
 export async function unlikeIdeaApi(ideaId) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}/like`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}/like`, {
     method: "DELETE",
     headers: authHeaders(),
   });
@@ -181,7 +178,7 @@ export async function unlikeIdeaApi(ideaId) {
 }
 
 export async function convertIdeaToProjectApi(ideaId, payload) {
-  const res = await fetch(
+  const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/ideas/${ideaId}/convert-to-project`,
     {
       method: "POST",
@@ -193,12 +190,21 @@ export async function convertIdeaToProjectApi(ideaId, payload) {
   return handleResponse(res, "아이디어를 프로젝트로 전환하지 못했습니다.");
 }
 
+export async function pickupIdeaApi(ideaId) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}/pickup`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "아이디어를 건져오지 못했습니다.");
+}
+
 /* =========================
    Projects
 ========================= */
 
 export async function createProjectApi(payload) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/projects`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/projects`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(payload),
@@ -219,7 +225,7 @@ export async function getProjectsApi(params = {}) {
     ? `${API_BASE_URL}/api/v1/projects?${queryString}`
     : `${API_BASE_URL}/api/v1/projects`;
 
-  const res = await fetch(url, {
+  const res = await authenticatedFetch(url, {
     headers: authHeaders(),
   });
 
@@ -227,15 +233,31 @@ export async function getProjectsApi(params = {}) {
 }
 
 export async function getProjectApi(projectId) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/projects/${projectId}`, {
     headers: authHeaders(),
   });
 
   return handleResponse(res, "프로젝트 정보를 불러오지 못했습니다.");
 }
 
+export async function getRecommendedProjectsApi(payload = {}, limit = 20) {
+  const query = new URLSearchParams();
+  query.set("limit", limit);
+
+  const res = await authenticatedFetch(
+    `${API_BASE_URL}/api/v1/recommendations/projects?${query.toString()}`,
+    {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    }
+  );
+
+  return handleResponse(res, "추천 프로젝트를 불러오지 못했습니다.");
+}
+
 export async function updateProjectApi(projectId, payload) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/projects/${projectId}`, {
     method: "PATCH",
     headers: authHeaders(),
     body: JSON.stringify(payload),
@@ -245,7 +267,7 @@ export async function updateProjectApi(projectId, payload) {
 }
 
 export async function deleteProjectApi(projectId) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/projects/${projectId}`, {
     method: "DELETE",
     headers: authHeaders(),
   });
@@ -254,7 +276,7 @@ export async function deleteProjectApi(projectId) {
 }
 
 export async function applyProjectApi(projectId, message) {
-  const res = await fetch(
+  const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/projects/${projectId}/applications`,
     {
       method: "POST",
@@ -267,7 +289,7 @@ export async function applyProjectApi(projectId, message) {
 }
 
 export async function getProjectApplicationsApi(projectId) {
-  const res = await fetch(
+  const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/projects/${projectId}/applications`,
     {
       headers: authHeaders(),
@@ -282,7 +304,7 @@ export async function decideProjectApplicationApi(
   applicationId,
   payload
 ) {
-  const res = await fetch(
+  const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/projects/${projectId}/applications/${applicationId}`,
     {
       method: "PATCH",
@@ -295,7 +317,7 @@ export async function decideProjectApplicationApi(
 }
 
 export async function updateProjectStatusApi(projectId, status) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}/status`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/projects/${projectId}/status`, {
     method: "PATCH",
     headers: authHeaders(),
     body: JSON.stringify({ status }),
@@ -305,7 +327,7 @@ export async function updateProjectStatusApi(projectId, status) {
 }
 
 export async function getProjectProgressApi(projectId) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}/progress`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/projects/${projectId}/progress`, {
     headers: authHeaders(),
   });
 
@@ -313,7 +335,7 @@ export async function getProjectProgressApi(projectId) {
 }
 
 export async function revertProjectToIdeaApi(projectId) {
-  const res = await fetch(
+  const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/projects/${projectId}/revert-to-idea`,
     {
       method: "POST",
@@ -329,7 +351,7 @@ export async function revertProjectToIdeaApi(projectId) {
 ========================= */
 
 export async function inviteProjectMemberApi(projectId, payload) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}/invite`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/projects/${projectId}/invite`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(payload),
@@ -339,7 +361,7 @@ export async function inviteProjectMemberApi(projectId, payload) {
 }
 
 export async function acceptProjectInviteApi(projectId, inviteId) {
-  const res = await fetch(
+  const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/projects/${projectId}/invite/${inviteId}/accept`,
     {
       method: "POST",
@@ -351,7 +373,7 @@ export async function acceptProjectInviteApi(projectId, inviteId) {
 }
 
 export async function rejectProjectInviteApi(projectId, inviteId) {
-  const res = await fetch(
+  const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/projects/${projectId}/invite/${inviteId}/reject`,
     {
       method: "POST",
@@ -363,7 +385,7 @@ export async function rejectProjectInviteApi(projectId, inviteId) {
 }
 
 export async function addProjectMemberApi(projectId, payload) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}/members`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/projects/${projectId}/members`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(payload),
@@ -373,7 +395,7 @@ export async function addProjectMemberApi(projectId, payload) {
 }
 
 export async function removeProjectMemberApi(projectId, memberId) {
-  const res = await fetch(
+  const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/projects/${projectId}/members/${memberId}`,
     {
       method: "DELETE",
@@ -389,7 +411,7 @@ export async function removeProjectMemberApi(projectId, memberId) {
 ========================= */
 
 export async function createTodoApi(projectId, payload) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}/todos`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/projects/${projectId}/todos`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(payload),
@@ -399,7 +421,7 @@ export async function createTodoApi(projectId, payload) {
 }
 
 export async function getTodosApi(projectId) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}/todos`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/projects/${projectId}/todos`, {
     headers: authHeaders(),
   });
 
@@ -407,7 +429,7 @@ export async function getTodosApi(projectId) {
 }
 
 export async function updateTodoApi(projectId, todoId, payload) {
-  const res = await fetch(
+  const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/projects/${projectId}/todos/${todoId}`,
     {
       method: "PATCH",
@@ -420,7 +442,7 @@ export async function updateTodoApi(projectId, todoId, payload) {
 }
 
 export async function toggleTodoDoneApi(projectId, todoId) {
-  const res = await fetch(
+  const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/projects/${projectId}/todos/${todoId}/done`,
     {
       method: "PATCH",
@@ -431,8 +453,21 @@ export async function toggleTodoDoneApi(projectId, todoId) {
   return handleResponse(res, "Todo 완료 상태 변경에 실패했습니다.");
 }
 
+export async function generateAITodosApi(projectId, payload = {}) {
+  const res = await authenticatedFetch(
+    `${API_BASE_URL}/api/v1/projects/${projectId}/todos/ai-generate`,
+    {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    }
+  );
+
+  return handleResponse(res, "AI Todo 생성에 실패했습니다.");
+}
+
 export async function deleteTodoApi(projectId, todoId) {
-  const res = await fetch(
+  const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/projects/${projectId}/todos/${todoId}`,
     {
       method: "DELETE",
@@ -448,7 +483,7 @@ export async function deleteTodoApi(projectId, todoId) {
 ========================= */
 
 export async function createMilestoneApi(projectId, payload) {
-  const res = await fetch(
+  const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/projects/${projectId}/milestones`,
     {
       method: "POST",
@@ -461,7 +496,7 @@ export async function createMilestoneApi(projectId, payload) {
 }
 
 export async function updateMilestoneApi(projectId, milestoneId, payload) {
-  const res = await fetch(
+  const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/projects/${projectId}/milestones/${milestoneId}`,
     {
       method: "PATCH",
@@ -478,7 +513,7 @@ export async function updateMilestoneApi(projectId, milestoneId, payload) {
 ========================= */
 
 export async function createRecruitmentApi(projectId, payload) {
-  const res = await fetch(
+  const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/projects/${projectId}/recruitments`,
     {
       method: "POST",
@@ -491,7 +526,7 @@ export async function createRecruitmentApi(projectId, payload) {
 }
 
 export async function updateRecruitmentApi(projectId, recruitmentId, payload) {
-  const res = await fetch(
+  const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/projects/${projectId}/recruitments/${recruitmentId}`,
     {
       method: "PATCH",
@@ -508,7 +543,7 @@ export async function updateRecruitmentApi(projectId, recruitmentId, payload) {
 ========================= */
 
 export async function createProjectReviewApi(projectId, payload) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}/reviews`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/projects/${projectId}/reviews`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(payload),
@@ -518,7 +553,7 @@ export async function createProjectReviewApi(projectId, payload) {
 }
 
 export async function getProjectReviewsApi(projectId) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}/reviews`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/projects/${projectId}/reviews`, {
     headers: authHeaders(),
   });
 
@@ -530,7 +565,7 @@ export async function getProjectReviewsApi(projectId) {
 ========================= */
 
 export async function getChatRoomsApi(projectId) {
-  const res = await fetch(
+  const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/chats/projects/${projectId}/rooms`,
     {
       headers: authHeaders(),
@@ -540,13 +575,13 @@ export async function getChatRoomsApi(projectId) {
   return handleResponse(res, "채팅방 목록을 불러오지 못했습니다.");
 }
 
-export async function createChatRoomApi(projectId, name) {
-  const res = await fetch(
+export async function createChatRoomApi(projectId, payload) {
+  const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/chats/projects/${projectId}/rooms`,
     {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ name }),
+      body: JSON.stringify(payload),
     }
   );
 
@@ -554,7 +589,7 @@ export async function createChatRoomApi(projectId, name) {
 }
 
 export async function getMessagesApi(roomId) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/chats/rooms/${roomId}/messages`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/chats/rooms/${roomId}/messages`, {
     headers: authHeaders(),
   });
 
@@ -562,7 +597,7 @@ export async function getMessagesApi(roomId) {
 }
 
 export async function sendMessageApi(roomId, message) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/chats/rooms/${roomId}/messages`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/chats/rooms/${roomId}/messages`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({ message }),
@@ -576,7 +611,7 @@ export async function sendMessageApi(roomId, message) {
 ========================= */
 
 export async function getMyProfileApi() {
-  const res = await fetch(`${API_BASE_URL}/api/v1/users/me/profile`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/users/me/profile`, {
     headers: authHeaders(),
   });
 
@@ -584,7 +619,7 @@ export async function getMyProfileApi() {
 }
 
 export async function getMyReputationApi() {
-  const res = await fetch(`${API_BASE_URL}/api/v1/users/me/reputation`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/users/me/reputation`, {
     headers: authHeaders(),
   });
 
@@ -592,7 +627,7 @@ export async function getMyReputationApi() {
 }
 
 export async function getUserStatsApi(userId) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/users/${userId}/stats`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/users/${userId}/stats`, {
     headers: authHeaders(),
   });
 
@@ -600,7 +635,7 @@ export async function getUserStatsApi(userId) {
 }
 
 export async function getUserProjectsApi(userId) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/users/${userId}/projects`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/users/${userId}/projects`, {
     headers: authHeaders(),
   });
 
@@ -608,7 +643,7 @@ export async function getUserProjectsApi(userId) {
 }
 
 export async function getMyReceivedReviewsApi() {
-  const res = await fetch(`${API_BASE_URL}/api/v1/users/me/reviews`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/users/me/reviews`, {
     headers: authHeaders(),
   });
 
@@ -616,7 +651,7 @@ export async function getMyReceivedReviewsApi() {
 }
 
 export async function updateMyProfileApi(payload) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/users/me/profile`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/users/me/profile`, {
     method: "PATCH",
     headers: authHeaders(),
     body: JSON.stringify(payload),
@@ -626,7 +661,7 @@ export async function updateMyProfileApi(payload) {
 }
 
 export async function addMySkillApi(name, proficiency = 3) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/users/me/skills`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/users/me/skills`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({ name, proficiency }),
@@ -636,7 +671,7 @@ export async function addMySkillApi(name, proficiency = 3) {
 }
 
 export async function addMyInterestApi(name, interestLevel = 3) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/users/me/interests`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/users/me/interests`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({
@@ -654,7 +689,7 @@ export async function uploadMyAvatarApi(file) {
   const formData = new FormData();
   formData.append("file", file);
 
-  const res = await fetch(`${API_BASE_URL}/api/v1/users/me/avatar`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/users/me/avatar`, {
     method: "POST",
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -670,7 +705,7 @@ export async function uploadMyAvatarApi(file) {
 ========================= */
 
 export async function requestAdoptionApi(projectId, message) {
-  const res = await fetch(
+  const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/adoptions/projects/${projectId}/request`,
     {
       method: "POST",
@@ -689,7 +724,7 @@ export async function requestAdoptionApi(projectId, message) {
 export const applyIdeaApi = applyProjectApi;
 
 export async function getNotificationsApi() {
-  const res = await fetch(`${API_BASE_URL}/api/v1/notifications`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/notifications`, {
     headers: authHeaders(),
   });
 
@@ -697,7 +732,7 @@ export async function getNotificationsApi() {
 }
 
 export async function readNotificationApi(notificationId) {
-  const res = await fetch(
+  const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/notifications/${notificationId}/read`,
     {
       method: "PATCH",
@@ -708,8 +743,82 @@ export async function readNotificationApi(notificationId) {
   return handleResponse(res, "알림 읽음 처리에 실패했습니다.");
 }
 
+/* =========================
+   Admin
+========================= */
+
+export async function getAdminOverviewApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/overview`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "운영 요약을 불러오지 못했습니다.");
+}
+
+export async function getAdminUsersApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/users`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "사용자 목록을 불러오지 못했습니다.");
+}
+
+export async function updateAdminUserStatusApi(userId, payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/users/${userId}/status`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "사용자 상태 변경에 실패했습니다.");
+}
+
+export async function getAdminProjectsApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/projects`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "프로젝트 목록을 불러오지 못했습니다.");
+}
+
+export async function getAdminReportsApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/reports`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "신고 목록을 불러오지 못했습니다.");
+}
+
+export async function updateAdminReportApi(reportId, payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/reports/${reportId}`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "신고 처리에 실패했습니다.");
+}
+
+export async function getAdminPaymentsApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/payments`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "결제 이벤트 목록을 불러오지 못했습니다.");
+}
+
+export async function updateAdminPaymentApi(eventId, payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/payments/${eventId}`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "결제 이벤트 처리에 실패했습니다.");
+}
+
 export async function getMyChatRoomsApi() {
-  const res = await fetch(`${API_BASE_URL}/api/v1/chats/my/rooms`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/chats/my/rooms`, {
     headers: authHeaders(),
   });
 
@@ -717,7 +826,7 @@ export async function getMyChatRoomsApi() {
 }
 
 export async function completeTeamApi(projectId) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}/complete-team`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/projects/${projectId}/complete-team`, {
     method: "POST",
     headers: authHeaders(),
   });
@@ -726,14 +835,14 @@ export async function completeTeamApi(projectId) {
 }
 
 export async function getIdeaDetailApi(ideaId) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}`, {
     headers: authHeaders(),
   });
   return handleResponse(res, "아이디어 정보를 불러오지 못했습니다.");
 }
 
 export async function getMyProjectsApi() {
-  const res = await fetch(`${API_BASE_URL}/api/v1/users/me/projects`, {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/users/me/projects`, {
     headers: authHeaders(),
   });
 
@@ -745,7 +854,7 @@ export async function discardProjectToWellApi(projectId) {
 }
 
 export async function getUserProfileApi(userId) {
-  const res = await fetch(
+  const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/users/${userId}/profile`,
     {
       headers: authHeaders(),
@@ -756,7 +865,7 @@ export async function getUserProfileApi(userId) {
 }
 
 export async function getUserReceivedReviewsApi(userId) {
-  const res = await fetch(
+  const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/users/${userId}/reviews/received`,
     {
       headers: authHeaders(),

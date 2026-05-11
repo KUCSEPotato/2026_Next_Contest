@@ -13,6 +13,7 @@ from app.models import (
     CommunityPostReaction,
     CommunityCommentReaction,
     CommunityPostFile,
+    Notification,
     User,
 )
 from app.schemas import (
@@ -390,6 +391,21 @@ async def create_comment(
         is_anonymous=payload.is_anonymous,
     )
     db.add(comment)
+    db.flush()
+    if post.author_id != current_user_id:
+        db.add(
+            Notification(
+                user_id=post.author_id,
+                type="system",
+                title="게시글에 새 댓글이 달렸습니다",
+                body=f"'{post.title}' 게시글에 새 댓글이 달렸습니다.",
+                data={
+                    "post_id": post_id,
+                    "comment_id": comment.id,
+                    "url": f"/community/{post_id}",
+                },
+            )
+        )
     db.commit()
     db.refresh(comment)
 

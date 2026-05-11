@@ -10,6 +10,9 @@ import {
   completeTeamApi,
 } from "../../../../lib/api";
 
+const unwrapResponseData = (result, fallback = null) =>
+  result?.data?.data ?? result?.data ?? fallback;
+
 export default function ProjectManagePage() {
   const params = useParams();
   const router = useRouter();
@@ -57,7 +60,11 @@ export default function ProjectManagePage() {
   ).length;
 
   const maxMembers = project?.maxMembers ?? project?.max_members ?? 0;
-  const canAcceptMore = !maxMembers || acceptedCount < maxMembers;
+  const currentMemberCount =
+    project?.currentMembers ?? project?.current_members ?? project?.members?.length ?? 1;
+  const displayCurrentMemberCount = Math.max(currentMemberCount, acceptedCount + 1);
+  const isTeamFull = maxMembers > 0 && displayCurrentMemberCount >= maxMembers;
+  const canAcceptMore = !maxMembers || displayCurrentMemberCount < maxMembers;
 
   const handleDecision = async (applicationId, status) => {
     if (status === "accepted" && !canAcceptMore) {
@@ -78,16 +85,8 @@ export default function ProjectManagePage() {
         getProjectApi(projectId),
       ]);
 
-      setApplications(apps.data?.data || []);
-      setProject(proj.data?.data || proj.data);
-
-      setApplications((prev) =>
-        prev.map((application) =>
-          application.id === applicationId
-            ? { ...application, status }
-            : application
-        )
-      );
+      setApplications(unwrapResponseData(apps, []));
+      setProject(unwrapResponseData(proj));
 
       alert(status === "accepted" ? "지원자를 승인했습니다." : "지원자를 거절했습니다.");
     } catch (error) {
@@ -109,7 +108,7 @@ export default function ProjectManagePage() {
       await completeTeamApi(projectId);
 
       const proj = await getProjectApi(projectId);
-      setProject(proj.data?.data || proj.data);
+      setProject(unwrapResponseData(proj));
 
       alert("팀 결성이 완료되었습니다.");
     } catch (error) {
@@ -164,24 +163,23 @@ export default function ProjectManagePage() {
           </p>
 
           <div className="mt-6 rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
-            확정 인원: {acceptedCount} / {maxMembers || "제한 없음"}
+            확정 인원: {displayCurrentMemberCount} /{" "}
+            {maxMembers ? `${maxMembers}명 (리더 포함)` : "제한 없음"}
           </div>
 
-          <button
-            onClick={handleCompleteTeam}
-            disabled={
-              isCompletingTeam ||
-              project?.status === "in_progress" ||
-              acceptedCount === 0
-            }
-            className="mt-4 w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-          >
-            {project?.status === "in_progress"
-              ? "이미 팀 결성이 완료되었습니다"
-              : isCompletingTeam
-              ? "팀 결성 중..."
-              : "팀 결성"}
-          </button>
+          {(isTeamFull || project?.status === "in_progress") && (
+            <button
+              onClick={handleCompleteTeam}
+              disabled={isCompletingTeam || project?.status === "in_progress"}
+              className="mt-4 w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+            >
+              {project?.status === "in_progress"
+                ? "이미 팀 결성이 완료되었습니다"
+                : isCompletingTeam
+                ? "팀 결성 중..."
+                : "팀 결성하기"}
+            </button>
+          )}
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
