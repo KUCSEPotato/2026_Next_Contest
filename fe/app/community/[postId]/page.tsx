@@ -39,6 +39,13 @@ const CATEGORIES = [
   { label: "공지", value: "announcement" },
 ];
 
+const REACTIONS: { type: ReactionType; emoji: string }[] = [
+  { type: "like", emoji: "❤️" },
+  { type: "interested", emoji: "🤔" },
+  { type: "helpful", emoji: "👍" },
+  { type: "curious", emoji: "🧐" },
+];
+
 export default function PostDetailPage() {
   const router = useRouter();
   const { postId } = useParams<{ postId: string }>();
@@ -63,7 +70,6 @@ export default function PostDetailPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
 
-  // ── 인증 ────────────────────────────────────────────────────────────────────
   useEffect(() => {
     const token = localStorage.getItem("access_token");
     if (token) {
@@ -75,11 +81,9 @@ export default function PostDetailPage() {
         console.error("유저 정보 파싱 실패", e);
         localStorage.removeItem("user");
       }
-      // TODO: /me API로 교체
     }
   }, []);
 
-  // ── 게시물 로드 ──────────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
       setLoadingPost(true);
@@ -97,7 +101,6 @@ export default function PostDetailPage() {
     })();
   }, [pid]);
 
-  // ── 댓글 로드 ────────────────────────────────────────────────────────────────
   const loadComments = useCallback(async () => {
     setLoadingComments(true);
     try {
@@ -114,24 +117,27 @@ export default function PostDetailPage() {
     loadComments();
   }, [loadComments]);
 
-  // ── 게시물 반응 ──────────────────────────────────────────────────────────────
+  // ── 게시물 반응 (단일 선택) ──────────────────────────────────────────────────
   const handleReactPost = async (type: ReactionType) => {
     if (!currentUser) { setShowLoginModal(true); return; }
     if (!post) return;
     try {
-      const res = await reactToPost(pid, type);
+      await reactToPost(pid, type);
       setPost((p) => {
         if (!p) return p;
-        const wasMyReaction = p.user_reaction === type;
+        const prevReaction = p.user_reaction;
+        const isRemoving = prevReaction === type;
+        const newStats = { ...p.reaction_stats };
+        if (prevReaction) {
+          newStats[prevReaction] = Math.max(0, newStats[prevReaction] - 1);
+        }
+        if (!isRemoving) {
+          newStats[type] = newStats[type] + 1;
+        }
         return {
           ...p,
-          user_reaction: wasMyReaction ? null : type,
-          reaction_stats: {
-            ...p.reaction_stats,
-            [type]: wasMyReaction
-              ? p.reaction_stats[type] - 1
-              : p.reaction_stats[type] + 1,
-          },
+          user_reaction: isRemoving ? null : type,
+          reaction_stats: newStats,
         };
       });
     } catch (e) {
@@ -139,7 +145,6 @@ export default function PostDetailPage() {
     }
   };
 
-  // ── 게시물 수정 ──────────────────────────────────────────────────────────────
   const handleSaveEdit = async () => {
     if (!editContent.trim()) return;
     setSavingEdit(true);
@@ -158,7 +163,6 @@ export default function PostDetailPage() {
     }
   };
 
-  // ── 게시물 삭제 ──────────────────────────────────────────────────────────────
   const handleDeletePost = async () => {
     if (!confirm("게시물을 삭제할까요?")) return;
     try {
@@ -169,7 +173,6 @@ export default function PostDetailPage() {
     }
   };
 
-  // ── 댓글 작성 ────────────────────────────────────────────────────────────────
   const handleAddComment = async () => {
     if (!commentText.trim() || !currentUser) return;
     setSubmittingComment(true);
@@ -194,7 +197,6 @@ export default function PostDetailPage() {
     }
   };
 
-  // ── 대댓글 작성 ──────────────────────────────────────────────────────────────
   const handleAddReply = async (parentId: number, content: string) => {
     if (!currentUser) return;
     try {
@@ -221,23 +223,26 @@ export default function PostDetailPage() {
     }
   };
 
-  // ── 댓글 반응 ────────────────────────────────────────────────────────────────
+  // ── 댓글 반응 (단일 선택) ────────────────────────────────────────────────────
   const handleReactComment = async (commentId: number, type: ReactionType) => {
     if (!currentUser) { setShowLoginModal(true); return; }
     try {
       await reactToComment(pid, commentId, type);
       setComments((prev) =>
         updateCommentInTree(prev, commentId, (c) => {
-          const wasMyReaction = c.user_reaction === type;
+          const prevReaction = c.user_reaction;
+          const isRemoving = prevReaction === type;
+          const newStats = { ...c.reaction_stats };
+          if (prevReaction) {
+            newStats[prevReaction] = Math.max(0, newStats[prevReaction] - 1);
+          }
+          if (!isRemoving) {
+            newStats[type] = newStats[type] + 1;
+          }
           return {
             ...c,
-            user_reaction: wasMyReaction ? null : type,
-            reaction_stats: {
-              ...c.reaction_stats,
-              [type]: wasMyReaction
-                ? c.reaction_stats[type] - 1
-                : c.reaction_stats[type] + 1,
-            },
+            user_reaction: isRemoving ? null : type,
+            reaction_stats: newStats,
           };
         })
       );
@@ -246,7 +251,6 @@ export default function PostDetailPage() {
     }
   };
 
-  // ── 댓글 수정 ────────────────────────────────────────────────────────────────
   const handleEditComment = async (commentId: number, content: string) => {
     try {
       const updated = await updateComment(pid, commentId, { content });
@@ -258,7 +262,6 @@ export default function PostDetailPage() {
     }
   };
 
-  // ── 댓글 삭제 ────────────────────────────────────────────────────────────────
   const handleDeleteComment = async (commentId: number) => {
     if (!confirm("댓글을 삭제할까요?")) return;
     try {
@@ -270,7 +273,6 @@ export default function PostDetailPage() {
     }
   };
 
-  // ── Render ──────────────────────────────────────────────────────────────────
   if (loadingPost) {
     return (
       <div className="flex min-h-screen items-center justify-center text-sm text-gray-400">
@@ -299,7 +301,6 @@ export default function PostDetailPage() {
     <div className="min-h-screen bg-gray-50">
       <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
 
-        {/* Back */}
         <button
           onClick={() => router.push("/community")}
           className="mb-5 flex items-center gap-1.5 text-sm text-gray-500 transition hover:text-gray-800"
@@ -309,8 +310,6 @@ export default function PostDetailPage() {
 
         {/* Post */}
         <div className="mb-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-
-          {/* Author + menu */}
           <div className="mb-4 flex items-start justify-between">
             <div className="flex items-center gap-2.5">
               <Avatar user={post.author} size={42} />
@@ -359,7 +358,6 @@ export default function PostDetailPage() {
             )}
           </div>
 
-          {/* Content */}
           {editing ? (
             <div className="mb-4">
               <input
@@ -374,7 +372,6 @@ export default function PostDetailPage() {
                 rows={8}
                 className="w-full resize-none rounded-xl border border-gray-200 p-3 text-sm focus:border-red-400 focus:outline-none"
               />
-              {/* 카테고리 */}
               <div className="mt-3 flex flex-wrap gap-2">
                 {CATEGORIES.map((cat) => (
                   <button
@@ -409,9 +406,7 @@ export default function PostDetailPage() {
           ) : (
             <>
               {post.title && (
-                <h2 className="mb-2 text-lg font-bold text-gray-900">
-                  {post.title}
-                </h2>
+                <h2 className="mb-2 text-lg font-bold text-gray-900">{post.title}</h2>
               )}
               <p className="mb-3 whitespace-pre-wrap text-sm leading-relaxed text-gray-800">
                 {post.content}
@@ -419,16 +414,9 @@ export default function PostDetailPage() {
             </>
           )}
 
-          {/* Reactions */}
           {!editing && (
-            <div className="mt-4 flex items-center gap-3 border-t border-gray-50 pt-4">
-              {(["like", "interested", "helpful", "curious"] as ReactionType[]).map((type) => {
-                const EMOJI: Record<ReactionType, string> = {
-                  like: "❤️",
-                  interested: "🤔",
-                  helpful: "👍",
-                  curious: "🧐",
-                };
+            <div className="mt-4 flex items-center gap-2 border-t border-gray-50 pt-4">
+              {REACTIONS.map(({ type, emoji }) => {
                 const count = post.reaction_stats[type];
                 const isActive = post.user_reaction === type;
                 return (
@@ -441,7 +429,7 @@ export default function PostDetailPage() {
                         : "border-gray-200 text-gray-400 hover:border-red-200 hover:text-red-400"
                     }`}
                   >
-                    {EMOJI[type]} {count > 0 && <span>{count}</span>}
+                    {emoji} {count > 0 && <span>{count}</span>}
                   </button>
                 );
               })}
@@ -458,9 +446,7 @@ export default function PostDetailPage() {
           {loadingComments ? (
             <p className="py-8 text-center text-xs text-gray-400">댓글 불러오는 중...</p>
           ) : comments.length === 0 ? (
-            <p className="mb-4 text-center text-xs text-gray-400">
-              첫 댓글을 남겨보세요 💬
-            </p>
+            <p className="mb-4 text-center text-xs text-gray-400">첫 댓글을 남겨보세요 💬</p>
           ) : (
             <div className="mb-4 divide-y divide-gray-50">
               {comments.map((c) => (
@@ -483,7 +469,6 @@ export default function PostDetailPage() {
             </div>
           )}
 
-          {/* 댓글 입력 */}
           {currentUser ? (
             <div className="flex items-center gap-2 border-t border-gray-50 pt-4">
               <Avatar user={currentUser} size={32} />
