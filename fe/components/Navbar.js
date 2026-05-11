@@ -7,6 +7,7 @@ import {
   AUTH_CHANGED_EVENT,
   getStoredUser,
   getToken,
+  loadCurrentUser,
   refreshAccessToken,
   removeToken,
 } from "../lib/auth";
@@ -19,24 +20,50 @@ export default function Navbar() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const syncAuthState = () => {
-      setToken(getToken());
-      setUser(getStoredUser());
+    let cancelled = false;
+
+    const syncAuthState = async () => {
+      const currentToken = getToken();
+      const storedUser = getStoredUser();
+
+      if (!cancelled) {
+        setToken(currentToken);
+        setUser(storedUser);
+      }
+
+      if (!currentToken || storedUser?.role) {
+        return;
+      }
+
+      try {
+        const currentUser = await loadCurrentUser();
+        if (!cancelled) {
+          setToken(getToken());
+          setUser(currentUser);
+        }
+      } catch {
+        if (!cancelled) {
+          setUser(getStoredUser());
+        }
+      }
     };
 
     syncAuthState();
-    refreshAccessToken().catch(() => {
-      syncAuthState();
-    });
+    refreshAccessToken().then(syncAuthState).catch(syncAuthState);
 
-    window.addEventListener(AUTH_CHANGED_EVENT, syncAuthState);
-    window.addEventListener("storage", syncAuthState);
-    window.addEventListener("focus", syncAuthState);
+    const handleAuthSync = () => {
+      syncAuthState();
+    };
+
+    window.addEventListener(AUTH_CHANGED_EVENT, handleAuthSync);
+    window.addEventListener("storage", handleAuthSync);
+    window.addEventListener("focus", handleAuthSync);
 
     return () => {
-      window.removeEventListener(AUTH_CHANGED_EVENT, syncAuthState);
-      window.removeEventListener("storage", syncAuthState);
-      window.removeEventListener("focus", syncAuthState);
+      cancelled = true;
+      window.removeEventListener(AUTH_CHANGED_EVENT, handleAuthSync);
+      window.removeEventListener("storage", handleAuthSync);
+      window.removeEventListener("focus", handleAuthSync);
     };
   }, []);
 
