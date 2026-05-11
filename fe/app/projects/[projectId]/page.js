@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import {
   getProjectApi,
   applyProjectApi,
-  requestAdoptionApi,
   getMyProfileApi,
   updateProjectApi,
   deleteProjectApi,
@@ -55,9 +54,6 @@ export default function ProjectDetailPage() {
   const [message, setMessage] = useState("");
   const [isApplying, setIsApplying] = useState(false);
 
-  const [adoptionMessage, setAdoptionMessage] = useState("");
-  const [isRequestingAdoption, setIsRequestingAdoption] = useState(false);
-
   const [isEditing, setIsEditing] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -78,6 +74,10 @@ export default function ProjectDetailPage() {
 
   const inputClassName =
     "w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100";
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [projectId]);
 
   useEffect(() => {
     async function fetchProject() {
@@ -240,25 +240,6 @@ export default function ProjectDetailPage() {
       alert("프로젝트 지원에 실패했습니다.");
     } finally {
       setIsApplying(false);
-    }
-  };
-
-  const handleAdoptionRequest = async () => {
-    if (!adoptionMessage.trim()) {
-      alert("이어받기 요청 메시지를 입력해주세요.");
-      return;
-    }
-
-    try {
-      setIsRequestingAdoption(true);
-      await requestAdoptionApi(projectId, adoptionMessage);
-      alert("이어받기 요청이 완료되었습니다.");
-      setAdoptionMessage("");
-    } catch (error) {
-      console.error(error);
-      alert("이어받기 요청에 실패했습니다.");
-    } finally {
-      setIsRequestingAdoption(false);
     }
   };
 
@@ -543,57 +524,30 @@ export default function ProjectDetailPage() {
                 </button>
               </section>
             ) : (
-              <>
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <h2 className="text-lg font-bold text-slate-900">
-                    프로젝트 지원하기
-                  </h2>
+              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-bold text-slate-900">
+                  프로젝트 지원하기
+                </h2>
 
-                  <p className="mt-2 text-sm text-slate-500">
-                    팀장에게 보낼 간단한 소개와 참여 의지를 적어주세요.
-                  </p>
+                <p className="mt-2 text-sm text-slate-500">
+                  팀장에게 보낼 간단한 소개와 참여 의지를 적어주세요.
+                </p>
 
-                  <textarea
-                    className={textareaClassName}
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder="예: React와 UI 구현을 맡아 참여하고 싶습니다."
-                  />
+                <textarea
+                  className={textareaClassName}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="예: React와 UI 구현을 맡아 참여하고 싶습니다."
+                />
 
-                  <button
-                    onClick={handleApply}
-                    disabled={isApplying}
-                    className="mt-4 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-                  >
-                    {isApplying ? "지원 중..." : "지원하기"}
-                  </button>
-                </section>
-
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <h2 className="text-lg font-bold text-slate-900">
-                    프로젝트 이어받기
-                  </h2>
-
-                  <p className="mt-2 text-sm text-slate-500">
-                    이 프로젝트를 이어서 진행하고 싶은 이유를 작성해주세요.
-                  </p>
-
-                  <textarea
-                    className={textareaClassName}
-                    value={adoptionMessage}
-                    onChange={(e) => setAdoptionMessage(e.target.value)}
-                    placeholder="예: 기존 아이디어를 발전시켜 완성도 높은 서비스로 이어가고 싶습니다."
-                  />
-
-                  <button
-                    onClick={handleAdoptionRequest}
-                    disabled={isRequestingAdoption}
-                    className="mt-4 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-                  >
-                    {isRequestingAdoption ? "요청 중..." : "이어받기 요청하기"}
-                  </button>
-                </section>
-              </>
+                <button
+                  onClick={handleApply}
+                  disabled={isApplying}
+                  className="mt-4 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                >
+                  {isApplying ? "지원 중..." : "지원하기"}
+                </button>
+              </section>
             )}
           </aside>
         </div>
