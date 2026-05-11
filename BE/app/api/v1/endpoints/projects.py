@@ -365,6 +365,24 @@ async def list_projects(
     )
 
 
+def _serialize_project_member(member: ProjectMember, user: User | None) -> dict:
+    return {
+        "user_id": member.user_id,
+        "role_in_project": member.role_in_project,
+        "nickname": user.nickname if user else None,
+        "name": user.name if user else None,
+        "avatar_url": user.avatar_url if user else None,
+        "user": {
+            "id": user.id,
+            "nickname": user.nickname,
+            "name": user.name,
+            "avatar_url": user.avatar_url,
+        }
+        if user
+        else None,
+    }
+
+
 @router.get("/{project_id}", summary="프로젝트 상세", description="프로젝트 상세와 활성 멤버 목록을 조회합니다.")
 async def get_project(project_id: int, db: Session = Depends(get_db)) -> dict:
     """프로젝트 상세 조회 API.
@@ -375,6 +393,12 @@ async def get_project(project_id: int, db: Session = Depends(get_db)) -> dict:
     """
     project = _get_project_or_404(db, project_id)
     members = db.query(ProjectMember).filter(ProjectMember.project_id == project_id, ProjectMember.left_at.is_(None)).all()
+    member_user_ids = [member.user_id for member in members]
+    member_users = (
+        {user.id: user for user in db.query(User).filter(User.id.in_(member_user_ids)).all()}
+        if member_user_ids
+        else {}
+    )
     
     # Get tech_stack from project_skills
     tech_stack = db.query(Skill.name).join(
@@ -395,7 +419,10 @@ async def get_project(project_id: int, db: Session = Depends(get_db)) -> dict:
             "currentMembers": len(members),
             "maxMembers": project.max_members,
             "techStack": tech_stack_list,
-            "members": [{"user_id": m.user_id, "role_in_project": m.role_in_project} for m in members],
+            "members": [
+                _serialize_project_member(member, member_users.get(member.user_id))
+                for member in members
+            ],
         }
     )
 
