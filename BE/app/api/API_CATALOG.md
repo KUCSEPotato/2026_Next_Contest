@@ -105,6 +105,8 @@
 - POST /projects: 직접 프로젝트 생성 + 생성자 리더 등록(max_members: 최대 멤버 수, 기본값 10, idea_id는 선택사항)
 - GET /projects: 프로젝트 목록 조회
 - GET /projects/{project_id}: 프로젝트 상세 + 멤버(현재 멤버 수, 최대 멤버 수, 경쟁률 포함)
+  - `members` 항목은 `user_id`, `role_in_project`, `nickname`, `name`, `avatar_url`, `user` 객체를 포함합니다.
+  - `user` 객체 형식: `{ id, nickname, name, avatar_url }`
 - PATCH /projects/{project_id}: 프로젝트 메타데이터 수정(max_members 수정 가능)
 - DELETE /projects/{project_id}: 프로젝트 soft delete
 - PATCH /projects/{project_id}/status: 프로젝트 상태 변경
