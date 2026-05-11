@@ -25,6 +25,30 @@ from app.services.s3_upload import get_s3_service
 router = APIRouter()
 
 
+def _serialize_review(db: Session, review: Review) -> dict:
+    reviewer = db.get(User, review.reviewer_id)
+    project = db.get(Project, review.project_id)
+
+    return {
+        "id": review.id,
+        "reviewer": {
+            "id": reviewer.id if reviewer else review.reviewer_id,
+            "nickname": reviewer.nickname if reviewer else "탈퇴한 사용자",
+            "avatar_url": reviewer.avatar_url if reviewer else None,
+        },
+        "project": {
+            "id": project.id if project else review.project_id,
+            "title": project.title if project else "삭제된 프로젝트",
+        },
+        "teamwork_score": review.teamwork_score,
+        "contribution_score": review.contribution_score,
+        "responsibility_score": review.responsibility_score,
+        "comment": review.comment,
+        "message": review.comment,
+        "created_at": review.created_at,
+    }
+
+
 @router.get("/me/profile", summary="내 프로필 조회", description="현재 로그인한 사용자의 프로필과 기술 스택을 조회합니다.")
 async def get_my_profile(
     current_user_id: int = Depends(get_current_user_id),
@@ -519,6 +543,30 @@ async def remove_my_interest(
     return success_response(data={"removed": True, "interest_id": interest_id})
 
 
+@router.get("/me/reviews", summary="내가 받은 리뷰 목록", description="팀원들이 남긴 리뷰 목록을 조회합니다.")
+async def get_my_reviews(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    """내가 받은 리뷰 목록 조회 API (마이페이지용).
+
+    Swagger 테스트 방법:
+    - Authorization 헤더를 설정합니다.
+
+    응답:
+    - 현재 사용자(reviewee)가 받은 모든 리뷰를 최신순으로 반환합니다.
+    - reviewer 정보(닉네임, 아바타)와 프로젝트 정보를 포함합니다.
+    """
+    reviews = (
+        db.query(Review)
+        .filter(Review.reviewee_id == current_user_id)
+        .order_by(Review.created_at.desc())
+        .all()
+    )
+
+    return success_response(data=[_serialize_review(db, review) for review in reviews])
+
+
 @router.get("/{user_id}/reviews", summary="사용자 리뷰 조회", description="특정 사용자가 받은 리뷰 목록을 공개적으로 조회합니다.")
 async def get_user_reviews(
     user_id: int,
@@ -551,81 +599,7 @@ async def get_user_reviews(
         .all()
     )
 
-    result = []
-    for review in reviews:
-        reviewer = db.get(User, review.reviewer_id)
-        project = db.get(Project, review.project_id)
-        result.append(
-            {
-                "id": review.id,
-                "reviewer": {
-                    "id": reviewer.id,
-                    "nickname": reviewer.nickname,
-                    "avatar_url": reviewer.avatar_url,
-                },
-                "project": {
-                    "id": project.id,
-                    "title": project.title,
-                },
-                "teamwork_score": review.teamwork_score,
-                "contribution_score": review.contribution_score,
-                "responsibility_score": review.responsibility_score,
-                "comment": review.comment,
-                "message": review.comment,
-                "created_at": review.created_at,
-            }
-        )
-
-    return success_response(data=result)
-
-
-@router.get("/me/reviews", summary="내가 받은 리뷰 목록", description="팀원들이 남긴 리뷰 목록을 조회합니다.")
-async def get_my_reviews(
-    current_user_id: int = Depends(get_current_user_id),
-    db: Session = Depends(get_db),
-) -> dict:
-    """내가 받은 리뷰 목록 조회 API (마이페이지용).
-
-    Swagger 테스트 방법:
-    - Authorization 헤더를 설정합니다.
-
-    응답:
-    - 현재 사용자(reviewee)가 받은 모든 리뷰를 최신순으로 반환합니다.
-    - reviewer 정보(닉네임, 아바타)와 프로젝트 정보를 포함합니다.
-    """
-    reviews = (
-        db.query(Review)
-        .filter(Review.reviewee_id == current_user_id)
-        .order_by(Review.created_at.desc())
-        .all()
-    )
-
-    result = []
-    for review in reviews:
-        reviewer = db.get(User, review.reviewer_id)
-        project = db.get(Project, review.project_id)
-        result.append(
-            {
-                "id": review.id,
-                "reviewer": {
-                    "id": reviewer.id,
-                    "nickname": reviewer.nickname,
-                    "avatar_url": reviewer.avatar_url,
-                },
-                "project": {
-                    "id": project.id,
-                    "title": project.title,
-                },
-                "teamwork_score": review.teamwork_score,
-                "contribution_score": review.contribution_score,
-                "responsibility_score": review.responsibility_score,
-                "comment": review.comment,
-                "message": review.comment,
-                "created_at": review.created_at,
-            }
-        )
-
-    return success_response(data=result)
+    return success_response(data=[_serialize_review(db, review) for review in reviews])
 
 
 @router.get("/me/reputation", summary="내 신뢰도 조회", description="리뷰 기반 평점 요약을 반환합니다.")
@@ -642,24 +616,6 @@ async def get_my_reputation(
     - 리뷰가 없으면 review_count=0, score=0.0 반환
     - 리뷰가 있으면 teamwork/contribution/responsibility 평균과 종합 score를 반환
     """
-    global_count, global_teamwork, global_contribution, global_responsibility = (
-        db.query(
-            func.count(Review.id),
-            func.avg(Review.teamwork_score),
-            func.avg(Review.contribution_score),
-            func.avg(Review.responsibility_score),
-        )
-        .one()
-    )
-
-    global_avg_teamwork = float(global_teamwork or 0)
-    global_avg_contribution = float(global_contribution or 0)
-    global_avg_responsibility = float(global_responsibility or 0)
-    global_score = round(
-        (global_avg_teamwork + global_avg_contribution + global_avg_responsibility) / 3,
-        2,
-    )
-
     aggregate = db.get(UserRatingAggregate, current_user_id)
     if aggregate is None:
         return success_response(
@@ -669,11 +625,6 @@ async def get_my_reputation(
                 "avg_contribution": 0.0,
                 "avg_responsibility": 0.0,
                 "score": 0.0,
-                "global_review_count": int(global_count or 0),
-                "global_avg_teamwork": round(global_avg_teamwork, 2),
-                "global_avg_contribution": round(global_avg_contribution, 2),
-                "global_avg_responsibility": round(global_avg_responsibility, 2),
-                "global_score": global_score,
             }
         )
 
@@ -685,11 +636,6 @@ async def get_my_reputation(
             "avg_contribution": round(float(aggregate.avg_contribution), 2),
             "avg_responsibility": round(float(aggregate.avg_responsibility), 2),
             "score": round(score, 2),
-            "global_review_count": int(global_count or 0),
-            "global_avg_teamwork": round(global_avg_teamwork, 2),
-            "global_avg_contribution": round(global_avg_contribution, 2),
-            "global_avg_responsibility": round(global_avg_responsibility, 2),
-            "global_score": global_score,
         },
     )
 

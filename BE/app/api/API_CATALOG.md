@@ -61,7 +61,7 @@
 - DELETE /users/me/interests/{interest_id}: 관심 분야 제거
 - 프로젝트 생성/시작/완료/재활용 시 코인 보상 이력이 누적됩니다.
 - POST /users/me/onboarding/ideas: 온보딩 마지막 단계에서 관심 아이디어 선택 및 가입 완료 처리
-- GET /users/me/reputation: 리뷰 기반 신뢰도/평점 요약(`score`, 항목별 평균, 전체 이용자 평균 포함)
+- GET /users/me/reputation: 리뷰 기반 신뢰도/평점 요약(`score`, 항목별 평균 포함)
 
 ## 3) Ideas
 
