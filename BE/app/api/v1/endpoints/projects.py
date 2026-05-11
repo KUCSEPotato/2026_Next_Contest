@@ -16,6 +16,7 @@ from app.dependencies.auth import get_current_user_id_from_token
 from app.models import Application
 from app.models import ChatMessage
 from app.models import ChatRoom
+from app.models import ChatRoomMember
 from app.models import FailureStory
 from app.models import Idea
 from app.models import Invitation
@@ -484,10 +485,31 @@ async def list_applications(
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
     apps = db.query(Application).filter(Application.project_id == project_id).order_by(Application.id.desc()).all()
+    applicant_ids = [app.applicant_id for app in apps]
+    applicants = (
+        {user.id: user for user in db.query(User).filter(User.id.in_(applicant_ids)).all()}
+        if applicant_ids
+        else {}
+    )
     return success_response(
         data=[
-            {"id": a.id, "applicant_id": a.applicant_id, "message": a.message, "status": a.status}
-            for a in apps
+            {
+                "id": app.id,
+                "applicant_id": app.applicant_id,
+                "message": app.message,
+                "status": app.status,
+                "applicant": {
+                    "id": applicants[app.applicant_id].id,
+                    "nickname": applicants[app.applicant_id].nickname,
+                    "name": applicants[app.applicant_id].name,
+                    "email": applicants[app.applicant_id].email,
+                    "bio": applicants[app.applicant_id].bio,
+                    "avatar_url": applicants[app.applicant_id].avatar_url,
+                }
+                if app.applicant_id in applicants
+                else None,
+            }
+            for app in apps
         ]
     )
 
@@ -512,10 +534,24 @@ async def decide_application(
     app_obj = db.get(Application, application_id)
     if app_obj is None or app_obj.project_id != project_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
+    if app_obj.status != "pending":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only pending applications can be decided")
 
     decision = payload.status
     if decision not in {"accepted", "rejected"}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="status must be accepted or rejected")
+
+    if decision == "accepted":
+        active_member_count = (
+            db.query(ProjectMember)
+            .filter(
+                ProjectMember.project_id == project_id,
+                ProjectMember.left_at.is_(None),
+            )
+            .count()
+        )
+        if project.max_members and active_member_count >= project.max_members:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Project is already full")
 
     app_obj.status = decision
     app_obj.decided_by = current_user_id
@@ -1495,6 +1531,16 @@ async def complete_team(
         )
         db.add(team_room)
         db.flush()
+
+    existing_chat_member_ids = {
+        user_id
+        for (user_id,) in db.query(ChatRoomMember.user_id)
+        .filter(ChatRoomMember.room_id == team_room.id)
+        .all()
+    }
+    for member_id in active_members:
+        if member_id not in existing_chat_member_ids:
+            db.add(ChatRoomMember(room_id=team_room.id, user_id=member_id))
 
     system_message = ChatMessage(
         room_id=team_room.id,
