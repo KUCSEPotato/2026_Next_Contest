@@ -6,26 +6,37 @@ import { User } from "../_types";
 import { createPost } from "../_lib/api";
 import MediaPreview, { MediaItem } from "../_components/MediaPreview";
 
-const CATEGORIES = ["IT/소프트웨어", "경영/경제", "디자인", "AI/데이터", "기타"];
+const CATEGORIES = [
+  { label: "일반", value: "general" },
+  { label: "질문", value: "question" },
+  { label: "아이디어", value: "idea" },
+  { label: "작업 공유", value: "showcase" },
+  { label: "이벤트", value: "event" },
+  { label: "공지", value: "announcement" },
+];
 
 const MAX_FILES = 10;
 const MAX_FILE_SIZE_MB = 50;
+const BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"}/api/v1/community`;
 
-// TODO: BE 미디어 업로드 API 구현 후 아래 함수 채우기
-// async function uploadMediaFile(file: File): Promise<string> {
-//   const formData = new FormData();
-//   formData.append("file", file);
-//   const res = await fetch(
-//     `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"}/community/media/upload`,
-//     {
-//       method: "POST",
-//       headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
-//       body: formData,
-//     }
-//   );
-//   const json = await res.json();
-//   return json.data.url;
-// }
+async function uploadFile(postId: number, file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const token = localStorage.getItem("access_token");
+  const res = await fetch(`${BASE}/${postId}/files`, {
+    method: "POST",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail ?? `파일 업로드 실패 (${res.status})`);
+  }
+  const json = await res.json();
+  return json.data.s3_url;
+}
 
 export default function NewPostPage() {
   const router = useRouter();
@@ -42,8 +53,13 @@ export default function NewPostPage() {
   useEffect(() => {
     const token = localStorage.getItem("access_token");
     if (!token) { router.replace("/login"); return; }
-    const raw = localStorage.getItem("user");
-    if (raw) setCurrentUser(JSON.parse(raw));
+    try {
+      const raw = localStorage.getItem("user");
+      if (raw) setCurrentUser(JSON.parse(raw));
+    } catch (e) {
+      console.error("유저 정보 파싱 실패", e);
+      localStorage.removeItem("user");
+    }
   }, [router]);
 
   // ── 파일 선택 ──────────────────────────────────────────────────────────────
@@ -73,7 +89,7 @@ export default function NewPostPage() {
 
   const handleRemoveMedia = (i: number) => {
     setMedia((prev) => {
-      URL.revokeObjectURL(prev[i].url); // 메모리 해제
+      URL.revokeObjectURL(prev[i].url);
       return prev.filter((_, idx) => idx !== i);
     });
   };
@@ -85,26 +101,32 @@ export default function NewPostPage() {
     setError("");
 
     try {
-      // TODO: BE 미디어 업로드 API 완성 후 아래 주석 해제
-      // const mediaUrls: string[] = [];
-      // for (let i = 0; i < media.length; i++) {
-      //   setMedia((prev) =>
-      //     prev.map((m, idx) => idx === i ? { ...m, uploading: true } : m)
-      //   );
-      //   const url = await uploadMediaFile(media[i].file);
-      //   mediaUrls.push(url);
-      //   setMedia((prev) =>
-      //     prev.map((m, idx) => idx === i ? { ...m, uploading: false, uploadedUrl: url } : m)
-      //   );
-      // }
-
+      // 1. 게시물 먼저 생성
       const post = await createPost({
         title: title.trim() || undefined as any,
         content: content.trim(),
         category: category || undefined,
-        // TODO: mediaUrls 추가
-        // media_urls: mediaUrls,
       });
+
+      // 2. 파일 순차 업로드
+      for (let i = 0; i < media.length; i++) {
+        const item = media[i];
+        if (!item.file) continue;
+        setMedia((prev) =>
+          prev.map((m, idx) => idx === i ? { ...m, uploading: true } : m)
+        );
+        try {
+          const s3Url = await uploadFile(post.id, item.file);
+          setMedia((prev) =>
+            prev.map((m, idx) => idx === i ? { ...m, uploading: false, uploadedUrl: s3Url } : m)
+          );
+        } catch (uploadErr: any) {
+          setMedia((prev) =>
+            prev.map((m, idx) => idx === i ? { ...m, uploading: false } : m)
+          );
+          console.error(`파일 ${item.file.name} 업로드 실패:`, uploadErr);
+        }
+      }
 
       router.push(`/community/${post.id}`);
     } catch (e: any) {
@@ -171,15 +193,15 @@ export default function NewPostPage() {
           <div className="flex flex-wrap gap-2">
             {CATEGORIES.map((cat) => (
               <button
-                key={cat}
-                onClick={() => setCategory(category === cat ? "" : cat)}
+                key={cat.value}
+                onClick={() => setCategory(category === cat.value ? "" : cat.value)}
                 className={`rounded-full border px-3 py-1 text-xs transition ${
-                  category === cat
+                  category === cat.value
                     ? "border-red-600 bg-red-600 text-white"
                     : "border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-500"
                 }`}
               >
-                {cat}
+                {cat.label}
               </button>
             ))}
           </div>
@@ -187,19 +209,12 @@ export default function NewPostPage() {
 
         {/* 파일 첨부 툴바 */}
         <div className="mt-3 rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-gray-500">
-              파일 첨부
-              <span className="ml-1.5 text-gray-300">
-                ({media.length}/{MAX_FILES}) · 최대 {MAX_FILE_SIZE_MB}MB
-              </span>
-            </p>
-
-            {/* 업로드 비활성 안내 — BE 완성 후 제거 */}
-            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] text-amber-500">
-              ⚠️ 저장은 API 연동 후 적용
+          <p className="text-xs font-medium text-gray-500">
+            파일 첨부
+            <span className="ml-1.5 text-gray-300">
+              ({media.length}/{MAX_FILES}) · 최대 {MAX_FILE_SIZE_MB}MB
             </span>
-          </div>
+          </p>
 
           <div className="mt-2 flex gap-2">
             {/* 사진 */}

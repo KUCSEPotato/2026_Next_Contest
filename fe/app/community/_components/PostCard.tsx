@@ -14,6 +14,13 @@ interface PostCardProps {
   onLoginRequired: () => void;
 }
 
+const REACTIONS: { type: ReactionType; emoji: string; activeEmoji: string }[] = [
+  { type: "like", emoji: "🤍", activeEmoji: "❤️" },
+  { type: "interested", emoji: "🤔", activeEmoji: "🤔" },
+  { type: "helpful", emoji: "👍", activeEmoji: "👍" },
+  { type: "curious", emoji: "🧐", activeEmoji: "🧐" },
+];
+
 export default function PostCard({
   post,
   currentUser,
@@ -36,9 +43,6 @@ export default function PostCard({
   }, []);
 
   const isOwn = currentUser?.id === post.author_id;
-  const totalLikes = post.reaction_stats.like;
-  const isLiked = post.user_reaction === "like";
-
   const goToDetail = () => router.push(`/community/${post.id}`);
 
   return (
@@ -118,22 +122,32 @@ export default function PostCard({
       )}
 
       {/* Actions */}
-      <div className="mt-3 flex items-center gap-4 border-t border-gray-50 pt-3">
-        <button
-          onClick={() => {
-            if (!currentUser) { onLoginRequired(); return; }
-            onReact(post.id, "like");
-          }}
-          className={`flex items-center gap-1.5 text-sm transition ${
-            isLiked ? "text-red-500" : "text-gray-400 hover:text-red-400"
-          }`}
-        >
-          {isLiked ? "❤️" : "🤍"} <span className="text-xs">{totalLikes}</span>
-        </button>
+      <div className="mt-3 flex items-center gap-2 border-t border-gray-50 pt-3">
+        {REACTIONS.map(({ type, emoji, activeEmoji }) => {
+          const isActive = post.user_reaction === type;
+          const count = post.reaction_stats[type];
+          return (
+            <button
+              key={type}
+              onClick={() => {
+                if (!currentUser) { onLoginRequired(); return; }
+                onReact(post.id, type);
+              }}
+              className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition ${
+                isActive
+                  ? "border-red-300 bg-red-50 text-red-500"
+                  : "border-gray-200 text-gray-400 hover:border-red-200 hover:text-red-400"
+              }`}
+            >
+              {isActive ? activeEmoji : emoji}
+              {count > 0 && <span>{count}</span>}
+            </button>
+          );
+        })}
 
         <button
           onClick={goToDetail}
-          className="flex items-center gap-1.5 text-xs text-gray-400 transition hover:text-gray-600"
+          className="ml-1 flex items-center gap-1.5 text-xs text-gray-400 transition hover:text-gray-600"
         >
           💬 <span>{post.comment_count}</span>
         </button>

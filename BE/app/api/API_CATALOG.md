@@ -38,6 +38,7 @@
 - GET /users/{user_id}/profile: 공개 프로필 조회
 - GET /users/{user_id}/stats: 활동 통계 조회
 - GET /users/{user_id}/projects: 사용자 프로젝트 이력
+- GET /users/{user_id}/reviews: **공개 리뷰 조회** (인증 불필요, 평점과 코멘트 포함)
 - GET /users/me/reviews: **내가 받은 리뷰 목록**(마이페이지용)
 - GET /users/me/applications: **내가 지원한 프로젝트 목록**(지원현황 조회)
 - POST /users/me/skills: 기술 스택 등록
@@ -157,10 +158,13 @@
 ## 11) Chats
 
 - GET /chats/projects/{project_id}/rooms: 프로젝트 채팅방 목록
-- POST /chats/projects/{project_id}/rooms: 채팅방 생성
-- GET /chats/rooms/{room_id}/messages: 메시지 목록 조회
-- POST /chats/rooms/{room_id}/messages: 메시지 전송
-- WS /chats/projects/{project_id}/rooms/{room_id}/ws: 채팅 메시지 실시간 송수신/구독
+- POST /chats/projects/{project_id}/rooms: 채팅방 생성 (프로젝트 리더만, member_ids로 참여자 선택)
+  - Request: `{ "name": "room_name", "member_ids": [1, 2, 3] }`
+  - 검증: 리더권한, in_progress 상태, member_ids는 모두 프로젝트 멤버여야 함
+- GET /chats/rooms/{room_id}/messages: 메시지 목록 조회 (ChatRoomMember만 접근 가능)
+- POST /chats/rooms/{room_id}/messages: 메시지 전송 (ChatRoomMember만 가능)
+- GET /chats/my/rooms: 현재 사용자가 속한 채팅방 목록 (최신 메시지 정보 포함)
+- WS /chats/projects/{project_id}/rooms/{room_id}/ws: 채팅 메시지 실시간 송수신 (ChatRoomMember만)
 
 ## 12) Community (커뮤니티 게시판)
 

@@ -12,6 +12,10 @@ import {
   addMySkillApi,
   addMyInterestApi,
   discardProjectToWellApi,
+  getProjectApi,
+  createProjectReviewApi,
+  uploadMyAvatarApi,
+  getImageUrl,
 } from "../../lib/api";
 
 export default function MyPage() {
@@ -26,13 +30,56 @@ export default function MyPage() {
   const [loading, setLoading] = useState(true);
   const [showReviews, setShowReviews] = useState(false);
   const [discardingId, setDiscardingId] = useState(null);
-  const [discardConfirm, setDiscardConfirm] = useState(null); // project object
+  const [discardConfirm, setDiscardConfirm] = useState(null);
+
+  const [reviewProject, setReviewProject] = useState(null);
+  const [reviewTargets, setReviewTargets] = useState([]);
+  const [reviewInputs, setReviewInputs] = useState({});
+  const [isSubmittingReviews, setIsSubmittingReviews] = useState(false);
 
   const [editNickname, setEditNickname] = useState("");
   const [editBio, setEditBio] = useState("");
   const [editAvatarUrl, setEditAvatarUrl] = useState("");
   const [newSkill, setNewSkill] = useState("");
   const [newInterest, setNewInterest] = useState("");
+
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("이미지 파일만 업로드할 수 있습니다.");
+      return;
+    }
+
+    try {
+      setIsUploadingAvatar(true);
+
+      const result = await uploadMyAvatarApi(file);
+      const avatarUrl = result.data.avatar_url;
+      console.log("업로드 결과:", result);
+      console.log("avatarUrl:", avatarUrl);
+
+
+      setProfile((prev) => ({
+        ...prev,
+        avatar_url: avatarUrl,
+      }));
+
+      setEditAvatarUrl(avatarUrl);
+
+      alert("프로필 이미지가 업로드되었습니다.");
+    } catch (error) {
+      console.error(error);
+      alert("프로필 이미지 업로드에 실패했습니다.");
+    } finally {
+      setIsUploadingAvatar(false);
+      e.target.value = "";
+    }
+  };
 
   const inputClassName =
     "w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100";
@@ -45,6 +92,11 @@ export default function MyPage() {
     setEditNickname(profileData.nickname || "");
     setEditBio(profileData.bio || "");
     setEditAvatarUrl(profileData.avatar_url || "");
+  }
+
+  async function reloadMyProjects() {
+    const projectsResult = await getMyProjectsApi();
+    setProjects(projectsResult.data || []);
   }
 
   useEffect(() => {
@@ -64,42 +116,37 @@ export default function MyPage() {
           await Promise.allSettled([
             getMyReputationApi(),
             getUserStatsApi(profileData.id),
-            // GET /users/me/projects — can_discard 필드 포함
             getMyProjectsApi(),
             getMyReceivedReviewsApi(),
           ]);
 
-        if (reputationResult.status === "fulfilled") {
-          setReputation(reputationResult.value.data);
-        } else {
-          console.error("신뢰도 조회 실패:", reputationResult.reason);
-          setReputation(null);
-        }
+        setReputation(
+          reputationResult.status === "fulfilled"
+            ? reputationResult.value.data
+            : null
+        );
 
-        if (statsResult.status === "fulfilled") {
-          setStats(statsResult.value.data);
-        } else {
-          console.error("통계 조회 실패:", statsResult.reason);
-          setStats({
-            lead_projects: 0,
-            completed_projects: 0,
-            review_received: 0,
-          });
-        }
+        setStats(
+          statsResult.status === "fulfilled"
+            ? statsResult.value.data
+            : {
+                lead_projects: 0,
+                completed_projects: 0,
+                review_received: 0,
+              }
+        );
 
-        if (projectsResult.status === "fulfilled") {
-          setProjects(projectsResult.value.data || []);
-        } else {
-          console.error("프로젝트 이력 조회 실패:", projectsResult.reason);
-          setProjects([]);
-        }
+        setProjects(
+          projectsResult.status === "fulfilled"
+            ? projectsResult.value.data || []
+            : []
+        );
 
-        if (reviewsResult.status === "fulfilled") {
-          setReviews(reviewsResult.value.data || []);
-        } else {
-          console.error("리뷰 조회 실패:", reviewsResult.reason);
-          setReviews([]);
-        }
+        setReviews(
+          reviewsResult.status === "fulfilled"
+            ? reviewsResult.value.data || []
+            : []
+        );
       } catch (error) {
         console.error("프로필 조회 실패:", error);
         alert("프로필 정보를 불러오지 못했습니다. 다시 로그인해주세요.");
@@ -112,18 +159,110 @@ export default function MyPage() {
     loadMyPage();
   }, [router]);
 
-  const handleDiscardToWell = async (project) => {
+  const isTeamFormedProject = (project) => {
+    return ["in_progress", "started", "completed", "paused"].includes(
+      project?.status
+    );
+  };
+
+  const openDiscardFlow = async (project) => {
+    if (!project.can_discard) return;
+
+    if (!isTeamFormedProject(project)) {
+      setDiscardConfirm(project);
+      return;
+    }
+
+    try {
+      const result = await getProjectApi(project.id);
+      const detail = result.data;
+
+      const targets = (detail.members || []).filter(
+        (member) => member.user_id !== profile?.id
+      );
+
+      if (targets.length === 0) {
+        setDiscardConfirm(project);
+        return;
+      }
+
+      const initialInputs = {};
+      targets.forEach((member) => {
+        initialInputs[member.user_id] = {
+          teamwork_score: 3,
+          contribution_score: 3,
+          responsibility_score: 3,
+          comment: "",
+        };
+      });
+
+      setReviewProject(project);
+      setReviewTargets(targets);
+      setReviewInputs(initialInputs);
+    } catch (error) {
+      console.error(error);
+      alert("프로젝트 멤버 정보를 불러오지 못했습니다.");
+    }
+  };
+
+  const updateReviewInput = (userId, field, value) => {
+    setReviewInputs((prev) => ({
+      ...prev,
+      [userId]: {
+        ...prev[userId],
+        [field]: value,
+      },
+    }));
+  };
+
+  const discardProject = async (project) => {
     try {
       setDiscardingId(project.id);
       await discardProjectToWellApi(project.id);
       setProjects((prev) => prev.filter((p) => p.id !== project.id));
       setDiscardConfirm(null);
-      alert(`"${project.title}" 아이디어가 영감의 샘에 투척되었습니다.`);
+      alert(`"${project.title}" 프로젝트가 영감의 샘으로 이동되었습니다.`);
     } catch (error) {
       console.error(error);
-      alert("투척에 실패했습니다. 다시 시도해주세요.");
+      alert("프로젝트 버리기에 실패했습니다.");
     } finally {
       setDiscardingId(null);
+    }
+  };
+
+  const submitReviewsAndDiscard = async () => {
+    if (!reviewProject) return;
+
+    try {
+      setIsSubmittingReviews(true);
+
+      for (const target of reviewTargets) {
+        const input = reviewInputs[target.user_id];
+
+        await createProjectReviewApi(reviewProject.id, {
+          reviewee_id: target.user_id,
+          teamwork_score: Number(input.teamwork_score),
+          contribution_score: Number(input.contribution_score),
+          responsibility_score: Number(input.responsibility_score),
+          comment: input.comment,
+        });
+      }
+
+      await discardProjectToWellApi(reviewProject.id);
+
+      setProjects((prev) => prev.filter((p) => p.id !== reviewProject.id));
+      setReviewProject(null);
+      setReviewTargets([]);
+      setReviewInputs({});
+
+      await reloadProfile();
+
+      alert("팀원 평가가 저장되었고, 프로젝트가 영감의 샘으로 이동되었습니다.");
+    } catch (error) {
+      console.error(error);
+      alert("평가 저장 또는 프로젝트 버리기에 실패했습니다.");
+    } finally {
+      setIsSubmittingReviews(false);
     }
   };
 
@@ -132,7 +271,6 @@ export default function MyPage() {
       const result = await updateMyProfileApi({
         nickname: editNickname,
         bio: editBio,
-        avatar_url: editAvatarUrl,
       });
 
       alert("프로필이 수정되었습니다.");
@@ -199,11 +337,20 @@ export default function MyPage() {
           <div className="flex items-center gap-6">
             <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-red-100 text-3xl font-bold text-red-600">
               {profile?.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  alt="profile"
-                  className="h-full w-full object-cover"
-                />
+                <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-red-100 text-3xl font-bold text-red-600">
+                  {profile?.avatar_url ? (
+                    <img
+                      src={getImageUrl(profile.avatar_url)}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    profile?.nickname?.[0] || "D"
+                  )}
+                </div>
               ) : (
                 profile?.nickname?.[0] || "D"
               )}
@@ -232,12 +379,36 @@ export default function MyPage() {
               className={inputClassName}
             />
 
-            <input
-              value={editAvatarUrl}
-              onChange={(e) => setEditAvatarUrl(e.target.value)}
-              placeholder="프로필 이미지 URL"
-              className={inputClassName}
-            />
+            <div>
+              <p className="mb-2 text-sm font-semibold text-slate-700">
+                프로필 이미지
+              </p>
+
+              <div className="flex items-center gap-3 rounded-xl border border-slate-300 px-4 py-3">
+                <label className="cursor-pointer rounded-lg bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100">
+                  파일 선택
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarUpload}
+                    disabled={isUploadingAvatar}
+                    className="hidden"
+                  />
+                </label>
+
+                <span className="text-sm text-slate-500">
+                  {profile?.avatar_url
+                    ? "변경하시려면 파일을 선택하십시오."
+                    : "선택된 파일 없음"}
+                </span>
+              </div>
+
+              <p className="mt-2 text-xs text-slate-400">
+                {isUploadingAvatar
+                  ? "이미지를 업로드하는 중입니다..."
+                  : "이미지 파일을 선택하면 자동으로 업로드됩니다."}
+              </p>
+            </div>
 
             <textarea
               value={editBio}
@@ -280,6 +451,7 @@ export default function MyPage() {
                   <p className="font-bold">
                     {review.project?.title || "프로젝트"}
                   </p>
+
                   <p className="text-sm text-gray-400">
                     익명{" "}
                     {review.created_at
@@ -417,16 +589,15 @@ export default function MyPage() {
                         {project.status || "상태 없음"}
                       </span>
 
-                      {/* can_discard가 true일 때만 투척하기 버튼 노출 */}
                       {project.can_discard && (
                         <span
                           onClick={(e) => {
                             e.stopPropagation();
-                            setDiscardConfirm(project);
+                            openDiscardFlow(project);
                           }}
                           className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-600 transition hover:bg-blue-100"
                         >
-                          💧 영감의 샘에 투척
+                          프로젝트 버리기
                         </span>
                       )}
 
@@ -450,30 +621,30 @@ export default function MyPage() {
         </section>
       </div>
 
-      {/* 투척 확인 모달 */}
       {discardConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-black/30 backdrop-blur-sm"
             onClick={() => setDiscardConfirm(null)}
           />
+
           <div className="relative w-full max-w-sm rounded-2xl bg-white p-7 shadow-2xl">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-3xl">
-              💧
-            </div>
             <h2 className="mb-2 text-center text-base font-bold text-slate-800">
-              영감의 샘에 투척할까요?
+              프로젝트를 영감의 샘으로 이동할까요?
             </h2>
+
             <p className="mb-1 text-center text-sm font-semibold text-slate-700 line-clamp-1">
               "{discardConfirm.title}"
             </p>
+
             <p className="mb-6 text-center text-sm text-slate-400 leading-relaxed">
-              이 아이디어는 프로젝트 상세 페이지에서 사라지고,
+              이 프로젝트는 프로젝트 목록에서 사라지고,
               <br />
-              <span className="font-semibold text-blue-600">영감의 샘</span>으로 이동됩니다.
+              영감의 샘에 아이디어로 표시됩니다.
               <br />
-              <span className="text-xs text-slate-300 mt-1 block">이 작업은 되돌릴 수 없습니다.</span>
+              이 작업은 되돌릴 수 없습니다.
             </p>
+
             <div className="flex gap-2">
               <button
                 onClick={() => setDiscardConfirm(null)}
@@ -481,12 +652,134 @@ export default function MyPage() {
               >
                 취소
               </button>
+
               <button
-                onClick={() => handleDiscardToWell(discardConfirm)}
+                onClick={() => discardProject(discardConfirm)}
                 disabled={discardingId === discardConfirm.id}
-                className="flex-1 rounded-xl bg-blue-500 py-3 text-sm font-semibold text-white shadow-md shadow-blue-100 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="flex-1 rounded-xl bg-blue-500 py-3 text-sm font-semibold text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
-                {discardingId === discardConfirm.id ? "투척 중..." : "투척하기 💧"}
+                {discardingId === discardConfirm.id ? "처리 중..." : "이동하기"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reviewProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+            onClick={() => {
+              if (!isSubmittingReviews) {
+                setReviewProject(null);
+                setReviewTargets([]);
+                setReviewInputs({});
+              }
+            }}
+          />
+
+          <div className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-7 shadow-2xl">
+            <h2 className="text-xl font-bold text-slate-900">
+              팀원 평가 후 프로젝트 버리기
+            </h2>
+
+            <p className="mt-2 text-sm text-slate-500">
+              진행중인 프로젝트를 버리기 전에 함께한 팀원들을 평가해주세요.
+              평가는 각 사용자의 마이페이지 신뢰도에 반영됩니다.
+            </p>
+
+            <div className="mt-6 space-y-5">
+              {reviewTargets.map((member) => {
+                const input = reviewInputs[member.user_id] || {
+                  teamwork_score: 3,
+                  contribution_score: 3,
+                  responsibility_score: 3,
+                  comment: "",
+                };
+
+                return (
+                  <div
+                    key={member.user_id}
+                    className="rounded-2xl border border-slate-200 p-5"
+                  >
+                    <p className="font-bold text-slate-900">
+                      User #{member.user_id} · {member.role_in_project}
+                    </p>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                      <ScoreSelect
+                        label="협업"
+                        value={input.teamwork_score}
+                        onChange={(value) =>
+                          updateReviewInput(
+                            member.user_id,
+                            "teamwork_score",
+                            value
+                          )
+                        }
+                      />
+
+                      <ScoreSelect
+                        label="기여"
+                        value={input.contribution_score}
+                        onChange={(value) =>
+                          updateReviewInput(
+                            member.user_id,
+                            "contribution_score",
+                            value
+                          )
+                        }
+                      />
+
+                      <ScoreSelect
+                        label="책임"
+                        value={input.responsibility_score}
+                        onChange={(value) =>
+                          updateReviewInput(
+                            member.user_id,
+                            "responsibility_score",
+                            value
+                          )
+                        }
+                      />
+                    </div>
+
+                    <textarea
+                      value={input.comment}
+                      onChange={(e) =>
+                        updateReviewInput(
+                          member.user_id,
+                          "comment",
+                          e.target.value
+                        )
+                      }
+                      placeholder="간단한 평가 코멘트를 남겨주세요."
+                      className="mt-4 min-h-24 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-6 flex gap-2">
+              <button
+                onClick={() => {
+                  setReviewProject(null);
+                  setReviewTargets([]);
+                  setReviewInputs({});
+                }}
+                disabled={isSubmittingReviews}
+                className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-medium text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                취소
+              </button>
+
+              <button
+                onClick={submitReviewsAndDiscard}
+                disabled={isSubmittingReviews}
+                className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                {isSubmittingReviews ? "처리 중..." : "평가 저장 후 버리기"}
               </button>
             </div>
           </div>
@@ -511,5 +804,24 @@ function MiniStat({ label, value }) {
       <p className="text-sm">{label}</p>
       <p className="text-xl font-bold">{value}</p>
     </div>
+  );
+}
+
+function ScoreSelect({ label, value, onChange }) {
+  return (
+    <label className="text-sm font-semibold text-slate-700">
+      {label}
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-100"
+      >
+        <option value={1}>1점</option>
+        <option value={2}>2점</option>
+        <option value={3}>3점</option>
+        <option value={4}>4점</option>
+        <option value={5}>5점</option>
+      </select>
+    </label>
   );
 }
