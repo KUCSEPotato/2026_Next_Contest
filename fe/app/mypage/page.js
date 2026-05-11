@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { updateStoredUser } from "../../lib/auth";
 import {
   getMyProfileApi,
   getMyReputationApi,
@@ -283,6 +284,7 @@ export default function MyPage() {
         skills: prev?.skills,
         interests: prev?.interests,
       }));
+      updateStoredUser(result.data);
       setIsEditingProfile(false);
     } catch (error) {
       console.error(error);

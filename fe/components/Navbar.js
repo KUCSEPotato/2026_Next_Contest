@@ -9,7 +9,9 @@ import {
   getToken,
   refreshAccessToken,
   removeToken,
+  updateStoredUser,
 } from "../lib/auth";
+import { getMyProfileApi } from "../lib/api";
 
 export default function Navbar() {
   const router = useRouter();
@@ -39,6 +41,41 @@ export default function Navbar() {
       window.removeEventListener("focus", syncAuthState);
     };
   }, []);
+
+  useEffect(() => {
+    if (!token) return;
+
+    let ignore = false;
+
+    async function syncLatestProfile() {
+      try {
+        const result = await getMyProfileApi();
+        if (ignore || !result?.data) return;
+
+        const latestUser = result.data;
+        const storedUser = getStoredUser();
+        const hasChanged =
+          storedUser?.id !== latestUser.id ||
+          storedUser?.email !== latestUser.email ||
+          storedUser?.nickname !== latestUser.nickname ||
+          storedUser?.avatar_url !== latestUser.avatar_url;
+
+        if (hasChanged) {
+          updateStoredUser(latestUser);
+        } else {
+          setUser(storedUser);
+        }
+      } catch {
+        // Keep the last stored user visible if profile sync fails.
+      }
+    }
+
+    syncLatestProfile();
+
+    return () => {
+      ignore = true;
+    };
+  }, [token]);
 
   if (pathname === "/login" || pathname === "/signup") {
     return null;

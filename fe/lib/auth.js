@@ -84,6 +84,14 @@ export function getStoredUser() {
   }
 }
 
+export function updateStoredUser(user) {
+  if (!canUseStorage() || !user) return;
+
+  const currentUser = getStoredUser() || {};
+  localStorage.setItem("user", JSON.stringify({ ...currentUser, ...user }));
+  notifyAuthChanged();
+}
+
 export function removeToken() {
   if (!canUseStorage()) return;
 
