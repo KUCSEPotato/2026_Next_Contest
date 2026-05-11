@@ -10,7 +10,6 @@ import {
   getProjectApi,
   getTodosApi,
   sendMessageApi,
-  toggleTodoDoneApi,
   updateTodoApi,
 } from "../../../lib/api";
 import { useRef } from "react";
@@ -189,18 +188,6 @@ export default function ChatRoomPage() {
     }
   };
 
-  const handleToggleTodo = async (todoId) => {
-    if (!projectId) return;
-
-    try {
-      await toggleTodoDoneApi(projectId, todoId);
-      await loadProjectTodos();
-    } catch (error) {
-      console.error(error);
-      alert("Todo 완료 상태를 변경하지 못했습니다.");
-    }
-  };
-
   const handleGenerateTodos = async () => {
     if (!projectId) {
       alert("프로젝트 정보를 찾을 수 없습니다.");
@@ -281,31 +268,6 @@ export default function ChatRoomPage() {
     } catch (error) {
       console.error(error);
       alert("Todo 수정에 실패했습니다.");
-    }
-  };
-
-  const handleMoveTodo = async (todoIndex, direction) => {
-    if (!projectId) return;
-
-    const targetIndex = todoIndex + direction;
-    if (targetIndex < 0 || targetIndex >= todos.length) return;
-
-    const currentTodo = todos[todoIndex];
-    const targetTodo = todos[targetIndex];
-
-    try {
-      await Promise.all([
-        updateTodoApi(projectId, currentTodo.id, {
-          priority: targetTodo.priority || targetIndex + 1,
-        }),
-        updateTodoApi(projectId, targetTodo.id, {
-          priority: currentTodo.priority || todoIndex + 1,
-        }),
-      ]);
-      await loadProjectTodos();
-    } catch (error) {
-      console.error(error);
-      alert("Todo 순서를 변경하지 못했습니다.");
     }
   };
 
@@ -525,7 +487,7 @@ export default function ChatRoomPage() {
                     </h3>
                   </div>
 
-                  {group.items.map(({ todo, index }) => {
+                  {group.items.map(({ todo }) => {
                     const isDone = todo.status === "done";
                     const isEditing = editingTodoId === todo.id;
                     const description = getVisibleTodoDescription(todo);
@@ -537,13 +499,6 @@ export default function ChatRoomPage() {
                         className="rounded-xl border border-slate-200 px-3 py-2 transition hover:border-red-200 hover:bg-red-50"
                       >
                         <div className="flex gap-2">
-                          <input
-                            type="checkbox"
-                            checked={isDone}
-                            onChange={() => handleToggleTodo(todo.id)}
-                            className="mt-1 h-4 w-4 shrink-0 accent-red-600"
-                          />
-
                           <div className="min-w-0 flex-1">
                             {isEditing ? (
                               <div className="space-y-2">
