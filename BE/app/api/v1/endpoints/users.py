@@ -1,10 +1,13 @@
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from datetime import datetime, timedelta, timezone
+from fastapi import APIRouter, Body, Depends, HTTPException, status, File, UploadFile
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.v1.response import success_response
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
+from app.models import Idea
+from app.models import IdeaBookmark
 from app.models import Application
 from app.models import Project
 from app.models import ProjectMember
@@ -15,6 +18,9 @@ from app.models import UserInterest
 from app.models import UserRatingAggregate
 from app.models import UserSkill
 from app.models import Interest
+from app.schemas.users import OnboardingIdeaSelectionRequest
+from app.schemas.users import UserProfileUpdateRequest
+from app.services.s3_upload import get_s3_service
 
 router = APIRouter()
 
@@ -45,23 +51,123 @@ async def get_my_profile(
         .filter(UserInterest.user_id == current_user_id)
         .all()
     )
+    selected_idea_ids = (
+        db.query(IdeaBookmark.idea_id)
+        .filter(IdeaBookmark.user_id == current_user_id)
+        .order_by(IdeaBookmark.id.asc())
+        .all()
+    )
+    
+    # 현재 참여중인 프로젝트 (멤버로 참여중인 프로젝트)
+    participating_projects = (
+        db.query(Project)
+        .join(ProjectMember, ProjectMember.project_id == Project.id)
+        .filter(
+            ProjectMember.user_id == current_user_id,
+            Project.deleted_at.is_(None),
+        )
+        .all()
+    )
+    participating_project_list = [
+        {
+            "id": p.id,
+            "title": p.title,
+            "status": p.status,
+            "leader_id": p.leader_id,
+        }
+        for p in participating_projects
+    ]
 
     return success_response(
         data={
             "id": user.id,
             "email": user.email,
             "nickname": user.nickname,
+            "name": user.name,
+            "phone_number": user.phone_number,
+            "coin_balance": user.coin_balance,
             "bio": user.bio,
             "avatar_url": user.avatar_url,
             "skills": [name for (name,) in skills],
             "interests": [name for (name,) in interests],
+            "selected_idea_ids": [idea_id for (idea_id,) in selected_idea_ids],
+            "participating_projects": participating_project_list,
+            "onboarding_step": user.onboarding_step,
+            "onboarding_completed_at": user.onboarding_completed_at,
+        },
+    )
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    skills = (
+        db.query(Skill.name)
+        .join(UserSkill, UserSkill.skill_id == Skill.id)
+        .filter(UserSkill.user_id == current_user_id)
+        .all()
+    ),
+
+
+@router.post("/me/avatar", summary="아바타 업로드", description="마이페이지에서 사용자 아바타(사진)를 업로드합니다.")
+async def upload_my_avatar(
+    file: UploadFile = File(...),
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+    s3_service = Depends(get_s3_service),
+) -> dict:
+    """사용자 아바타 업로드 API.
+
+    - Accepts image files only (content-type starts with `image/`).
+    - Uploads to S3 under `avatars/` folder and saves the public URL to `user.avatar_url`.
+    """
+    user = db.get(User, current_user_id)
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    content_type = file.content_type or ""
+    if not content_type.startswith("image/"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only image uploads are allowed")
+
+    content = await file.read()
+
+    upload_result = await s3_service.upload_file(content, file.filename, content_type, "avatars")
+
+    user.avatar_url = upload_result["s3_url"]
+    db.commit()
+    db.refresh(user)
+
+    return success_response(data={"avatar_url": user.avatar_url})
+
+
+@router.get("/me/onboarding", summary="내 온보딩 상태 조회", description="회원가입/프로필/관심 아이디어 선택 진행 상태를 조회합니다.")
+async def get_my_onboarding_state(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    user = db.get(User, current_user_id)
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    selected_idea_ids = (
+        db.query(IdeaBookmark.idea_id)
+        .filter(IdeaBookmark.user_id == current_user_id)
+        .order_by(IdeaBookmark.id.asc())
+        .all()
+    )
+
+    return success_response(
+        data={
+            "onboarding_step": user.onboarding_step,
+            "profile_ready": bool(user.name and user.phone_number),
+            "completed": user.onboarding_step == "completed",
+            "selected_idea_ids": [idea_id for (idea_id,) in selected_idea_ids],
+            "onboarding_completed_at": user.onboarding_completed_at,
         },
     )
 
 
 @router.patch("/me/profile", summary="내 프로필 수정", description="닉네임/소개/아바타 URL을 수정합니다.")
 async def update_my_profile(
-    payload: dict = Body(default={}),
+    payload: UserProfileUpdateRequest,
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -74,15 +180,109 @@ async def update_my_profile(
     if user is None or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    for field in ("nickname", "bio", "avatar_url"):
-        if field in payload:
-            setattr(user, field, payload[field])
+    if payload.nickname is not None and payload.nickname != user.nickname:
+        duplicate = db.query(User).filter(User.nickname == payload.nickname, User.id != user.id, User.deleted_at.is_(None)).first()
+        if duplicate:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nickname already exists")
+
+    for field in ("nickname", "name", "phone_number", "bio", "avatar_url"):
+        value = getattr(payload, field)
+        if value is not None:
+            setattr(user, field, value)
+
+    if user.onboarding_step == "profile_pending" and user.name and user.phone_number:
+        user.onboarding_step = "ideas_pending"
 
     db.commit()
     db.refresh(user)
     return success_response(
-        data={"id": user.id, "nickname": user.nickname, "bio": user.bio, "avatar_url": user.avatar_url},
+        data={
+            "id": user.id,
+            "nickname": user.nickname,
+            "name": user.name,
+            "phone_number": user.phone_number,
+            "coin_balance": user.coin_balance,
+            "bio": user.bio,
+            "avatar_url": user.avatar_url,
+            "onboarding_step": user.onboarding_step,
+        },
     )
+
+
+@router.get("/me/onboarding", summary="내 온보딩 상태 조회", description="회원가입/프로필/관심 아이디어 선택 진행 상태를 조회합니다.")
+async def get_my_onboarding_state(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    user = db.get(User, current_user_id)
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    selected_idea_ids = (
+        db.query(IdeaBookmark.idea_id)
+        .filter(IdeaBookmark.user_id == current_user_id)
+        .order_by(IdeaBookmark.id.asc())
+        .all()
+    )
+
+    return success_response(
+        data={
+            "onboarding_step": user.onboarding_step,
+            "profile_ready": bool(user.name and user.phone_number),
+            "completed": user.onboarding_step == "completed",
+            "selected_idea_ids": [idea_id for (idea_id,) in selected_idea_ids],
+            "onboarding_completed_at": user.onboarding_completed_at,
+        },
+    )
+
+
+@router.get("/me/projects", summary="내가 리더인 프로젝트 목록", description="현재 사용자가 리더인 프로젝트를 반환합니다.")
+async def get_my_projects(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    """내가 리더인 프로젝트 목록 조회 API.
+    
+    각 프로젝트에 can_discard 필드를 포함합니다.
+    can_discard 조건:
+    - 팀 결성이 된 프로젝트 (status가 'started', 'in_progress', 'completed', 'recycled' 중 하나)
+    - 또는 아이디어 생성 후 30일 이상 경과한 프로젝트
+    
+    Swagger 테스트 방법:
+    - Authorization 헤더에 Bearer access token을 넣습니다.
+    """
+    projects = (
+        db.query(Project)
+        .filter(Project.leader_id == current_user_id, Project.deleted_at.is_(None))
+        .order_by(Project.created_at.desc())
+        .all()
+    )
+    
+    response_data = []
+    now = datetime.now(timezone.utc)
+    
+    for project in projects:
+        # 팀 결성 여부: status가 'planning' 이상인 경우
+        team_formed = project.status != "planning"
+        
+        # 아이디어 생성 후 30일 이상 경과 여부
+        days_since_creation = (now - project.created_at.replace(tzinfo=timezone.utc)).days if project.created_at else 0
+        time_elapsed_30_days = days_since_creation >= 30
+        
+        # can_discard 조건: 팀 결성됐거나 30일 이상 경과
+        can_discard = team_formed or time_elapsed_30_days
+        
+        response_data.append({
+            "id": project.id,
+            "title": project.title,
+            "status": project.status,
+            "difficulty": project.difficulty,
+            "category": project.category,
+            "created_at": project.created_at.isoformat() if project.created_at else None,
+            "can_discard": can_discard,
+        })
+    
+    return success_response(data=response_data)
 
 
 @router.get("/{user_id}/profile", summary="공개 프로필 조회", description="특정 사용자의 공개 프로필을 조회합니다.")
@@ -262,6 +462,48 @@ async def add_my_interest(
     return success_response(data={"interest_id": interest.id, "name": interest.name, "interest_level": interest_level})
 
 
+@router.post("/me/onboarding/ideas", summary="온보딩 관심 아이디어 선택", description="회원가입 마지막 단계에서 관심 있는 아이디어를 선택하고 온보딩을 완료합니다.")
+async def select_onboarding_ideas(
+    payload: OnboardingIdeaSelectionRequest,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    user = db.get(User, current_user_id)
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if not user.name or not user.phone_number:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Complete profile before selecting ideas")
+
+    selected_idea_ids = []
+    created_bookmarks = 0
+    for idea_id in payload.idea_ids:
+        idea = db.get(Idea, idea_id)
+        if idea is None or idea.deleted_at is not None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Idea not found: {idea_id}")
+
+        bookmark = db.query(IdeaBookmark).filter(IdeaBookmark.user_id == current_user_id, IdeaBookmark.idea_id == idea_id).first()
+        if bookmark is None:
+            bookmark = IdeaBookmark(user_id=current_user_id, idea_id=idea_id)
+            db.add(bookmark)
+            created_bookmarks += 1
+        selected_idea_ids.append(idea_id)
+
+    user.onboarding_step = "completed"
+    user.onboarding_completed_at = datetime.now(timezone.utc)
+    db.commit()
+
+    return success_response(
+        data={
+            "completed": True,
+            "selected_idea_ids": selected_idea_ids,
+            "bookmarks_created": created_bookmarks,
+            "onboarding_step": user.onboarding_step,
+            "onboarding_completed_at": user.onboarding_completed_at,
+        },
+    )
+
+
 @router.delete("/me/interests/{interest_id}", summary="내 관심 분야 삭제", description="등록된 관심 분야 매핑을 제거합니다.")
 async def remove_my_interest(
     interest_id: int,
@@ -275,6 +517,65 @@ async def remove_my_interest(
     db.delete(user_interest)
     db.commit()
     return success_response(data={"removed": True, "interest_id": interest_id})
+
+
+@router.get("/{user_id}/reviews", summary="사용자 리뷰 조회", description="특정 사용자가 받은 리뷰 목록을 공개적으로 조회합니다.")
+async def get_user_reviews(
+    user_id: int,
+    db: Session = Depends(get_db),
+) -> dict:
+    """사용자 리뷰 조회 API (공개).
+
+    인증 불필요. 누구나 다른 사용자의 리뷰 기록을 조회할 수 있습니다.
+
+    테스트 방법:
+    - 경로: /api/v1/users/{user_id}/reviews
+    - user_id: 조회할 사용자의 ID
+
+    응답:
+    - 해당 사용자(reviewee)가 받은 모든 리뷰를 최신순으로 반환합니다.
+    - reviewer 정보(id, nickname, avatar_url)와 프로젝트 정보(id, title)를 포함합니다.
+    - 각 리뷰의 점수(teamwork, contribution, responsibility)와 코멘트를 포함합니다.
+    
+    검증:
+    - 사용자가 없으면 `404`
+    """
+    user = db.get(User, user_id)
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    
+    reviews = (
+        db.query(Review)
+        .filter(Review.reviewee_id == user_id)
+        .order_by(Review.created_at.desc())
+        .all()
+    )
+
+    result = []
+    for review in reviews:
+        reviewer = db.get(User, review.reviewer_id)
+        project = db.get(Project, review.project_id)
+        result.append(
+            {
+                "id": review.id,
+                "reviewer": {
+                    "id": reviewer.id,
+                    "nickname": reviewer.nickname,
+                    "avatar_url": reviewer.avatar_url,
+                },
+                "project": {
+                    "id": project.id,
+                    "title": project.title,
+                },
+                "teamwork_score": review.teamwork_score,
+                "contribution_score": review.contribution_score,
+                "responsibility_score": review.responsibility_score,
+                "comment": review.comment,
+                "created_at": review.created_at,
+            }
+        )
+
+    return success_response(data=result)
 
 
 @router.get("/me/reviews", summary="내가 받은 리뷰 목록", description="팀원들이 남긴 리뷰 목록을 조회합니다.")

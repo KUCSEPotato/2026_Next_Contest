@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getIdeasApi } from "../../lib/api";
+import { AUTH_CHANGED_EVENT, getToken } from "../../lib/auth";
+import { getProjectsApi, getRecommendedProjectsApi } from "../../lib/api";
 
 interface Project {
   id: number;
+  project_id?: number | null;
+  converted_to_project_id?: number | null;
   title: string;
   description: string;
   summary?: string;
@@ -13,9 +16,42 @@ interface Project {
   techStack: string[];
   currentMembers: number;
   maxMembers: number;
-  daysLeft: number;
+  status: string;
   difficulty: "beginner" | "intermediate" | "advanced";
   isUrgent: boolean;
+  applicantCount: number;
+  remainingSeats: number;
+  competitionRatio: number;
+  createdAt: string;
+}
+
+interface ApiProject {
+  id: number;
+  title?: string;
+  description?: string;
+  summary?: string;
+  category?: string;
+  tech_stack?: string[];
+  techStack?: string[];
+  currentMembers?: number;
+  current_members?: number;
+  maxMembers?: number;
+  max_members?: number;
+  applicantCount?: number;
+  applicant_count?: number;
+  remainingSeats?: number;
+  remaining_seats?: number;
+  competitionRatio?: number;
+  competition_ratio?: number;
+  created_at?: string;
+  createdAt?: string;
+  status?: string;
+  difficulty?: "beginner" | "intermediate" | "advanced";
+}
+
+interface RecommendedProject {
+  project_id?: number;
+  id?: number;
 }
 
 const CATEGORIES = [
@@ -42,31 +78,91 @@ const DIFFICULTY_COLOR = {
   advanced: "text-rose-600 bg-rose-50",
 };
 
+const DIFFICULTY_OPTIONS = [
+  { value: "beginner", label: "입문" },
+  { value: "intermediate", label: "중급" },
+  { value: "advanced", label: "고급" },
+];
+
+const RECRUITMENT_STATUS_OPTIONS = [
+  { value: "recruiting", label: "모집중" },
+  { value: "closed", label: "모집완료" },
+];
+
+const SORT_OPTIONS = [
+  { value: "latest", label: "최신순" },
+  { value: "recommended", label: "AI 기반 추천순" },
+  { value: "competition", label: "경쟁률순" },
+];
+
+const SERVICE_BLOCKS = [
+  {
+    title: "프로젝트 탐색",
+    description: "진행 중인 아이디어와 프로젝트를 둘러보고 함께할 팀을 찾아보세요.",
+    path: "/mainpage",
+    isActive: true,
+  },
+  {
+    title: "영감의 샘",
+    description: "아이디어를 흘려보내고,\n새로운 영감을 건져가세요.",
+    path: "/ideas/pickup",
+    isActive: false,
+  },
+  {
+    title: "자유항해",
+    description: "질문, 회고, 팀원 모집까지\n넓은 바다처럼 자유롭게.",
+    path: "/community",
+    isActive: false,
+  },
+];
+
 const useAuth = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    setIsLoggedIn(!!token);
+    const syncAuthState = () => setIsLoggedIn(!!getToken());
+
+    syncAuthState();
+    window.addEventListener(AUTH_CHANGED_EVENT, syncAuthState);
+    window.addEventListener("storage", syncAuthState);
+
+    return () => {
+      window.removeEventListener(AUTH_CHANGED_EVENT, syncAuthState);
+      window.removeEventListener("storage", syncAuthState);
+    };
   }, []);
 
   return { isLoggedIn };
 };
 
-function normalizeIdea(idea: any): Project {
+function normalizeProject(project: ApiProject): Project {
   return {
-    id: idea.id,
-    title: idea.title || "제목 없음",
-    description: idea.summary || idea.description || "설명이 없습니다.",
-    summary: idea.summary,
-    category: idea.domain || idea.category || "IT/소프트웨어",
-    techStack: idea.tech_stack || idea.techStack || [],
-    currentMembers: idea.currentMembers ?? 1,
-    maxMembers: idea.required_members || idea.maxMembers || 4,
-    daysLeft: idea.daysLeft ?? 30,
-    difficulty: idea.difficulty || "beginner",
-    isUrgent: idea.isUrgent ?? false,
+    id: project.id,
+    project_id: project.id,
+    converted_to_project_id: project.id,
+    title: project.title || "제목 없음",
+    description: project.summary || project.description || "설명이 없습니다.",
+    summary: project.summary,
+    category: project.category || "IT/소프트웨어",
+    techStack: project.techStack || project.tech_stack || [],
+    currentMembers: project.currentMembers ?? project.current_members ?? 0,
+    maxMembers: project.maxMembers ?? project.max_members ?? 0,
+    applicantCount: project.applicantCount ?? project.applicant_count ?? 0,
+    remainingSeats: project.remainingSeats ?? project.remaining_seats ?? 0,
+    competitionRatio: project.competitionRatio ?? project.competition_ratio ?? 0,
+    status: project.status || "planning",
+    difficulty: project.difficulty ?? "beginner",
+    isUrgent: false,
+    createdAt: project.createdAt ?? project.created_at ?? "",
   };
+}
+
+function isProjectRecruiting(project: Project) {
+  return (
+    project.status !== "in_progress" &&
+    project.status !== "completed" &&
+    (!project.maxMembers || project.currentMembers < project.maxMembers)
+  );
 }
 
 export default function MainPage() {
@@ -79,29 +175,61 @@ export default function MainPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(null);
+  const [selectedRecruitmentStatus, setSelectedRecruitmentStatus] = useState<string | null>(null);
+  const [memberMin, setMemberMin] = useState("");
+  const [memberMax, setMemberMax] = useState("");
+  const [sortBy, setSortBy] = useState("latest");
+  const [recommendedProjectIds, setRecommendedProjectIds] = useState<number[]>([]);
   const [showLoginModal, setShowLoginModal] = useState(false);
 
   useEffect(() => {
-    async function loadIdeas() {
+    async function loadProjects() {
       try {
         setLoading(true);
         setLoadError("");
 
-        const result = await getIdeasApi({ page: 1, size: 50 });
-        const ideas = result.data || [];
+        const result = await getProjectsApi({ page: 1, size: 100 });
+        const projects = result.data || [];
 
-        setProjects(ideas.map(normalizeIdea));
+        setProjects(projects.map(normalizeProject));
       } catch (error) {
-        console.error("아이디어 목록 조회 실패:", error);
-        setLoadError("아이디어 목록을 불러오지 못했습니다.");
+        console.error("프로젝트 목록 조회 실패:", error);
+        setLoadError("프로젝트 목록을 불러오지 못했습니다.");
         setProjects([]);
       } finally {
         setLoading(false);
       }
     }
 
-    loadIdeas();
+    loadProjects();
   }, []);
+
+  useEffect(() => {
+    async function loadRecommendedProjectOrder() {
+      if (sortBy !== "recommended") return;
+
+      if (!isLoggedIn) {
+        setRecommendedProjectIds([]);
+        return;
+      }
+
+      try {
+        const result = await getRecommendedProjectsApi({}, 100);
+        const recommendations: RecommendedProject[] = result.data || [];
+        setRecommendedProjectIds(
+          recommendations
+            .map((project) => project.project_id ?? project.id)
+            .filter((id): id is number => typeof id === "number")
+        );
+      } catch (error) {
+        console.error("추천 프로젝트 조회 실패:", error);
+        setRecommendedProjectIds([]);
+      }
+    }
+
+    loadRecommendedProjectOrder();
+  }, [isLoggedIn, sortBy]);
 
   const handleProtectedAction = () => {
     if (!isLoggedIn) {
@@ -111,35 +239,130 @@ export default function MainPage() {
     return true;
   };
 
-  const handleProjectClick = (id: number) => {
-    if (!handleProtectedAction()) return;
-    router.push(`/ideas/${id}`);
+  const handleServiceClick = (path: string) => {
+    if (path === "/mainpage") {
+      router.push(path);
+      return;
+    }
+
+    router.push(path);
   };
 
-  const handleApply = (e: React.MouseEvent, id: number) => {
-    e.stopPropagation();
+  const handleProjectClick = (project: Project) => {
     if (!handleProtectedAction()) return;
-    router.push(`/ideas/${id}`);
+
+    const projectId = project.project_id || project.converted_to_project_id || project.id;
+
+    if (projectId) {
+      router.push(`/projects/${projectId}`, { scroll: true });
+    } else {
+      alert("연결된 프로젝트가 없습니다.");
+    }
   };
 
-  const filteredProjects = projects.filter((p) => {
-    const matchCategory = selectedCategory
-      ? p.category === selectedCategory
-      : true;
+  const filteredProjects = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const minMembers = memberMin ? Number(memberMin) : null;
+    const maxMembers = memberMax ? Number(memberMax) : null;
+    const recommendationRank = new Map(
+      recommendedProjectIds.map((projectId, index) => [projectId, index])
+    );
 
-    const matchSearch = searchQuery
-      ? p.title.includes(searchQuery) ||
-        p.description.includes(searchQuery) ||
-        p.techStack.some((t) =>
-          t.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-      : true;
+    return projects
+      .filter((project) => {
+        const matchCategory = selectedCategory
+          ? project.category === selectedCategory
+          : true;
 
-    return matchCategory && matchSearch;
-  });
+        const matchDifficulty = selectedDifficulty
+          ? project.difficulty === selectedDifficulty
+          : true;
+
+        const recruiting = isProjectRecruiting(project);
+        const matchRecruitmentStatus =
+          selectedRecruitmentStatus === "recruiting"
+            ? recruiting
+            : selectedRecruitmentStatus === "closed"
+            ? !recruiting
+            : true;
+
+        const memberCount = project.maxMembers || project.currentMembers;
+        const matchMemberMin = minMembers === null || memberCount >= minMembers;
+        const matchMemberMax = maxMembers === null || memberCount <= maxMembers;
+
+        const matchSearch = query
+          ? project.title.toLowerCase().includes(query) ||
+            project.description.toLowerCase().includes(query) ||
+            project.techStack.some((tech) =>
+              tech.toLowerCase().includes(query)
+            )
+          : true;
+
+        return (
+          matchCategory &&
+          matchDifficulty &&
+          matchRecruitmentStatus &&
+          matchMemberMin &&
+          matchMemberMax &&
+          matchSearch
+        );
+      })
+      .sort((a, b) => {
+        if (sortBy === "competition") {
+          return b.competitionRatio - a.competitionRatio;
+        }
+
+        if (sortBy === "recommended") {
+          const aRank = recommendationRank.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+          const bRank = recommendationRank.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+
+          if (aRank !== bRank) return aRank - bRank;
+        }
+
+        return (
+          new Date(b.createdAt || 0).getTime() -
+          new Date(a.createdAt || 0).getTime()
+        );
+      });
+  }, [
+    memberMax,
+    memberMin,
+    projects,
+    recommendedProjectIds,
+    searchQuery,
+    selectedCategory,
+    selectedDifficulty,
+    selectedRecruitmentStatus,
+    sortBy,
+  ]);
+
+  const hasActiveFilters =
+    searchQuery ||
+    selectedCategory ||
+    selectedDifficulty ||
+    selectedRecruitmentStatus ||
+    memberMin ||
+    memberMax ||
+    sortBy !== "latest";
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <header className="mx-auto flex max-w-6xl items-center justify-end gap-3 px-4 py-4">
+        <button
+          onClick={() => router.push("/notifications")}
+          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-red-300 hover:text-red-600"
+        >
+          알림
+        </button>
+
+        <button
+          onClick={() => router.push("/chat")}
+          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-red-300 hover:text-red-600"
+        >
+          채팅
+        </button>
+      </header>
+
       <main className="mx-auto max-w-6xl px-4 pb-16">
         <section className="py-10 text-center sm:py-14">
           <h1 className="mb-3 text-2xl font-bold leading-tight text-gray-900 sm:text-4xl">
@@ -147,18 +370,73 @@ export default function MainPage() {
             <br className="sm:hidden" /> 팀을 프로젝트로
           </h1>
 
-          <p className="mb-6 text-sm text-gray-500 sm:text-base">
-            AI가 나에게 맞는 프로젝트와 팀원을 연결해드려요
+          <p className="mb-8 text-sm text-gray-500 sm:text-base">
+            관심 있는 기능을 선택하고 Devory에서 함께할 팀을 찾아보세요
           </p>
+
+          <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 text-left sm:grid-cols-3">
+            {SERVICE_BLOCKS.map((block) => (
+              <button
+                key={block.title}
+                onClick={() => handleServiceClick(block.path)}
+                className={`rounded-2xl border p-5 shadow-sm transition hover:border-red-300 hover:shadow-md ${
+                  block.isActive
+                    ? "border-red-200 bg-red-50"
+                    : "border-gray-200 bg-white"
+                }`}
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <p
+                    className={`text-base font-bold ${
+                      block.isActive ? "text-red-600" : "text-gray-900"
+                    }`}
+                  >
+                    {block.title}
+                  </p>
+
+                  {block.isActive && (
+                    <span className="rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                      현재
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-sm leading-relaxed text-gray-500 whitespace-pre-line">
+                  {block.description}
+                </p>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="mb-8 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-lg font-bold text-gray-900">프로젝트 탐색</p>
+              <p className="mt-1 text-sm text-gray-500">
+                등록된 프로젝트를 살펴보고 함께할 팀을 찾아보세요.
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                if (!handleProtectedAction()) return;
+                router.push("/ideas/new");
+              }}
+              className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+            >
+              아이디어 등록하기
+            </button>
+          </div>
 
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="아이디어 제목이나 기술 스택을 검색해보세요"
-            className="mx-auto mb-4 w-full max-w-xl rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-400"
+            placeholder="프로젝트 제목이나 기술 스택을 검색해보세요"
+            className="mb-4 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-400"
           />
 
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <div className="flex flex-wrap gap-2">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat.label}
@@ -178,21 +456,143 @@ export default function MainPage() {
               </button>
             ))}
           </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1fr_1fr]">
+            <div>
+              <p className="mb-2 text-xs font-semibold text-gray-500">
+                프로젝트 난이도
+              </p>
+
+              <div className="flex flex-wrap gap-2">
+                {DIFFICULTY_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() =>
+                      setSelectedDifficulty(
+                        selectedDifficulty === option.value ? null : option.value
+                      )
+                    }
+                    className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                      selectedDifficulty === option.value
+                        ? "border-red-600 bg-red-600 text-white"
+                        : "border-gray-200 bg-white text-gray-600 hover:border-red-300 hover:text-red-600"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-semibold text-gray-500">
+                모집 상태
+              </p>
+
+              <div className="flex flex-wrap gap-2">
+                {RECRUITMENT_STATUS_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() =>
+                      setSelectedRecruitmentStatus(
+                        selectedRecruitmentStatus === option.value
+                          ? null
+                          : option.value
+                      )
+                    }
+                    className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                      selectedRecruitmentStatus === option.value
+                        ? "border-red-600 bg-red-600 text-white"
+                        : "border-gray-200 bg-white text-gray-600 hover:border-red-300 hover:text-red-600"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-semibold text-gray-500">
+                정렬 기준
+              </p>
+
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-red-400"
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-semibold text-gray-500">
+              모집 인원 범위
+            </p>
+
+            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center">
+              <input
+                type="number"
+                min="1"
+                max="100"
+                value={memberMin}
+                onChange={(e) => setMemberMin(e.target.value)}
+                placeholder="최소 인원"
+                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-400"
+              />
+
+              <span className="hidden text-center text-sm text-gray-400 sm:block">
+                -
+              </span>
+
+              <input
+                type="number"
+                min="1"
+                max="100"
+                value={memberMax}
+                onChange={(e) => setMemberMax(e.target.value)}
+                placeholder="최대 인원"
+                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-400"
+              />
+            </div>
+          </div>
+
+          {sortBy === "recommended" && !isLoggedIn && (
+            <p className="mt-3 text-xs text-amber-600">
+              AI 기반 추천순은 로그인 후 기술 스택 정보를 바탕으로 더 정확하게 정렬됩니다.
+            </p>
+          )}
         </section>
 
         <section className="mb-10">
           <div className="mb-4 flex items-center justify-between">
             <span className="text-base font-bold text-gray-900">
-              {searchQuery || selectedCategory
+              {searchQuery ||
+              selectedCategory ||
+              selectedDifficulty ||
+              selectedRecruitmentStatus ||
+              memberMin ||
+              memberMax
                 ? `검색 결과 (${filteredProjects.length})`
-                : "전체 아이디어"}
+                : "전체 프로젝트"}
             </span>
 
-            {(searchQuery || selectedCategory) && (
+            {hasActiveFilters && (
               <button
                 onClick={() => {
                   setSearchQuery("");
                   setSelectedCategory(null);
+                  setSelectedDifficulty(null);
+                  setSelectedRecruitmentStatus(null);
+                  setMemberMin("");
+                  setMemberMax("");
+                  setSortBy("latest");
                 }}
                 className="text-xs text-gray-400 transition hover:text-gray-600"
               >
@@ -203,7 +603,7 @@ export default function MainPage() {
 
           {loading ? (
             <div className="py-16 text-center text-sm text-gray-500">
-              아이디어 목록을 불러오는 중...
+              프로젝트 목록을 불러오는 중...
             </div>
           ) : loadError ? (
             <div className="py-16 text-center text-sm text-red-500">
@@ -213,7 +613,7 @@ export default function MainPage() {
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <p className="mb-3 text-3xl">🔍</p>
               <p className="mb-1 text-sm font-medium text-gray-600">
-                등록된 아이디어가 없어요
+                등록된 프로젝트가 없어요
               </p>
               <p className="text-xs text-gray-400">
                 직접 첫 아이디어를 등록해보세요
@@ -225,30 +625,11 @@ export default function MainPage() {
                 <ProjectCard
                   key={project.id}
                   project={project}
-                  onClick={() => handleProjectClick(project.id)}
-                  onApply={(e) => handleApply(e, project.id)}
+                  onClick={() => handleProjectClick(project)}
                 />
               ))}
             </div>
           )}
-        </section>
-
-        <section className="rounded-2xl bg-red-600 p-6 text-center text-white sm:p-8">
-          <p className="mb-2 text-lg font-bold sm:text-xl">
-            팀이 없어도 괜찮아요
-          </p>
-          <p className="mb-5 text-sm text-red-100">
-            아이디어만 있으면 Devory가 팀을 만들어드려요
-          </p>
-          <button
-            onClick={() => {
-              if (!handleProtectedAction()) return;
-              router.push("/ideas/new");
-            }}
-            className="rounded-xl bg-white px-6 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
-          >
-            아이디어 등록하기 →
-          </button>
         </section>
       </main>
 
@@ -265,13 +646,19 @@ export default function MainPage() {
 function ProjectCard({
   project,
   onClick,
-  onApply,
 }: {
   project: Project;
   onClick: () => void;
-  onApply: (e: React.MouseEvent) => void;
 }) {
-  const isAlmostFull = project.currentMembers >= project.maxMembers - 1;
+  const isAlmostFull =
+    project.maxMembers > 0 && project.currentMembers >= project.maxMembers;
+
+  const isRecruiting = isProjectRecruiting(project);
+
+  const competitionRate =
+    isRecruiting && project.remainingSeats > 0
+      ? project.competitionRatio.toFixed(1)
+      : null;
 
   return (
     <div
@@ -327,18 +714,26 @@ function ProjectCard({
 
       <div className="mt-auto flex items-center justify-between border-t border-gray-50 pt-3">
         <div className="flex items-center gap-3 text-xs text-gray-400">
-          <span className={isAlmostFull ? "font-medium text-red-500" : ""}>
-            👥 {project.currentMembers}/{project.maxMembers}명
+          <span className={isAlmostFull ? "font-medium text-blue-500" : ""}>
+            👥 {project.currentMembers}/{project.maxMembers ? project.maxMembers : "제한 없음"}명
           </span>
-          <span>📅 {project.daysLeft}일 남음</span>
+
+          <span
+            className={
+              isRecruiting
+                ? "font-medium text-green-500"
+                : "font-medium text-gray-500"
+            }
+          >
+            {isRecruiting ? "모집중" : "모집완료"}
+          </span>
         </div>
 
-        <button
-          onClick={onApply}
-          className="rounded-lg bg-red-600 px-3 py-1 text-xs font-medium text-white transition hover:bg-red-700"
-        >
-          참여하기
-        </button>
+        {isRecruiting && competitionRate && (
+          <span className="rounded-full bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-600">
+            경쟁률 {competitionRate}:1
+          </span>
+        )}
       </div>
     </div>
   );

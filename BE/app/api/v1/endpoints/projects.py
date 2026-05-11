@@ -8,15 +8,22 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.v1.response import success_response
+from app.api.v1.endpoints.llm import _call_gemini_for_todo_list
+from app.api.v1.endpoints.llm import _parse_gemini_response
+from app.core.config import settings
 from app.core.realtime import project_todo_channel
 from app.core.realtime import realtime_hub
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
 from app.dependencies.auth import get_current_user_id_from_token
 from app.models import Application
+from app.models import ChatMessage
+from app.models import ChatRoom
+from app.models import ChatRoomMember
 from app.models import FailureStory
 from app.models import Idea
 from app.models import Invitation
+from app.models import Notification
 from app.models import Project
 from app.models import ProjectMember
 from app.models import ProjectMilestone
@@ -40,6 +47,13 @@ from app.schemas import RecruitmentCreateRequest
 from app.schemas import RecruitmentUpdateRequest
 from app.schemas import TodoCreateRequest
 from app.schemas import TodoUpdateRequest
+from app.services.economy import reward_project_completed
+from app.services.economy import reward_project_registration
+from app.services.economy import reward_project_recycled
+from app.services.economy import reward_project_started
+from app.core.realtime import project_todo_channel
+from app.core.realtime import chat_room_channel
+from app.core.realtime import realtime_hub
 
 router = APIRouter()
 
@@ -67,6 +81,51 @@ def _build_recruitment_response(recruitment: ProjectRecruitment) -> dict:
         "id": recruitment.id,
         "position_name": recruitment.position_name,
         "required_count": recruitment.required_count,
+        "difficulty": recruitment.difficulty,
+        "category": recruitment.category,
+        "summary": recruitment.summary,
+        "status": recruitment.status,
+        "deadline": recruitment.deadline.isoformat() if recruitment.deadline else None,
+        "daysLeft": days_left,
+        "isUrgent": _is_urgent(recruitment.deadline),
+        "description": recruitment.description,
+    }
+
+
+def _project_notification_data(project_id: int) -> dict:
+    return {
+        "project_id": project_id,
+        "url": f"/projects/{project_id}",
+    }
+
+
+def _build_recruitment_response_with_competition(db: Session, recruitment: ProjectRecruitment) -> dict:
+    """경쟁률을 포함한 recruitment 응답을 빌드합니다."""
+    # 지원자 수 계산 (pending 상태만)
+    applicant_count = (
+        db.query(func.count(Application.id))
+        .filter(
+            Application.project_id == recruitment.project_id,
+            Application.status == "pending",
+        )
+        .scalar() or 0
+    )
+    
+    # 경쟁률 계산 (모집 인원 0이면 0.0)
+    competition_ratio = (
+        round(applicant_count / recruitment.required_count, 2)
+        if recruitment.required_count > 0
+        else 0.0
+    )
+    
+    days_left = _calculate_days_left(recruitment.deadline)
+    return {
+        "id": recruitment.id,
+        "position_name": recruitment.position_name,
+        "required_count": recruitment.required_count,
+        "applicant_count": applicant_count,
+        "competition_ratio": competition_ratio,
+        "competition_ratio_percent": f"{competition_ratio * 100:.1f}%",
         "difficulty": recruitment.difficulty,
         "category": recruitment.category,
         "summary": recruitment.summary,
@@ -183,6 +242,84 @@ def _build_todo_response(todo: Todo, assignments: list[dict] | None = None) -> d
     }
 
 
+def _fallback_ai_todo_titles(project: Project) -> list[str]:
+    return [
+        f"기획 - {project.title} 핵심 사용자 흐름과 완료 기준 정리",
+        "기획 - 팀원별 역할, 담당 영역, 리뷰 방식을 문서화",
+        "설계 - 화면/기능 단위로 구현 범위를 세분화하고 우선순위 결정",
+        "설계 - 필요한 API, 데이터 모델, 상태 흐름 목록화",
+        "구현 - 가장 작은 MVP 기능을 먼저 구현하고 팀 리뷰 진행",
+        "구현 - 주요 사용자 액션별 예외 처리와 빈 상태 구현",
+        "검증 - 핵심 플로우를 실제 계정으로 점검하고 수정사항 기록",
+        "검증 - 배포 전 남은 이슈와 다음 스프린트 Todo 정리",
+    ]
+
+
+def _build_ai_todo_context(
+    project: Project,
+    members: list[ProjectMember],
+    member_users: dict[int, User],
+    messages: list[ChatMessage],
+) -> str:
+    member_lines = [
+        f"- {member_users[member.user_id].nickname if member.user_id in member_users else f'User #{member.user_id}'}: {member.role_in_project}"
+        for member in members
+    ]
+    message_lines = []
+    for message in messages:
+        sender = member_users.get(message.sender_id) if message.sender_id is not None else None
+        sender_name = sender.nickname if sender else "시스템"
+        message_lines.append(f"{sender_name}: {message.message}")
+
+    return "\n".join(
+        [
+            "[프로젝트 정보]",
+            f"제목: {project.title}",
+            f"한줄소개: {project.summary or ''}",
+            f"상세내용: {project.description or ''}",
+            "",
+            "[팀원]",
+            "\n".join(member_lines) or "팀원 정보 없음",
+            "",
+            "[최근 채팅]",
+            "\n".join(message_lines) or "최근 채팅 없음",
+        ]
+    )
+
+
+async def _generate_ai_todo_titles(context_text: str, project: Project) -> list[str]:
+    if not settings.gemini_api_key:
+        return _fallback_ai_todo_titles(project)
+
+    try:
+        response_text = await _call_gemini_for_todo_list(context_text)
+        todos_by_user = _parse_gemini_response(response_text)
+    except HTTPException:
+        return _fallback_ai_todo_titles(project)
+
+    titles: list[str] = []
+    for todos in todos_by_user.values():
+        if not isinstance(todos, list):
+            continue
+        for todo in todos:
+            if isinstance(todo, str) and todo.strip():
+                titles.append(todo.strip())
+
+    deduped_titles = list(dict.fromkeys(titles))
+    return deduped_titles[:8] or _fallback_ai_todo_titles(project)
+
+
+def _split_ai_todo_title(raw_title: str) -> tuple[str, str]:
+    normalized = raw_title.strip().strip("-• ")
+    if " - " in normalized:
+        stage, title = normalized.split(" - ", 1)
+        return stage.strip()[:30] or "planning", title.strip()[:200]
+    if ":" in normalized:
+        stage, title = normalized.split(":", 1)
+        return stage.strip()[:30] or "planning", title.strip()[:200]
+    return "AI 추천", normalized[:200]
+
+
 async def _broadcast_todo_snapshot(db: Session, project_id: int, todo: Todo, event_type: str) -> None:
     assignments = _serialize_todo_assignments(db, [todo.id]).get(todo.id, [])
     await realtime_hub.broadcast_json(
@@ -217,12 +354,23 @@ async def create_project(
         status=payload.status,
         progress_percent=payload.progress_percent,
         max_members=payload.max_members,
+        min_members=payload.min_members,
         is_public=payload.is_public,
     )
     db.add(project)
     db.flush()
 
     db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
+    reward_project_registration(db, project)
+    db.add(
+        Notification(
+            user_id=current_user_id,
+            type="project_update",
+            title="프로젝트가 등록되었습니다",
+            body=f"'{project.title}' 프로젝트가 생성되었습니다.",
+            data=_project_notification_data(project.id),
+        )
+    )
     db.commit()
     db.refresh(project)
     return success_response(data={"id": project.id, "title": project.title, "max_members": project.max_members})
@@ -255,21 +403,67 @@ async def list_projects(
             ProjectMember.project_id == p.id,
             ProjectMember.left_at.is_(None)
         ).scalar() or 0
+
+        tech_stack = db.query(Skill.name).join(
+            ProjectSkill, ProjectSkill.skill_id == Skill.id
+        ).filter(ProjectSkill.project_id == p.id).all()
+        tech_stack_list = [s[0] for s in tech_stack]
+
+        applicant_count = db.query(func.count(Application.id)).filter(
+            Application.project_id == p.id,
+            Application.status == "pending",
+        ).scalar() or 0
+
+        total_members = p.max_members or 0
+        remaining_seats = max(total_members - current_members, 0)
+
+        competition_ratio = (
+            round(applicant_count / remaining_seats, 1)
+            if remaining_seats > 0
+            else 0
+        )
+
         data.append({
             "id": p.id,
             "title": p.title,
+            "summary": p.summary,
+            "description": p.description,
+            "category": p.category,
             "status": p.status,
             "difficulty": p.difficulty,
             "progress_percent": float(p.progress_percent),
             "leader_id": p.leader_id,
             "currentMembers": current_members,
             "maxMembers": p.max_members,
+            "techStack": tech_stack_list,
+            "applicantCount": applicant_count,
+            "remainingSeats": remaining_seats,
+            "competitionRatio": competition_ratio,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
         })
     
     return success_response(
         data=data,
         meta={"page": page, "size": size, "total": total},
     )
+
+
+def _serialize_project_member(member: ProjectMember, user: User | None) -> dict:
+    return {
+        "user_id": member.user_id,
+        "role_in_project": member.role_in_project,
+        "nickname": user.nickname if user else None,
+        "name": user.name if user else None,
+        "avatar_url": user.avatar_url if user else None,
+        "user": {
+            "id": user.id,
+            "nickname": user.nickname,
+            "name": user.name,
+            "avatar_url": user.avatar_url,
+        }
+        if user
+        else None,
+    }
 
 
 @router.get("/{project_id}", summary="프로젝트 상세", description="프로젝트 상세와 활성 멤버 목록을 조회합니다.")
@@ -282,6 +476,12 @@ async def get_project(project_id: int, db: Session = Depends(get_db)) -> dict:
     """
     project = _get_project_or_404(db, project_id)
     members = db.query(ProjectMember).filter(ProjectMember.project_id == project_id, ProjectMember.left_at.is_(None)).all()
+    member_user_ids = [member.user_id for member in members]
+    member_users = (
+        {user.id: user for user in db.query(User).filter(User.id.in_(member_user_ids)).all()}
+        if member_user_ids
+        else {}
+    )
     
     # Get tech_stack from project_skills
     tech_stack = db.query(Skill.name).join(
@@ -302,7 +502,10 @@ async def get_project(project_id: int, db: Session = Depends(get_db)) -> dict:
             "currentMembers": len(members),
             "maxMembers": project.max_members,
             "techStack": tech_stack_list,
-            "members": [{"user_id": m.user_id, "role_in_project": m.role_in_project} for m in members],
+            "members": [
+                _serialize_project_member(member, member_users.get(member.user_id))
+                for member in members
+            ],
         }
     )
 
@@ -320,13 +523,30 @@ async def apply_project(
     - Authorization 헤더를 설정하고 message를 포함해 호출합니다.
     - 동일 프로젝트 중복 지원 시 `409`를 반환합니다.
     """
-    _get_project_or_404(db, project_id)
+    project = _get_project_or_404(db, project_id)
     exists = db.query(Application).filter(Application.project_id == project_id, Application.applicant_id == current_user_id).first()
     if exists:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Application already exists")
 
     app_obj = Application(project_id=project_id, applicant_id=current_user_id, message=payload.message, status="pending")
     db.add(app_obj)
+    db.flush()
+    if project.leader_id != current_user_id:
+        applicant = db.get(User, current_user_id)
+        applicant_name = applicant.nickname if applicant else "새 지원자"
+        db.add(
+            Notification(
+                user_id=project.leader_id,
+                type="application_received",
+                title="새 프로젝트 지원이 도착했습니다",
+                body=f"{applicant_name}님이 '{project.title}' 프로젝트에 지원했습니다.",
+                data={
+                    **_project_notification_data(project_id),
+                    "application_id": app_obj.id,
+                    "applicant_id": current_user_id,
+                },
+            )
+        )
     db.commit()
     db.refresh(app_obj)
     return success_response(data={"id": app_obj.id, "status": app_obj.status})
@@ -347,10 +567,31 @@ async def list_applications(
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
     apps = db.query(Application).filter(Application.project_id == project_id).order_by(Application.id.desc()).all()
+    applicant_ids = [app.applicant_id for app in apps]
+    applicants = (
+        {user.id: user for user in db.query(User).filter(User.id.in_(applicant_ids)).all()}
+        if applicant_ids
+        else {}
+    )
     return success_response(
         data=[
-            {"id": a.id, "applicant_id": a.applicant_id, "message": a.message, "status": a.status}
-            for a in apps
+            {
+                "id": app.id,
+                "applicant_id": app.applicant_id,
+                "message": app.message,
+                "status": app.status,
+                "applicant": {
+                    "id": applicants[app.applicant_id].id,
+                    "nickname": applicants[app.applicant_id].nickname,
+                    "name": applicants[app.applicant_id].name,
+                    "email": applicants[app.applicant_id].email,
+                    "bio": applicants[app.applicant_id].bio,
+                    "avatar_url": applicants[app.applicant_id].avatar_url,
+                }
+                if app.applicant_id in applicants
+                else None,
+            }
+            for app in apps
         ]
     )
 
@@ -375,21 +616,64 @@ async def decide_application(
     app_obj = db.get(Application, application_id)
     if app_obj is None or app_obj.project_id != project_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
+    if app_obj.status != "pending":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only pending applications can be decided")
 
     decision = payload.status
     if decision not in {"accepted", "rejected"}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="status must be accepted or rejected")
+
+    if decision == "accepted":
+        active_member_count = (
+            db.query(ProjectMember)
+            .filter(
+                ProjectMember.project_id == project_id,
+                ProjectMember.left_at.is_(None),
+            )
+            .count()
+        )
+        if project.max_members and active_member_count >= project.max_members:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Project is already full")
 
     app_obj.status = decision
     app_obj.decided_by = current_user_id
     app_obj.decided_at = datetime.now(timezone.utc)
 
     if decision == "accepted":
-        exists_member = db.query(ProjectMember).filter(ProjectMember.project_id == project_id, ProjectMember.user_id == app_obj.applicant_id).first()
-        if exists_member is None:
-            db.add(ProjectMember(project_id=project_id, user_id=app_obj.applicant_id, role_in_project=payload.role_in_project or "member"))
+        exists_member = (
+            db.query(ProjectMember)
+            .filter(
+                ProjectMember.project_id == project_id,
+                ProjectMember.user_id == app_obj.applicant_id,
+            )
+            .first()
+        )
 
-    db.commit()
+        if exists_member is None:
+            db.add(
+                ProjectMember(
+                    project_id=project_id,
+                    user_id=app_obj.applicant_id,
+                    role_in_project=payload.role_in_project or "member",
+                )
+            )
+
+    decision_label = "승인" if decision == "accepted" else "거절"
+    db.add(
+        Notification(
+            user_id=app_obj.applicant_id,
+            type="application_decided",
+            title=f"프로젝트 지원이 {decision_label}되었습니다",
+            body=f"'{project.title}' 프로젝트 지원이 {decision_label}되었습니다.",
+            data={
+                **_project_notification_data(project_id),
+                "application_id": app_obj.id,
+                "decision": decision,
+            },
+        )
+    )
+
+    db.commit() 
     return success_response(data={"id": app_obj.id, "status": app_obj.status})
 
 
@@ -431,6 +715,8 @@ async def delete_project(
     """
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
+    if project.idea_id is not None and project.status != "completed":
+        reward_project_recycled(db, project)
     project.deleted_at = datetime.now(timezone.utc)
     db.commit()
     return success_response(data={"deleted": True, "id": project_id})
@@ -470,9 +756,13 @@ async def revert_project_to_idea(
     if project.idea_id is not None:
         idea = db.get(Idea, project.idea_id)
         if idea is not None and idea.deleted_at is None:
-            # Idea의 변환 기록 제거
+            # Idea의 변환 기록 제거 및 투척 표시
             idea.converted_to_project_id = None
+            idea.is_discarded = True
             idea_reverted = True
+
+    if project.idea_id is not None:
+        reward_project_recycled(db, project)
     
     # 프로젝트 soft delete
     project.deleted_at = datetime.now(timezone.utc)
@@ -504,7 +794,14 @@ async def update_project_status(
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
 
+    previous_status = project.status
     project.status = payload.status
+
+    if previous_status != "in_progress" and payload.status == "in_progress":
+        reward_project_started(db, project)
+    if previous_status != "completed" and payload.status == "completed":
+        reward_project_completed(db, project)
+
     db.commit()
     return success_response(data={"id": project.id, "status": project.status})
 
@@ -589,6 +886,9 @@ async def create_recruitment(
         project_id=project_id,
         position_name=payload.position_name,
         required_count=payload.required_count,
+        category=payload.category,
+        difficulty=payload.difficulty,
+        summary=payload.summary,
         status=payload.status,
         deadline=payload.deadline,
         description=payload.description,
@@ -596,7 +896,7 @@ async def create_recruitment(
     db.add(recruitment)
     db.commit()
     db.refresh(recruitment)
-    return success_response(data=_build_recruitment_response(recruitment))
+    return success_response(data=_build_recruitment_response_with_competition(db, recruitment))
 
 
 @router.patch("/{project_id}/recruitments/{recruitment_id}", summary="재모집 수정", description="재모집의 상태/인원/설명/마감일을 갱신합니다.")
@@ -620,7 +920,7 @@ async def update_recruitment(
 
     db.commit()
     db.refresh(recruitment)
-    return success_response(data=_build_recruitment_response(recruitment))
+    return success_response(data=_build_recruitment_response_with_competition(db, recruitment))
 
 
 @router.post("/{project_id}/invite", summary="멤버 초대", description="리더가 특정 유저를 프로젝트로 초대합니다.")
@@ -798,7 +1098,7 @@ async def list_todos(
     """Todo 목록 조회 API(프로젝트 멤버 전용)."""
     _get_project_or_404(db, project_id)
     _ensure_project_member(db, project_id, current_user_id)
-    todos = db.query(Todo).filter(Todo.project_id == project_id).order_by(Todo.id.desc()).all()
+    todos = db.query(Todo).filter(Todo.project_id == project_id).order_by(Todo.priority.asc(), Todo.id.asc()).all()
     assignments_by_todo = _serialize_todo_assignments(db, [todo.id for todo in todos])
     return success_response(
         data=[_build_todo_response(todo, assignments_by_todo.get(todo.id, [])) for todo in todos]
@@ -845,6 +1145,93 @@ async def update_todo(
     return success_response(data=_build_todo_response(todo, assignments))
 
 
+@router.post("/{project_id}/todos/ai-generate", summary="AI Todo 생성", description="프로젝트 상세와 최근 채팅을 바탕으로 Todo 목록을 생성합니다.")
+async def generate_project_todos_with_ai(
+    project_id: int,
+    payload: dict = Body(default={}),
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    project = _get_project_or_404(db, project_id)
+    _ensure_project_leader(project, current_user_id)
+
+    members = (
+        db.query(ProjectMember)
+        .filter(ProjectMember.project_id == project_id, ProjectMember.left_at.is_(None))
+        .all()
+    )
+    member_ids = [member.user_id for member in members]
+    member_users = (
+        {user.id: user for user in db.query(User).filter(User.id.in_(member_ids)).all()}
+        if member_ids
+        else {}
+    )
+
+    room_id = payload.get("room_id")
+    message_ids = payload.get("message_ids") or []
+    limit = min(max(int(payload.get("limit", 12) or 12), 4), 20)
+    messages_query = db.query(ChatMessage).join(ChatRoom, ChatRoom.id == ChatMessage.room_id).filter(
+        ChatRoom.project_id == project_id,
+    )
+    if room_id:
+        messages_query = messages_query.filter(ChatMessage.room_id == room_id)
+    if message_ids:
+        messages_query = messages_query.filter(ChatMessage.id.in_(message_ids))
+        recent_messages = messages_query.order_by(ChatMessage.created_at.asc()).all()
+    else:
+        recent_messages = messages_query.order_by(ChatMessage.created_at.desc()).limit(50).all()
+        recent_messages = list(reversed(recent_messages))
+
+    context_text = _build_ai_todo_context(project, members, member_users, recent_messages)
+    titles = (await _generate_ai_todo_titles(context_text, project))[:limit]
+
+    existing_titles = {
+        title.lower()
+        for (title,) in db.query(Todo.title).filter(Todo.project_id == project_id).all()
+    }
+    max_priority = (
+        db.query(func.max(Todo.priority))
+        .filter(Todo.project_id == project_id)
+        .scalar()
+        or 0
+    )
+
+    created_todos: list[Todo] = []
+    for index, raw_title in enumerate(titles, start=1):
+        stage, title = _split_ai_todo_title(raw_title)
+        if title.lower() in existing_titles:
+            continue
+
+        todo = Todo(
+            project_id=project_id,
+            creator_id=current_user_id,
+            assignee_id=member_ids[0] if member_ids else None,
+            title=title,
+            description="AI가 선택한 채팅 범위와 프로젝트 상세 정보를 바탕으로 생성한 Todo입니다.",
+            stage=stage,
+            status="todo",
+            priority=max_priority + index,
+        )
+        db.add(todo)
+        db.flush()
+        _sync_todo_assignments(db, todo, member_ids)
+        created_todos.append(todo)
+        existing_titles.add(title.lower())
+
+    db.commit()
+    for todo in created_todos:
+        db.refresh(todo)
+        await _broadcast_todo_snapshot(db, project_id, todo, "todo.created")
+
+    assignments_by_todo = _serialize_todo_assignments(db, [todo.id for todo in created_todos])
+    return success_response(
+        data=[
+            _build_todo_response(todo, assignments_by_todo.get(todo.id, []))
+            for todo in created_todos
+        ]
+    )
+
+
 @router.patch("/{project_id}/todos/{todo_id}/done", summary="Todo 완료 토글", description="현재 사용자 할당분의 완료 상태를 토글합니다.")
 async def toggle_todo_assignment_done(
     project_id: int,
@@ -876,11 +1263,17 @@ async def toggle_todo_assignment_done(
         .first()
     )
     if assignment is None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Todo assignment not found")
+        assignment = TodoAssignment(todo_id=todo_id, user_id=current_user_id, is_done=False)
+        db.add(assignment)
+        db.flush()
 
-    assignment.is_done = not assignment.is_done
+    next_done = todo.status != "done"
+    todo.status = "done" if next_done else "todo"
+    todo.completed_at = datetime.now(timezone.utc) if next_done else None
+    assignment.is_done = next_done
     assignment.done_at = datetime.now(timezone.utc) if assignment.is_done else None
     db.commit()
+    db.refresh(todo)
     db.refresh(assignment)
 
     assignments = _serialize_todo_assignments(db, [todo.id]).get(todo.id, [])
@@ -961,7 +1354,7 @@ async def project_todos_websocket(
     channel = project_todo_channel(project_id)
     await realtime_hub.connect(channel, websocket)
     try:
-        todos = db.query(Todo).filter(Todo.project_id == project_id).order_by(Todo.id.desc()).all()
+        todos = db.query(Todo).filter(Todo.project_id == project_id).order_by(Todo.priority.asc(), Todo.id.asc()).all()
         assignments_by_todo = _serialize_todo_assignments(db, [todo.id for todo in todos])
         await websocket.send_json(
             {
@@ -979,7 +1372,7 @@ async def project_todos_websocket(
                 continue
 
             if event_type == "todo.refresh":
-                todos = db.query(Todo).filter(Todo.project_id == project_id).order_by(Todo.id.desc()).all()
+                todos = db.query(Todo).filter(Todo.project_id == project_id).order_by(Todo.priority.asc(), Todo.id.asc()).all()
                 assignments_by_todo = _serialize_todo_assignments(db, [todo.id for todo in todos])
                 await websocket.send_json(
                     {
@@ -1160,7 +1553,7 @@ async def create_review(
     - reviewee_id 필수, 자기 자신 리뷰는 불가합니다.
     - 중복 리뷰를 방지하며 생성 후 평점 집계를 재계산합니다.
     """
-    _get_project_or_404(db, project_id)
+    project = _get_project_or_404(db, project_id)
     _ensure_project_member(db, project_id, current_user_id)
     reviewee_id = payload.get("reviewee_id")
     if not reviewee_id:
@@ -1186,6 +1579,22 @@ async def create_review(
         comment=payload.get("comment"),
     )
     db.add(review)
+    db.flush()
+    reviewer = db.get(User, current_user_id)
+    reviewer_name = reviewer.nickname if reviewer else "팀원"
+    db.add(
+        Notification(
+            user_id=reviewee_id,
+            type="review_received",
+            title="새 리뷰를 받았습니다",
+            body=f"{reviewer_name}님이 '{project.title}' 프로젝트 리뷰를 남겼습니다.",
+            data={
+                **_project_notification_data(project_id),
+                "review_id": review.id,
+                "reviewer_id": current_user_id,
+            },
+        )
+    )
     db.commit()
     db.refresh(review)
 
@@ -1238,3 +1647,149 @@ async def list_project_reviews(
             for r in reviews
         ]
     )
+
+
+@router.post("/{project_id}/complete-team", summary="팀 결성 완료", description="리더가 팀 결성을 완료하고 프로젝트를 시작합니다.")
+async def complete_team(
+    project_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    """팀 결성 완료 API(리더 전용).
+
+    동작:
+    - 리더 권한 확인
+    - 현재 활성 ProjectMember 수가 min_members 이상인지 확인
+    - 부족하면 400 반환
+    - 충분하면 project.status를 in_progress로 변경
+    - 팀원들에게 알림 생성
+    - 프로젝트 이름으로 팀 채팅방 생성
+    - 팀 채팅방에 시스템 메시지 추가
+    """
+    project = _get_project_or_404(db, project_id)
+    _ensure_project_leader(project, current_user_id)
+
+    active_members = _get_active_project_member_ids(db, project_id)
+    if len(active_members) < project.min_members:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Not enough members to complete team",
+        )
+
+    project.status = "in_progress"
+
+    for member_id in active_members:
+        notification = Notification(
+            user_id=member_id,
+            type="project_update",
+            title="팀 결성이 완료되었습니다",
+            body=f"프로젝트 '{project.title}'의 팀 결성이 완료되어 프로젝트가 시작되었습니다.",
+            data=_project_notification_data(project_id),
+        )
+        db.add(notification)
+
+    team_room = (
+        db.query(ChatRoom)
+        .filter(
+            ChatRoom.project_id == project_id,
+            ChatRoom.name == project.title,
+            ChatRoom.is_active.is_(True),
+        )
+        .first()
+    )
+
+    if team_room is None:
+        team_room = ChatRoom(
+            project_id=project_id,
+            name=project.title,
+            is_active=True,
+        )
+        db.add(team_room)
+        db.flush()
+
+    existing_chat_member_ids = {
+        user_id
+        for (user_id,) in db.query(ChatRoomMember.user_id)
+        .filter(ChatRoomMember.room_id == team_room.id)
+        .all()
+    }
+    for member_id in active_members:
+        if member_id not in existing_chat_member_ids:
+            db.add(ChatRoomMember(room_id=team_room.id, user_id=member_id))
+
+    system_message = ChatMessage(
+        room_id=team_room.id,
+        sender_id=None,
+        message="팀 결성이 완료되었습니다! 인사를 나누고 프로젝트를 시작하세요.",
+    )
+    db.add(system_message)
+    db.flush()
+
+    await realtime_hub.broadcast_json(
+        chat_room_channel(team_room.id),
+        {
+            "type": "chat.message.created",
+            "data": {
+                "id": system_message.id,
+                "room_id": system_message.room_id,
+                "sender_id": None,
+                "sender_nickname": "시스템",
+                "sender_avatar_url": None,
+                "message": system_message.message,
+                "created_at": system_message.created_at.isoformat()
+                if system_message.created_at
+                else None,
+            },
+        },
+    )
+
+    db.commit()
+
+    return success_response(
+        data={
+            "project_id": project_id,
+            "status": "in_progress",
+            "chat_room_id": team_room.id,
+            "chat_room_name": team_room.name,
+        }
+    )
+
+# ═══════════════════════════════════════════════════════════════
+# ━━ Recruitment (경쟁률)
+# ═══════════════════════════════════════════════════════════════
+
+@router.get("/{project_id}/recruitments", summary="프로젝트 모집공고 목록 (경쟁률 포함)", description="경쟁률과 함께 프로젝트의 모든 모집공고를 조회합니다.")
+async def list_recruitments(
+    project_id: int,
+    db: Session = Depends(get_db),
+) -> dict:
+    """프로젝트의 모집공고 목록 조회 (경쟁률 포함)"""
+    project = _get_project_or_404(db, project_id)
+    
+    recruitments = db.query(ProjectRecruitment).filter(
+        ProjectRecruitment.project_id == project_id
+    ).all()
+    
+    data = [_build_recruitment_response_with_competition(db, rec) for rec in recruitments]
+    
+    return success_response(data=data)
+
+
+@router.get("/{project_id}/recruitments/{recruitment_id}", summary="모집공고 상세 (경쟁률 포함)", description="경쟁률 정보와 함께 모집공고 상세를 조회합니다.")
+async def get_recruitment(
+    project_id: int,
+    recruitment_id: int,
+    db: Session = Depends(get_db),
+) -> dict:
+    """모집공고 상세 조회 (경쟁률 포함)"""
+    project = _get_project_or_404(db, project_id)
+    
+    recruitment = db.query(ProjectRecruitment).filter(
+        ProjectRecruitment.id == recruitment_id,
+        ProjectRecruitment.project_id == project_id,
+    ).first()
+    
+    if not recruitment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recruitment not found")
+    
+    return success_response(data=_build_recruitment_response_with_competition(db, recruitment))

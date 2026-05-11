@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { saveToken } from "../../lib/auth";
+import { authenticatedFetch, saveAuthSession } from "../../lib/auth";
 import { loginApi } from "../../lib/api";
 
 export default function LoginPage() {
@@ -24,9 +24,29 @@ export default function LoginPage() {
 
       const result = await loginApi(loginId, password);
 
-      saveToken(result.data.access_token);
-      localStorage.setItem("refresh_token", result.data.refresh_token);
-      localStorage.setItem("user_id", result.data.user_id);
+      saveAuthSession({
+        accessToken: result.data.access_token,
+        refreshToken: result.data.refresh_token,
+        userId: result.data.user_id,
+      });
+
+      const meRes = await authenticatedFetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"}/api/v1/auth/me`,
+        { headers: { Authorization: `Bearer ${result.data.access_token}` } }
+      );
+      const me = await meRes.json();
+      if (me.data) {
+        saveAuthSession({
+          accessToken: result.data.access_token,
+          refreshToken: result.data.refresh_token,
+          userId: result.data.user_id,
+          user: me.data,
+        });
+      } else {
+        console.error("/auth/me 응답 이상:", me);
+        alert("로그인에 실패했습니다. 아이디 또는 비밀번호를 확인해주세요.");
+        return;
+      }
 
       alert("로그인되었습니다.");
       router.push("/mainpage");
@@ -57,13 +77,13 @@ export default function LoginPage() {
         </h1>
 
         <p className="mt-2 text-center text-sm text-slate-500">
-          이메일 또는 닉네임으로 로그인하세요
+          이메일로 로그인하세요
         </p>
 
         <div className="mt-6 space-y-4">
           <input
             type="text"
-            placeholder="이메일 또는 닉네임"
+            placeholder="이메일"
             value={loginId}
             onChange={(e) => setLoginId(e.target.value)}
             className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"

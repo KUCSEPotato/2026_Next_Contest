@@ -32,6 +32,7 @@ class ProjectCreateRequest(CommonProjectRequest):
     status: str = "planning"
     progress_percent: float = Field(default=0, ge=0, le=100)
     max_members: int = Field(default=10, ge=1, le=100)
+    min_members: int = Field(default=1, ge=1, le=100)
     is_public: bool = True
 
 
@@ -39,6 +40,7 @@ class ProjectUpdateRequest(CommonProjectUpdateRequest):
     status: str | None = None
     progress_percent: float | None = Field(default=None, ge=0, le=100)
     max_members: int | None = Field(default=None, ge=1, le=100)
+    min_members: int | None = Field(default=None, ge=1, le=100)
     is_public: bool | None = None
 
 
@@ -85,7 +87,7 @@ class TodoCreateRequest(BaseModel):
     description: str | None = None
     stage: str = "planning"
     status: str = "todo"
-    priority: int = Field(default=3, ge=1, le=5)
+    priority: int = Field(default=1, ge=1, le=1000)
     due_date: date | None = None
 
 
@@ -96,7 +98,7 @@ class TodoUpdateRequest(BaseModel):
     description: str | None = None
     stage: str | None = None
     status: str | None = None
-    priority: int | None = Field(default=None, ge=1, le=5)
+    priority: int | None = Field(default=None, ge=1, le=1000)
     due_date: date | None = None
 
 
@@ -106,6 +108,9 @@ class TodoUpdateRequest(BaseModel):
 class RecruitmentCreateRequest(CommonProjectRequest):
     position_name: str = Field(min_length=1, max_length=100)
     required_count: int = Field(default=1, ge=1, le=20)
+    category: str | None = None
+    difficulty: str = Field(default="normal", pattern="^(easy|normal|hard)$")
+    summary: str | None = Field(default=None, max_length=500)
     deadline: date | None = None
     status: str = "open"
 
@@ -113,5 +118,8 @@ class RecruitmentCreateRequest(CommonProjectRequest):
 class RecruitmentUpdateRequest(CommonProjectUpdateRequest):
     position_name: str | None = Field(default=None, min_length=1, max_length=100)
     required_count: int | None = Field(default=None, ge=1, le=20)
+    category: str | None = None
+    difficulty: str | None = Field(default=None, pattern="^(easy|normal|hard)$")
+    summary: str | None = None
     deadline: date | None = None
     status: str | None = None

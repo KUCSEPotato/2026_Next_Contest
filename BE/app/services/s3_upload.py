@@ -1,0 +1,129 @@
+"""S3 file upload service."""
+
+import os
+from io import BytesIO
+from uuid import uuid4
+
+import boto3
+from fastapi import HTTPException, status
+
+from app.core.config import settings
+
+
+class S3FileUploadService:
+    """Service for uploading files to AWS S3."""
+
+    def __init__(self):
+        if not settings.aws_access_key_id or not settings.aws_secret_access_key or not settings.aws_s3_bucket:
+            raise RuntimeError("AWS S3 credentials not configured")
+
+        self.s3_client = boto3.client(
+            "s3",
+            region_name=settings.aws_s3_region,
+            aws_access_key_id=settings.aws_access_key_id,
+            aws_secret_access_key=settings.aws_secret_access_key,
+        )
+        self.bucket_name = settings.aws_s3_bucket
+
+    async def upload_file(
+        self,
+        file_content: bytes,
+        filename: str,
+        file_type: str,
+        folder: str,  # e.g., "community" or "ideas"
+    ) -> dict:
+        """Upload a file to S3 and return S3 key and URL.
+
+        Args:
+            file_content: File binary content
+            filename: Original filename
+            file_type: MIME type (e.g., "image/png", "application/pdf")
+            folder: Folder in S3 bucket ("community" or "ideas")
+
+        Returns:
+            {
+                "s3_key": "community/2026-05-08-uuid-filename.pdf",
+                "s3_url": "https://bucket.s3.ap-northeast-2.amazonaws.com/...",
+                "file_size": 12345,
+            }
+
+        Raises:
+            HTTPException: If file size exceeds limit or upload fails
+        """
+        # Validate file size
+        file_size = len(file_content)
+        max_size_bytes = settings.max_file_size_mb * 1024 * 1024
+        if file_size > max_size_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File size exceeds {settings.max_file_size_mb}MB limit",
+            )
+
+        # Generate unique filename
+        unique_id = str(uuid4())[:8]
+        base_name = os.path.splitext(filename)[0]
+        ext = os.path.splitext(filename)[1]
+        s3_filename = f"{base_name}-{unique_id}{ext}"
+        s3_key = f"{folder}/{s3_filename}"
+
+        try:
+            # Upload to S3
+            self.s3_client.put_object(
+                Bucket=self.bucket_name,
+                Key=s3_key,
+                Body=file_content,
+                ContentType=file_type,
+            )
+
+            # Generate public URL
+            s3_url = f"https://{self.bucket_name}.s3.{settings.aws_s3_region}.amazonaws.com/{s3_key}"
+
+            return {
+                "s3_key": s3_key,
+                "s3_url": s3_url,
+                "file_size": file_size,
+            }
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"File upload failed: {str(e)}",
+            )
+
+    async def delete_file(self, s3_key: str) -> None:
+        """Delete a file from S3.
+
+        Args:
+            s3_key: S3 object key (path)
+
+        Raises:
+            HTTPException: If deletion fails
+        """
+        try:
+            self.s3_client.delete_object(Bucket=self.bucket_name, Key=s3_key)
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"File deletion failed: {str(e)}",
+            )
+
+    def get_s3_service():
+        """Dependency to get S3 service instance."""
+        try:
+            return S3FileUploadService()
+        except RuntimeError:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="AWS S3 service not configured",
+            )
+
+
+# Helper function for dependency injection
+def get_s3_service() -> S3FileUploadService:
+    """Get S3 service instance. Can be used as a FastAPI dependency."""
+    try:
+        return S3FileUploadService()
+    except RuntimeError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AWS S3 service not configured",
+        )

@@ -1,17 +1,19 @@
 """Community Forum API Endpoints"""
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status, Header, File, UploadFile
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.v1.response import success_response
 from app.db.session import get_db
-from app.dependencies.auth import get_current_user_id
+from app.dependencies.auth import get_current_user_id, get_current_user_id_from_token
 from app.models import (
     CommunityPost,
     CommunityPostComment,
     CommunityPostReaction,
     CommunityCommentReaction,
+    CommunityPostFile,
+    Notification,
     User,
 )
 from app.schemas import (
@@ -21,6 +23,7 @@ from app.schemas import (
     PostUpdateRequest,
     ReactionRequest,
 )
+from app.services.s3_upload import get_s3_service
 
 router = APIRouter()
 
@@ -72,24 +75,56 @@ async def list_posts(
     category: str | None = None,
     page: int = 1,
     page_size: int = 20,
+    sort_by: str = "newest",
     db: Session = Depends(get_db),
+    authorization: str | None = Header(default=None),
 ) -> dict:
-    """게시물 목록 조회 (페이지네이션)"""
+    """게시물 목록 조회 (페이지네이션)
+    
+    sort_by 옵션:
+    - newest (기본값): 최신순 (created_at desc)
+    - views: 조회수 높은 순 (view_count desc)
+    - likes: 좋아요 많은 순
+    - comments: 댓글 많은 순
+    - trending/hot: 핫게 (조회수*0.1 + 좋아요*1.0 + 댓글*0.5)
+    """
     query = db.query(CommunityPost).filter(CommunityPost.deleted_at.is_(None))
 
     if category:
         query = query.filter(CommunityPost.category == category)
 
-    # 핀 된 글 먼저, 그 다음 최신순
-    query = query.order_by(
-        CommunityPost.is_pinned.desc(),
-        CommunityPost.created_at.desc(),
-    )
+    # sort_by에 따른 초기 정렬 설정 (핀 된 글은 항상 먼저)
+    if sort_by == "views":
+        query = query.order_by(
+            CommunityPost.is_pinned.desc(),
+            CommunityPost.view_count.desc(),
+        )
+    elif sort_by in ["likes", "comments", "trending", "hot"]:
+        # likes, comments, trending은 메모리에서 정렬하므로 일단 핀만 먼저
+        query = query.order_by(CommunityPost.is_pinned.desc())
+    else:  # newest (기본값)
+        query = query.order_by(
+            CommunityPost.is_pinned.desc(),
+            CommunityPost.created_at.desc(),
+        )
 
     total = query.count()
-    posts = query.offset((page - 1) * page_size).limit(page_size).all()
+    
+    # 페이지네이션 전에 정렬 (likes, comments, trending은 메모리 정렬이므로)
+    if sort_by in ["likes", "comments", "trending", "hot"]:
+        posts = query.all()  # 모든 데이터를 먼저 가져옴
+    else:
+        posts = query.offset((page - 1) * page_size).limit(page_size).all()
 
     result = []
+    # determine current user id if Authorization header provided
+    current_user_id: int | None = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+        try:
+            current_user_id = get_current_user_id_from_token(token)
+        except HTTPException:
+            current_user_id = None
     for post in posts:
         author = db.get(User, post.author_id)
         comment_count = (
@@ -117,6 +152,16 @@ async def list_posts(
         for reaction_type, count in reactions:
             reaction_stats[reaction_type] = count
 
+        # determine user's reaction if logged in
+        user_reaction = None
+        if current_user_id:
+            user_reaction_record = db.query(CommunityPostReaction).filter(
+                CommunityPostReaction.post_id == post.id,
+                CommunityPostReaction.user_id == current_user_id,
+            ).first()
+            if user_reaction_record:
+                user_reaction = user_reaction_record.reaction_type
+
         result.append(
             {
                 "id": post.id,
@@ -135,12 +180,46 @@ async def list_posts(
                 },
                 "comment_count": comment_count,
                 "reaction_stats": reaction_stats,
+                "user_reaction": user_reaction,
             }
         )
 
+    # 메모리에서 정렬 (likes, comments, trending은 계산된 값이므로)
+    if sort_by == "likes":
+        # 좋아요순으로 정렬 (핀 된 글 우선 유지)
+        pinned = [p for p in result if p["is_pinned"]]
+        unpinned = [p for p in result if not p["is_pinned"]]
+        unpinned.sort(key=lambda x: x["reaction_stats"]["like"], reverse=True)
+        result = pinned + unpinned
+    elif sort_by == "comments":
+        # 댓글순으로 정렬 (핀 된 글 우선 유지)
+        pinned = [p for p in result if p["is_pinned"]]
+        unpinned = [p for p in result if not p["is_pinned"]]
+        unpinned.sort(key=lambda x: x["comment_count"], reverse=True)
+        result = pinned + unpinned
+    elif sort_by in ["trending", "hot"]:
+        # 핫게 정렬: 조회수*0.1 + 좋아요*1.0 + 댓글*0.5
+        def calculate_trending_score(post):
+            return (
+                post["view_count"] * 0.1 +
+                post["reaction_stats"]["like"] * 1.0 +
+                post["comment_count"] * 0.5
+            )
+        
+        pinned = [p for p in result if p["is_pinned"]]
+        unpinned = [p for p in result if not p["is_pinned"]]
+        unpinned.sort(key=calculate_trending_score, reverse=True)
+        result = pinned + unpinned
+
+    # 페이지네이션 적용 (likes, comments, trending은 이제 정렬이 완료됨)
+    if sort_by in ["likes", "comments", "trending", "hot"]:
+        paginated_result = result[(page - 1) * page_size : page * page_size]
+    else:
+        paginated_result = result
+
     return success_response(
         data={
-            "posts": result,
+            "posts": paginated_result,
             "total": total,
             "page": page,
             "page_size": page_size,
@@ -309,12 +388,35 @@ async def create_comment(
         author_id=current_user_id,
         content=payload.content,
         parent_comment_id=payload.parent_comment_id,
+        is_anonymous=payload.is_anonymous,
     )
     db.add(comment)
+    db.flush()
+    if post.author_id != current_user_id:
+        db.add(
+            Notification(
+                user_id=post.author_id,
+                type="system",
+                title="게시글에 새 댓글이 달렸습니다",
+                body=f"'{post.title}' 게시글에 새 댓글이 달렸습니다.",
+                data={
+                    "post_id": post_id,
+                    "comment_id": comment.id,
+                    "url": f"/community/{post_id}",
+                },
+            )
+        )
     db.commit()
     db.refresh(comment)
 
     author = db.get(User, current_user_id)
+    # 익명인 경우 작성자 정보 숨김
+    author_info = {
+        "id": author.id if not payload.is_anonymous else None,
+        "nickname": "익명" if payload.is_anonymous else author.nickname,
+        "avatar_url": None if payload.is_anonymous else author.avatar_url,
+    }
+    
     return success_response(
         data={
             "id": comment.id,
@@ -322,12 +424,9 @@ async def create_comment(
             "author_id": comment.author_id,
             "content": comment.content,
             "parent_comment_id": comment.parent_comment_id,
+            "is_anonymous": comment.is_anonymous,
             "created_at": comment.created_at,
-            "author": {
-                "id": author.id,
-                "nickname": author.nickname,
-                "avatar_url": author.avatar_url,
-            },
+            "author": author_info,
         },
     )
 
@@ -385,15 +484,16 @@ async def list_comments(
             {
                 "id": comment.id,
                 "post_id": comment.post_id,
-                "author_id": comment.author_id,
+                "author_id": comment.author_id if not comment.is_anonymous else None,
                 "content": comment.content,
                 "parent_comment_id": comment.parent_comment_id,
+                "is_anonymous": comment.is_anonymous,
                 "created_at": comment.created_at,
                 "updated_at": comment.updated_at,
                 "author": {
-                    "id": author.id,
-                    "nickname": author.nickname,
-                    "avatar_url": author.avatar_url,
+                    "id": author.id if not comment.is_anonymous else None,
+                    "nickname": "익명" if comment.is_anonymous else author.nickname,
+                    "avatar_url": None if comment.is_anonymous else author.avatar_url,
                 },
                 "reaction_stats": reaction_stats,
                 "reply_count": reply_count,
@@ -556,3 +656,118 @@ async def add_comment_reaction(
         db.add(reaction)
         db.commit()
         return success_response(data={"action": "added", "reaction_type": payload.reaction_type})
+
+
+# ═══════════════════════════════════════════════════════════════
+# ━━ File Upload
+# ═══════════════════════════════════════════════════════════════
+
+@router.post("/{post_id}/files", summary="게시물에 파일 첨부", description="게시물에 파일을 업로드합니다. 최대 50MB.")
+async def upload_post_file(
+    post_id: int,
+    file: UploadFile = File(...),
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+    s3_service=Depends(get_s3_service),
+) -> dict:
+    """게시물에 파일 업로드"""
+    post = db.get(CommunityPost, post_id)
+    if not post or post.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+
+    # Read file content
+    file_content = await file.read()
+    
+    # Upload to S3
+    upload_result = await s3_service.upload_file(
+        file_content=file_content,
+        filename=file.filename or "file",
+        file_type=file.content_type or "application/octet-stream",
+        folder="community",
+    )
+
+    # Save file record to database
+    file_record = CommunityPostFile(
+        post_id=post_id,
+        filename=file.filename or "file",
+        file_size=upload_result["file_size"],
+        file_type=file.content_type or "application/octet-stream",
+        s3_key=upload_result["s3_key"],
+        s3_url=upload_result["s3_url"],
+        uploaded_by=current_user_id,
+    )
+    db.add(file_record)
+    db.commit()
+    db.refresh(file_record)
+
+    return success_response(
+        data={
+            "id": file_record.id,
+            "post_id": file_record.post_id,
+            "filename": file_record.filename,
+            "file_size": file_record.file_size,
+            "file_type": file_record.file_type,
+            "s3_url": file_record.s3_url,
+            "uploaded_at": file_record.created_at,
+        },
+    )
+
+
+@router.get("/{post_id}/files", summary="게시물 첨부 파일 조회", description="게시물의 첨부 파일 목록을 조회합니다.")
+async def list_post_files(
+    post_id: int,
+    db: Session = Depends(get_db),
+) -> dict:
+    """게시물의 모든 첨부 파일 조회"""
+    post = db.get(CommunityPost, post_id)
+    if not post or post.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+
+    files = db.query(CommunityPostFile).filter(
+        CommunityPostFile.post_id == post_id,
+        CommunityPostFile.deleted_at.is_(None),
+    ).all()
+
+    return success_response(
+        data={
+            "files": [
+                {
+                    "id": f.id,
+                    "filename": f.filename,
+                    "file_size": f.file_size,
+                    "file_type": f.file_type,
+                    "s3_url": f.s3_url,
+                    "uploaded_at": f.created_at,
+                }
+                for f in files
+            ]
+        },
+    )
+
+
+@router.delete("/{post_id}/files/{file_id}", summary="게시물 첨부 파일 삭제", description="게시물의 첨부 파일을 삭제합니다.")
+async def delete_post_file(
+    post_id: int,
+    file_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+    s3_service=Depends(get_s3_service),
+) -> dict:
+    """게시물 첨부 파일 삭제 (소프트 삭제)"""
+    file_record = db.get(CommunityPostFile, file_id)
+    if not file_record or file_record.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+
+    # 권한 검증: 업로드한 사람 또는 게시물 작성자만 삭제 가능
+    post = db.get(CommunityPost, post_id)
+    if file_record.uploaded_by != current_user_id and post.author_id != current_user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+
+    # S3에서 파일 삭제
+    await s3_service.delete_file(file_record.s3_key)
+
+    # DB에서 소프트 삭제
+    file_record.deleted_at = func.now()
+    db.commit()
+
+    return success_response(data={"deleted": True, "file_id": file_id})

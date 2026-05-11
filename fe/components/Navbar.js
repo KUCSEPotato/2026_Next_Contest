@@ -3,25 +3,78 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
-import { getToken, removeToken } from "../lib/auth";
+import {
+  AUTH_CHANGED_EVENT,
+  getStoredUser,
+  getToken,
+  loadCurrentUser,
+  refreshAccessToken,
+  removeToken,
+} from "../lib/auth";
 
 export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
 
   const [token, setToken] = useState(null);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    setToken(getToken());
+    let cancelled = false;
+
+    const syncAuthState = async () => {
+      const currentToken = getToken();
+      const storedUser = getStoredUser();
+
+      if (!cancelled) {
+        setToken(currentToken);
+        setUser(storedUser);
+      }
+
+      if (!currentToken || storedUser?.role) {
+        return;
+      }
+
+      try {
+        const currentUser = await loadCurrentUser();
+        if (!cancelled) {
+          setToken(getToken());
+          setUser(currentUser);
+        }
+      } catch {
+        if (!cancelled) {
+          setUser(getStoredUser());
+        }
+      }
+    };
+
+    syncAuthState();
+    refreshAccessToken().then(syncAuthState).catch(syncAuthState);
+
+    const handleAuthSync = () => {
+      syncAuthState();
+    };
+
+    window.addEventListener(AUTH_CHANGED_EVENT, handleAuthSync);
+    window.addEventListener("storage", handleAuthSync);
+    window.addEventListener("focus", handleAuthSync);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener(AUTH_CHANGED_EVENT, handleAuthSync);
+      window.removeEventListener("storage", handleAuthSync);
+      window.removeEventListener("focus", handleAuthSync);
+    };
   }, []);
 
-  if (pathname === "/login") {
+  if (pathname === "/login" || pathname === "/signup") {
     return null;
   }
 
   const handleLogout = () => {
     removeToken();
     setToken(null);
+    setUser(null);
     router.push("/login");
   };
 
@@ -40,21 +93,38 @@ export default function Navbar() {
         </button>
 
         <div className="flex items-center gap-3 text-sm font-semibold">
-          <button onClick={() => router.push("/mainpage")}>프로젝트</button>
-          <button onClick={() => router.push("/ideas/new")}>아이디어 등록</button>
-          <button onClick={() => router.push("/mypage")}>마이페이지</button>
+          <button
+            onClick={() => router.push("/mypage")}
+            className="text-slate-700 transition hover:text-red-600"
+          >
+            마이페이지
+          </button>
+
+          {user?.role === "admin" && (
+            <button
+              onClick={() => router.push("/admin")}
+              className="text-slate-700 transition hover:text-red-600"
+            >
+              관리자
+            </button>
+          )}
 
           {token ? (
-            <button
-              onClick={handleLogout}
-              className="rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700"
-            >
-              로그아웃
-            </button>
+            <>
+              <span className="hidden max-w-[180px] truncate text-slate-500 sm:inline">
+                {user?.nickname || user?.email || "로그인됨"}
+              </span>
+              <button
+                onClick={handleLogout}
+                className="rounded-lg bg-red-600 px-4 py-2 text-white transition hover:bg-red-700"
+              >
+                로그아웃
+              </button>
+            </>
           ) : (
             <button
               onClick={() => router.push("/login")}
-              className="rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+              className="rounded-lg bg-red-600 px-4 py-2 text-white transition hover:bg-red-700"
             >
               로그인
             </button>

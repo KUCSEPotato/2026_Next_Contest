@@ -1,6 +1,7 @@
+import re
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile
 from sqlalchemy.orm import Session
 
 from app.api.v1.response import success_response
@@ -8,17 +9,88 @@ from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
 from app.models import Idea
 from app.models import IdeaBookmark
+from app.models import IdeaFile
 from app.models import IdeaLike
+from app.models import Notification
 from app.models import Project
 from app.models import ProjectMember
+from app.models import ProjectSkill
+from app.models import Skill
 from app.schemas import IdeaCreateRequest
 from app.schemas import IdeaUpdateRequest
 from app.schemas import ProjectCreateRequest
+from app.services.economy import reward_project_registration
+from app.services.s3_upload import get_s3_service
 
 router = APIRouter()
 
 
-@router.post("", summary="아이디어 생성", description="새로운 프로젝트 아이디어를 등록합니다.")
+def _normalize_skill_name(skill_name: str) -> str:
+    return re.sub(r"\s+", " ", skill_name.strip()).lower()
+
+
+def _sync_project_skills_from_idea(db: Session, project_id: int, tech_stack: list[str]) -> None:
+    existing_skill_ids = {
+        skill_id
+        for (skill_id,) in db.query(ProjectSkill.skill_id).filter(ProjectSkill.project_id == project_id).all()
+    }
+    for skill_name in tech_stack:
+        normalized_name = _normalize_skill_name(skill_name)
+        skill = db.query(Skill).filter(Skill.normalized_name == normalized_name).first()
+        if skill is None:
+            skill = Skill(name=skill_name.strip(), normalized_name=normalized_name)
+            db.add(skill)
+            db.flush()
+
+        if skill.id not in existing_skill_ids:
+            db.add(ProjectSkill(project_id=project_id, skill_id=skill.id))
+            existing_skill_ids.add(skill.id)
+
+
+def _project_notification_data(project_id: int) -> dict:
+    return {
+        "project_id": project_id,
+        "url": f"/projects/{project_id}",
+    }
+
+
+def _notify_project_registered(db: Session, project: Project) -> None:
+    db.add(
+        Notification(
+            user_id=project.leader_id,
+            type="project_update",
+            title="프로젝트가 등록되었습니다",
+            body=f"'{project.title}' 프로젝트가 생성되었습니다.",
+            data=_project_notification_data(project.id),
+        )
+    )
+
+
+def _create_project_from_idea(db: Session, idea: Idea, current_user_id: int) -> Project:
+    project = Project(
+        idea_id=idea.id,
+        leader_id=current_user_id,
+        title=idea.title,
+        summary=idea.summary,
+        description=idea.description,
+        category=idea.domain,
+        difficulty=idea.difficulty,
+        status="planning",
+        progress_percent=0,
+        max_members=max(int(idea.required_members or 1), 1),
+        is_public=idea.is_open,
+    )
+    db.add(project)
+    db.flush()
+    db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
+    _sync_project_skills_from_idea(db, project.id, list(idea.tech_stack or []))
+    idea.converted_to_project_id = project.id
+    reward_project_registration(db, project)
+    _notify_project_registered(db, project)
+    return project
+
+
+@router.post("", summary="아이디어 생성", description="아이디어를 등록하면 즉시 프로젝트도 함께 생성합니다.")
 async def create_idea(
     payload: IdeaCreateRequest,
     current_user_id: int = Depends(get_current_user_id),
@@ -28,7 +100,8 @@ async def create_idea(
 
     Swagger 테스트 방법:
     - Authorization 헤더를 설정합니다.
-    - body에 제목/설명/난이도를 포함해 호출합니다.
+    - body에 제목/설명/난이도/기술스택/해시태그를 포함해 호출합니다.
+    - 생성 성공 시 Idea와 Project가 동시에 만들어집니다.
     """
     idea = Idea(
         author_id=current_user_id,
@@ -43,9 +116,22 @@ async def create_idea(
         is_open=payload.is_open,
     )
     db.add(idea)
+    db.flush()
+
+    project = _create_project_from_idea(db, idea, current_user_id)
+
     db.commit()
     db.refresh(idea)
-    return success_response(data={"id": idea.id, "title": idea.title})
+    db.refresh(project)
+    return success_response(
+        data={
+            "idea_id": idea.id,
+            "project_id": project.id,
+            "title": idea.title,
+            "project_title": project.title,
+            "converted": True,
+        }
+    )
 
 
 @router.get("", summary="아이디어 목록", description="페이지네이션과 난이도 필터를 지원하는 아이디어 목록 조회 API입니다.")
@@ -53,12 +139,16 @@ async def list_ideas(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
     difficulty: str | None = Query(default=None),
+    discarded: bool | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> dict:
     """아이디어 목록 조회 API.
 
     Swagger 테스트 방법:
-    - query `page`, `size`, `difficulty`를 조합해 호출합니다.
+    - query `page`, `size`, `difficulty`, `discarded`를 조합해 호출합니다.
+    - `discarded=true`: 투척된 아이디어만 조회
+    - `discarded=false`: 투척되지 않은 아이디어만 조회
+    - `discarded` 미지정: 모든 아이디어 조회
 
     응답:
     - data에 아이디어 목록, meta에 page/size/total을 반환합니다.
@@ -67,21 +157,26 @@ async def list_ideas(
     query = query.filter(Idea.deleted_at.is_(None))
     if difficulty:
         query = query.filter(Idea.difficulty == difficulty)
+    if discarded is not None:
+        query = query.filter(Idea.is_discarded == discarded)
 
     total = query.count()
     ideas = query.order_by(Idea.created_at.desc()).offset((page - 1) * size).limit(size).all()
     return success_response(
         data=[
             {
-                "id": idea.id,
-                "title": idea.title,
-                "summary": idea.summary,
-                "tech_stack": idea.tech_stack,
-                "hashtags": idea.hashtags,
-                "difficulty": idea.difficulty,
-                "is_open": idea.is_open,
-                "created_at": idea.created_at,
-            }
+            "id": idea.id,
+            "project_id": idea.converted_to_project_id,
+            "converted_to_project_id": idea.converted_to_project_id,
+            "title": idea.title,
+            "summary": idea.summary,
+            "tech_stack": idea.tech_stack,
+            "hashtags": idea.hashtags,
+            "difficulty": idea.difficulty,
+            "is_open": idea.is_open,
+            "is_discarded": idea.is_discarded,
+            "created_at": idea.created_at,
+        }
             for idea in ideas
         ],
         meta={"page": page, "size": size, "total": total},
@@ -307,9 +402,9 @@ async def convert_idea_to_project(
     if idea.converted_to_project_id is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This idea has already been converted to a project")
     
-    # 프로젝트 생성
+    # 프로젝트 생성 및 기술 스택 동기화
     project = Project(
-        idea_id=idea_id,  # ← 변환 출처 기록
+        idea_id=idea_id,
         leader_id=current_user_id,
         title=payload.title,
         summary=payload.summary,
@@ -323,12 +418,10 @@ async def convert_idea_to_project(
     )
     db.add(project)
     db.flush()
-    
-    # 리더 멤버 자동 등록
     db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
-    
-    # 전환 기록
+    _sync_project_skills_from_idea(db, project.id, list(idea.tech_stack or []))
     idea.converted_to_project_id = project.id
+    _notify_project_registered(db, project)
     
     db.commit()
     db.refresh(project)
@@ -343,3 +436,179 @@ async def convert_idea_to_project(
             "converted": True,
         }
     )
+
+
+@router.post("/{idea_id}/pickup", summary="버려진 아이디어 줍기", description="영감의 샘에 버려진 아이디어를 다른 사용자가 새 프로젝트로 이어받습니다.")
+async def pickup_discarded_idea(
+    idea_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    """버려진 아이디어 줍기 API.
+
+    목적:
+    - 프로젝트에서 되돌려져 `is_discarded=True`가 된 아이디어를 타인이 재활용
+    - 원작성자는 자기 아이디어를 다시 주울 수 없음
+    - 이미 프로젝트에 연결된 아이디어는 중복으로 주울 수 없음
+
+    Swagger 테스트 방법:
+    - Authorization 헤더를 설정합니다.
+    - path의 `idea_id`를 전달합니다.
+
+    흐름:
+    1. 아이디어 존재/미삭제 검증
+    2. discarded 상태인지 검증
+    3. 프로젝트 미연결 상태인지 검증
+    4. 원작성자가 아닌지 검증
+    5. 새 Project 생성, 현재 사용자를 leader로 등록
+    6. converted_to_project_id 연결 및 is_discarded=False 처리
+    """
+    idea = db.get(Idea, idea_id)
+    if idea is None or idea.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Idea not found")
+
+    if not idea.is_discarded:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only discarded ideas can be picked up")
+
+    if idea.converted_to_project_id is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This idea is already connected to a project")
+
+    if idea.author_id == current_user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot pick up your own idea")
+
+    project = _create_project_from_idea(db, idea, current_user_id)
+    idea.is_discarded = False
+
+    db.commit()
+    db.refresh(project)
+    db.refresh(idea)
+
+    return success_response(
+        data={
+            "project_id": project.id,
+            "project_title": project.title,
+            "idea_id": idea.id,
+            "idea_title": idea.title,
+            "picked_up": True,
+        }
+    )
+
+
+# ═══════════════════════════════════════════════════════════════
+# ━━ File Upload
+# ═══════════════════════════════════════════════════════════════
+
+@router.post("/{idea_id}/files", summary="아이디어에 파일 첨부", description="아이디어에 파일을 업로드합니다. 최대 50MB.")
+async def upload_idea_file(
+    idea_id: int,
+    file: UploadFile = File(...),
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+    s3_service=Depends(get_s3_service),
+) -> dict:
+    """아이디어에 파일 업로드"""
+    idea = db.get(Idea, idea_id)
+    if not idea or idea.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Idea not found")
+
+    # 권한 검증: 아이디어 작성자만 파일 업로드 가능
+    if idea.user_id != current_user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only author can upload files")
+
+    # Read file content
+    file_content = await file.read()
+    
+    # Upload to S3
+    upload_result = await s3_service.upload_file(
+        file_content=file_content,
+        filename=file.filename or "file",
+        file_type=file.content_type or "application/octet-stream",
+        folder="ideas",
+    )
+
+    # Save file record to database
+    file_record = IdeaFile(
+        idea_id=idea_id,
+        filename=file.filename or "file",
+        file_size=upload_result["file_size"],
+        file_type=file.content_type or "application/octet-stream",
+        s3_key=upload_result["s3_key"],
+        s3_url=upload_result["s3_url"],
+        uploaded_by=current_user_id,
+    )
+    db.add(file_record)
+    db.commit()
+    db.refresh(file_record)
+
+    return success_response(
+        data={
+            "id": file_record.id,
+            "idea_id": file_record.idea_id,
+            "filename": file_record.filename,
+            "file_size": file_record.file_size,
+            "file_type": file_record.file_type,
+            "s3_url": file_record.s3_url,
+            "uploaded_at": file_record.created_at,
+        },
+    )
+
+
+@router.get("/{idea_id}/files", summary="아이디어 첨부 파일 조회", description="아이디어의 첨부 파일 목록을 조회합니다.")
+async def list_idea_files(
+    idea_id: int,
+    db: Session = Depends(get_db),
+) -> dict:
+    """아이디어의 모든 첨부 파일 조회"""
+    idea = db.get(Idea, idea_id)
+    if not idea or idea.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Idea not found")
+
+    files = db.query(IdeaFile).filter(
+        IdeaFile.idea_id == idea_id,
+        IdeaFile.deleted_at.is_(None),
+    ).all()
+
+    return success_response(
+        data={
+            "files": [
+                {
+                    "id": f.id,
+                    "filename": f.filename,
+                    "file_size": f.file_size,
+                    "file_type": f.file_type,
+                    "s3_url": f.s3_url,
+                    "uploaded_at": f.created_at,
+                }
+                for f in files
+            ]
+        },
+    )
+
+
+@router.delete("/{idea_id}/files/{file_id}", summary="아이디어 첨부 파일 삭제", description="아이디어의 첨부 파일을 삭제합니다.")
+async def delete_idea_file(
+    idea_id: int,
+    file_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+    s3_service=Depends(get_s3_service),
+) -> dict:
+    """아이디어 첨부 파일 삭제 (소프트 삭제)"""
+    file_record = db.get(IdeaFile, file_id)
+    if not file_record or file_record.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+
+    # 권한 검증: 아이디어 작성자 또는 파일 업로드자만 삭제 가능
+    idea = db.get(Idea, idea_id)
+    if file_record.uploaded_by != current_user_id and idea.user_id != current_user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+
+    # S3에서 파일 삭제
+    await s3_service.delete_file(file_record.s3_key)
+
+    # DB에서 소프트 삭제
+    from sqlalchemy import func
+    file_record.deleted_at = func.now()
+    db.commit()
+
+    return success_response(data={"deleted": True, "file_id": file_id})
