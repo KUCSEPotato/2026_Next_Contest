@@ -56,10 +56,10 @@ export default function NewIdeaPage() {
         const fullDescription = [
           description.trim(),
           expectedPeriod.trim()
-            ? `\n\n[예상 진행 기간]\n${expectedPeriod.trim()}`
+            ? `\n\n<b>[ 예상 진행 기간 ]</b>\n${expectedPeriod.trim()}`
             : "",
           preferredMembers.trim()
-            ? `\n\n[이런 분과 함께하고 싶어요]\n${preferredMembers.trim()}`
+            ? `\n\n<b>[ 이런 분과 함께하고 싶어요 ]</b>\n${preferredMembers.trim()}`
             : "",
         ].join("");
     
@@ -182,7 +182,7 @@ export default function NewIdeaPage() {
           <div className="grid gap-6 md:grid-cols-2">
             <div>
               <label className="mb-2 block text-sm font-semibold text-slate-700">
-                모집 인원
+                모집 인원 (리더 포함)
               </label>
               <input
                 type="number"
