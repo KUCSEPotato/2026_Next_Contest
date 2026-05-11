@@ -2,10 +2,9 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { saveAuthSession } from "../../../../lib/auth";
+import { getApiBaseUrl, saveAuthSession } from "../../../../lib/auth";
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const API_BASE = getApiBaseUrl();
 
 function GithubLoading() {
   return (
