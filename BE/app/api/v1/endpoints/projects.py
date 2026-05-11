@@ -8,6 +8,9 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.v1.response import success_response
+from app.api.v1.endpoints.llm import _call_gemini_for_todo_list
+from app.api.v1.endpoints.llm import _parse_gemini_response
+from app.core.config import settings
 from app.core.realtime import project_todo_channel
 from app.core.realtime import realtime_hub
 from app.db.session import get_db
@@ -237,6 +240,69 @@ def _build_todo_response(todo: Todo, assignments: list[dict] | None = None) -> d
         "assignee_id": todo.assignee_id,
         "assignments": assignments or [],
     }
+
+
+def _fallback_ai_todo_titles(project: Project) -> list[str]:
+    return [
+        f"{project.title} 핵심 기능 범위 정리",
+        "팀원별 역할과 담당 Todo 확정",
+        "첫 번째 실행 가능한 결과물 구현",
+        "진행 상황 공유 및 다음 스프린트 계획",
+    ]
+
+
+def _build_ai_todo_context(
+    project: Project,
+    members: list[ProjectMember],
+    member_users: dict[int, User],
+    messages: list[ChatMessage],
+) -> str:
+    member_lines = [
+        f"- {member_users[member.user_id].nickname if member.user_id in member_users else f'User #{member.user_id}'}: {member.role_in_project}"
+        for member in members
+    ]
+    message_lines = []
+    for message in messages:
+        sender = member_users.get(message.sender_id) if message.sender_id is not None else None
+        sender_name = sender.nickname if sender else "시스템"
+        message_lines.append(f"{sender_name}: {message.message}")
+
+    return "\n".join(
+        [
+            "[프로젝트 정보]",
+            f"제목: {project.title}",
+            f"한줄소개: {project.summary or ''}",
+            f"상세내용: {project.description or ''}",
+            "",
+            "[팀원]",
+            "\n".join(member_lines) or "팀원 정보 없음",
+            "",
+            "[최근 채팅]",
+            "\n".join(message_lines) or "최근 채팅 없음",
+        ]
+    )
+
+
+async def _generate_ai_todo_titles(context_text: str, project: Project) -> list[str]:
+    if not settings.gemini_api_key:
+        return _fallback_ai_todo_titles(project)
+
+    try:
+        response_text = await _call_gemini_for_todo_list(context_text)
+        todos_by_user = _parse_gemini_response(response_text)
+    except HTTPException:
+        return _fallback_ai_todo_titles(project)
+
+    titles: list[str] = []
+    for todos in todos_by_user.values():
+        if not isinstance(todos, list):
+            continue
+        for todo in todos:
+            if isinstance(todo, str) and todo.strip():
+                titles.append(todo.strip())
+
+    deduped_titles = list(dict.fromkeys(titles))
+    return deduped_titles[:8] or _fallback_ai_todo_titles(project)
 
 
 async def _broadcast_todo_snapshot(db: Session, project_id: int, todo: Todo, event_type: str) -> None:
@@ -1064,6 +1130,71 @@ async def update_todo(
     return success_response(data=_build_todo_response(todo, assignments))
 
 
+@router.post("/{project_id}/todos/ai-generate", summary="AI Todo 생성", description="프로젝트 상세와 최근 채팅을 바탕으로 Todo 목록을 생성합니다.")
+async def generate_project_todos_with_ai(
+    project_id: int,
+    payload: dict = Body(default={}),
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    project = _get_project_or_404(db, project_id)
+    _ensure_project_member(db, project_id, current_user_id)
+
+    members = (
+        db.query(ProjectMember)
+        .filter(ProjectMember.project_id == project_id, ProjectMember.left_at.is_(None))
+        .all()
+    )
+    member_ids = [member.user_id for member in members]
+    member_users = (
+        {user.id: user for user in db.query(User).filter(User.id.in_(member_ids)).all()}
+        if member_ids
+        else {}
+    )
+
+    room_id = payload.get("room_id")
+    messages_query = db.query(ChatMessage).join(ChatRoom, ChatRoom.id == ChatMessage.room_id).filter(
+        ChatRoom.project_id == project_id,
+    )
+    if room_id:
+        messages_query = messages_query.filter(ChatMessage.room_id == room_id)
+    recent_messages = messages_query.order_by(ChatMessage.created_at.desc()).limit(50).all()
+    recent_messages = list(reversed(recent_messages))
+
+    context_text = _build_ai_todo_context(project, members, member_users, recent_messages)
+    titles = await _generate_ai_todo_titles(context_text, project)
+
+    created_todos: list[Todo] = []
+    for title in titles:
+        todo = Todo(
+            project_id=project_id,
+            creator_id=current_user_id,
+            assignee_id=member_ids[0] if member_ids else None,
+            title=title[:200],
+            description="AI가 프로젝트 정보와 최근 채팅을 바탕으로 생성한 Todo입니다.",
+            stage="planning",
+            status="todo",
+            priority=3,
+        )
+        db.add(todo)
+        db.flush()
+        _sync_todo_assignments(db, todo, member_ids)
+        created_todos.append(todo)
+
+    db.commit()
+    for todo in created_todos:
+        db.refresh(todo)
+        await _broadcast_todo_snapshot(db, project_id, todo, "todo.created")
+
+    assignments_by_todo = _serialize_todo_assignments(db, [todo.id for todo in created_todos])
+    return success_response(
+        data=[
+            _build_todo_response(todo, assignments_by_todo.get(todo.id, []))
+            for todo in created_todos
+        ]
+    )
+
+
 @router.patch("/{project_id}/todos/{todo_id}/done", summary="Todo 완료 토글", description="현재 사용자 할당분의 완료 상태를 토글합니다.")
 async def toggle_todo_assignment_done(
     project_id: int,
@@ -1095,11 +1226,17 @@ async def toggle_todo_assignment_done(
         .first()
     )
     if assignment is None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Todo assignment not found")
+        assignment = TodoAssignment(todo_id=todo_id, user_id=current_user_id, is_done=False)
+        db.add(assignment)
+        db.flush()
 
-    assignment.is_done = not assignment.is_done
+    next_done = todo.status != "done"
+    todo.status = "done" if next_done else "todo"
+    todo.completed_at = datetime.now(timezone.utc) if next_done else None
+    assignment.is_done = next_done
     assignment.done_at = datetime.now(timezone.utc) if assignment.is_done else None
     db.commit()
+    db.refresh(todo)
     db.refresh(assignment)
 
     assignments = _serialize_todo_assignments(db, [todo.id]).get(todo.id, [])

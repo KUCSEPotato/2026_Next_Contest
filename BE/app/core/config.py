@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     google_oauth_client_id: str | None = None
     google_oauth_client_secret: str | None = None
     google_oauth_redirect_uri: str | None = None
+    gemini_api_key: str | None = None
     # AWS S3 Configuration
     aws_access_key_id: str | None = None
     aws_secret_access_key: str | None = None
