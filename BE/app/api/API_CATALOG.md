@@ -53,7 +53,7 @@
 - GET /users/{user_id}/stats: 활동 통계 조회
 - GET /users/{user_id}/projects: 사용자 프로젝트 이력
 - GET /users/{user_id}/reviews: **공개 리뷰 조회** (인증 불필요, 평점과 코멘트 포함)
-- GET /users/me/reviews: **내가 받은 리뷰 목록**(마이페이지용)
+- GET /users/me/reviews: **내가 받은 리뷰 목록**(마이페이지용, `comment`와 호환용 `message` 포함)
 - GET /users/me/applications: **내가 지원한 프로젝트 목록**(지원현황 조회)
 - POST /users/me/skills: 기술 스택 등록
 - DELETE /users/me/skills/{skill_id}: 기술 스택 제거
@@ -61,7 +61,7 @@
 - DELETE /users/me/interests/{interest_id}: 관심 분야 제거
 - 프로젝트 생성/시작/완료/재활용 시 코인 보상 이력이 누적됩니다.
 - POST /users/me/onboarding/ideas: 온보딩 마지막 단계에서 관심 아이디어 선택 및 가입 완료 처리
-- GET /users/me/reputation: 리뷰 기반 신뢰도/평점 요약
+- GET /users/me/reputation: 리뷰 기반 신뢰도/평점 요약(`score`, 항목별 평균, 전체 이용자 평균 포함)
 
 ## 3) Ideas
 

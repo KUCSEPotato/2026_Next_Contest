@@ -571,6 +571,7 @@ async def get_user_reviews(
                 "contribution_score": review.contribution_score,
                 "responsibility_score": review.responsibility_score,
                 "comment": review.comment,
+                "message": review.comment,
                 "created_at": review.created_at,
             }
         )
@@ -619,6 +620,7 @@ async def get_my_reviews(
                 "contribution_score": review.contribution_score,
                 "responsibility_score": review.responsibility_score,
                 "comment": review.comment,
+                "message": review.comment,
                 "created_at": review.created_at,
             }
         )
@@ -640,18 +642,54 @@ async def get_my_reputation(
     - 리뷰가 없으면 review_count=0, score=0.0 반환
     - 리뷰가 있으면 teamwork/contribution/responsibility 평균과 종합 score를 반환
     """
+    global_count, global_teamwork, global_contribution, global_responsibility = (
+        db.query(
+            func.count(Review.id),
+            func.avg(Review.teamwork_score),
+            func.avg(Review.contribution_score),
+            func.avg(Review.responsibility_score),
+        )
+        .one()
+    )
+
+    global_avg_teamwork = float(global_teamwork or 0)
+    global_avg_contribution = float(global_contribution or 0)
+    global_avg_responsibility = float(global_responsibility or 0)
+    global_score = round(
+        (global_avg_teamwork + global_avg_contribution + global_avg_responsibility) / 3,
+        2,
+    )
+
     aggregate = db.get(UserRatingAggregate, current_user_id)
     if aggregate is None:
-        return success_response(data={"review_count": 0, "score": 0.0})
+        return success_response(
+            data={
+                "review_count": 0,
+                "avg_teamwork": 0.0,
+                "avg_contribution": 0.0,
+                "avg_responsibility": 0.0,
+                "score": 0.0,
+                "global_review_count": int(global_count or 0),
+                "global_avg_teamwork": round(global_avg_teamwork, 2),
+                "global_avg_contribution": round(global_avg_contribution, 2),
+                "global_avg_responsibility": round(global_avg_responsibility, 2),
+                "global_score": global_score,
+            }
+        )
 
     score = float((aggregate.avg_teamwork + aggregate.avg_contribution + aggregate.avg_responsibility) / 3)
     return success_response(
         data={
             "review_count": aggregate.review_count,
-            "avg_teamwork": float(aggregate.avg_teamwork),
-            "avg_contribution": float(aggregate.avg_contribution),
-            "avg_responsibility": float(aggregate.avg_responsibility),
+            "avg_teamwork": round(float(aggregate.avg_teamwork), 2),
+            "avg_contribution": round(float(aggregate.avg_contribution), 2),
+            "avg_responsibility": round(float(aggregate.avg_responsibility), 2),
             "score": round(score, 2),
+            "global_review_count": int(global_count or 0),
+            "global_avg_teamwork": round(global_avg_teamwork, 2),
+            "global_avg_contribution": round(global_avg_contribution, 2),
+            "global_avg_responsibility": round(global_avg_responsibility, 2),
+            "global_score": global_score,
         },
     )
 

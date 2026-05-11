@@ -474,41 +474,69 @@ export default function MyPage() {
             {reviews.length === 0 ? (
               <p className="text-sm text-slate-500">리뷰 없음</p>
             ) : (
-              reviews.map((review) => (
-                <div key={review.id} className="mb-3 rounded-xl border p-4">
-                  <p className="font-bold">
-                    {review.project?.title || "프로젝트"}
-                  </p>
+              reviews.map((review) => {
+                const reviewMessage = getReviewMessage(review);
 
-                  <p className="text-sm text-gray-400">
-                    익명{" "}
-                    {review.created_at
-                      ? `• ${new Date(review.created_at).toLocaleDateString()}`
-                      : ""}
-                  </p>
+                return (
+                  <div
+                    key={review.id}
+                    className="mb-3 rounded-xl border border-slate-200 p-4"
+                  >
+                    <p className="font-bold text-slate-900">
+                      {review.project?.title || "프로젝트"}
+                    </p>
 
-                  <div className="mt-2 text-sm">
-                    협업 {review.teamwork_score} / 기여{" "}
-                    {review.contribution_score} / 책임{" "}
-                    {review.responsibility_score}
+                    <p className="mt-1 text-sm text-slate-400">
+                      익명{" "}
+                      {review.created_at
+                        ? `• ${new Date(review.created_at).toLocaleDateString()}`
+                        : ""}
+                    </p>
+
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
+                      <span className="rounded-full bg-slate-100 px-3 py-1">
+                        협업 {review.teamwork_score}
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-3 py-1">
+                        기여 {review.contribution_score}
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-3 py-1">
+                        책임 {review.responsibility_score}
+                      </span>
+                    </div>
+
+                    <p
+                      className={`mt-3 rounded-xl px-4 py-3 text-sm leading-6 ${
+                        reviewMessage
+                          ? "bg-red-50 text-slate-700"
+                          : "bg-slate-50 text-slate-400"
+                      }`}
+                    >
+                      {reviewMessage || "작성된 리뷰 메시지가 없습니다."}
+                    </p>
                   </div>
-
-                  <p className="mt-2">{review.comment}</p>
-                </div>
-              ))
+                );
+              })
             )}
           </section>
         )}
 
         <section className="mb-6 rounded-2xl bg-white p-6 shadow">
-          <h2 className="mb-4 text-xl font-bold">신뢰도</h2>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">신뢰도</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                내 평점과 전체 이용자 평균을 함께 비교합니다.
+              </p>
+            </div>
 
-          <div className="grid grid-cols-4 gap-4">
-            <MiniStat label="종합" value={reputation?.score ?? 0} />
-            <MiniStat label="협업" value={reputation?.avg_teamwork ?? 0} />
-            <MiniStat label="기여" value={reputation?.avg_contribution ?? 0} />
-            <MiniStat label="책임" value={reputation?.avg_responsibility ?? 0} />
+            <div className="rounded-xl bg-slate-50 px-4 py-2 text-sm text-slate-600">
+              받은 평가 {reputation?.review_count ?? 0}개 · 전체{" "}
+              {reputation?.global_review_count ?? 0}개
+            </div>
           </div>
+
+          <RatingComparison reputation={reputation} />
         </section>
 
         <div className="mb-6 grid gap-6 lg:grid-cols-2">
@@ -662,7 +690,7 @@ export default function MyPage() {
             </h2>
 
             <p className="mb-1 text-center text-sm font-semibold text-slate-700 line-clamp-1">
-              "{discardConfirm.title}"
+              &quot;{discardConfirm.title}&quot;
             </p>
 
             <p className="mb-6 text-center text-sm text-slate-400 leading-relaxed">
@@ -826,13 +854,107 @@ function StatCard({ title, value }) {
   );
 }
 
-function MiniStat({ label, value }) {
+function RatingComparison({ reputation }) {
+  const items = [
+    {
+      label: "종합",
+      mine: reputation?.score,
+      global: reputation?.global_score,
+    },
+    {
+      label: "협업",
+      mine: reputation?.avg_teamwork,
+      global: reputation?.global_avg_teamwork,
+    },
+    {
+      label: "기여",
+      mine: reputation?.avg_contribution,
+      global: reputation?.global_avg_contribution,
+    },
+    {
+      label: "책임",
+      mine: reputation?.avg_responsibility,
+      global: reputation?.global_avg_responsibility,
+    },
+  ];
+
   return (
-    <div className="rounded-xl bg-gray-100 p-4">
-      <p className="text-sm">{label}</p>
-      <p className="text-xl font-bold">{value}</p>
+    <div className="mt-5 space-y-4">
+      {items.map((item) => (
+        <RatingRow
+          key={item.label}
+          label={item.label}
+          mine={item.mine}
+          global={item.global}
+        />
+      ))}
     </div>
   );
+}
+
+function RatingRow({ label, mine, global }) {
+  const mineValue = normalizeRating(mine);
+  const globalValue = normalizeRating(global);
+
+  return (
+    <div className="rounded-2xl border border-slate-200 p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="font-bold text-slate-900">{label}</p>
+        <div className="flex items-center gap-3 text-sm">
+          <span className="font-semibold text-red-600">
+            나 {formatRating(mineValue)}
+          </span>
+          <span className="text-slate-400">
+            전체 {formatRating(globalValue)}
+          </span>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <RatingBar label="나" value={mineValue} className="bg-red-600" />
+        <RatingBar label="전체 평균" value={globalValue} className="bg-slate-400" />
+      </div>
+    </div>
+  );
+}
+
+function RatingBar({ label, value, className }) {
+  return (
+    <div className="grid grid-cols-[70px_1fr] items-center gap-3 text-xs font-semibold text-slate-500">
+      <span>{label}</span>
+      <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+        <div
+          className={`h-full rounded-full ${className}`}
+          style={{ width: `${(value / 5) * 100}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function normalizeRating(value) {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+
+  return Math.min(5, Math.max(0, numericValue));
+}
+
+function formatRating(value) {
+  return normalizeRating(value).toFixed(1);
+}
+
+function getReviewMessage(review) {
+  const message =
+    review?.comment ||
+    review?.message ||
+    review?.review_message ||
+    review?.content ||
+    "";
+
+  return String(message).trim();
 }
 
 function ScoreSelect({ label, value, onChange }) {
