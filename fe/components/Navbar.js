@@ -73,6 +73,15 @@ export default function Navbar() {
             마이페이지
           </button>
 
+          {user?.role === "admin" && (
+            <button
+              onClick={() => router.push("/admin")}
+              className="text-slate-700 transition hover:text-red-600"
+            >
+              관리자
+            </button>
+          )}
+
           {token ? (
             <>
               <span className="hidden max-w-[180px] truncate text-slate-500 sm:inline">

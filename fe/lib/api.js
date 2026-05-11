@@ -743,6 +743,80 @@ export async function readNotificationApi(notificationId) {
   return handleResponse(res, "알림 읽음 처리에 실패했습니다.");
 }
 
+/* =========================
+   Admin
+========================= */
+
+export async function getAdminOverviewApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/overview`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "운영 요약을 불러오지 못했습니다.");
+}
+
+export async function getAdminUsersApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/users`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "사용자 목록을 불러오지 못했습니다.");
+}
+
+export async function updateAdminUserStatusApi(userId, payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/users/${userId}/status`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "사용자 상태 변경에 실패했습니다.");
+}
+
+export async function getAdminProjectsApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/projects`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "프로젝트 목록을 불러오지 못했습니다.");
+}
+
+export async function getAdminReportsApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/reports`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "신고 목록을 불러오지 못했습니다.");
+}
+
+export async function updateAdminReportApi(reportId, payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/reports/${reportId}`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "신고 처리에 실패했습니다.");
+}
+
+export async function getAdminPaymentsApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/payments`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "결제 이벤트 목록을 불러오지 못했습니다.");
+}
+
+export async function updateAdminPaymentApi(eventId, payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/payments/${eventId}`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "결제 이벤트 처리에 실패했습니다.");
+}
+
 export async function getMyChatRoomsApi() {
   const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/chats/my/rooms`, {
     headers: authHeaders(),

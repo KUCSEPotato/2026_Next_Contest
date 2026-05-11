@@ -248,11 +248,14 @@
 
 ## 14) Admin
 
+- GET /admin/overview: 운영 요약 지표(사용자/프로젝트/미처리 신고/결제 이벤트/활성 구독)
 - GET /admin/users: 전체 사용자 목록 조회(관리자)
 - PATCH /admin/users/{user_id}/status: 사용자 상태/역할 변경(관리자)
 - GET /admin/projects: 전체 프로젝트 목록 조회(관리자)
 - GET /admin/reports: 신고 목록 조회(관리자)
 - PATCH /admin/reports/{report_id}: 신고 처리 상태 변경(관리자)
+- GET /admin/payments: 결제 이벤트 목록 조회(관리자)
+- PATCH /admin/payments/{event_id}: 결제 이벤트 처리/해제(관리자)
 
 ## 참고 문서
 
