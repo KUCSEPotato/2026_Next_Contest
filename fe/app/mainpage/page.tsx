@@ -19,6 +19,9 @@ interface Project {
   status: string;
   difficulty: "beginner" | "intermediate" | "advanced";
   isUrgent: boolean;
+  applicantCount: number;
+  remainingSeats: number;
+  competitionRatio: number;
 }
 
 interface ApiProject {
@@ -101,7 +104,7 @@ const useAuth = () => {
   return { isLoggedIn };
 };
 
-function normalizeProject(project: ApiProject): Project {
+function normalizeProject(project: any): Project {
   return {
     id: project.id,
     project_id: project.id,
@@ -110,9 +113,12 @@ function normalizeProject(project: ApiProject): Project {
     description: project.summary || project.description || "설명이 없습니다.",
     summary: project.summary,
     category: project.category || "IT/소프트웨어",
-    techStack: project.tech_stack || project.techStack || [],
+    techStack: project.techStack || project.tech_stack || [],
     currentMembers: project.currentMembers ?? project.current_members ?? 0,
     maxMembers: project.maxMembers ?? project.max_members ?? 0,
+    applicantCount: project.applicantCount ?? project.applicant_count ?? 0,
+    remainingSeats: project.remainingSeats ?? project.remaining_seats ?? 0,
+    competitionRatio: project.competitionRatio ?? project.competition_ratio ?? 0,
     status: project.status || "planning",
     difficulty: project.difficulty || "beginner",
     isUrgent: false,
@@ -390,8 +396,8 @@ function ProjectCard({
     (!project.maxMembers || project.currentMembers < project.maxMembers);
 
   const competitionRate =
-    isRecruiting && project.maxMembers > 0
-      ? (project.currentMembers / project.maxMembers).toFixed(1)
+    isRecruiting && project.remainingSeats > 0
+      ? project.competitionRatio.toFixed(1)
       : null;
 
   return (

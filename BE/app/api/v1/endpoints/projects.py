@@ -305,15 +305,42 @@ async def list_projects(
             ProjectMember.project_id == p.id,
             ProjectMember.left_at.is_(None)
         ).scalar() or 0
+
+        tech_stack = db.query(Skill.name).join(
+            ProjectSkill, ProjectSkill.skill_id == Skill.id
+        ).filter(ProjectSkill.project_id == p.id).all()
+        tech_stack_list = [s[0] for s in tech_stack]
+
+        applicant_count = db.query(func.count(Application.id)).filter(
+            Application.project_id == p.id,
+            Application.status == "pending",
+        ).scalar() or 0
+
+        total_members = (p.max_members or 0) + 1
+        remaining_seats = max(total_members - current_members, 0)
+
+        competition_ratio = (
+            round(applicant_count / remaining_seats, 1)
+            if remaining_seats > 0
+            else 0
+        )
+
         data.append({
             "id": p.id,
             "title": p.title,
+            "summary": p.summary,
+            "description": p.description,
+            "category": p.category,
             "status": p.status,
             "difficulty": p.difficulty,
             "progress_percent": float(p.progress_percent),
             "leader_id": p.leader_id,
             "currentMembers": current_members,
             "maxMembers": p.max_members,
+            "techStack": tech_stack_list,
+            "applicantCount": applicant_count,
+            "remainingSeats": remaining_seats,
+            "competitionRatio": competition_ratio,
         })
     
     return success_response(
