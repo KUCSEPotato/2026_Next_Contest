@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { authenticatedFetch, saveAuthSession } from "../../lib/auth";
+import { authenticatedFetch, getApiBaseUrl, saveAuthSession } from "../../lib/auth";
 import { loginApi } from "../../lib/api";
 
 export default function LoginPage() {
@@ -31,7 +31,7 @@ export default function LoginPage() {
       });
 
       const meRes = await authenticatedFetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"}/api/v1/auth/me`,
+        `${getApiBaseUrl()}/api/v1/auth/me`,
         { headers: { Authorization: `Bearer ${result.data.access_token}` } }
       );
       const me = await meRes.json();

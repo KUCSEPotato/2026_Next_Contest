@@ -1,7 +1,7 @@
 import { PostSummary, PostDetail, CommentItem, ReactionType, PostFile } from "../_types";
-import { authenticatedFetch, getToken } from "../../../lib/auth";
+import { authenticatedFetch, getApiBaseUrl, getToken } from "../../../lib/auth";
 
-const BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"}/api/v1/community`;
+const BASE = `${getApiBaseUrl()}/api/v1/community`;
 
 function authHeaders(): HeadersInit {
   const token = getToken();
