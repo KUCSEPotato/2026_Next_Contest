@@ -142,6 +142,7 @@ class Project(Base):
     is_public: Mapped[bool] = mapped_column(Boolean, default=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     max_members: Mapped[int] = mapped_column(SmallInteger, default=10)
     min_members: Mapped[int] = mapped_column(SmallInteger, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -291,6 +292,14 @@ class Retrospective(Base):
     what_went_badly: Mapped[str | None] = mapped_column(Text)
     lessons_learned: Mapped[str | None] = mapped_column(Text)
     next_actions: Mapped[str | None] = mapped_column(Text)
+    tech_stack: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    domain: Mapped[str | None] = mapped_column(String(100))
+    felt_point: Mapped[str | None] = mapped_column(Text)
+    lacked_point: Mapped[str | None] = mapped_column(Text)
+    ai_refined_felt: Mapped[str | None] = mapped_column(Text)
+    ai_refined_lacked: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class FailureStory(Base):
