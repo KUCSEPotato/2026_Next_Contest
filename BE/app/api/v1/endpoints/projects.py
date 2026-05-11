@@ -47,6 +47,8 @@ from app.schemas import RecruitmentCreateRequest
 from app.schemas import RecruitmentUpdateRequest
 from app.schemas import TodoCreateRequest
 from app.schemas import TodoUpdateRequest
+from app.schemas import MemoirCreateRequest
+from app.schemas import MemoirRefineRequest
 from app.services.economy import reward_project_completed
 from app.services.economy import reward_project_registration
 from app.services.economy import reward_project_recycled
@@ -239,6 +241,23 @@ def _build_todo_response(todo: Todo, assignments: list[dict] | None = None) -> d
         "completed_at": todo.completed_at.isoformat() if todo.completed_at else None,
         "assignee_id": todo.assignee_id,
         "assignments": assignments or [],
+    }
+
+
+def _build_memoir_response(memoir: Retrospective) -> dict:
+    return {
+        "id": memoir.id,
+        "project_id": memoir.project_id,
+        "author_id": memoir.author_id,
+        "title": memoir.title,
+        "tech_stack": memoir.tech_stack,
+        "domain": memoir.domain,
+        "felt_point": memoir.felt_point,
+        "lacked_point": memoir.lacked_point,
+        "ai_refined_felt": memoir.ai_refined_felt,
+        "ai_refined_lacked": memoir.ai_refined_lacked,
+        "created_at": memoir.created_at.isoformat() if memoir.created_at else None,
+        "updated_at": memoir.updated_at.isoformat() if memoir.updated_at else None,
     }
 
 
@@ -798,8 +817,12 @@ async def update_project_status(
     project.status = payload.status
 
     if previous_status != "in_progress" and payload.status == "in_progress":
+        project.started_at = datetime.now(timezone.utc)
         reward_project_started(db, project)
     if previous_status != "completed" and payload.status == "completed":
+        completed_at = datetime.now(timezone.utc)
+        project.ended_at = completed_at
+        project.completed_at = completed_at
         reward_project_completed(db, project)
 
     db.commit()
@@ -1793,3 +1816,153 @@ async def get_recruitment(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recruitment not found")
     
     return success_response(data=_build_recruitment_response_with_competition(db, recruitment))
+
+
+# ============================================
+# 회고(Memoir) 관련 엔드포인트
+# ============================================
+
+
+@router.post(
+    "/{project_id}/memoir",
+    summary="회고 저장",
+    description="프로젝트 회고를 저장합니다. (선택한 기술 스택, 분야, 느낀 점, 부족했던 점)",
+)
+async def create_memoir(
+    project_id: int,
+    payload: MemoirCreateRequest,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    """회고 저장 API. 프로젝트의 모든 멤버가 작성할 수 있습니다."""
+    project = _get_project_or_404(db, project_id)
+    
+    # 프로젝트 멤버 확인
+    member = db.query(ProjectMember).filter(
+        ProjectMember.project_id == project_id,
+        ProjectMember.user_id == current_user_id,
+    ).first()
+    
+    if not member and project.leader_id != current_user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a project member")
+    
+    # 기존 회고 확인 (중복 방지)
+    existing = db.query(Retrospective).filter(
+        Retrospective.project_id == project_id,
+        Retrospective.author_id == current_user_id,
+    ).first()
+    
+    if existing:
+        existing.tech_stack = payload.tech_stack
+        existing.domain = payload.domain
+        existing.felt_point = payload.felt_point
+        existing.lacked_point = payload.lacked_point
+        db.commit()
+        db.refresh(existing)
+        return success_response(data=_build_memoir_response(existing))
+    
+    # 새로운 회고 생성
+    memoir = Retrospective(
+        project_id=project_id,
+        author_id=current_user_id,
+        title=f"Project {project_id} Memoir",
+        tech_stack=payload.tech_stack,
+        domain=payload.domain,
+        felt_point=payload.felt_point,
+        lacked_point=payload.lacked_point,
+    )
+    db.add(memoir)
+    db.commit()
+    db.refresh(memoir)
+    
+    return success_response(data=_build_memoir_response(memoir))
+
+
+@router.get(
+    "/{project_id}/memoir/me",
+    summary="내 회고 조회",
+    description="이 프로젝트에서 내가 작성한 회고를 조회합니다.",
+)
+async def get_my_memoir(
+    project_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    """내 회고 조회 API."""
+    project = _get_project_or_404(db, project_id)
+    
+    memoir = db.query(Retrospective).filter(
+        Retrospective.project_id == project_id,
+        Retrospective.author_id == current_user_id,
+    ).first()
+    
+    if not memoir:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Memoir not found")
+    
+    return success_response(data=_build_memoir_response(memoir))
+
+
+@router.post(
+    "/{project_id}/memoir/ai-refine",
+    summary="회고 텍스트 AI 정제",
+    description="느낀 점과 부족했던 점을 AI가 정제합니다.",
+)
+async def refine_memoir_text(
+    project_id: int,
+    payload: MemoirRefineRequest,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    """회고 AI 정제 API."""
+    project = _get_project_or_404(db, project_id)
+    
+    # LLM 서비스 호출
+    from app.api.v1.endpoints.llm import _call_gemini_for_memoir_refine
+    
+    refined_felt = await _call_gemini_for_memoir_refine(payload.felt_point)
+    refined_lacked = await _call_gemini_for_memoir_refine(payload.lacked_point)
+    
+    return success_response(
+        data={
+            "original_felt": payload.felt_point,
+            "refined_felt": refined_felt,
+            "original_lacked": payload.lacked_point,
+            "refined_lacked": refined_lacked,
+        }
+    )
+
+
+@router.get(
+    "/{project_id}/memoirs",
+    summary="프로젝트 전체 회고 조회",
+    description="프로젝트의 모든 회고를 조회합니다. (리더 전용)",
+)
+async def get_project_memoirs(
+    project_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    """프로젝트 전체 회고 조회 API."""
+    project = _get_project_or_404(db, project_id)
+    _ensure_project_leader(project, current_user_id)
+    
+    memoirs = db.query(Retrospective).filter(
+        Retrospective.project_id == project_id,
+    ).all()
+    
+    return success_response(
+        data=[
+            {
+                "id": m.id,
+                "author_id": m.author_id,
+                "tech_stack": m.tech_stack,
+                "domain": m.domain,
+                "felt_point": m.felt_point,
+                "lacked_point": m.lacked_point,
+                "ai_refined_felt": m.ai_refined_felt,
+                "ai_refined_lacked": m.ai_refined_lacked,
+                "created_at": m.created_at,
+            }
+            for m in memoirs
+        ]
+    )
