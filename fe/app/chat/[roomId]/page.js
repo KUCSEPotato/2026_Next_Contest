@@ -141,7 +141,7 @@ export default function ChatRoomPage() {
                 >
                   <p>{message.message}</p>
                   <p className="mt-1 text-xs text-slate-400">
-                    sender #{message.sender_id}
+                    {message.sender_nickname || `User #${message.sender_id}`}
                   </p>
                 </div>
               </div>
