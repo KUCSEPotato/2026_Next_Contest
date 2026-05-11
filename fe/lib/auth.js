@@ -5,6 +5,10 @@ export function getApiBaseUrl() {
 
   if (typeof window !== "undefined") {
     const { protocol, hostname } = window.location;
+    if (hostname === "devory.kr" || hostname === "www.devory.kr") {
+      return "https://api.devory.kr";
+    }
+
     if (hostname && hostname !== "localhost" && hostname !== "127.0.0.1") {
       return `${protocol}//${hostname}:8000`;
     }

@@ -105,6 +105,8 @@ def create_app() -> FastAPI:
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://3.37.87.121:3000",
+        "https://devory.kr",
+        "https://www.devory.kr",
     ]
     allowed_origins = []
     for value in configured_origins:
