@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { authenticatedFetch, saveAuthSession } from "../../lib/auth";
 
 // ─── 상수 ────────────────────────────────────────────────────────────────────
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
@@ -129,15 +130,20 @@ export default function SignupPage() {
     const tokenFromQuery = params.get("access_token");
 
     if (via === "github" && tokenFromQuery) {
-      localStorage.setItem("access_token", tokenFromQuery);
-      setAccessToken(tokenFromQuery);
+      queueMicrotask(() => {
+        saveAuthSession({
+          accessToken: tokenFromQuery,
+          userId: params.get("user_id"),
+        });
+        setAccessToken(tokenFromQuery);
 
-      // 신규 유저는 온보딩 Step2, 기존 유저는 메인으로 이동
-      if (stepParam === "2") {
-        setStep(2);
-      } else if (stepParam === "profile") {
-        router.push("/mainpage");
-      }
+        // 신규 유저는 온보딩 Step2, 기존 유저는 메인으로 이동
+        if (stepParam === "2") {
+          setStep(2);
+        } else if (stepParam === "profile") {
+          router.push("/mainpage");
+        }
+      });
     }
   }, [router]);
 
@@ -209,10 +215,12 @@ export default function SignupPage() {
 
       const token = data.data?.access_token || data.data?.onboarding_token;
       setAccessToken(token);
-      localStorage.setItem("access_token", token);
-      if (data.data?.refresh_token) {
-        localStorage.setItem("refresh_token", data.data.refresh_token);
-      }
+      saveAuthSession({
+        accessToken: token,
+        refreshToken: data.data?.refresh_token,
+        userId: data.data?.user_id,
+        user: data.data?.user,
+      });
 
       setStep(2);
     } catch (err) {
@@ -247,7 +255,7 @@ export default function SignupPage() {
 
       // 스킬 등록 (백엔드가 건당 1개씩 받음)
       for (const skill of selectedSkills) {
-        await fetch(`${API_BASE}/api/v1/users/me/skills`, {
+        await authenticatedFetch(`${API_BASE}/api/v1/users/me/skills`, {
           method: "POST",
           headers,
           body: JSON.stringify({ name: skill }),
@@ -256,7 +264,7 @@ export default function SignupPage() {
 
       // 관심 분야 등록 (백엔드가 건당 1개씩 받음)
       for (const interest of selectedInterests) {
-        await fetch(`${API_BASE}/api/v1/users/me/interests`, {
+        await authenticatedFetch(`${API_BASE}/api/v1/users/me/interests`, {
           method: "POST",
           headers,
           body: JSON.stringify({ name: interest }),
@@ -264,7 +272,7 @@ export default function SignupPage() {
       }
 
       // 온보딩 완료 처리
-      await fetch(`${API_BASE}/api/v1/users/me/onboarding/ideas`, {
+      await authenticatedFetch(`${API_BASE}/api/v1/users/me/onboarding/ideas`, {
         method: "POST",
         headers,
         body: JSON.stringify({}),
@@ -286,7 +294,7 @@ export default function SignupPage() {
     setShowCompletionModal(false);
     setIsLoadingProjects(true);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/matching/recommend-projects`, {
+      const res = await authenticatedFetch(`${API_BASE}/api/v1/matching/recommend-projects`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       const data = await res.json();

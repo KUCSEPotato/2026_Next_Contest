@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AUTH_CHANGED_EVENT, getToken } from "../../lib/auth";
 import { getProjectsApi } from "../../lib/api";
 
 interface Project {
@@ -18,6 +19,22 @@ interface Project {
   status: string;
   difficulty: "beginner" | "intermediate" | "advanced";
   isUrgent: boolean;
+}
+
+interface ApiProject {
+  id: number;
+  title?: string;
+  description?: string;
+  summary?: string;
+  category?: string;
+  tech_stack?: string[];
+  techStack?: string[];
+  currentMembers?: number;
+  current_members?: number;
+  maxMembers?: number;
+  max_members?: number;
+  status?: string;
+  difficulty?: "beginner" | "intermediate" | "advanced";
 }
 
 const CATEGORIES = [
@@ -69,14 +86,22 @@ const useAuth = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    setIsLoggedIn(!!token);
+    const syncAuthState = () => setIsLoggedIn(!!getToken());
+
+    syncAuthState();
+    window.addEventListener(AUTH_CHANGED_EVENT, syncAuthState);
+    window.addEventListener("storage", syncAuthState);
+
+    return () => {
+      window.removeEventListener(AUTH_CHANGED_EVENT, syncAuthState);
+      window.removeEventListener("storage", syncAuthState);
+    };
   }, []);
 
   return { isLoggedIn };
 };
 
-function normalizeProject(project: any): Project {
+function normalizeProject(project: ApiProject): Project {
   return {
     id: project.id,
     project_id: project.id,

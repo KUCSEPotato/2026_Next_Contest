@@ -1,13 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getToken, removeToken } from "../lib/auth";
+import { AUTH_CHANGED_EVENT, getToken, removeToken } from "../lib/auth";
 
 export default function HomePage() {
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
-    setToken(getToken());
+    const syncAuthState = () => setToken(getToken());
+
+    syncAuthState();
+    window.addEventListener(AUTH_CHANGED_EVENT, syncAuthState);
+    window.addEventListener("storage", syncAuthState);
+
+    return () => {
+      window.removeEventListener(AUTH_CHANGED_EVENT, syncAuthState);
+      window.removeEventListener("storage", syncAuthState);
+    };
   }, []);
 
   const handleLogout = () => {

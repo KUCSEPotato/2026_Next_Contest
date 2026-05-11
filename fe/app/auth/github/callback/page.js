@@ -1,7 +1,8 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { saveAuthSession } from "../../../../lib/auth";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
@@ -33,20 +34,7 @@ function GithubCallbackContent() {
   const [status, setStatus] = useState("processing");
   const [errorMsg, setErrorMsg] = useState("");
 
-  useEffect(() => {
-    const code = searchParams.get("code");
-    const error = searchParams.get("error");
-
-    if (error || !code) {
-      setStatus("error");
-      setErrorMsg("GitHub 인증이 취소되었거나 오류가 발생했어요.");
-      return;
-    }
-
-    handleGithubCallback(code);
-  }, [searchParams]);
-
-  const handleGithubCallback = async (code) => {
+  const handleGithubCallback = useCallback(async (code) => {
     try {
       const res = await fetch(
         `${API_BASE}/api/v1/auth/oauth/github`,
@@ -65,25 +53,12 @@ function GithubCallbackContent() {
         throw new Error(data.detail || "GitHub 로그인 실패");
       }
 
-      // 토큰 저장
-      localStorage.setItem(
-        "access_token",
-        data.data.access_token
-      );
-
-      if (data.data.refresh_token) {
-        localStorage.setItem(
-          "refresh_token",
-          data.data.refresh_token
-        );
-      }
-
-      if (data.data.user_id) {
-        localStorage.setItem(
-          "user_id",
-          data.data.user_id
-        );
-      }
+      saveAuthSession({
+        accessToken: data.data.access_token,
+        refreshToken: data.data.refresh_token,
+        userId: data.data.user_id,
+        user: data.data.user,
+      });
 
       // 신규 유저 → 회원가입 Step2
       // 기존 유저 → 메인페이지
@@ -101,7 +76,24 @@ function GithubCallbackContent() {
           : "알 수 없는 오류가 발생했어요."
       );
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    const code = searchParams.get("code");
+    const error = searchParams.get("error");
+
+    if (error || !code) {
+      queueMicrotask(() => {
+        setStatus("error");
+        setErrorMsg("GitHub 인증이 취소되었거나 오류가 발생했어요.");
+      });
+      return;
+    }
+
+    queueMicrotask(() => {
+      handleGithubCallback(code);
+    });
+  }, [handleGithubCallback, searchParams]);
 
   if (status === "error") {
     return (

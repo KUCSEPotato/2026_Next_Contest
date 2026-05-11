@@ -1,11 +1,10 @@
 import { PostSummary, PostDetail, CommentItem, ReactionType } from "../_types";
+import { authenticatedFetch, getToken } from "../../../lib/auth";
 
 const BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"}/api/v1/community`;
 
 function authHeaders(): HeadersInit {
-  const token = typeof window !== "undefined"
-    ? localStorage.getItem("access_token")
-    : null;
+  const token = getToken();
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -35,12 +34,12 @@ export async function getPosts(params?: {
   if (params?.page_size) qs.set("page_size", String(params.page_size));
   if (params?.sort_by) qs.set("sort_by", params.sort_by);
 
-  const res = await fetch(`${BASE}?${qs}`, { headers: authHeaders() });
+  const res = await authenticatedFetch(`${BASE}?${qs}`, { headers: authHeaders() });
   return handleResponse(res);
 }
 
 export async function getPost(postId: number): Promise<PostDetail> {
-  const res = await fetch(`${BASE}/${postId}`, { headers: authHeaders() });
+  const res = await authenticatedFetch(`${BASE}/${postId}`, { headers: authHeaders() });
   return handleResponse(res);
 }
 
@@ -49,7 +48,7 @@ export async function createPost(payload: {
   content: string;
   category?: string;
 }): Promise<PostDetail> {
-  const res = await fetch(BASE, {
+  const res = await authenticatedFetch(BASE, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(payload),
@@ -61,7 +60,7 @@ export async function updatePost(
   postId: number,
   payload: { title?: string; content?: string; category?: string }
 ): Promise<PostDetail> {
-  const res = await fetch(`${BASE}/${postId}`, {
+  const res = await authenticatedFetch(`${BASE}/${postId}`, {
     method: "PATCH",
     headers: authHeaders(),
     body: JSON.stringify(payload),
@@ -70,7 +69,7 @@ export async function updatePost(
 }
 
 export async function deletePost(postId: number): Promise<void> {
-  const res = await fetch(`${BASE}/${postId}`, {
+  const res = await authenticatedFetch(`${BASE}/${postId}`, {
     method: "DELETE",
     headers: authHeaders(),
   });
@@ -81,7 +80,7 @@ export async function reactToPost(
   postId: number,
   reactionType: ReactionType
 ): Promise<{ action: "added" | "removed"; reaction_type: ReactionType }> {
-  const res = await fetch(`${BASE}/${postId}/reactions`, {
+  const res = await authenticatedFetch(`${BASE}/${postId}/reactions`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({ reaction_type: reactionType }),
@@ -137,7 +136,7 @@ export async function getComments(
   if (params?.page) qs.set("page", String(params.page));
   if (params?.page_size) qs.set("page_size", String(params.page_size));
 
-  const res = await fetch(`${BASE}/${postId}/comments?${qs}`, {
+  const res = await authenticatedFetch(`${BASE}/${postId}/comments?${qs}`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -147,7 +146,7 @@ export async function createComment(
   postId: number,
   payload: { content: string; parent_comment_id?: number | null }
 ): Promise<CommentItem> {
-  const res = await fetch(`${BASE}/${postId}/comments`, {
+  const res = await authenticatedFetch(`${BASE}/${postId}/comments`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(payload),
@@ -160,7 +159,7 @@ export async function updateComment(
   commentId: number,
   payload: { content: string }
 ): Promise<CommentItem> {
-  const res = await fetch(`${BASE}/${postId}/comments/${commentId}`, {
+  const res = await authenticatedFetch(`${BASE}/${postId}/comments/${commentId}`, {
     method: "PATCH",
     headers: authHeaders(),
     body: JSON.stringify(payload),
@@ -172,7 +171,7 @@ export async function deleteComment(
   postId: number,
   commentId: number
 ): Promise<void> {
-  const res = await fetch(`${BASE}/${postId}/comments/${commentId}`, {
+  const res = await authenticatedFetch(`${BASE}/${postId}/comments/${commentId}`, {
     method: "DELETE",
     headers: authHeaders(),
   });
@@ -184,7 +183,7 @@ export async function reactToComment(
   commentId: number,
   reactionType: ReactionType
 ): Promise<{ action: "added" | "removed"; reaction_type: ReactionType }> {
-  const res = await fetch(`${BASE}/${postId}/comments/${commentId}/reactions`, {
+  const res = await authenticatedFetch(`${BASE}/${postId}/comments/${commentId}/reactions`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({ reaction_type: reactionType }),

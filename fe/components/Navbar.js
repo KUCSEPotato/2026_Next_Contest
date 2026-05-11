@@ -3,16 +3,41 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
-import { getToken, removeToken } from "../lib/auth";
+import {
+  AUTH_CHANGED_EVENT,
+  getStoredUser,
+  getToken,
+  refreshAccessToken,
+  removeToken,
+} from "../lib/auth";
 
 export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
 
   const [token, setToken] = useState(null);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    setToken(getToken());
+    const syncAuthState = () => {
+      setToken(getToken());
+      setUser(getStoredUser());
+    };
+
+    syncAuthState();
+    refreshAccessToken().catch(() => {
+      syncAuthState();
+    });
+
+    window.addEventListener(AUTH_CHANGED_EVENT, syncAuthState);
+    window.addEventListener("storage", syncAuthState);
+    window.addEventListener("focus", syncAuthState);
+
+    return () => {
+      window.removeEventListener(AUTH_CHANGED_EVENT, syncAuthState);
+      window.removeEventListener("storage", syncAuthState);
+      window.removeEventListener("focus", syncAuthState);
+    };
   }, []);
 
   if (pathname === "/login" || pathname === "/signup") {
@@ -22,6 +47,7 @@ export default function Navbar() {
   const handleLogout = () => {
     removeToken();
     setToken(null);
+    setUser(null);
     router.push("/login");
   };
 
@@ -48,12 +74,17 @@ export default function Navbar() {
           </button>
 
           {token ? (
-            <button
-              onClick={handleLogout}
-              className="rounded-lg bg-red-600 px-4 py-2 text-white transition hover:bg-red-700"
-            >
-              로그아웃
-            </button>
+            <>
+              <span className="hidden max-w-[180px] truncate text-slate-500 sm:inline">
+                {user?.nickname || user?.email || "로그인됨"}
+              </span>
+              <button
+                onClick={handleLogout}
+                className="rounded-lg bg-red-600 px-4 py-2 text-white transition hover:bg-red-700"
+              >
+                로그아웃
+              </button>
+            </>
           ) : (
             <button
               onClick={() => router.push("/login")}
