@@ -50,6 +50,8 @@ async def fetch_github_user_profile(access_token: str) -> dict[str, Any]:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unable to fetch GitHub user profile")
 
     user_data = user_response.json()
+    github_id = user_data.get("id")
+    github_login = user_data.get("login")
     email = user_data.get("email")
     if not email:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -62,13 +64,17 @@ async def fetch_github_user_profile(access_token: str) -> dict[str, Any]:
             if selected:
                 email = selected.get("email")
 
+    if not email and github_id and github_login:
+        # GitHub email 비공개 계정의 경우 no-reply 주소를 fallback으로 사용
+        email = f"{github_id}+{github_login}@users.noreply.github.com"
+
     if not email:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="GitHub account email is required")
 
     return {
-        "provider_id": str(user_data.get("id")) if user_data.get("id") is not None else None,
+        "provider_id": str(github_id) if github_id is not None else None,
         "email": email,
-        "login": user_data.get("login"),
+        "login": github_login,
         "avatar_url": user_data.get("avatar_url"),
         "name": user_data.get("name"),
     }
