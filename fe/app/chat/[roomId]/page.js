@@ -42,6 +42,7 @@ export default function ChatRoomPage() {
   const [editingTodoId, setEditingTodoId] = useState(null);
   const [editingTodoTitle, setEditingTodoTitle] = useState("");
   const [editingTodoDescription, setEditingTodoDescription] = useState("");
+  const [expandedTodoIds, setExpandedTodoIds] = useState([]);
 
   const loadMessages = useCallback(async () => {
     try {
@@ -307,6 +308,16 @@ export default function ChatRoomPage() {
     }
   };
 
+  const toggleTodoDetail = (todoId) => {
+    setExpandedTodoIds((prev) =>
+      prev.includes(todoId)
+        ? prev.filter((id) => id !== todoId)
+        : [...prev, todoId]
+    );
+  };
+
+  const todoGroups = groupTodosByStage(todos);
+
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
       <div className="mx-auto grid h-[80vh] w-full max-w-6xl gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -485,116 +496,185 @@ export default function ChatRoomPage() {
                 아직 Todo가 없습니다. 직접 추가하거나 AI 생성 버튼을 눌러 시작해보세요.
               </p>
             ) : (
-              todos.map((todo, index) => {
-                const isDone = todo.status === "done";
-                const isEditing = editingTodoId === todo.id;
+              todoGroups.map((group) => (
+                <div key={group.stage} className="space-y-2">
+                  <div className="sticky top-0 z-10 bg-white/95 py-1 backdrop-blur">
+                    <h3 className="text-xs font-bold text-red-600">
+                      {group.stage}
+                    </h3>
+                  </div>
 
-                return (
-                  <div
-                    key={todo.id}
-                    className="rounded-xl border border-slate-200 p-3 transition hover:border-red-200 hover:bg-red-50"
-                  >
-                    <div className="flex gap-3">
-                      <input
-                        type="checkbox"
-                        checked={isDone}
-                        onChange={() => handleToggleTodo(todo.id)}
-                        className="mt-1 h-4 w-4 accent-red-600"
-                      />
+                  {group.items.map(({ todo, index }) => {
+                    const isDone = todo.status === "done";
+                    const isEditing = editingTodoId === todo.id;
+                    const description = getVisibleTodoDescription(todo);
+                    const isExpanded = expandedTodoIds.includes(todo.id);
 
-                      <div className="min-w-0 flex-1">
-                        {isEditing ? (
-                          <div className="space-y-2">
-                            <input
-                              value={editingTodoTitle}
-                              onChange={(e) => setEditingTodoTitle(e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-red-500"
-                            />
+                    return (
+                      <div
+                        key={todo.id}
+                        className="rounded-xl border border-slate-200 px-3 py-2 transition hover:border-red-200 hover:bg-red-50"
+                      >
+                        <div className="flex gap-2">
+                          <input
+                            type="checkbox"
+                            checked={isDone}
+                            onChange={() => handleToggleTodo(todo.id)}
+                            className="mt-1 h-4 w-4 shrink-0 accent-red-600"
+                          />
 
-                            <textarea
-                              value={editingTodoDescription}
-                              onChange={(e) => setEditingTodoDescription(e.target.value)}
-                              className="min-h-20 w-full resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-red-500"
-                              placeholder="상세 설명"
-                            />
+                          <div className="min-w-0 flex-1">
+                            {isEditing ? (
+                              <div className="space-y-2">
+                                <input
+                                  value={editingTodoTitle}
+                                  onChange={(e) =>
+                                    setEditingTodoTitle(e.target.value)
+                                  }
+                                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-red-500"
+                                />
 
-                            <div className="flex gap-2">
+                                <textarea
+                                  value={editingTodoDescription}
+                                  onChange={(e) =>
+                                    setEditingTodoDescription(e.target.value)
+                                  }
+                                  className="min-h-20 w-full resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-red-500"
+                                  placeholder="세부 내용"
+                                />
+
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => handleSaveTodoEdit(todo)}
+                                    className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white"
+                                  >
+                                    저장
+                                  </button>
+
+                                  <button
+                                    onClick={cancelEditingTodo}
+                                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500"
+                                  >
+                                    취소
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    description && toggleTodoDetail(todo.id)
+                                  }
+                                  className={`block w-full text-left text-sm font-semibold leading-5 ${
+                                    isDone
+                                      ? "text-slate-400 line-through"
+                                      : "text-slate-800"
+                                  }`}
+                                >
+                                  {todo.title}
+                                </button>
+
+                                {description && isExpanded && (
+                                  <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+                                    {description}
+                                  </p>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {!isEditing && (
+                          <div className="mt-2 flex items-center justify-between gap-2 pl-6">
+                            {description ? (
                               <button
-                                onClick={() => handleSaveTodoEdit(todo)}
-                                className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white"
+                                onClick={() => toggleTodoDetail(todo.id)}
+                                className="text-xs font-semibold text-slate-400 hover:text-red-600"
                               >
-                                저장
+                                {isExpanded ? "접기" : "상세"}
+                              </button>
+                            ) : (
+                              <span />
+                            )}
+
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => handleMoveTodo(index, -1)}
+                                disabled={index === 0}
+                                className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500 disabled:opacity-40"
+                              >
+                                위
                               </button>
 
                               <button
-                                onClick={cancelEditingTodo}
-                                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500"
+                                onClick={() => handleMoveTodo(index, 1)}
+                                disabled={index === todos.length - 1}
+                                className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500 disabled:opacity-40"
                               >
-                                취소
+                                아래
+                              </button>
+
+                              <button
+                                onClick={() => startEditingTodo(todo)}
+                                className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 hover:border-red-300 hover:text-red-600"
+                              >
+                                수정
                               </button>
                             </div>
                           </div>
-                        ) : (
-                          <>
-                            {todo.stage && (
-                              <span className="mb-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
-                                {todo.stage}
-                              </span>
-                            )}
-
-                            <span
-                              className={`block text-sm font-semibold ${
-                                isDone
-                                  ? "text-slate-400 line-through"
-                                  : "text-slate-800"
-                              }`}
-                            >
-                              {todo.title}
-                            </span>
-
-                            {todo.description && (
-                              <span className="mt-1 block text-xs leading-5 text-slate-500">
-                                {todo.description}
-                              </span>
-                            )}
-                          </>
                         )}
                       </div>
-                    </div>
-
-                    {!isEditing && (
-                      <div className="mt-3 flex justify-end gap-1">
-                        <button
-                          onClick={() => handleMoveTodo(index, -1)}
-                          disabled={index === 0}
-                          className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500 disabled:opacity-40"
-                        >
-                          위
-                        </button>
-
-                        <button
-                          onClick={() => handleMoveTodo(index, 1)}
-                          disabled={index === todos.length - 1}
-                          className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500 disabled:opacity-40"
-                        >
-                          아래
-                        </button>
-
-                        <button
-                          onClick={() => startEditingTodo(todo)}
-                          className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 hover:border-red-300 hover:text-red-600"
-                        >
-                          수정
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
+                    );
+                  })}
+                </div>
+              ))
             )}
           </section>
         </aside>
       </div>
     </main>
   );
+}
+
+function groupTodosByStage(todos) {
+  const groups = [];
+  const groupMap = new Map();
+
+  todos.forEach((todo, index) => {
+    const stage = normalizeTodoStage(todo.stage);
+
+    if (!groupMap.has(stage)) {
+      const group = { stage, items: [] };
+      groupMap.set(stage, group);
+      groups.push(group);
+    }
+
+    groupMap.get(stage).items.push({ todo, index });
+  });
+
+  return groups;
+}
+
+function normalizeTodoStage(stage) {
+  const value = String(stage || "").trim();
+
+  if (!value || value === "planning") {
+    return "기획 단계";
+  }
+
+  return value;
+}
+
+function getVisibleTodoDescription(todo) {
+  const description = String(todo?.description || "").trim();
+
+  if (
+    description ===
+    "AI가 선택한 채팅 범위와 프로젝트 상세 정보를 바탕으로 생성한 Todo입니다."
+  ) {
+    return "";
+  }
+
+  return description;
 }
