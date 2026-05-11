@@ -51,7 +51,6 @@ from app.schemas import TodoCreateRequest
 from app.schemas import TodoUpdateRequest
 from app.schemas import MemoirCreateRequest
 from app.schemas import MemoirRefineRequest
-from app.schemas import MemoirAiRefineRequest
 from app.services.economy import reward_project_completed
 from app.services.economy import reward_project_registration
 from app.services.economy import reward_project_recycled
@@ -1500,17 +1499,17 @@ async def create_retrospective(
 )
 async def refine_memoir(
     project_id: int,
-    payload: MemoirAiRefineRequest,
+    payload: MemoirRefineRequest,
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict:
     _get_project_or_404(db, project_id)
     _ensure_project_member(db, project_id, current_user_id)
 
-    feelings = payload.feelings.strip()
-    shortcomings = payload.shortcomings.strip()
+    feelings = payload.felt_point.strip()
+    shortcomings = payload.lacked_point.strip()
     if not feelings or not shortcomings:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="feelings and shortcomings are required")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="felt_point and lacked_point are required")
 
     refined_text = await _call_gemini_for_memoir_refine(feelings, shortcomings)
     return success_response(data={"refined_memoir": refined_text})

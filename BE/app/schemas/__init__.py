@@ -30,7 +30,6 @@ from app.schemas.projects import MemoirCreateRequest
 from app.schemas.projects import MemoirUpdateRequest
 from app.schemas.projects import MemoirRefineRequest
 from app.schemas.projects import MemoirResponse
-from app.schemas.projects import MemoirAiRefineRequest
 from app.schemas.users import OnboardingIdeaSelectionRequest
 from app.schemas.users import UserProfileUpdateRequest
 
@@ -62,7 +61,6 @@ __all__ = [
 	"SignupRequest",
 	"TodoCreateRequest",
 	"TodoUpdateRequest",
-	"MemoirAiRefineRequest",
 	"TokenRefreshRequest",
 	"OnboardingIdeaSelectionRequest",
 	"UserProfileUpdateRequest",
