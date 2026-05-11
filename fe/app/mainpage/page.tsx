@@ -254,7 +254,7 @@ export default function MainPage() {
     const projectId = project.project_id || project.converted_to_project_id || project.id;
 
     if (projectId) {
-      router.push(`/projects/${projectId}`);
+      router.push(`/projects/${projectId}`, { scroll: true });
     } else {
       alert("연결된 프로젝트가 없습니다.");
     }

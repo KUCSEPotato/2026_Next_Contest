@@ -76,6 +76,10 @@ export default function ProjectDetailPage() {
     "w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100";
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [projectId]);
+
+  useEffect(() => {
     async function fetchProject() {
       try {
         const [projectResult, profileResult] = await Promise.all([
