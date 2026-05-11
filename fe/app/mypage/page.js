@@ -7,6 +7,7 @@ import {
   getMyProfileApi,
   getMyReputationApi,
   getUserStatsApi,
+  getUserReceivedReviewsApi,
   getMyProjectsApi,
   getMyReceivedReviewsApi,
   updateMyProfileApi,
@@ -114,12 +115,11 @@ export default function MyPage() {
         setEditBio(profileData.bio || "");
         setEditAvatarUrl(profileData.avatar_url || "");
 
-        const [reputationResult, statsResult, projectsResult, reviewsResult] =
+        const [reputationResult, statsResult, projectsResult] =
           await Promise.allSettled([
             getMyReputationApi(),
             getUserStatsApi(profileData.id),
             getMyProjectsApi(),
-            getMyReceivedReviewsApi(),
           ]);
 
         setReputation(
@@ -128,15 +128,16 @@ export default function MyPage() {
             : null
         );
 
-        setStats(
+        const statsData =
           statsResult.status === "fulfilled"
             ? statsResult.value.data
             : {
                 lead_projects: 0,
                 completed_projects: 0,
                 review_received: 0,
-              }
-        );
+              };
+
+        setStats(statsData);
 
         setProjects(
           projectsResult.status === "fulfilled"
@@ -144,11 +145,8 @@ export default function MyPage() {
             : []
         );
 
-        setReviews(
-          reviewsResult.status === "fulfilled"
-            ? reviewsResult.value.data || []
-            : []
-        );
+        const reviewsData = await loadReceivedReviews(profileData.id, statsData);
+        setReviews(reviewsData);
       } catch (error) {
         console.error("프로필 조회 실패:", error);
         alert("프로필 정보를 불러오지 못했습니다. 다시 로그인해주세요.");
@@ -526,17 +524,16 @@ export default function MyPage() {
             <div>
               <h2 className="text-xl font-bold text-slate-900">신뢰도</h2>
               <p className="mt-1 text-sm text-slate-500">
-                내 평점과 전체 이용자 평균을 함께 비교합니다.
+                받은 리뷰를 바탕으로 내 강점과 보완 항목을 확인합니다.
               </p>
             </div>
 
             <div className="rounded-xl bg-slate-50 px-4 py-2 text-sm text-slate-600">
-              받은 평가 {reputation?.review_count ?? 0}개 · 전체{" "}
-              {reputation?.global_review_count ?? 0}개
+              받은 평가 {reputation?.review_count ?? 0}개
             </div>
           </div>
 
-          <RatingComparison reputation={reputation} />
+          <RatingSummary reputation={reputation} />
         </section>
 
         <div className="mb-6 grid gap-6 lg:grid-cols-2">
@@ -854,80 +851,95 @@ function StatCard({ title, value }) {
   );
 }
 
-function RatingComparison({ reputation }) {
+async function loadReceivedReviews(userId, statsData) {
+  try {
+    const result = await getMyReceivedReviewsApi();
+    const reviews = result.data || [];
+
+    if (reviews.length > 0 || !statsData?.review_received) {
+      return reviews;
+    }
+  } catch (error) {
+    console.error("내 리뷰 조회 실패, 공개 리뷰 API로 재시도합니다:", error);
+  }
+
+  try {
+    const fallbackResult = await getUserReceivedReviewsApi(userId);
+    return fallbackResult.data || [];
+  } catch (error) {
+    console.error("공개 리뷰 API 재시도 실패:", error);
+    return [];
+  }
+}
+
+function RatingSummary({ reputation }) {
   const items = [
     {
-      label: "종합",
-      mine: reputation?.score,
-      global: reputation?.global_score,
-    },
-    {
       label: "협업",
-      mine: reputation?.avg_teamwork,
-      global: reputation?.global_avg_teamwork,
+      value: reputation?.avg_teamwork,
     },
     {
       label: "기여",
-      mine: reputation?.avg_contribution,
-      global: reputation?.global_avg_contribution,
+      value: reputation?.avg_contribution,
     },
     {
       label: "책임",
-      mine: reputation?.avg_responsibility,
-      global: reputation?.global_avg_responsibility,
+      value: reputation?.avg_responsibility,
     },
   ];
-
-  return (
-    <div className="mt-5 space-y-4">
-      {items.map((item) => (
-        <RatingRow
-          key={item.label}
-          label={item.label}
-          mine={item.mine}
-          global={item.global}
-        />
-      ))}
-    </div>
+  const rankedItems = [...items].sort(
+    (a, b) => normalizeRating(b.value) - normalizeRating(a.value)
   );
-}
-
-function RatingRow({ label, mine, global }) {
-  const mineValue = normalizeRating(mine);
-  const globalValue = normalizeRating(global);
+  const strongest = rankedItems[0];
+  const weakest = rankedItems[rankedItems.length - 1];
 
   return (
-    <div className="rounded-2xl border border-slate-200 p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="font-bold text-slate-900">{label}</p>
-        <div className="flex items-center gap-3 text-sm">
-          <span className="font-semibold text-red-600">
-            나 {formatRating(mineValue)}
-          </span>
-          <span className="text-slate-400">
-            전체 {formatRating(globalValue)}
-          </span>
+    <div className="mt-5 grid gap-4 lg:grid-cols-[220px_1fr]">
+      <div className="rounded-2xl bg-red-50 p-5">
+        <p className="text-sm font-semibold text-red-600">종합 평점</p>
+        <p className="mt-2 text-4xl font-black text-slate-900">
+          {formatRating(reputation?.score)}
+        </p>
+        <p className="mt-1 text-sm text-slate-500">5점 만점</p>
+
+        <div className="mt-5 grid grid-cols-2 gap-2 text-sm">
+          <div className="rounded-xl bg-white px-3 py-2">
+            <p className="text-slate-400">강점</p>
+            <p className="font-bold text-slate-800">{strongest.label}</p>
+          </div>
+          <div className="rounded-xl bg-white px-3 py-2">
+            <p className="text-slate-400">보완</p>
+            <p className="font-bold text-slate-800">{weakest.label}</p>
+          </div>
         </div>
       </div>
 
-      <div className="space-y-2">
-        <RatingBar label="나" value={mineValue} className="bg-red-600" />
-        <RatingBar label="전체 평균" value={globalValue} className="bg-slate-400" />
+      <div className="space-y-3 rounded-2xl border border-slate-200 p-5">
+        {items.map((item) => (
+          <RatingRow key={item.label} label={item.label} value={item.value} />
+        ))}
       </div>
     </div>
   );
 }
 
-function RatingBar({ label, value, className }) {
+function RatingRow({ label, value }) {
+  const ratingValue = normalizeRating(value);
+
   return (
-    <div className="grid grid-cols-[70px_1fr] items-center gap-3 text-xs font-semibold text-slate-500">
-      <span>{label}</span>
+    <div className="grid gap-2 sm:grid-cols-[70px_1fr_48px] sm:items-center">
+      <p className="text-sm font-bold text-slate-800">{label}</p>
+
       <div className="h-3 overflow-hidden rounded-full bg-slate-100">
         <div
-          className={`h-full rounded-full ${className}`}
-          style={{ width: `${(value / 5) * 100}%` }}
+          className="h-full rounded-full bg-red-600"
+          style={{ width: `${(ratingValue / 5) * 100}%` }}
         />
       </div>
+
+      <p className="text-right text-sm font-bold text-slate-700">
+        {formatRating(ratingValue)}
+      </p>
     </div>
   );
 }

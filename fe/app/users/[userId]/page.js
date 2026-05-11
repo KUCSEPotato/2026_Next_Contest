@@ -143,28 +143,34 @@ export default function UserProfilePage() {
             {reviews.length === 0 ? (
               <p className="text-sm text-slate-500">리뷰 없음</p>
             ) : (
-              reviews.map((review) => (
-                <div key={review.id} className="mb-3 rounded-xl border p-4">
-                  <p className="font-bold">
-                    {review.project?.title || "프로젝트"}
-                  </p>
+              reviews.map((review) => {
+                const reviewMessage = getReviewMessage(review);
 
-                  <p className="text-sm text-gray-400">
-                    익명{" "}
-                    {review.created_at
-                      ? `• ${new Date(review.created_at).toLocaleDateString()}`
-                      : ""}
-                  </p>
+                return (
+                  <div key={review.id} className="mb-3 rounded-xl border p-4">
+                    <p className="font-bold">
+                      {review.project?.title || "프로젝트"}
+                    </p>
 
-                  <div className="mt-2 text-sm">
-                    협업 {review.teamwork_score} / 기여{" "}
-                    {review.contribution_score} / 책임{" "}
-                    {review.responsibility_score}
+                    <p className="text-sm text-gray-400">
+                      익명{" "}
+                      {review.created_at
+                        ? `• ${new Date(review.created_at).toLocaleDateString()}`
+                        : ""}
+                    </p>
+
+                    <div className="mt-2 text-sm">
+                      협업 {review.teamwork_score} / 기여{" "}
+                      {review.contribution_score} / 책임{" "}
+                      {review.responsibility_score}
+                    </div>
+
+                    <p className="mt-2">
+                      {reviewMessage || "작성된 리뷰 메시지가 없습니다."}
+                    </p>
                   </div>
-
-                  <p className="mt-2">{review.comment}</p>
-                </div>
-              ))
+                );
+              })
             )}
           </section>
         )}
@@ -262,4 +268,15 @@ function StatCard({ title, value }) {
       <p className="text-3xl font-bold">{value}</p>
     </div>
   );
+}
+
+function getReviewMessage(review) {
+  const message =
+    review?.comment ||
+    review?.message ||
+    review?.review_message ||
+    review?.content ||
+    "";
+
+  return String(message).trim();
 }

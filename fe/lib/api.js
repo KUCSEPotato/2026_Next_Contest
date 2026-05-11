@@ -866,7 +866,7 @@ export async function getUserProfileApi(userId) {
 
 export async function getUserReceivedReviewsApi(userId) {
   const res = await authenticatedFetch(
-    `${API_BASE_URL}/api/v1/users/${userId}/reviews/received`,
+    `${API_BASE_URL}/api/v1/users/${userId}/reviews`,
     {
       headers: authHeaders(),
     }
