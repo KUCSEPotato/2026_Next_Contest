@@ -121,21 +121,25 @@ export default function SignupPage() {
   const pwChecks = validatePassword(password);
   const pwValid = pwChecks.length && pwChecks.hasLetter && pwChecks.hasNumber;
 
-  // GitHub OAuth 콜백에서 step=2로 넘어온 경우 (신규 유저)
+  // GitHub OAuth 콜백 처리
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const stepParam = params.get("step");
     const via = params.get("via");
+    const tokenFromQuery = params.get("access_token");
 
-    if (stepParam === "2" && via === "github") {
-      // callback 페이지에서 이미 토큰 저장 완료 → 바로 Step 2로
-      const token = localStorage.getItem("access_token");
-      if (token) {
-        setAccessToken(token);
+    if (via === "github" && tokenFromQuery) {
+      localStorage.setItem("access_token", tokenFromQuery);
+      setAccessToken(tokenFromQuery);
+
+      // 신규 유저는 온보딩 Step2, 기존 유저는 메인으로 이동
+      if (stepParam === "2") {
         setStep(2);
+      } else if (stepParam === "profile") {
+        router.push("/mainpage");
       }
     }
-  }, []);
+  }, [router]);
 
   // ── GitHub OAuth ─────────────────────────────────────────────────────────
   const handleGithubLogin = () => {
@@ -143,6 +147,12 @@ export default function SignupPage() {
     const redirectUri = encodeURIComponent(
       process.env.NEXT_PUBLIC_GITHUB_REDIRECT_URI
     );
+
+    if (!clientId || !process.env.NEXT_PUBLIC_GITHUB_REDIRECT_URI) {
+      alert("GitHub OAuth 환경변수가 설정되지 않았습니다.");
+      return;
+    }
+
     window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=user:email`;
   };
 
