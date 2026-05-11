@@ -1,4 +1,4 @@
-import { PostSummary, PostDetail, CommentItem, ReactionType } from "../_types";
+import { PostSummary, PostDetail, CommentItem, ReactionType, PostFile } from "../_types";
 import { authenticatedFetch, getToken } from "../../../lib/auth";
 
 const BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"}/api/v1/community`;
@@ -54,6 +54,23 @@ export async function createPost(payload: {
     body: JSON.stringify(payload),
   });
   return handleResponse(res);
+}
+
+export async function uploadPostFile(postId: number, file: File): Promise<PostFile> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await authenticatedFetch(`${BASE}/${postId}/files`, {
+    method: "POST",
+    body: formData,
+  });
+  return handleResponse(res);
+}
+
+export async function getPostFiles(postId: number): Promise<PostFile[]> {
+  const res = await authenticatedFetch(`${BASE}/${postId}/files`);
+  const data = await handleResponse<{ files: PostFile[] }>(res);
+  return data.files;
 }
 
 export async function updatePost(
