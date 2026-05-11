@@ -358,6 +358,7 @@ async def list_projects(
             "applicantCount": applicant_count,
             "remainingSeats": remaining_seats,
             "competitionRatio": competition_ratio,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
         })
     
     return success_response(
