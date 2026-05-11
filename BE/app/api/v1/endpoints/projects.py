@@ -333,7 +333,7 @@ async def list_projects(
             Application.status == "pending",
         ).scalar() or 0
 
-        total_members = (p.max_members or 0) + 1
+        total_members = p.max_members or 0
         remaining_seats = max(total_members - current_members, 0)
 
         competition_ratio = (

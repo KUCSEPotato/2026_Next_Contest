@@ -360,7 +360,7 @@ export default function ProjectDetailPage() {
 
                 <div>
                   <label className="mb-1 block text-sm font-semibold text-slate-700">
-                    모집 인원
+                    모집 인원 (리더 포함)
                   </label>
                   <input
                     className={inputClassName}
@@ -372,7 +372,7 @@ export default function ProjectDetailPage() {
                     placeholder="모집 인원 (리더 포함)"
                   />
                   <p className="mt-1 text-xs text-slate-500">
-                    {acceptedMemberCount}명(현재 팀원수) 이상으로만 설정할 수 있습니다.
+                    리더 포함 총 인원입니다. {acceptedMemberCount}명(현재 팀원수) 이상으로만 설정할 수 있습니다.
                   </p>
                 </div>
               </div>
