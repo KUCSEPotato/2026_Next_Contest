@@ -158,3 +158,31 @@ export async function authenticatedFetch(input, init = {}) {
   retryHeaders.set("Authorization", `Bearer ${refreshedToken}`);
   return fetch(input, { ...init, headers: retryHeaders });
 }
+
+export async function loadCurrentUser() {
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/v1/auth/me`);
+  if (!response.ok) {
+    if (response.status === 401) {
+      removeToken();
+    }
+    throw new Error("현재 로그인 정보를 불러오지 못했습니다.");
+  }
+
+  const payload = await response.json();
+  const user = payload.data;
+  if (!user) {
+    throw new Error("현재 로그인 응답에 사용자 정보가 없습니다.");
+  }
+
+  const accessToken = getToken();
+  if (accessToken) {
+    saveAuthSession({
+      accessToken,
+      refreshToken: getRefreshToken(),
+      userId: user.id,
+      user,
+    });
+  }
+
+  return user;
+}

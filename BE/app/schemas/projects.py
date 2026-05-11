@@ -87,7 +87,7 @@ class TodoCreateRequest(BaseModel):
     description: str | None = None
     stage: str = "planning"
     status: str = "todo"
-    priority: int = Field(default=3, ge=1, le=5)
+    priority: int = Field(default=1, ge=1, le=1000)
     due_date: date | None = None
 
 
@@ -98,7 +98,7 @@ class TodoUpdateRequest(BaseModel):
     description: str | None = None
     stage: str | None = None
     status: str | None = None
-    priority: int | None = Field(default=None, ge=1, le=5)
+    priority: int | None = Field(default=None, ge=1, le=1000)
     due_date: date | None = None
 
 

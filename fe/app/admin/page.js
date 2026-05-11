@@ -12,7 +12,7 @@ import {
   updateAdminReportApi,
   updateAdminUserStatusApi,
 } from "../../lib/api";
-import { getStoredUser } from "../../lib/auth";
+import { getStoredUser, getToken, loadCurrentUser } from "../../lib/auth";
 
 const TABS = [
   { id: "reports", label: "신고" },
@@ -99,9 +99,22 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
-    queueMicrotask(() => {
-      const storedUser = getStoredUser();
-      if (storedUser?.role !== "admin") {
+    let cancelled = false;
+
+    const initializeAdmin = async () => {
+      let currentUser = getStoredUser();
+
+      if (getToken() && currentUser?.role !== "admin") {
+        try {
+          currentUser = await loadCurrentUser();
+        } catch {
+          currentUser = getStoredUser();
+        }
+      }
+
+      if (cancelled) return;
+
+      if (currentUser?.role !== "admin") {
         setIsAuthorized(false);
         setLoading(false);
         return;
@@ -109,7 +122,13 @@ export default function AdminPage() {
 
       setIsAuthorized(true);
       loadAdminData();
-    });
+    };
+
+    queueMicrotask(initializeAdmin);
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function handleReportStatus(reportId, status) {
