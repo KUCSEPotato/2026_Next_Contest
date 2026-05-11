@@ -442,9 +442,12 @@ export default function ProjectDetailPage() {
         <div className="grid gap-6 lg:grid-cols-3">
           <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm lg:col-span-2">
             <h2 className="text-xl font-bold text-slate-900">프로젝트 설명</h2>
-            <p className="mt-4 whitespace-pre-line leading-7 text-slate-700">
-              {project.description}
-            </p>
+            <div
+              className="mt-4 whitespace-pre-line leading-7 text-slate-700"
+              dangerouslySetInnerHTML={{
+                __html: project.description?.replace(/\n/g, "<br />"),
+              }}
+            />
           </section>
 
           <aside className="space-y-6">
