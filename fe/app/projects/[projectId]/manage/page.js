@@ -28,6 +28,8 @@ const isDoneTodo = (todo) =>
   Boolean(todo?.completed_at) ||
   todo?.is_done === true;
 
+const getMemberUserId = (member) => member?.user_id || member?.user?.id;
+
 const TODO_STAGES = [
   { value: "planning", label: "기획" },
   { value: "design", label: "설계" },
@@ -109,7 +111,7 @@ export default function ProjectManagePage() {
     project &&
     profile &&
     (project.leader_id === profile.id ||
-      (project.members || []).some((member) => member.user_id === profile.id));
+      (project.members || []).some((member) => getMemberUserId(member) === profile.id));
 
   const acceptedCount = applications.filter(
     (application) => application.status === "accepted"
@@ -135,14 +137,16 @@ export default function ProjectManagePage() {
       ? ""
       : todos.length === 0
         ? "Todo가 있어야 프로젝트 완료 처리를 할 수 있습니다."
-      : canCompleteProject
+      : canCompleteProject && isLeader
           ? "완료 조건을 충족했습니다. 프로젝트 완료 버튼을 눌러 마무리하세요."
+          : canCompleteProject
+            ? "완료 조건을 충족했습니다. 프로젝트 완료 처리는 팀장만 할 수 있습니다."
           : "Todo를 70% 이상 완료하면 프로젝트 완료 버튼을 누를 수 있습니다.";
   const todoGroups = groupTodosByStage(todos);
 
   const getProjectMemberIds = () =>
     (project?.members || [])
-      .map((member) => member.user_id || member.id || member.user?.id)
+      .map(getMemberUserId)
       .filter(Boolean);
 
   const reloadProjectAndTodos = async () => {
@@ -220,6 +224,11 @@ export default function ProjectManagePage() {
   }, [isProjectCompleted, isProjectMember, hasPromptedCompletionReview, getPendingReviewTargets]);
 
   const handleDecision = async (applicationId, status) => {
+    if (!isLeader) {
+      alert("지원자 처리는 팀장만 할 수 있습니다.");
+      return;
+    }
+
     if (status === "accepted" && !canAcceptMore) {
       alert("모집 인원을 초과할 수 없습니다.");
       return;
@@ -251,6 +260,11 @@ export default function ProjectManagePage() {
   };
 
   const handleCompleteTeam = async () => {
+    if (!isLeader) {
+      alert("팀 결성은 팀장만 할 수 있습니다.");
+      return;
+    }
+
     if (!confirm("팀 결성을 완료하고 프로젝트를 시작할까요?")) {
       return;
     }
@@ -405,6 +419,11 @@ export default function ProjectManagePage() {
   };
 
   const handleCompleteProject = async () => {
+    if (!isLeader) {
+      alert("프로젝트 완료 처리는 팀장만 할 수 있습니다.");
+      return;
+    }
+
     if (!canCompleteProject) return;
 
     if (!confirm("프로젝트를 완료 처리할까요? 완료 후 회고록을 작성할 수 있습니다.")) {
@@ -429,6 +448,11 @@ export default function ProjectManagePage() {
   };
 
   const handleCreateRecruitment = async () => {
+    if (!isLeader) {
+      alert("재모집 등록은 팀장만 할 수 있습니다.");
+      return;
+    }
+
     if (!recruitmentPosition.trim()) {
       alert("재모집 포지션을 입력해주세요.");
       return;
@@ -574,13 +598,13 @@ export default function ProjectManagePage() {
     </div>
   );
 
-  if (!isLeader && !(isProjectCompleted && isProjectMember)) {
+  if (!isProjectMember) {
     return (
       <main className="min-h-screen bg-slate-50 px-6 py-10">
         <div className="mx-auto w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
           <h1 className="text-2xl font-bold text-slate-900">접근 권한이 없습니다.</h1>
           <p className="mt-3 text-slate-500">
-            프로젝트 등록인만 지원자 목록을 확인하고 팀을 확정할 수 있습니다.
+            이 프로젝트에 참여 중인 팀원만 진행 관리 페이지를 볼 수 있습니다.
           </p>
           <button
             onClick={() => router.push(`/projects/${projectId}`)}
@@ -589,38 +613,6 @@ export default function ProjectManagePage() {
             프로젝트 상세로 돌아가기
           </button>
         </div>
-      </main>
-    );
-  }
-
-  if (!isLeader && isProjectCompleted && isProjectMember) {
-    return (
-      <main className="min-h-screen bg-slate-50 px-6 py-10">
-        <div className="mx-auto w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <p className="text-sm font-semibold text-red-600">Project #{projectId}</p>
-          <h1 className="mt-2 text-3xl font-bold text-slate-900">
-            프로젝트가 완료되었습니다
-          </h1>
-          <p className="mt-3 text-slate-500">
-            함께한 팀원 평가를 남기고, 프로젝트 회고를 작성해보세요.
-          </p>
-
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <button
-              onClick={openCompletionReview}
-              className="flex-1 rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
-            >
-              팀원 평가하기
-            </button>
-            <button
-              onClick={() => router.push(`/memoir?projectId=${projectId}`)}
-              className="flex-1 rounded-xl border border-slate-200 px-5 py-3 font-semibold text-slate-600 transition hover:bg-slate-50"
-            >
-              개발자의 텃밭일기
-            </button>
-          </div>
-        </div>
-        {completionReviewModal}
       </main>
     );
   }
@@ -634,11 +626,12 @@ export default function ProjectManagePage() {
           </p>
 
           <h1 className="mt-2 text-3xl font-bold text-slate-900">
-            {project?.title || "프로젝트"} 지원자 관리
+            {project?.title || "프로젝트"} 진행 관리
           </h1>
 
           <p className="mt-3 text-slate-500">
-            지원자의 프로필과 지원 메시지를 확인하고 팀원을 확정하세요.
+            팀원들과 Todo 진행률, 작업 단계, 프로젝트 완료 상태를 함께 확인하세요.
+            팀 결성, 재모집, 지원자 처리는 팀장만 할 수 있습니다.
           </p>
 
           <div className="mt-6 rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
@@ -646,7 +639,7 @@ export default function ProjectManagePage() {
             {maxMembers ? `${maxMembers}명 (리더 포함)` : "제한 없음"}
           </div>
 
-          {!isProjectCompleted && (
+          {isLeader && !isProjectCompleted && (
             <button
               onClick={
                 isProjectInProgress
@@ -667,7 +660,7 @@ export default function ProjectManagePage() {
             </button>
           )}
 
-          {isProjectInProgress && showRecruitmentForm && (
+          {isLeader && isProjectInProgress && showRecruitmentForm && (
             <div className="mt-4 rounded-xl border border-red-100 bg-red-50/40 p-4">
               <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_160px]">
                 <div>
@@ -750,7 +743,7 @@ export default function ProjectManagePage() {
                 </p>
               </div>
 
-              {isProjectInProgress && !isProjectCompleted && (
+              {isLeader && isProjectInProgress && !isProjectCompleted && (
                 <button
                   onClick={handleCompleteProject}
                   disabled={isCompletingTeam || !canCompleteProject}
@@ -761,12 +754,20 @@ export default function ProjectManagePage() {
               )}
 
               {isProjectCompleted && (
-                <button
-                  onClick={() => router.push(`/memoir?projectId=${projectId}`)}
-                  className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
-                >
-                  개발자의 텃밭일기
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={openCompletionReview}
+                    className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                  >
+                    팀원 평가하기
+                  </button>
+                  <button
+                    onClick={() => router.push(`/memoir?projectId=${projectId}`)}
+                    className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
+                  >
+                    개발자의 텃밭일기
+                  </button>
+                </div>
               )}
             </div>
 
@@ -780,7 +781,7 @@ export default function ProjectManagePage() {
             {completionHelpText && (
               <p
                 className={`mt-2 text-xs ${
-                  canCompleteProject ? "text-red-600" : "text-slate-500"
+                  canCompleteProject && isLeader ? "text-red-600" : "text-slate-500"
                 }`}
               >
                 {completionHelpText}
@@ -789,87 +790,89 @@ export default function ProjectManagePage() {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <h2 className="text-xl font-bold text-slate-900">지원자 목록</h2>
+        {isLeader && (
+          <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+            <h2 className="text-xl font-bold text-slate-900">지원자 목록</h2>
 
-          {applications.length === 0 ? (
-            <p className="mt-4 text-slate-500">아직 지원자가 없습니다.</p>
-          ) : (
-            <div className="mt-6 space-y-4">
-              {applications.map((application) => {
-                const applicant =
-                  application.applicant || application.user || application.profile;
+            {applications.length === 0 ? (
+              <p className="mt-4 text-slate-500">아직 지원자가 없습니다.</p>
+            ) : (
+              <div className="mt-6 space-y-4">
+                {applications.map((application) => {
+                  const applicant =
+                    application.applicant || application.user || application.profile;
 
-                return (
-                  <div
-                    key={application.id}
-                    className="rounded-2xl border border-slate-200 p-5"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <button
-                          onClick={() =>
-                            router.push(`/users/${application.applicant_id}`)
-                          }
-                          className="text-left text-lg font-bold text-slate-900 transition hover:text-red-600 hover:underline"
-                        >
-                          User #{application.applicant_id}
-                          {(applicant?.nickname || applicant?.name) &&
-                            ` · ${applicant.nickname || applicant.name}`}
-                        </button>
+                  return (
+                    <div
+                      key={application.id}
+                      className="rounded-2xl border border-slate-200 p-5"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <button
+                            onClick={() =>
+                              router.push(`/users/${application.applicant_id}`)
+                            }
+                            className="text-left text-lg font-bold text-slate-900 transition hover:text-red-600 hover:underline"
+                          >
+                            User #{application.applicant_id}
+                            {(applicant?.nickname || applicant?.name) &&
+                              ` · ${applicant.nickname || applicant.name}`}
+                          </button>
 
-                        {applicant?.email && (
-                          <p className="mt-1 text-sm text-slate-500">
-                            {applicant.email}
+                          {applicant?.email && (
+                            <p className="mt-1 text-sm text-slate-500">
+                              {applicant.email}
+                            </p>
+                          )}
+
+                          {applicant?.bio && (
+                            <p className="mt-3 text-sm text-slate-700">
+                              {applicant.bio}
+                            </p>
+                          )}
+
+                          <p className="mt-4 whitespace-pre-line rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
+                            {application.message || "지원 메시지가 없습니다."}
                           </p>
-                        )}
+                        </div>
 
-                        {applicant?.bio && (
-                          <p className="mt-3 text-sm text-slate-700">
-                            {applicant.bio}
-                          </p>
-                        )}
-
-                        <p className="mt-4 whitespace-pre-line rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
-                          {application.message || "지원 메시지가 없습니다."}
-                        </p>
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
+                          {application.status}
+                        </span>
                       </div>
 
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
-                        {application.status}
-                      </span>
-                    </div>
+                      <div className="mt-5 flex justify-end gap-2">
+                        <button
+                          onClick={() => handleDecision(application.id, "rejected")}
+                          disabled={
+                            processingId === application.id ||
+                            application.status !== "pending"
+                          }
+                          className="rounded-xl border border-slate-300 px-4 py-2 font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          거절
+                        </button>
 
-                    <div className="mt-5 flex justify-end gap-2">
-                      <button
-                        onClick={() => handleDecision(application.id, "rejected")}
-                        disabled={
-                          processingId === application.id ||
-                          application.status !== "pending"
-                        }
-                        className="rounded-xl border border-slate-300 px-4 py-2 font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        거절
-                      </button>
-
-                      <button
-                        onClick={() => handleDecision(application.id, "accepted")}
-                        disabled={
-                          processingId === application.id ||
-                          application.status !== "pending" ||
-                          !canAcceptMore
-                        }
-                        className="rounded-xl bg-red-600 px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
-                      >
-                        승인
-                      </button>
+                        <button
+                          onClick={() => handleDecision(application.id, "accepted")}
+                          disabled={
+                            processingId === application.id ||
+                            application.status !== "pending" ||
+                            !canAcceptMore
+                          }
+                          className="rounded-xl bg-red-600 px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+                        >
+                          승인
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
 
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -885,7 +888,7 @@ export default function ProjectManagePage() {
                 {todoCompletionRate}% 완료
               </div>
 
-              {isProjectInProgress && !isProjectCompleted && (
+              {isLeader && isProjectInProgress && !isProjectCompleted && (
                 <button
                   onClick={handleCompleteProject}
                   disabled={isCompletingTeam || !canCompleteProject}
