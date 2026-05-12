@@ -31,6 +31,7 @@ from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
 from app.models import User
 from app.schemas.auth import ForgotPasswordRequest
+from app.schemas.auth import FindLoginIdRequest
 from app.schemas.auth import LoginRequest
 from app.schemas.auth import LogoutRequest
 from app.schemas.auth import OAuthGithubLoginRequest
@@ -163,7 +164,7 @@ async def signup(payload: SignupRequest, db: Session = Depends(get_db)) -> dict:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists")
 
     if db.query(User).filter(User.nickname == login_id, User.deleted_at.is_(None)).first():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 존재하는 닉네임입니다.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="중복된 아이디입니다.")
 
     user = User(
         email=email,
@@ -647,6 +648,17 @@ async def refresh_token(payload: TokenRefreshRequest) -> dict:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token type")
 
     return success_response(data={"access_token": create_access_token(user_id), "token_type": "bearer"})
+
+
+@router.post("/login-id/find", summary="아이디 찾기", description="가입 이메일로 로그인 아이디를 조회합니다.")
+async def find_login_id(payload: FindLoginIdRequest, db: Session = Depends(get_db)) -> dict:
+    user = db.query(User).filter(User.email == payload.email, User.deleted_at.is_(None)).first()
+    return success_response(
+        data={
+            "login_id": user.nickname if user else None,
+            "message": "If account exists, login id was found",
+        },
+    )
 
 
 @router.post("/password/forgot", summary="비밀번호 재설정 요청", description="계정이 존재하면 임시 재설정 토큰을 발급합니다.")

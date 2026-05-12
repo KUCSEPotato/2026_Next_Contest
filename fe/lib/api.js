@@ -79,6 +79,36 @@ export async function loginApi(loginId, password) {
     return handleResponse(res, "로그인에 실패했습니다.");
   }
 
+export async function findLoginIdApi(email) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/auth/login-id/find`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify({ email }),
+  });
+
+  return handleResponse(res, "아이디 찾기에 실패했습니다.");
+}
+
+export async function requestPasswordResetApi(email) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/auth/password/forgot`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify({ email }),
+  });
+
+  return handleResponse(res, "비밀번호 재설정 요청에 실패했습니다.");
+}
+
+export async function resetPasswordApi(token, newPassword) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/auth/password/reset`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+
+  return handleResponse(res, "비밀번호 재설정에 실패했습니다.");
+}
+
 /* =========================
    Ideas
 ========================= */
