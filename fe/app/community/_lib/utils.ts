@@ -15,8 +15,12 @@ export const tempId = () => _tempId--;
 export function buildCommentTree(comments: CommentItem[]): CommentItem[] {
   const map = new Map<number, CommentItem>();
   const roots: CommentItem[] = [];
+  const byCreatedAt = (a: CommentItem, b: CommentItem) => {
+    const timeDiff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    return timeDiff || a.id - b.id;
+  };
 
-  comments.forEach((c) => map.set(c.id, { ...c, replies: [] }));
+  [...comments].sort(byCreatedAt).forEach((c) => map.set(c.id, { ...c, replies: [] }));
   map.forEach((c) => {
     if (c.parent_comment_id == null) {
       roots.push(c);
@@ -25,6 +29,8 @@ export function buildCommentTree(comments: CommentItem[]): CommentItem[] {
       if (parent) parent.replies!.push(c);
     }
   });
+  roots.sort(byCreatedAt);
+  roots.forEach((root) => root.replies?.sort(byCreatedAt));
   return roots;
 }
 

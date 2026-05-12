@@ -60,6 +60,44 @@ const HOT_SECTIONS: HotSection[] = [
 ];
 
 type Tab = "board" | "hot";
+type HotPostsState = {
+  popular: PostSummary | null;
+  most_recommended: PostSummary | null;
+  most_commented: PostSummary | null;
+  most_viewed: PostSummary | null;
+  latest: PostSummary | null;
+};
+
+function applyPostReaction(
+  post: PostSummary,
+  type: ReactionType,
+  result: Awaited<ReturnType<typeof reactToPost>>
+): PostSummary {
+  if (result.reaction_stats) {
+    return {
+      ...post,
+      user_reaction: result.user_reaction ?? null,
+      reaction_stats: result.reaction_stats,
+    };
+  }
+
+  const newStats = { ...post.reaction_stats };
+  if (result.action === "removed") {
+    const rt = result.reaction_type;
+    newStats[rt] = Math.max(0, newStats[rt] - 1);
+    return { ...post, user_reaction: null, reaction_stats: newStats };
+  }
+  const prevReaction = post.user_reaction;
+  if (prevReaction && prevReaction !== type) {
+    newStats[prevReaction] = Math.max(0, newStats[prevReaction] - 1);
+  }
+  newStats[type] = newStats[type] + 1;
+  return {
+    ...post,
+    user_reaction: type,
+    reaction_stats: newStats,
+  };
+}
 
 export default function CommunityPage() {
   const router = useRouter();
@@ -75,13 +113,7 @@ export default function CommunityPage() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [tab, setTab] = useState<Tab>("board");
 
-  const [hotPosts, setHotPosts] = useState<{
-    popular: PostSummary | null;
-    most_recommended: PostSummary | null;
-    most_commented: PostSummary | null;
-    most_viewed: PostSummary | null;
-    latest: PostSummary | null;
-  } | null>(null);
+  const [hotPosts, setHotPosts] = useState<HotPostsState | null>(null);
   const [loadingHot, setLoadingHot] = useState(false);
   const reactingPostIds = useRef(new Set<number>());
 
@@ -156,26 +188,17 @@ export default function CommunityPage() {
     try {
       const result = await reactToPost(postId, type);
       setPosts((prev) =>
-        prev.map((p) => {
-          if (p.id !== postId) return p;
-          const newStats = { ...p.reaction_stats };
-          if (result.action === "removed") {
-            const rt = result.reaction_type;
-            newStats[rt] = Math.max(0, newStats[rt] - 1);
-            return { ...p, user_reaction: null, reaction_stats: newStats };
-          }
-          const prevReaction = p.user_reaction;
-          if (prevReaction && prevReaction !== type) {
-            newStats[prevReaction] = Math.max(0, newStats[prevReaction] - 1);
-          }
-          newStats[type] = newStats[type] + 1;
-          return {
-            ...p,
-            user_reaction: type,
-            reaction_stats: newStats,
-          };
-        })
+        prev.map((p) => (p.id === postId ? applyPostReaction(p, type, result) : p))
       );
+      setHotPosts((prev) => {
+        if (!prev) return prev;
+        return Object.fromEntries(
+          Object.entries(prev).map(([key, post]) => [
+            key,
+            post?.id === postId ? applyPostReaction(post, type, result) : post,
+          ])
+        ) as HotPostsState;
+      });
     } catch (e) {
       console.error(e);
     } finally {
