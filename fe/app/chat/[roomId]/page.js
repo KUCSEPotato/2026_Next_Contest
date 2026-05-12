@@ -23,6 +23,26 @@ const TODO_STAGES = [
   { value: "verification", label: "검증" },
 ];
 
+const CHAT_READ_COUNTS_STORAGE_KEY = "devory_chat_read_counts";
+
+const getStoredChatReadCounts = () => {
+  if (typeof window === "undefined") return {};
+
+  try {
+    return JSON.parse(localStorage.getItem(CHAT_READ_COUNTS_STORAGE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+};
+
+const markChatRoomRead = (roomId, messageCount) => {
+  if (typeof window === "undefined" || !roomId) return;
+
+  const readCounts = getStoredChatReadCounts();
+  readCounts[String(roomId)] = messageCount;
+  localStorage.setItem(CHAT_READ_COUNTS_STORAGE_KEY, JSON.stringify(readCounts));
+};
+
 export default function ChatRoomPage() {
   const params = useParams();
   const router = useRouter();
@@ -196,6 +216,10 @@ export default function ChatRoomPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "auto" });
   }, [messages]);
+
+  useEffect(() => {
+    markChatRoomRead(roomId, messages.length);
+  }, [messages.length, roomId]);
 
   const handleSend = async () => {
     if (!input.trim()) {
