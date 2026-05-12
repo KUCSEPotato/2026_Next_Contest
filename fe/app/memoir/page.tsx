@@ -614,10 +614,10 @@ function MemoirContent() {
   return (
     <>
       <style>{fontStyle}</style>
-      <div style={{ minHeight: "100vh", background: "#fdf5f5", color: "#3c1010", fontFamily: "'Gowun Dodum', sans-serif" }}>
+      <div style={{ background: "#fdf5f5", color: "#3c1010", fontFamily: "'Gowun Dodum', sans-serif" }}>
 
         {/* ── Hero ── */}
-        <section style={{ background: "#f0c4c4", padding: "40px 20px 32px", textAlign: "center", borderBottom: "1px solid #e8a8a8" }}>
+        <section style={{ background: "#f0c4c4", padding: "28px 20px 24px", textAlign: "center", borderBottom: "1px solid #e8a8a8" }}>
           <div style={{ display: "inline-block", background: "#9b1c1c", color: "#fdf0f0", fontSize: 12, padding: "5px 16px", borderRadius: 20, marginBottom: 14, fontFamily: "'Gowun Dodum', sans-serif" }}>
             📖 개발자의 텃밭일기
           </div>
