@@ -3,7 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { authenticatedFetch, getApiBaseUrl, saveAuthSession } from "../../lib/auth";
+import {
+  authenticatedFetch,
+  getApiBaseUrl,
+  removeToken,
+  saveAuthSession,
+} from "../../lib/auth";
 import {
   findLoginIdApi,
   loginApi,
@@ -54,6 +59,7 @@ export default function LoginPage() {
       client_id: clientId,
       redirect_uri: redirectUri,
       scope: "read:user user:email",
+      state: "login",
     });
 
     window.location.href = `https://github.com/login/oauth/authorize?${params.toString()}`;
@@ -269,7 +275,10 @@ export default function LoginPage() {
         <div className="mt-4 text-center text-sm text-slate-500">
           계정이 없으신가요?{" "}
           <span
-            onClick={() => router.push("/signup")}
+            onClick={() => {
+              removeToken({ reason: "signup_entry" });
+              router.push("/signup");
+            }}
             className="cursor-pointer font-semibold text-red-600 hover:underline"
           >
             회원가입
