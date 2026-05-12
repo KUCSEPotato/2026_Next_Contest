@@ -14,6 +14,14 @@ import {
   updateProjectRetrospectiveApi,
 } from "../../lib/api";
 
+/* ── 폰트 인젝션 (layout.tsx에 추가하면 더 깔끔해요) ── */
+const fontStyle = `
+  @import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Nanum+Myeongjo:wght@400;700&display=swap');
+`;
+
+/* ────────────────────────────────────────────────────────────
+   타입
+──────────────────────────────────────────────────────────── */
 interface Rating {
   avg_contribution: number;
   avg_responsibility: number;
@@ -72,83 +80,62 @@ interface RetrospectiveDetail {
   next_actions?: string | null;
 }
 
+/* ────────────────────────────────────────────────────────────
+   리뷰 멘트 시스템 (미리보기와 동일)
+──────────────────────────────────────────────────────────── */
 const REVIEW_MESSAGES: Record<string, Record<number, string>> = {
   기여도: {
-    5: "프로젝트를 앞으로 끌고 가는 힘이 아주 인상적이었어요.",
-    4: "맡은 역할을 안정적으로 수행하며 팀에 분명한 기여를 남겼어요.",
-    3: "필요한 순간마다 역할을 해냈고, 다음에는 더 선명한 기여를 기대해볼 수 있어요.",
-    2: "기여의 방향은 보였지만 다음 프로젝트에서는 더 적극적인 참여가 필요해 보여요.",
-    1: "시작점에 가까웠어요. 다음에는 더 많은 실행 경험을 쌓아보면 좋아요.",
+    5: "팀이 앞으로 나아갈 수 있도록 누구보다 앞장서서 힘을 보탠 사람이에요. 당신 덕분에 팀이 움직였어요.",
+    4: "팀에 진심으로 힘을 보태며 함께 달린 사람이에요. 당신의 기여가 팀의 속도를 만들었어요.",
+    3: "필요한 순간마다 제 몫을 다한 사람이에요. 꾸준함이 쌓이면 더 빛날 거예요.",
+    2: "한 발짝씩 팀에 보탬이 되려 노력한 사람이에요. 다음엔 더 많이 함께할 수 있을 거예요.",
+    1: "시작이 반이에요. 이 경험이 다음 기여의 씨앗이 될 거예요.",
   },
   책임감: {
-    5: "믿고 맡길 수 있는 팀원이라는 인상을 강하게 남겼어요.",
-    4: "맡은 일을 끝까지 챙기는 태도가 팀에 안정감을 줬어요.",
-    3: "기본적인 책임을 해냈고, 꾸준함을 조금 더 키우면 좋아요.",
-    2: "완료까지 이어지는 힘을 더 키우면 다음에는 훨씬 좋아질 거예요.",
-    1: "작은 약속부터 차근차근 지켜나가는 연습이 필요해 보여요.",
+    5: "팀에서 가장 믿음직한 버팀목이었어요. 누구도 걱정하지 않아도 될 만큼 든든한 사람이었어요.",
+    4: "맡은 일을 끝까지 놓지 않는 든든한 버팀목이었어요. 팀원들이 믿고 기댈 수 있는 사람이었어요.",
+    3: "주어진 역할을 성실하게 해낸 사람이에요. 책임감의 근육이 이미 자라고 있어요.",
+    2: "때로는 흔들렸지만 포기하지 않은 사람이에요. 그 자체가 이미 책임감의 출발이에요.",
+    1: "완주했다는 것 자체가 책임감의 증거예요. 다음엔 더 탄탄해질 거예요.",
   },
-  협업: {
-    5: "팀의 방향을 맞추고 분위기를 좋게 만드는 협업력이 돋보였어요.",
-    4: "의견을 잘 나누고 팀의 흐름에 맞춰 움직였어요.",
-    3: "필요한 소통은 해냈고, 조금 더 먼저 말 걸면 더 좋아질 것 같아요.",
-    2: "협업의 시도는 있었지만 표현과 공유를 더 자주 하면 좋아요.",
-    1: "다음 프로젝트에서는 팀원들과 더 자주 맞춰보는 경험이 필요해요.",
+  소통: {
+    5: "팀의 언어를 만든 사람이에요. 당신이 있어서 모두가 같은 방향을 볼 수 있었어요.",
+    4: "의견을 명확하게 전달하고 팀의 목소리를 귀 기울여 들을 줄 아는, 연결고리 같은 사람이었어요.",
+    3: "필요한 말을 할 줄 아는 사람이에요. 조금 더 먼저 말을 걸어보면 어떨까요?",
+    2: "표현하는 게 쉽지 않았겠지만, 시도한 것만으로도 충분히 의미 있어요.",
+    1: "말 한마디가 팀을 바꿀 수 있어요. 다음엔 더 많이 표현해봐요.",
   },
 };
 
-const TECH_CHIPS = [
-  "React",
-  "Next.js",
-  "TypeScript",
-  "Node.js",
-  "Python",
-  "Spring Boot",
-  "Flutter",
-  "Firebase",
-  "Docker",
-  "AWS",
-];
+const TECH_CHIPS = ["React", "Next.js", "TypeScript", "Node.js", "Python", "Spring Boot", "Flutter", "Firebase", "Docker", "AWS"];
+const FIELD_CHIPS = ["프론트엔드", "백엔드", "모바일", "UI/UX 디자인", "데이터 분석", "AI/ML", "DevOps", "기획/PM", "팀 리드"];
 
-const FIELD_CHIPS = [
-  "프론트엔드",
-  "백엔드",
-  "모바일",
-  "UI/UX 디자인",
-  "데이터 분석",
-  "AI/ML",
-  "DevOps",
-  "기획/PM",
-  "팀 리드",
-];
-
+/* ────────────────────────────────────────────────────────────
+   유틸
+──────────────────────────────────────────────────────────── */
 function average(values: number[]) {
   if (!values.length) return 0;
-  return Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1));
+  return Number((values.reduce((s, v) => s + v, 0) / values.length).toFixed(1));
 }
 
 function toDateLabel(value?: string | null) {
   if (!value) return "기록 없음";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "기록 없음";
-  return date.toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return "기록 없음";
+  return d.toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" });
 }
 
 function daysBetween(start?: string | null) {
   if (!start) return 0;
-  const startDate = new Date(start);
-  if (Number.isNaN(startDate.getTime())) return 0;
-  const diff = Date.now() - startDate.getTime();
-  return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  const d = new Date(start);
+  if (isNaN(d.getTime())) return 0;
+  return Math.max(1, Math.ceil((Date.now() - d.getTime()) / 86400000));
 }
 
 function pickProjectFromList(projects: ProjectData[]) {
   return (
-    projects.find((project) => project.status === "completed") ||
-    projects.find((project) => project.status === "in_progress") ||
+    projects.find((p) => p.status === "completed") ||
+    projects.find((p) => p.status === "in_progress") ||
     projects[0] ||
     null
   );
@@ -156,7 +143,6 @@ function pickProjectFromList(projects: ProjectData[]) {
 
 function parseLessonsLearned(value?: string | null): { chips: string[]; lessons: string } {
   if (!value) return { chips: [], lessons: "" };
-
   try {
     const parsed = JSON.parse(value);
     if (parsed && typeof parsed === "object") {
@@ -165,59 +151,93 @@ function parseLessonsLearned(value?: string | null): { chips: string[]; lessons:
         lessons: typeof parsed.lessons === "string" ? parsed.lessons : "",
       };
     }
-  } catch {
-    // Older retrospectives stored this as a comma-separated plain string.
-  }
-
-  return {
-    chips: value
-      .split(",")
-      .map((chip) => chip.trim())
-      .filter(Boolean),
-    lessons: "",
-  };
+  } catch {}
+  return { chips: value.split(",").map((c) => c.trim()).filter(Boolean), lessons: "" };
 }
 
 function stringifyLessonsLearned(data: GrowthData) {
-  return JSON.stringify({
-    chips: data.chips,
-    lessons: data.lessons || "",
-  });
+  return JSON.stringify({ chips: data.chips, lessons: data.lessons || "" });
 }
 
+/* ── 서수 (1번째, 2번째…) ── */
+function ordinalKo(n: number) {
+  return `${n}번째`;
+}
+
+/* ────────────────────────────────────────────────────────────
+   장미 SVG
+──────────────────────────────────────────────────────────── */
+function RoseSVG() {
+  return (
+    <svg viewBox="0 0 120 140" width={90} height={105} xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      {/* 줄기 */}
+      <path d="M60 110 Q55 125 52 135" stroke="#6b4226" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+      <path d="M60 110 Q65 125 68 135" stroke="#6b4226" strokeWidth="2" fill="none" strokeLinecap="round"/>
+      {/* 잎 */}
+      <path d="M55 118 Q40 112 38 100 Q50 104 55 118Z" fill="#c0392b" opacity="0.45"/>
+      <path d="M65 122 Q80 115 82 103 Q70 108 65 122Z" fill="#c0392b" opacity="0.35"/>
+      {/* 꽃받침 */}
+      <path d="M48 92 Q60 84 72 92 Q70 100 60 102 Q50 100 48 92Z" fill="#a93226"/>
+      {/* 꽃잎 바깥 */}
+      <ellipse cx="60" cy="70" rx="26" ry="28" fill="#e74c3c"/>
+      <path d="M34 70 Q28 50 40 42 Q48 60 34 70Z" fill="#e74c3c"/>
+      <path d="M86 70 Q92 50 80 42 Q72 60 86 70Z" fill="#e74c3c"/>
+      <path d="M60 42 Q40 30 38 44 Q50 50 60 42Z" fill="#ec7063"/>
+      <path d="M60 42 Q80 30 82 44 Q70 50 60 42Z" fill="#ec7063"/>
+      {/* 꽃잎 중간 */}
+      <ellipse cx="60" cy="66" rx="20" ry="22" fill="#c0392b"/>
+      <path d="M40 66 Q38 50 50 46 Q54 60 40 66Z" fill="#c0392b"/>
+      <path d="M80 66 Q82 50 70 46 Q66 60 80 66Z" fill="#c0392b"/>
+      <path d="M60 44 Q44 36 46 48 Q54 52 60 44Z" fill="#e74c3c"/>
+      <path d="M60 44 Q76 36 74 48 Q66 52 60 44Z" fill="#e74c3c"/>
+      {/* 꽃잎 안쪽 */}
+      <ellipse cx="60" cy="63" rx="13" ry="14" fill="#922b21"/>
+      <path d="M47 63 Q46 53 54 50 Q57 60 47 63Z" fill="#922b21"/>
+      <path d="M73 63 Q74 53 66 50 Q63 60 73 63Z" fill="#922b21"/>
+      {/* 중심 */}
+      <ellipse cx="60" cy="60" rx="7" ry="8" fill="#641e16"/>
+      <ellipse cx="60" cy="59" rx="4" ry="4.5" fill="#922b21"/>
+    </svg>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────
+   Stars
+──────────────────────────────────────────────────────────── */
 function Stars({ score, avg }: { score: number; avg: number }) {
   return (
-    <div className="flex items-center gap-0.5">
+    <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
       {[1, 2, 3, 4, 5].map((i) => (
-        <span key={i} className={`text-[13px] ${i <= score ? "opacity-100" : "opacity-20"}`}>
-          ★
-        </span>
+        <span key={i} style={{ fontSize: 13, opacity: i <= score ? 1 : 0.2, color: "#c0392b" }}>⭐</span>
       ))}
-      <span className="ml-1 text-[11px] text-red-300">{avg.toFixed(1)}</span>
+      <span style={{ fontSize: 11, color: "#c08080", marginLeft: 5, fontFamily: "'Gowun Dodum', sans-serif" }}>
+        {avg.toFixed(1)}
+      </span>
     </div>
   );
 }
 
+/* ────────────────────────────────────────────────────────────
+   ReviewSection
+──────────────────────────────────────────────────────────── */
 function ReviewSection({ rating }: { rating: Rating }) {
   const items = [
     { label: "기여도", avg: rating.avg_contribution },
     { label: "책임감", avg: rating.avg_responsibility },
-    { label: "협업", avg: rating.avg_teamwork },
+    { label: "소통",   avg: rating.avg_teamwork },
   ];
 
   return (
-    <div className="flex flex-col gap-3">
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {items.map(({ label, avg }) => {
         const score = Math.min(5, Math.max(1, Math.round(avg || 0)));
-
         return (
-          <div key={label} className="rounded-2xl border border-red-100 bg-red-50/50 px-4 py-3.5">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-bold text-red-700">{label}</span>
+          <div key={label} style={{ background: "#fdf4f4", border: "1px solid #f0cccc", borderRadius: 14, padding: "14px 16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 7 }}>
+              <span style={{ fontSize: 12, color: "#a83030", fontWeight: 700, fontFamily: "'Gowun Dodum', sans-serif" }}>{label}</span>
               <Stars score={score} avg={avg || 0} />
             </div>
-
-            <p className="m-0 text-[13px] leading-7 text-red-950">
+            <p style={{ margin: 0, fontSize: 13, color: "#6b2020", lineHeight: 1.7, fontFamily: "'Gowun Dodum', sans-serif" }}>
               {avg > 0 ? REVIEW_MESSAGES[label][score] : "아직 이 항목의 리뷰 데이터가 없어요."}
             </p>
           </div>
@@ -227,6 +247,9 @@ function ReviewSection({ rating }: { rating: Rating }) {
   );
 }
 
+/* ────────────────────────────────────────────────────────────
+   GrowthModal
+──────────────────────────────────────────────────────────── */
 function GrowthModal({
   initialData,
   saving,
@@ -238,73 +261,65 @@ function GrowthModal({
   onClose: () => void;
   onSave: (data: GrowthData) => void;
 }) {
-  const initialChips = initialData?.chips || [];
-  const [selectedTech, setSelectedTech] = useState<string[]>(
-    initialChips.filter((chip) => TECH_CHIPS.includes(chip))
-  );
-  const [selectedField, setSelectedField] = useState<string[]>(
-    initialChips.filter((chip) => FIELD_CHIPS.includes(chip))
-  );
-  const [customInput, setCustomInput] = useState(
-    initialChips
-      .filter((chip) => !TECH_CHIPS.includes(chip) && !FIELD_CHIPS.includes(chip))
-      .join(", ")
-  );
-  const [good, setGood] = useState(initialData?.good || "");
-  const [bad, setBad] = useState(initialData?.bad || "");
-  const [lessons, setLessons] = useState(initialData?.lessons || "");
-  const [nextActions, setNextActions] = useState(initialData?.nextActions || "");
+  const init = initialData?.chips || [];
+  const [selectedTech, setSelectedTech]   = useState<string[]>(init.filter((c) => TECH_CHIPS.includes(c)));
+  const [selectedField, setSelectedField] = useState<string[]>(init.filter((c) => FIELD_CHIPS.includes(c)));
+  const [customInput, setCustomInput]     = useState(init.filter((c) => !TECH_CHIPS.includes(c) && !FIELD_CHIPS.includes(c)).join(", "));
+  const [good, setGood]                   = useState(initialData?.good || "");
+  const [bad, setBad]                     = useState(initialData?.bad || "");
+  const [lessons, setLessons]             = useState(initialData?.lessons || "");
+  const [nextActions, setNextActions]     = useState(initialData?.nextActions || "");
 
-  function toggle(arr: string[], setArr: (value: string[]) => void, val: string) {
+  function toggle(arr: string[], setArr: (v: string[]) => void, val: string) {
     setArr(arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val]);
   }
 
   function handleSave() {
-    const custom = customInput
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    const chips = [...selectedTech, ...selectedField, ...custom];
-
+    const custom = customInput.split(",").map((s) => s.trim()).filter(Boolean);
+    const chips  = [...selectedTech, ...selectedField, ...custom];
     if (!chips.length && !good.trim() && !bad.trim() && !lessons.trim() && !nextActions.trim()) {
-      alert("하나 이상 선택하거나 입력해주세요.");
+      alert("하나 이상 선택하거나 입력해주세요 🌹");
       return;
     }
-
     onSave({ chips, good, bad, lessons, nextActions });
   }
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%", border: "1px solid #f0c8c8", borderRadius: 10,
+    padding: "10px 14px", fontSize: 13, fontFamily: "'Gowun Dodum', sans-serif",
+    color: "#3c1010", background: "#fdf8f8", outline: "none", boxSizing: "border-box",
+  };
 
   return (
     <div
       onClick={(e) => e.target === e.currentTarget && onClose()}
-      className="fixed inset-0 z-[200] flex items-end justify-center bg-black/40"
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.38)", zIndex: 200, display: "flex", alignItems: "flex-end", justifyContent: "center" }}
     >
-      <div className="max-h-[85vh] w-full max-w-[480px] overflow-y-auto rounded-t-[24px] bg-white px-5 pb-10 pt-5">
-        <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-red-100" />
-
-        <p className="mb-1 text-xl font-bold text-red-950">성장 기록하기</p>
-        <p className="mb-6 text-sm text-red-300">프로젝트에서 배운 것과 다음에 가져갈 점을 남겨보세요.</p>
+      <div style={{ background: "#fff", borderRadius: "24px 24px 0 0", width: "100%", maxWidth: 480, padding: "22px 22px 40px", maxHeight: "85vh", overflowY: "auto" }}>
+        <div style={{ width: 38, height: 4, background: "#f0d0d0", borderRadius: 4, margin: "0 auto 18px" }} />
+        <p style={{ fontFamily: "'Nanum Myeongjo', serif", fontSize: 20, fontWeight: 700, color: "#5c0a0a", marginBottom: 4 }}>🌹 성장 기록하기</p>
+        <p style={{ fontSize: 13, color: "#c08080", marginBottom: 22, fontFamily: "'Gowun Dodum', sans-serif" }}>이 프로젝트에서 새롭게 도전한 것들을 골라봐요</p>
 
         {[
           { title: "기술 스택", chips: TECH_CHIPS, selected: selectedTech, setSelected: setSelectedTech },
-          { title: "분야", chips: FIELD_CHIPS, selected: selectedField, setSelected: setSelectedField },
+          { title: "분야",     chips: FIELD_CHIPS, selected: selectedField, setSelected: setSelectedField },
         ].map(({ title, chips, selected, setSelected }) => (
-          <div key={title} className="mb-5">
-            <p className="mb-2 text-xs font-bold text-red-700">
-              {title} <span className="font-normal text-red-300">(복수 선택)</span>
+          <div key={title} style={{ marginBottom: 18 }}>
+            <p style={{ fontSize: 12, color: "#a83030", fontWeight: 700, marginBottom: 9, fontFamily: "'Gowun Dodum', sans-serif" }}>
+              {title} <span style={{ fontWeight: 400, color: "#c08080" }}>(복수 선택)</span>
             </p>
-
-            <div className="flex flex-wrap gap-2">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
               {chips.map((chip) => (
                 <button
                   key={chip}
                   onClick={() => toggle(selected, setSelected, chip)}
-                  className={`rounded-full border px-4 py-1.5 text-[13px] transition ${
-                    selected.includes(chip)
-                      ? "border-red-600 bg-red-600 text-white"
-                      : "border-red-100 bg-red-50 text-red-700 hover:border-red-300"
-                  }`}
+                  style={{
+                    padding: "7px 15px", borderRadius: 20, border: "1px solid", cursor: "pointer",
+                    fontSize: 13, fontFamily: "'Gowun Dodum', sans-serif", transition: "all .15s",
+                    background: selected.includes(chip) ? "#9b1c1c" : "#fdf4f4",
+                    color:      selected.includes(chip) ? "#fdf0f0" : "#9b1c1c",
+                    borderColor: selected.includes(chip) ? "#9b1c1c" : "#f0c0c0",
+                  }}
                 >
                   {chip}
                 </button>
@@ -313,31 +328,27 @@ function GrowthModal({
           </div>
         ))}
 
-        <p className="mb-2 text-xs font-bold text-red-700">
-          직접 입력 <span className="font-normal text-red-300">(쉼표로 구분)</span>
+        <p style={{ fontSize: 12, color: "#a83030", fontWeight: 700, marginBottom: 9, fontFamily: "'Gowun Dodum', sans-serif" }}>
+          직접 입력 <span style={{ fontWeight: 400, color: "#c08080" }}>(쉼표로 구분)</span>
         </p>
-
-        <input
-          value={customInput}
-          onChange={(e) => setCustomInput(e.target.value)}
-          placeholder="GraphQL, 외부 API 연동, 코드 리뷰"
-          className="mb-4 w-full rounded-xl border border-red-100 bg-red-50/40 px-4 py-3 text-sm text-red-950 outline-none focus:border-red-300"
-        />
+        <input value={customInput} onChange={(e) => setCustomInput(e.target.value)} placeholder="예: GraphQL, 외부 API 연동, 코드 리뷰" style={{ ...inputStyle, marginBottom: 14 }} />
 
         {[
-          { label: "좋았던 점", value: good, setter: setGood, placeholder: "기억에 남는 성과나 좋았던 경험을 적어주세요." },
-          { label: "아쉬웠던 점", value: bad, setter: setBad, placeholder: "다음 프로젝트에서 개선하고 싶은 점을 적어주세요." },
-          { label: "배운 점", value: lessons, setter: setLessons, placeholder: "이번 프로젝트를 통해 배운 내용을 적어주세요." },
-          { label: "다음 액션", value: nextActions, setter: setNextActions, placeholder: "다음에 시도할 구체적인 행동을 적어주세요." },
-        ].map(({ label, value, setter, placeholder }) => (
-          <div key={label} className="mb-4">
-            <p className="mb-2 text-xs font-bold text-red-700">{label}</p>
+          { label: "느낀 점",     value: good,        setValue: setGood,        ph: "이 프로젝트에서 배운 점, 좋았던 경험을 자유롭게 적어주세요 🌹" },
+          { label: "부족했던 점", value: bad,         setValue: setBad,         ph: "아쉬웠던 점, 다음엔 개선하고 싶은 것을 적어주세요" },
+          { label: "배운 점",     value: lessons,     setValue: setLessons,     ph: "이번 프로젝트를 통해 새롭게 배운 내용을 적어주세요" },
+          { label: "다음 액션",   value: nextActions, setValue: setNextActions, ph: "다음에 시도할 구체적인 행동을 적어주세요" },
+        ].map(({ label, value, setValue, ph }) => (
+          <div key={label} style={{ marginBottom: 14 }}>
+            <p style={{ fontSize: 12, color: "#a83030", fontWeight: 700, marginBottom: 9, fontFamily: "'Gowun Dodum', sans-serif" }}>
+              {label} <span style={{ fontWeight: 400, color: "#c08080" }}>(선택)</span>
+            </p>
             <textarea
               value={value}
-              onChange={(e) => setter(e.target.value)}
-              placeholder={placeholder}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder={ph}
               rows={3}
-              className="w-full resize-none rounded-xl border border-red-100 bg-red-50/40 px-4 py-3 text-sm leading-7 text-red-950 outline-none focus:border-red-300"
+              style={{ ...inputStyle, resize: "none", lineHeight: 1.8, minHeight: 80 }}
             />
           </div>
         ))}
@@ -345,54 +356,60 @@ function GrowthModal({
         <button
           onClick={handleSave}
           disabled={saving}
-          className="mt-2 w-full rounded-2xl bg-red-600 py-4 text-base font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-300"
+          style={{
+            width: "100%", background: saving ? "#f0a0a0" : "#9b1c1c", color: "#fdf0f0",
+            border: "none", borderRadius: 14, padding: 16, fontSize: 16,
+            fontFamily: "'Gowun Dodum', sans-serif", cursor: saving ? "not-allowed" : "pointer", marginTop: 6,
+          }}
         >
-          {saving ? "저장 중..." : "회고 저장하기"}
+          {saving ? "저장 중..." : "수확 기록 저장하기 🌹"}
         </button>
       </div>
     </div>
   );
 }
 
-function Section({
-  emoji,
-  label,
-  headline,
-  children,
-}: {
+/* ────────────────────────────────────────────────────────────
+   Section
+──────────────────────────────────────────────────────────── */
+function Section({ emoji, label, headline, children }: {
   emoji: string;
   label: string;
   headline: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <section className="mx-4 mt-5 overflow-hidden rounded-2xl border border-red-100 bg-white">
-      <div className="flex items-center gap-2 px-5 pt-5">
-        <span className="text-xl leading-none">{emoji}</span>
-        <span className="text-[11px] text-red-300">{label}</span>
+    <section style={{ margin: "20px 16px 0", background: "#fff", borderRadius: 18, border: "1px solid #f0d0d0", overflow: "hidden" }}>
+      <div style={{ padding: "18px 20px 0", display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 22, lineHeight: 1 }}>{emoji}</span>
+        <span style={{ fontSize: 11, color: "#c08080", fontFamily: "'Gowun Dodum', sans-serif" }}>{label}</span>
       </div>
-
-      <p className="m-0 px-5 pb-5 pt-2 text-lg font-bold leading-7 text-red-950">{headline}</p>
-
-      <div className="mx-5 h-px bg-red-50" />
-      <div className="px-5 py-5">{children}</div>
+      <p style={{ fontFamily: "'Nanum Myeongjo', serif", fontSize: 18, color: "#5c0a0a", padding: "8px 20px 18px", fontWeight: 700, lineHeight: 1.55, margin: 0 }}>
+        {headline}
+      </p>
+      <div style={{ height: 1, background: "#f5e0e0", margin: "0 20px" }} />
+      <div style={{ padding: "18px 20px" }}>{children}</div>
     </section>
   );
 }
 
+/* ────────────────────────────────────────────────────────────
+   MemoirContent
+──────────────────────────────────────────────────────────── */
 function MemoirContent() {
   const searchParams = useSearchParams();
   const requestedProjectId = searchParams.get("projectId");
 
-  const [modalOpen, setModalOpen] = useState(false);
-  const [project, setProject] = useState<ProjectData | null>(null);
-  const [progress, setProgress] = useState<ProgressData | null>(null);
-  const [reviews, setReviews] = useState<ProjectReview[]>([]);
-  const [growth, setGrowth] = useState<GrowthData | null>(null);
+  const [modalOpen, setModalOpen]           = useState(false);
+  const [project, setProject]               = useState<ProjectData | null>(null);
+  const [progress, setProgress]             = useState<ProgressData | null>(null);
+  const [reviews, setReviews]               = useState<ProjectReview[]>([]);
+  const [growth, setGrowth]                 = useState<GrowthData | null>(null);
   const [retrospectiveId, setRetrospectiveId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [harvestCount, setHarvestCount]     = useState(1); // 몇 번째 수확
+  const [loading, setLoading]               = useState(true);
+  const [saving, setSaving]                 = useState(false);
+  const [error, setError]                   = useState("");
 
   useEffect(() => {
     let ignore = false;
@@ -409,11 +426,7 @@ function MemoirContent() {
             getProjectApi(requestedProjectId),
             getProjectsApi({ page: 1, size: 100 }),
           ]);
-
-          if (detailResult.status === "fulfilled") {
-            selectedProject = detailResult.value.data;
-          }
-
+          if (detailResult.status === "fulfilled") selectedProject = detailResult.value.data;
           if (selectedProject && listResult.status === "fulfilled") {
             const listed = (listResult.value.data || []).find(
               (item: ProjectData) => Number(item.id) === Number(selectedProject?.id)
@@ -423,49 +436,54 @@ function MemoirContent() {
         } else {
           const myProjectsResult = await getMyProjectsApi().catch(() => null);
           selectedProject = pickProjectFromList(myProjectsResult?.data || []);
-
           if (!selectedProject) {
             const completedResult = await getProjectsApi({ page: 1, size: 20, status: "completed" });
             selectedProject = pickProjectFromList(completedResult.data || []);
           }
         }
 
-        if (!selectedProject) {
-          throw new Error("회고를 보여줄 프로젝트가 없습니다.");
-        }
+        if (!selectedProject) throw new Error("회고를 보여줄 프로젝트가 없습니다.");
 
         const projectId = selectedProject.id;
-        const [progressResult, reviewsResult, retrospectivesResult] = await Promise.allSettled([
-          getProjectProgressApi(projectId),
-          getProjectReviewsApi(projectId),
-          getProjectRetrospectivesApi(projectId),
-        ]);
+
+        const [progressResult, reviewsResult, retrospectivesResult, myProjectsResult] =
+          await Promise.allSettled([
+            getProjectProgressApi(projectId),
+            getProjectReviewsApi(projectId),
+            getProjectRetrospectivesApi(projectId),
+            getMyProjectsApi(),
+          ]);
+
+        // 몇 번째 수확인지 계산 (completed 프로젝트 수)
+        if (myProjectsResult.status === "fulfilled") {
+          const completed = (myProjectsResult.value.data || []).filter(
+            (p: ProjectData) => p.status === "completed"
+          );
+          const idx = completed.findIndex((p: ProjectData) => Number(p.id) === Number(projectId));
+          setHarvestCount(idx >= 0 ? idx + 1 : completed.length || 1);
+        }
 
         let loadedGrowth: GrowthData | null = null;
         let loadedRetrospectiveId: number | null = null;
 
         if (retrospectivesResult.status === "fulfilled") {
-          const firstRetrospective = (retrospectivesResult.value.data || [])[0] as
-            | RetrospectiveSummary
-            | undefined;
-
-          if (firstRetrospective) {
-            const detail = await getProjectRetrospectiveApi(projectId, firstRetrospective.id);
-            const retrospective = detail.data as RetrospectiveDetail;
-            const lessonsLearned = parseLessonsLearned(retrospective.lessons_learned);
-            loadedRetrospectiveId = retrospective.id;
+          const first = (retrospectivesResult.value.data || [])[0] as RetrospectiveSummary | undefined;
+          if (first) {
+            const detail = await getProjectRetrospectiveApi(projectId, first.id);
+            const retro  = detail.data as RetrospectiveDetail;
+            const ll     = parseLessonsLearned(retro.lessons_learned);
+            loadedRetrospectiveId = retro.id;
             loadedGrowth = {
-              chips: lessonsLearned.chips,
-              good: retrospective.what_went_well || "",
-              bad: retrospective.what_went_badly || "",
-              lessons: lessonsLearned.lessons,
-              nextActions: retrospective.next_actions || "",
+              chips: ll.chips,
+              good: retro.what_went_well || "",
+              bad: retro.what_went_badly || "",
+              lessons: ll.lessons,
+              nextActions: retro.next_actions || "",
             };
           }
         }
 
         if (ignore) return;
-
         setProject(selectedProject);
         setProgress(progressResult.status === "fulfilled" ? progressResult.value.data : null);
         setReviews(reviewsResult.status === "fulfilled" ? reviewsResult.value.data || [] : []);
@@ -480,48 +498,39 @@ function MemoirContent() {
     }
 
     loadMemoir();
-
-    return () => {
-      ignore = true;
-    };
+    return () => { ignore = true; };
   }, [requestedProjectId]);
 
-  const rating = useMemo<Rating>(() => {
-    return {
-      avg_contribution: average(reviews.map((review) => Number(review.contribution_score || 0)).filter(Boolean)),
-      avg_responsibility: average(reviews.map((review) => Number(review.responsibility_score || 0)).filter(Boolean)),
-      avg_teamwork: average(reviews.map((review) => Number(review.teamwork_score || 0)).filter(Boolean)),
-    };
-  }, [reviews]);
+  const rating = useMemo<Rating>(() => ({
+    avg_contribution:   average(reviews.map((r) => Number(r.contribution_score  || 0)).filter(Boolean)),
+    avg_responsibility: average(reviews.map((r) => Number(r.responsibility_score || 0)).filter(Boolean)),
+    avg_teamwork:       average(reviews.map((r) => Number(r.teamwork_score       || 0)).filter(Boolean)),
+  }), [reviews]);
 
-  const todoTotal = progress?.todo_total ?? 0;
-  const todoDone = progress?.todo_done ?? 0;
-  const todoPercent = Math.round(progress?.progress_percent ?? 0);
+  const todoTotal    = progress?.todo_total    ?? 0;
+  const todoDone     = progress?.todo_done     ?? 0;
+  const todoPercent  = Math.round(progress?.progress_percent ?? 0);
   const durationDays = daysBetween(project?.created_at);
-  const hours = durationDays * 6;
-  const techStack = project?.techStack?.length ? project.techStack : [project?.category || "프로젝트"];
+  const hours        = durationDays * 6;
+  const techStack    = project?.techStack?.length ? project.techStack : [project?.category || "프로젝트"];
 
   async function handleSaveGrowth(data: GrowthData) {
     if (!project) return;
-
     try {
       setSaving(true);
-
       const payload = {
         title: `${project.title} 회고`,
-        what_went_well: data.good,
+        what_went_well:  data.good,
         what_went_badly: data.bad,
         lessons_learned: stringifyLessonsLearned(data),
-        next_actions: data.nextActions || data.lessons || "",
+        next_actions:    data.nextActions || data.lessons || "",
       };
-
       if (retrospectiveId) {
         await updateProjectRetrospectiveApi(project.id, retrospectiveId, payload);
       } else {
         const result = await createProjectRetrospectiveApi(project.id, payload);
         setRetrospectiveId(result.data?.id || null);
       }
-
       setGrowth(data);
       setModalOpen(false);
     } catch (err) {
@@ -532,208 +541,227 @@ function MemoirContent() {
     }
   }
 
-  function buildFeelingText(data: GrowthData): React.ReactNode {
-    return (
-      <>
-        {data.good.trim() && (
-          <p>
-            이번 프로젝트에서 가장 값진 순간은 <strong>{data.good}</strong>이었어요.
-          </p>
-        )}
-        {data.bad.trim() && (
-          <p>
-            <strong>{data.bad}</strong> 부분은 아쉬웠지만, 그걸 알아차린 것 자체가 다음 성장의
-            시작이에요.
-          </p>
-        )}
-        {(data.lessons || data.nextActions) && (
-          <p>{data.nextActions || data.lessons}</p>
-        )}
-        <p>쌓인 기록은 다음 프로젝트에서 더 단단한 선택으로 돌아올 거예요.</p>
-      </>
+  /* AI 정제 느낀 점 (프리뷰와 동일 멘트) */
+  function buildFeelingText(): React.ReactNode {
+    if (!growth) return null;
+    const parts: React.ReactNode[] = [];
+    if (growth.good.trim()) {
+      const s = growth.good.length > 40 ? growth.good.slice(0, 40) + "..." : growth.good;
+      parts.push(
+        <p key="good" style={{ margin: "0 0 14px" }}>
+          이번 프로젝트에서 가장 값진 순간은 <strong>{s}</strong>이었어요.{" "}
+          그 경험이 앞으로의 성장에 단단한 뿌리가 될 거예요.
+        </p>
+      );
+    }
+    if (growth.bad.trim()) {
+      const s = growth.bad.length > 40 ? growth.bad.slice(0, 40) + "..." : growth.bad;
+      parts.push(
+        <p key="bad" style={{ margin: "0 0 14px" }}>
+          <strong>{s}</strong> 부분이 아쉬웠지만, 이를 인식하는 것 자체가 이미 한 뼘 자란 증거예요.
+        </p>
+      );
+    }
+    if (growth.nextActions?.trim() || growth.lessons?.trim()) {
+      parts.push(
+        <p key="next" style={{ margin: "0 0 14px" }}>
+          {growth.nextActions || growth.lessons}
+        </p>
+      );
+    }
+    parts.push(
+      <p key="closing" style={{ margin: 0 }}>
+        씨앗을 심는 사람만이 열매를 맛볼 수 있어요. 당신은 이미 훌륭한 개발자의 텃밭을 가꾸고 있어요. 🌹
+      </p>
     );
+    return parts;
   }
 
+  /* 로딩 / 에러 */
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-red-50/40 px-6 text-center text-sm text-red-500">
-        회고 데이터를 불러오는 중입니다...
+      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#fdf5f5", fontSize: 14, color: "#c08080", fontFamily: "'Gowun Dodum', sans-serif" }}>
+        회고 데이터를 불러오는 중이에요 🌹
       </div>
     );
   }
 
   if (error || !project) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-red-50/40 px-6 text-center">
+      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#fdf5f5", textAlign: "center", fontFamily: "'Gowun Dodum', sans-serif" }}>
         <div>
-          <p className="text-lg font-bold text-red-950">회고를 불러오지 못했어요</p>
-          <p className="mt-2 text-sm text-red-400">{error || "프로젝트 정보가 없습니다."}</p>
+          <p style={{ fontSize: 18, fontWeight: 700, color: "#5c0a0a" }}>회고를 불러오지 못했어요</p>
+          <p style={{ marginTop: 8, fontSize: 14, color: "#c08080" }}>{error || "프로젝트 정보가 없습니다."}</p>
         </div>
       </div>
     );
   }
 
+  /* ── 프로젝트 설명 AI 정제: <b> 태그 없이 plain text 렌더 ── */
+  const projectDesc = (project.description || project.summary || "")
+    .replace(/<[^>]*>/g, ""); // 혹시 남아있는 HTML 태그 제거
+
   return (
-    <div className="min-h-screen bg-red-50/40 text-red-950">
-      <section className="border-b border-red-100 bg-red-100 px-5 py-10 text-center">
-        <div className="mb-4 inline-block rounded-full bg-red-600 px-4 py-1.5 text-xs font-semibold text-white">
-          개발자의 성장 일기
-        </div>
+    <>
+      <style>{fontStyle}</style>
+      <div style={{ minHeight: "100vh", background: "#fdf5f5", color: "#3c1010", fontFamily: "'Gowun Dodum', sans-serif" }}>
 
-        <h1 className="mb-2 text-2xl font-bold leading-snug text-red-950">{project.title}</h1>
+        {/* ── Hero ── */}
+        <section style={{ background: "#f0c4c4", padding: "40px 20px 32px", textAlign: "center", borderBottom: "1px solid #e8a8a8" }}>
+          <div style={{ display: "inline-block", background: "#9b1c1c", color: "#fdf0f0", fontSize: 12, padding: "5px 16px", borderRadius: 20, marginBottom: 14, fontFamily: "'Gowun Dodum', sans-serif" }}>
+            📖 개발자의 텃밭일기
+          </div>
+          <p style={{ fontFamily: "'Nanum Myeongjo', serif", fontSize: 26, fontWeight: 700, color: "#5c0a0a", marginBottom: 6, lineHeight: 1.4 }}>
+            {project.title}
+          </p>
+          <p style={{ fontSize: 14, color: "#a84444", margin: 0 }}>나의 텃밭일기를 기록해요</p>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.72)", border: "1px solid #e0a8a8", borderRadius: 20, padding: "5px 14px", fontSize: 13, color: "#9b3030", marginTop: 14 }}>
+            📅 {toDateLabel(project.created_at)} 시작 · {durationDays}일간의 여정
+          </div>
+        </section>
 
-        <p className="m-0 text-sm text-red-500">{project.summary || "프로젝트를 마친 기록을 정리해요."}</p>
+        {/* 1. 할 일 달성 */}
+        <Section emoji="✅" label="할 일 달성" headline={<>나는 {todoDone}개의 할 일을<br />달성했어요</>}>
+          <p style={{ fontFamily: "'Nanum Myeongjo', serif", fontSize: 48, fontWeight: 700, color: "#9b1c1c", lineHeight: 1, margin: 0 }}>
+            {todoDone}
+            <span style={{ fontSize: 16, color: "#c06060", marginLeft: 4 }}>개 완료</span>
+          </p>
+          <div style={{ height: 12, background: "#fce8e8", borderRadius: 12, overflow: "hidden", margin: "12px 0 5px", border: "1px solid #f0c0c0" }}>
+            <div style={{ height: "100%", background: "#c0392b", borderRadius: 12, width: `${todoPercent}%` }} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#c08080" }}>
+            <span>전체 {todoTotal}개 중</span>
+            <span style={{ color: "#9b1c1c", fontWeight: 700 }}>{todoPercent}% 달성 🎉</span>
+          </div>
+        </Section>
 
-        <div className="mt-4 inline-flex items-center gap-1 rounded-full border border-red-200 bg-white/70 px-4 py-1.5 text-[13px] text-red-700">
-          {toDateLabel(project.created_at)} 시작 · {durationDays || "?"}일간의 여정
-        </div>
-      </section>
+        {/* 2. 나는 이런 사람이었어요 */}
+        <Section emoji="🌹" label="팀원 리뷰 기반 · 평균 반올림" headline="나는 이런 사람이었어요">
+          <ReviewSection rating={rating} />
+        </Section>
 
-      <Section emoji="✅" label="Todo 달성" headline={<>나는 {todoDone}개의 일을 완료했어요</>}>
-        <p className="m-0 text-5xl font-bold leading-none text-red-600">
-          {todoDone}
-          <span className="ml-1 text-base text-red-300">개 완료</span>
-        </p>
+        {/* 3. 이런 프로젝트를 만들었어요 */}
+        <Section emoji="🗺️" label="프로젝트 소개" headline={<>나는 이런 프로젝트를<br />만들었어요</>}>
+          <div style={{ fontSize: 14, color: "#7a3030", lineHeight: 1.9, background: "#fdf6f6", borderLeft: "3px solid #e05555", padding: "13px 16px", borderRadius: "0 12px 12px 0" }}>
+            {projectDesc || "프로젝트 설명이 아직 없어요."}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 14 }}>
+            {techStack.map((tag) => (
+              <span key={tag} style={{ background: "#fce8e8", color: "#9b1c1c", fontSize: 12, padding: "5px 12px", borderRadius: 20, border: "1px solid #f0c0c0" }}>
+                {tag}
+              </span>
+            ))}
+          </div>
+        </Section>
 
-        <div className="my-3 h-3 overflow-hidden rounded-full border border-red-100 bg-red-50">
-          <div className="h-full rounded-full bg-red-600" style={{ width: `${todoPercent}%` }} />
-        </div>
+        {/* 4. n시간 동안 수행했어요 */}
+        <Section emoji="⏱️" label="투자한 시간" headline={<>나는 약 {hours}시간 동안<br />프로젝트를 수행했어요</>}>
+          <p style={{ fontFamily: "'Nanum Myeongjo', serif", fontSize: 52, fontWeight: 700, color: "#9b1c1c", lineHeight: 1, margin: 0 }}>
+            {hours}
+            <span style={{ fontSize: 18, color: "#c06060", marginLeft: 6 }}>시간</span>
+          </p>
+          <p style={{ fontSize: 13, color: "#c08080", marginTop: 5 }}>{durationDays}일 × 하루 평균 6시간 기준</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 16 }}>
+            {[
+              { val: `${durationDays}일`, label: "총 프로젝트 기간" },
+              { val: `${Math.ceil(durationDays / 7)}주`, label: "함께한 기간" },
+            ].map(({ val, label }) => (
+              <div key={label} style={{ background: "#fdf4f4", border: "1px solid #f0cccc", borderRadius: 12, padding: 12, textAlign: "center" }}>
+                <p style={{ fontSize: 22, fontWeight: 700, color: "#9b1c1c", margin: 0 }}>{val}</p>
+                <p style={{ fontSize: 11, color: "#c08080", marginTop: 3 }}>{label}</p>
+              </div>
+            ))}
+          </div>
+        </Section>
 
-        <div className="flex justify-between text-xs text-red-300">
-          <span>전체 {todoTotal}개 중</span>
-          <span className="font-bold text-red-600">{todoPercent}% 달성</span>
-        </div>
-      </Section>
-
-      <Section emoji="🌟" label="팀 리뷰 기반 평균" headline="나는 이런 팀원이었어요">
-        <ReviewSection rating={rating} />
-      </Section>
-
-      <Section emoji="🧩" label="프로젝트 소개" headline="나는 이런 프로젝트를 만들었어요">
-        <div className="rounded-r-2xl border-l-4 border-red-400 bg-red-50/60 px-4 py-3 text-sm leading-8 text-red-900">
-          {project.description || project.summary || "프로젝트 설명이 아직 없습니다."}
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          {techStack.map((tag) => (
-            <span key={tag} className="rounded-full border border-red-100 bg-red-50 px-3 py-1 text-xs text-red-700">
-              {tag}
-            </span>
-          ))}
-        </div>
-      </Section>
-
-      <Section emoji="⏱️" label="투자한 시간" headline={<>나는 약 {hours}시간 동안 프로젝트를 수행했어요</>}>
-        <p className="m-0 text-5xl font-bold leading-none text-red-600">
-          {hours}
-          <span className="ml-1 text-lg text-red-300">시간</span>
-        </p>
-
-        <p className="mt-2 text-[13px] text-red-300">
-          {durationDays || "?"}일 · 하루 평균 6시간 기준
-        </p>
-
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          {[
-            { val: `${durationDays || 0}일`, label: "총 프로젝트 기간" },
-            { val: `${Math.ceil((durationDays || 0) / 7)}주`, label: "함께한 기간" },
-          ].map(({ val, label }) => (
-            <div key={label} className="rounded-2xl border border-red-100 bg-red-50/50 p-3 text-center">
-              <p className="m-0 text-xl font-bold text-red-600">{val}</p>
-              <p className="mt-1 text-[11px] text-red-300">{label}</p>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      <Section emoji="🌱" label="나의 성장" headline="나는 이만큼 성장했어요">
-        {!growth ? (
-          <button
-            onClick={() => setModalOpen(true)}
-            className="flex w-full cursor-pointer flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-red-200 bg-red-50/40 px-4 py-6 text-center transition hover:border-red-300"
-          >
-            <span className="text-3xl">＋</span>
-
-            <span className="text-sm leading-7 text-red-700">
-              새롭게 알게 된 것들을 기록해보세요
-              <br />
-              <span className="text-xs text-red-300">기술 스택, 분야, 좋았던 점, 아쉬웠던 점을 남길 수 있어요.</span>
-            </span>
-          </button>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <div>
-              <p className="mb-2 text-xs text-red-300">새롭게 알게 된 것들</p>
-
-              <div className="flex flex-wrap gap-2">
-                {growth.chips.map((chip) => (
-                  <span key={chip} className="rounded-full border border-red-100 bg-red-50 px-3 py-1 text-xs text-red-700">
-                    {chip}
-                  </span>
-                ))}
+        {/* 5. 이만큼 성장했어요 */}
+        <Section emoji="🌺" label="나의 성장" headline="나는 이만큼 성장했어요">
+          {!growth ? (
+            <div
+              onClick={() => setModalOpen(true)}
+              style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "22px 16px", gap: 10, cursor: "pointer", border: "2px dashed #f0b0b0", borderRadius: 14, background: "#fdf8f8", textAlign: "center" }}
+            >
+              <span style={{ fontSize: 32 }}>✍️</span>
+              <div style={{ fontSize: 14, color: "#a83030", lineHeight: 1.7 }}>
+                새롭게 도전한 것들을 기록해봐요<br />
+                <span style={{ fontSize: 12, color: "#c08080" }}>기술 스택, 분야, 느낀 점을 담을 수 있어요</span>
               </div>
             </div>
-
-            <button
-              onClick={() => setModalOpen(true)}
-              className="self-start rounded-xl border border-red-100 bg-white px-4 py-2 text-xs text-red-700 transition hover:border-red-300"
-            >
-              수정하기
-            </button>
-          </div>
-        )}
-      </Section>
-
-      <Section emoji="💬" label="회고 정리" headline="나는 이런 점을 느꼈어요">
-        {!growth || (!growth.good.trim() && !growth.bad.trim() && !growth.nextActions?.trim()) ? (
-          <p className="m-0 py-5 text-center text-[13px] leading-8 text-red-300">
-            위에서 성장 기록을 작성하면
-            <br />
-            회고 문장이 이곳에 정리돼요.
-          </p>
-        ) : (
-          <div className="relative overflow-hidden rounded-2xl border border-red-100 bg-red-50/50 p-5">
-            <span className="absolute -top-3 left-3 text-7xl leading-none text-red-100">&quot;</span>
-
-            <div className="relative z-10 space-y-4 pl-2 text-sm leading-8 text-red-950">
-              {buildFeelingText(growth)}
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <p style={{ fontSize: 12, color: "#c08080", marginBottom: 8 }}>새롭게 도전한 것들</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                  {growth.chips.map((c) => (
+                    <span key={c} style={{ background: "#fce8e8", color: "#9b1c1c", fontSize: 12, padding: "5px 13px", borderRadius: 20, border: "1px solid #f0c0c0" }}>{c}</span>
+                  ))}
+                </div>
+              </div>
+              <button
+                onClick={() => setModalOpen(true)}
+                style={{ alignSelf: "flex-start", fontSize: 12, color: "#a83030", background: "none", border: "1px solid #f0c0c0", borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontFamily: "'Gowun Dodum', sans-serif" }}
+              >
+                ✏️ 수정하기
+              </button>
             </div>
+          )}
+        </Section>
 
-            <span className="mt-4 inline-block rounded-full bg-red-100 px-3 py-1 text-[11px] text-red-700">
-              저장된 회고를 바탕으로 정리했어요
-            </span>
+        {/* 6. 이런 점을 느꼈어요 */}
+        <Section emoji="💬" label="AI 정제 회고" headline="나는 이런 점을 느꼈어요">
+          {!growth || (!growth.good.trim() && !growth.bad.trim() && !growth.nextActions?.trim() && !growth.lessons?.trim()) ? (
+            <p style={{ textAlign: "center", padding: 18, color: "#c08080", fontSize: 13, lineHeight: 1.9, margin: 0 }}>
+              위에서 성장 기록을 작성하면<br />AI가 느낀 점을 정리해드려요 🌹
+            </p>
+          ) : (
+            <div style={{ background: "#fdf4f4", border: "1px solid #f0cccc", borderRadius: 14, padding: 18, position: "relative", overflow: "hidden" }}>
+              <span style={{ fontFamily: "'Nanum Myeongjo', serif", fontSize: 90, color: "#f0cccc", position: "absolute", top: -12, left: 10, lineHeight: 1 }}>"</span>
+              <div style={{ fontSize: 14, color: "#6b2020", lineHeight: 1.9, position: "relative", zIndex: 1, paddingLeft: 8 }}>
+                {buildFeelingText()}
+              </div>
+              <span style={{ display: "inline-block", background: "rgba(155,28,28,0.1)", color: "#9b1c1c", fontSize: 11, padding: "4px 10px", borderRadius: 20, marginTop: 12 }}>
+                ✨ AI가 정성껏 정리했어요
+              </span>
+            </div>
+          )}
+        </Section>
+
+        {/* Footer — 장미 SVG + n번째 수확 */}
+        <div style={{ margin: "24px 16px 40px", textAlign: "center", padding: "28px 20px 24px", background: "#9b1c1c", borderRadius: 18, color: "#fdf0f0" }}>
+          <div style={{ marginBottom: 12 }}>
+            <RoseSVG />
           </div>
+          <p style={{ fontFamily: "'Nanum Myeongjo', serif", fontSize: 20, fontWeight: 700, marginBottom: 8 }}>
+            {ordinalKo(harvestCount)} 수확을 축하해요!
+          </p>
+          <p style={{ fontSize: 13, opacity: 0.85, lineHeight: 1.8, margin: 0 }}>
+            씨앗을 심고 꾸준히 가꾼 당신,<br />이 텃밭일지는 영원히 남아있을 거예요.
+          </p>
+        </div>
+
+        {/* 모달 */}
+        {modalOpen && (
+          <GrowthModal
+            initialData={growth}
+            saving={saving}
+            onClose={() => setModalOpen(false)}
+            onSave={handleSaveGrowth}
+          />
         )}
-      </Section>
-
-      <footer className="mx-4 mb-10 mt-6 rounded-2xl bg-red-600 px-5 py-6 text-center text-white">
-        <p className="mb-2 text-4xl">🎉</p>
-        <p className="mb-2 text-xl font-bold">프로젝트 회고가 쌓였어요!</p>
-        <p className="m-0 text-[13px] leading-7 opacity-90">
-          지금 남긴 기록은
-          <br />
-          다음 프로젝트를 더 잘 시작하게 해줄 거예요.
-        </p>
-      </footer>
-
-      {modalOpen && (
-        <GrowthModal
-          initialData={growth}
-          saving={saving}
-          onClose={() => setModalOpen(false)}
-          onSave={handleSaveGrowth}
-        />
-      )}
-    </div>
+      </div>
+    </>
   );
 }
 
+/* ────────────────────────────────────────────────────────────
+   export
+──────────────────────────────────────────────────────────── */
 export default function MemoirPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-red-50/40 px-6 text-center text-sm text-red-500">
-          회고 데이터를 준비하는 중입니다...
+        <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#fdf5f5", fontSize: 14, color: "#c08080", fontFamily: "'Gowun Dodum', sans-serif" }}>
+          회고 데이터를 준비하는 중이에요 🌹
         </div>
       }
     >
