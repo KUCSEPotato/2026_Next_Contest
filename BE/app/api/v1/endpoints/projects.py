@@ -377,13 +377,19 @@ def _build_ai_todo_context(
 
 async def _generate_ai_todo_titles(context_text: str, project: Project) -> list[str]:
     if not settings.gemini_api_key:
-        return _fallback_ai_todo_titles(project)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="There is no Gemini API key available",
+        )
 
     try:
         response_text = await _call_gemini_for_todo_list(context_text)
         todos_by_user = _parse_gemini_response(response_text)
-    except HTTPException:
-        return _fallback_ai_todo_titles(project)
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Gemini API request failed: {str(error)}",
+        )
 
     titles: list[str] = []
     for todos in todos_by_user.values():
