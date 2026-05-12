@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status, Header, File, UploadFile
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.v1.response import success_response
@@ -597,31 +598,38 @@ async def add_post_reaction(
     existing = db.query(CommunityPostReaction).filter(
         CommunityPostReaction.post_id == post_id,
         CommunityPostReaction.user_id == current_user_id,
-        CommunityPostReaction.reaction_type == payload.reaction_type,
     ).first()
 
     if existing:
-        # 이미 있으면 제거
-        db.delete(existing)
-        db.commit()
-        return success_response(data={"action": "removed", "reaction_type": payload.reaction_type})
-    else:
-        # 기존 다른 반응 제거 후 새 반응 추가
-        old_reactions = db.query(CommunityPostReaction).filter(
-            CommunityPostReaction.post_id == post_id,
-            CommunityPostReaction.user_id == current_user_id,
-        ).all()
-        for r in old_reactions:
-            db.delete(r)
+        if existing.reaction_type == payload.reaction_type:
+            db.delete(existing)
+            db.commit()
+            return success_response(data={"action": "removed", "reaction_type": payload.reaction_type})
 
-        reaction = CommunityPostReaction(
-            post_id=post_id,
-            user_id=current_user_id,
-            reaction_type=payload.reaction_type,
-        )
-        db.add(reaction)
+        existing.reaction_type = payload.reaction_type
+        db.commit()
+        return success_response(data={"action": "updated", "reaction_type": payload.reaction_type})
+
+    reaction = CommunityPostReaction(
+        post_id=post_id,
+        user_id=current_user_id,
+        reaction_type=payload.reaction_type,
+    )
+    db.add(reaction)
+    try:
         db.commit()
         return success_response(data={"action": "added", "reaction_type": payload.reaction_type})
+    except IntegrityError:
+        db.rollback()
+        existing = db.query(CommunityPostReaction).filter(
+            CommunityPostReaction.post_id == post_id,
+            CommunityPostReaction.user_id == current_user_id,
+        ).first()
+        if existing is None:
+            raise
+        existing.reaction_type = payload.reaction_type
+        db.commit()
+        return success_response(data={"action": "updated", "reaction_type": payload.reaction_type})
 
 
 @router.post("/{post_id}/comments/{comment_id}/reactions", summary="댓글에 반응 추가", description="댓글에 추천 또는 비추천을 표현합니다.")
@@ -640,31 +648,38 @@ async def add_comment_reaction(
     existing = db.query(CommunityCommentReaction).filter(
         CommunityCommentReaction.comment_id == comment_id,
         CommunityCommentReaction.user_id == current_user_id,
-        CommunityCommentReaction.reaction_type == payload.reaction_type,
     ).first()
 
     if existing:
-        # 이미 있으면 제거
-        db.delete(existing)
-        db.commit()
-        return success_response(data={"action": "removed", "reaction_type": payload.reaction_type})
-    else:
-        # 기존 다른 반응 제거 후 새 반응 추가
-        old_reactions = db.query(CommunityCommentReaction).filter(
-            CommunityCommentReaction.comment_id == comment_id,
-            CommunityCommentReaction.user_id == current_user_id,
-        ).all()
-        for r in old_reactions:
-            db.delete(r)
+        if existing.reaction_type == payload.reaction_type:
+            db.delete(existing)
+            db.commit()
+            return success_response(data={"action": "removed", "reaction_type": payload.reaction_type})
 
-        reaction = CommunityCommentReaction(
-            comment_id=comment_id,
-            user_id=current_user_id,
-            reaction_type=payload.reaction_type,
-        )
-        db.add(reaction)
+        existing.reaction_type = payload.reaction_type
+        db.commit()
+        return success_response(data={"action": "updated", "reaction_type": payload.reaction_type})
+
+    reaction = CommunityCommentReaction(
+        comment_id=comment_id,
+        user_id=current_user_id,
+        reaction_type=payload.reaction_type,
+    )
+    db.add(reaction)
+    try:
         db.commit()
         return success_response(data={"action": "added", "reaction_type": payload.reaction_type})
+    except IntegrityError:
+        db.rollback()
+        existing = db.query(CommunityCommentReaction).filter(
+            CommunityCommentReaction.comment_id == comment_id,
+            CommunityCommentReaction.user_id == current_user_id,
+        ).first()
+        if existing is None:
+            raise
+        existing.reaction_type = payload.reaction_type
+        db.commit()
+        return success_response(data={"action": "updated", "reaction_type": payload.reaction_type})
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -495,7 +495,7 @@ class CommunityPostComment(Base):
 
 class CommunityPostReaction(Base):
     __tablename__ = "community_post_reactions"
-    __table_args__ = (UniqueConstraint("post_id", "user_id", "reaction_type", name="community_post_reactions_unique"),)
+    __table_args__ = (UniqueConstraint("post_id", "user_id", name="community_post_reactions_unique"),)
 
     id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
     post_id: Mapped[int] = mapped_column(ForeignKey("community_posts.id", ondelete="CASCADE"), nullable=False)
@@ -506,7 +506,7 @@ class CommunityPostReaction(Base):
 
 class CommunityCommentReaction(Base):
     __tablename__ = "community_comment_reactions"
-    __table_args__ = (UniqueConstraint("comment_id", "user_id", "reaction_type", name="community_comment_reactions_unique"),)
+    __table_args__ = (UniqueConstraint("comment_id", "user_id", name="community_comment_reactions_unique"),)
 
     id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
     comment_id: Mapped[int] = mapped_column(ForeignKey("community_post_comments.id", ondelete="CASCADE"), nullable=False)
