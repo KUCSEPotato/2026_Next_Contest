@@ -18,6 +18,8 @@ import {
   createProjectReviewApi,
   uploadMyAvatarApi,
   getImageUrl,
+  getChatRoomsApi,
+  createChatRoomApi,
 } from "../../lib/api";
 
 export default function MyPage() {
@@ -34,6 +36,7 @@ export default function MyPage() {
   const [showReviews, setShowReviews] = useState(false);
   const [discardingId, setDiscardingId] = useState(null);
   const [discardConfirm, setDiscardConfirm] = useState(null);
+  const [openingChatProjectId, setOpeningChatProjectId] = useState(null);
 
   const [reviewProject, setReviewProject] = useState(null);
   const [reviewTargets, setReviewTargets] = useState([]);
@@ -321,6 +324,36 @@ export default function MyPage() {
     } catch (error) {
       console.error(error);
       alert("관심 분야 추가에 실패했습니다.");
+    }
+  };
+
+  const openTeamChat = async (project) => {
+    if (!project.can_chat) {
+      alert("팀에 속한 프로젝트만 채팅방으로 이동할 수 있습니다.");
+      return;
+    }
+
+    try {
+      setOpeningChatProjectId(project.id);
+
+      const roomsResult = await getChatRoomsApi(project.id);
+      const rooms = Array.isArray(roomsResult.data) ? roomsResult.data : [];
+      const activeRoom = rooms.find((room) => room.is_active) || rooms[0];
+
+      if (activeRoom) {
+        router.push(`/chat/${activeRoom.id}?projectId=${project.id}`);
+        return;
+      }
+
+      const created = await createChatRoomApi(project.id, {
+        name: project.title || `Project #${project.id}`,
+      });
+      router.push(`/chat/${created.data.id}?projectId=${project.id}`);
+    } catch (error) {
+      console.error(error);
+      alert("팀 채팅방으로 이동하지 못했습니다.");
+    } finally {
+      setOpeningChatProjectId(null);
     }
   };
 
@@ -641,6 +674,18 @@ export default function MyPage() {
                       <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-600">
                         {project.status || "상태 없음"}
                       </span>
+
+                      {project.can_chat && (
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openTeamChat(project);
+                          }}
+                          className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-sm font-semibold text-slate-700 transition hover:border-red-300 hover:text-red-600"
+                        >
+                          {openingChatProjectId === project.id ? "이동 중..." : "채팅"}
+                        </span>
+                      )}
 
                       {project.can_discard && (
                         <span
