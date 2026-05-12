@@ -981,6 +981,33 @@ export async function adminDeletePostApi(postId) {
   return handleResponse(res, "게시물 삭제에 실패했습니다.");
 }
 
+export async function adminTakedownPostApi(postId) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/posts/${postId}/takedown`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "게시물 강제 내리기에 실패했습니다.");
+}
+
+export async function adminTakedownIdeaApi(ideaId) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/ideas/${ideaId}/takedown`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "아이디어 강제 내리기에 실패했습니다.");
+}
+
+export async function adminTakedownProjectApi(projectId) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/projects/${projectId}/takedown`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "프로젝트 강제 내리기에 실패했습니다.");
+}
+
 export async function getMyChatRoomsApi() {
   const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/chats/my/rooms`, {
     headers: authHeaders(),
