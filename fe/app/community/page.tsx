@@ -6,6 +6,7 @@ import { PostSummary, User, ReactionType } from "./_types";
 import { getPosts, deletePost, reactToPost, getHotPosts } from "./_lib/api";
 import PostCard from "./_components/PostCard";
 import LoginModal from "./_components/LoginModal";
+import { ThumbUpIcon } from "./_components/ReactionThumbIcons";
 
 const CATEGORIES = [
   { label: "전체", value: undefined },
@@ -43,7 +44,7 @@ type HotSection = {
 
 const HOT_SECTIONS: HotSection[] = [
   { key: "popular", label: "인기게시물", emoji: "🔥" },
-  { key: "most_recommended", label: "추천 TOP", emoji: "👍" },
+  { key: "most_recommended", label: "TOP", emoji: "" },
   { key: "most_commented", label: "댓글 TOP", emoji: "💬" },
   { key: "most_viewed", label: "조회수 TOP", emoji: "👀" },
   { key: "latest", label: "최신글", emoji: "🆕" },
@@ -385,7 +386,11 @@ export default function CommunityPage() {
                   return (
                     <div key={key} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                       <div className="mb-3 flex items-center gap-2">
-                        <span className="text-base">{emoji}</span>
+                        {key === "most_recommended" ? (
+                          <ThumbUpIcon className="h-4 w-4 shrink-0 text-red-600" />
+                        ) : (
+                          <span className="text-base">{emoji}</span>
+                        )}
                         <span className="text-sm font-bold text-gray-800">{label}</span>
                       </div>
                       <PostCard

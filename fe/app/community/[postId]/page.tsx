@@ -30,6 +30,7 @@ import {
 import Avatar from "../_components/Avatar";
 import CommentItem from "../_components/CommentItem";
 import LoginModal from "../_components/LoginModal";
+import { ThumbDownIcon, ThumbUpIcon } from "../_components/ReactionThumbIcons";
 
 const CATEGORIES = [
   { label: "일반", value: "general" },
@@ -42,21 +43,23 @@ const CATEGORIES = [
 
 const REACTIONS: {
   type: ReactionType;
-  label: string;
+  Icon: typeof ThumbUpIcon;
   inactiveClass: string;
   activeClass: string;
 }[] = [
   {
     type: "recommend",
-    label: "추천",
-    inactiveClass: "border-gray-200 text-gray-500 hover:border-red-200 hover:text-red-500",
-    activeClass: "border-red-300 bg-red-50 text-red-600",
+    Icon: ThumbUpIcon,
+    inactiveClass:
+      "border-gray-200 text-gray-500 hover:border-red-200 hover:text-red-600 [&_svg]:text-gray-400 hover:[&_svg]:text-red-600",
+    activeClass: "border-red-300 bg-red-50 text-red-600 [&_svg]:text-red-600",
   },
   {
     type: "not_recommend",
-    label: "비추천",
-    inactiveClass: "border-gray-200 text-gray-500 hover:border-slate-300 hover:text-slate-600",
-    activeClass: "border-slate-400 bg-slate-100 text-slate-700",
+    Icon: ThumbDownIcon,
+    inactiveClass:
+      "border-gray-200 text-gray-500 hover:border-red-200 hover:text-red-600 [&_svg]:text-gray-400 hover:[&_svg]:text-red-600",
+    activeClass: "border-red-300 bg-red-50 text-red-600 [&_svg]:text-red-600",
   },
 ];
 
@@ -504,7 +507,7 @@ export default function PostDetailPage() {
 
           {!editing && (
             <div className="mt-4 flex items-center gap-2 border-t border-gray-50 pt-4">
-              {REACTIONS.map(({ type, label, inactiveClass, activeClass }) => {
+              {REACTIONS.map(({ type, Icon, inactiveClass, activeClass }) => {
                 const count = post.reaction_stats[type];
                 const isActive = post.user_reaction === type;
                 return (
@@ -515,7 +518,7 @@ export default function PostDetailPage() {
                       isActive ? activeClass : inactiveClass
                     }`}
                   >
-                    {label}
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
                     {count > 0 && <span className="tabular-nums">{count}</span>}
                   </button>
                 );
