@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     max_file_size_mb: int = 50  # Maximum file size in MB
 
     model_config = {
-        "env_file": ["/home/ubuntu/devory-develop/.env.production", "/home/ubuntu/devory-develop/.env.develop", ".env"],
+        "env_file": [".env.production", ".env.develop", ".env"],
         "env_file_encoding": "utf-8",
         "extra": "ignore",
     }
