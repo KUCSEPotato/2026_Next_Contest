@@ -493,20 +493,22 @@ export default function MyPage() {
             </div>
             </div>
 
-            <button
-              onClick={() => setIsEditingProfile(true)}
-              className="shrink-0 rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
-            >
-              수정하기
-            </button>
-            <button
-              type="button"
-              onClick={handleWithdrawAccount}
-              disabled={isWithdrawing}
-              className="shrink-0 rounded-xl border border-red-200 bg-white px-5 py-3 font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isWithdrawing ? "처리 중..." : "회원 탈퇴"}
-            </button>
+            <div className="flex shrink-0 items-center gap-3">
+              <button
+                onClick={() => setIsEditingProfile(true)}
+                className="rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
+              >
+                수정하기
+              </button>
+              <button
+                type="button"
+                onClick={handleWithdrawAccount}
+                disabled={isWithdrawing}
+                className="rounded-xl border border-red-200 bg-white px-5 py-3 font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isWithdrawing ? "처리 중..." : "회원 탈퇴"}
+              </button>
+            </div>
           </div>
         </section>
 
