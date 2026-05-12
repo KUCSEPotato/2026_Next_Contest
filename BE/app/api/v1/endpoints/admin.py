@@ -11,6 +11,7 @@ from app.dependencies.auth import get_current_user_id
 from app.models import CommunityPost
 from app.models import PaymentEvent
 from app.models import Project
+from app.models import Idea
 from app.models import Report
 from app.models import UserSubscription
 from app.models import User
@@ -29,6 +30,11 @@ class AdminNoticeCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=300)
     content: str = Field(min_length=1)
     is_pinned: bool = False
+
+
+class AdminCoinRevokeRequest(BaseModel):
+    amount: int = Field(gt=0)
+    note: str | None = Field(default=None, max_length=500)
 
 
 def _ensure_admin(db: Session, user_id: int) -> None:
@@ -280,6 +286,104 @@ async def create_notice_for_admin(
     )
 
 
+@router.post("/users/{user_id}/coins/revoke", summary="관리자 코인 환수", description="관리자가 특정 사용자로부터 코인을 환수합니다.")
+async def revoke_user_coins_for_admin(
+    user_id: int,
+    payload: AdminCoinRevokeRequest,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    _ensure_admin(db, current_user_id)
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # perform revoke: create negative coin transaction
+    amount = int(payload.amount)
+    user.coin_balance = int(user.coin_balance or 0) - amount
+    from app.models import CoinTransaction
+
+    transaction = CoinTransaction(
+        user_id=user_id,
+        amount=-amount,
+        balance_after=user.coin_balance,
+        event_type="admin.manual_revoke",
+        source_type="admin",
+        source_id=int(datetime.now(timezone.utc).timestamp() * 1_000_000),
+        note=payload.note or "Admin manual coin revoke",
+    )
+    db.add(transaction)
+    db.commit()
+    return success_response(data={"id": user.id, "coin_balance": user.coin_balance, "revoked": amount})
+
+
+@router.get("/posts/mine", summary="관리자 작성 공지/이벤트 목록", description="현재 admin이 작성한 공지와 이벤트 글을 조회합니다.")
+async def list_my_admin_posts(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    _ensure_admin(db, current_user_id)
+    posts = (
+        db.query(CommunityPost)
+        .filter(CommunityPost.author_id == current_user_id, CommunityPost.category.in_(["announcement", "event"]))
+        .order_by(CommunityPost.created_at.desc())
+        .all()
+    )
+    return success_response(
+        data=[
+            {
+                "id": p.id,
+                "title": p.title,
+                "category": p.category,
+                "is_pinned": p.is_pinned,
+                "created_at": p.created_at,
+                "updated_at": p.updated_at,
+            }
+            for p in posts
+        ]
+    )
+
+
+@router.patch("/posts/{post_id}", summary="관리자 게시물 수정", description="관리자가 특정 게시물을 수정합니다.")
+async def admin_update_post(
+    post_id: int,
+    payload: dict = Body(default={}),
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    _ensure_admin(db, current_user_id)
+    post = db.get(CommunityPost, post_id)
+    if post is None or post.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    # allow updating title/content/category/is_pinned
+    if "title" in payload:
+        post.title = payload["title"]
+    if "content" in payload:
+        post.content = payload["content"]
+    if "category" in payload:
+        post.category = payload["category"]
+    if "is_pinned" in payload:
+        post.is_pinned = bool(payload["is_pinned"])
+    db.commit()
+    db.refresh(post)
+    return success_response(data={"id": post.id, "updated": True})
+
+
+@router.delete("/posts/{post_id}", summary="관리자 게시물 삭제", description="관리자가 특정 게시물을 강제로 삭제합니다 (soft delete).")
+async def admin_delete_post(
+    post_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    _ensure_admin(db, current_user_id)
+    post = db.get(CommunityPost, post_id)
+    if post is None or post.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    post.deleted_at = datetime.now(timezone.utc)
+    db.commit()
+    return success_response(data={"deleted": True, "post_id": post_id})
+
+
 @router.patch("/reports/{report_id}", summary="관리자 신고 처리", description="신고 상태를 변경하고 처리자를 기록합니다.")
 async def process_report(
     report_id: int,
@@ -360,3 +464,48 @@ async def run_stale_project_reminders(
     created_count = send_stale_project_notifications(db, stale_days=30)
     db.commit()
     return success_response(data={"created_notifications": created_count})
+
+
+@router.post("/posts/{post_id}/takedown", summary="관리자 게시물 강제 내리기", description="관리자가 특정 게시물을 강제로 내립니다 (soft delete).")
+async def admin_takedown_post(
+    post_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    _ensure_admin(db, current_user_id)
+    post = db.get(CommunityPost, post_id)
+    if post is None or post.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    post.deleted_at = datetime.now(timezone.utc)
+    db.commit()
+    return success_response(data={"deleted": True, "post_id": post_id})
+
+
+@router.post("/ideas/{idea_id}/takedown", summary="관리자 아이디어 강제 내리기", description="관리자가 특정 아이디어를 강제로 내립니다 (soft delete).")
+async def admin_takedown_idea(
+    idea_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    _ensure_admin(db, current_user_id)
+    idea = db.get(Idea, idea_id)
+    if idea is None or idea.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Idea not found")
+    idea.deleted_at = datetime.now(timezone.utc)
+    db.commit()
+    return success_response(data={"deleted": True, "idea_id": idea_id})
+
+
+@router.post("/projects/{project_id}/takedown", summary="관리자 프로젝트 강제 내리기", description="관리자가 특정 프로젝트를 강제로 내립니다 (soft delete).")
+async def admin_takedown_project(
+    project_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    _ensure_admin(db, current_user_id)
+    project = db.get(Project, project_id)
+    if project is None or project.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    project.deleted_at = datetime.now(timezone.utc)
+    db.commit()
+    return success_response(data={"deleted": True, "project_id": project_id})
