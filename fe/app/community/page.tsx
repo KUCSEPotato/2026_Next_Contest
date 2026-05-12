@@ -20,19 +20,25 @@ const CATEGORIES = [
 
 const SERVICE_BLOCKS = [
   {
-    title: "프로젝트 탐색",
-    description: "진행 중인 아이디어와 프로젝트를 둘러보고 함께할 팀을 찾아보세요.",
+    title: "개발의 땅",
+    subtitle: "Devory",
+    description: "진행 중인 프로젝트가 자라는 땅에서 함께할 팀을 찾아보세요.",
     path: "/mainpage",
+    icon: "sprout",
   },
   {
-    title: "아이디어 줍기",
-    description: "버려진 아이디어를 이어받아 새로운 프로젝트로 발전시켜보세요.",
+    title: "생각의 뜰",
+    subtitle: "IdeaYard",
+    description: "잠시 멈춘 아이디어 씨앗을 살펴보고 다시 싹틔워보세요.",
     path: "/ideas/pickup",
+    icon: "seed",
   },
   {
-    title: "자유게시판",
-    description: "팀원 모집, 질문, 회고 등 자유롭게 이야기를 나눠보세요.",
+    title: "모닥불",
+    subtitle: "Campfire",
+    description: "팀원 모집, 질문, 회고를 불빛 곁에서 편하게 나눠보세요.",
     path: "/community",
+    icon: "flame",
   },
 ];
 
@@ -210,11 +216,11 @@ export default function CommunityPage() {
       <main className="mx-auto max-w-6xl px-4 pb-16">
         <section className="py-10 text-center sm:py-14">
           <h1 className="mb-3 text-2xl font-bold leading-tight text-gray-900 sm:text-4xl">
-            자유롭게 묻고,
-            <br className="sm:hidden" /> 함께 나누는 공간
+            모닥불 곁에서,
+            <br className="sm:hidden" /> 함께 나누는 이야기
           </h1>
           <p className="mb-8 text-sm text-gray-500 sm:text-base">
-            팀원 모집, 질문, 회고, 작업 공유까지 자유롭게 이야기해보세요
+            팀원 모집, 질문, 회고, 작업 공유까지 편하게 이야기해보세요
           </p>
           <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 text-left sm:grid-cols-3">
             {SERVICE_BLOCKS.map((block) => {
@@ -223,16 +229,24 @@ export default function CommunityPage() {
                 <button
                   key={block.title}
                   onClick={() => router.push(block.path)}
-                  className={`rounded-2xl border p-5 shadow-sm transition hover:border-red-300 hover:shadow-md ${
-                    isActive ? "border-red-200 bg-red-50" : "border-gray-200 bg-white"
+                  className={`rounded-2xl border p-5 shadow-sm transition hover:border-orange-300 hover:shadow-md ${
+                    isActive ? "border-orange-200 bg-orange-50" : "border-gray-200 bg-white"
                   }`}
                 >
                   <div className="mb-3 flex items-center justify-between">
-                    <p className={`text-base font-bold ${isActive ? "text-red-600" : "text-gray-900"}`}>
-                      {block.title}
-                    </p>
+                    <div className="flex items-center gap-3">
+                      <ServiceIcon type={block.icon} active={isActive} />
+                      <div>
+                        <p className={`text-base font-bold ${isActive ? "text-orange-700" : "text-gray-900"}`}>
+                          {block.title}
+                        </p>
+                        <p className="text-[11px] font-semibold text-gray-400">
+                          {block.subtitle}
+                        </p>
+                      </div>
+                    </div>
                     {isActive && (
-                      <span className="rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                      <span className="rounded-full bg-orange-600 px-2 py-0.5 text-[10px] font-semibold text-white">
                         현재
                       </span>
                     )}
@@ -250,38 +264,38 @@ export default function CommunityPage() {
             onClick={() => setTab("board")}
             className={`rounded-xl px-5 py-2 text-sm font-semibold transition ${
               tab === "board"
-                ? "bg-red-600 text-white shadow-sm"
-                : "border border-gray-200 bg-white text-gray-600 hover:border-red-300 hover:text-red-600"
+                ? "bg-orange-600 text-white shadow-sm"
+                : "border border-gray-200 bg-white text-gray-600 hover:border-orange-300 hover:text-orange-700"
             }`}
           >
-            자유게시판
+            모닥불
           </button>
           <button
             onClick={() => setTab("hot")}
             className={`rounded-xl px-5 py-2 text-sm font-semibold transition ${
               tab === "hot"
-                ? "bg-red-600 text-white shadow-sm"
-                : "border border-gray-200 bg-white text-gray-600 hover:border-red-300 hover:text-red-600"
+                ? "bg-orange-600 text-white shadow-sm"
+                : "border border-gray-200 bg-white text-gray-600 hover:border-orange-300 hover:text-orange-700"
             }`}
           >
-            🔥 핫게시물
+            불꽃글
           </button>
         </div>
 
-        {/* 자유게시판 탭 */}
+        {/* 모닥불 탭 */}
         {tab === "board" && (
           <>
             <section className="mb-8 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-lg font-bold text-gray-900">자유게시판</p>
+                  <p className="text-lg font-bold text-gray-900">모닥불</p>
                   <p className="mt-1 text-sm text-gray-500">
-                    관심 있는 주제의 글을 둘러보고 자유롭게 의견을 나눠보세요.
+                    관심 있는 주제의 글을 둘러보고 모닥불 곁에서 의견을 나눠보세요.
                   </p>
                 </div>
                 <button
                   onClick={handleWriteClick}
-                  className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+                  className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-700"
                 >
                   글쓰기
                 </button>
@@ -293,8 +307,8 @@ export default function CommunityPage() {
                     onClick={() => { setSelectedCategory(cat.value); setPage(1); }}
                     className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                       selectedCategory === cat.value
-                        ? "border-red-600 bg-red-600 text-white"
-                        : "border-gray-200 bg-white text-gray-600 hover:border-red-300 hover:text-red-600"
+                        ? "border-orange-600 bg-orange-600 text-white"
+                        : "border-gray-200 bg-white text-gray-600 hover:border-orange-300 hover:text-orange-700"
                     }`}
                   >
                     {cat.label}
@@ -311,11 +325,11 @@ export default function CommunityPage() {
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <p className="mb-3 text-3xl">📭</p>
                 <p className="mb-1 text-sm font-medium text-gray-600">게시물이 없어요</p>
-                <p className="text-xs text-gray-400">자유게시판의 첫 글을 작성해보세요</p>
+                <p className="text-xs text-gray-400">모닥불의 첫 이야기를 남겨보세요</p>
                 {isLoggedIn && (
                   <button
                     onClick={() => router.push("/community/new")}
-                    className="mt-4 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+                    className="mt-4 rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-700"
                   >
                     첫 글 쓰기
                   </button>
@@ -368,7 +382,7 @@ export default function CommunityPage() {
         {tab === "hot" && (
           <section>
             <div className="mb-6">
-              <p className="text-lg font-bold text-gray-900">🔥 핫게시물</p>
+              <p className="text-lg font-bold text-gray-900">불꽃글</p>
               <p className="mt-1 text-sm text-gray-500">
                 지금 가장 주목받는 글을 모아봤어요. 겹치는 글은 인기게시물에만 표시돼요.
               </p>
@@ -416,5 +430,66 @@ export default function CommunityPage() {
         />
       )}
     </div>
+  );
+}
+
+function ServiceIcon({ type, active }: { type: string; active?: boolean }) {
+  const muted = active ? 1 : 0.72;
+
+  if (type === "seed") {
+    return (
+      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50">
+        <svg viewBox="0 0 48 48" className="h-7 w-7" aria-hidden>
+          <path
+            d="M25 39c8-4 14-11 14-20 0-5-3-9-8-9-8 0-16 9-16 18 0 6 4 10 10 11Z"
+            fill="#d97706"
+            opacity={muted}
+          />
+          <path
+            d="M16 36c5-8 11-14 19-20"
+            stroke="#78350f"
+            strokeWidth="3"
+            strokeLinecap="round"
+            fill="none"
+            opacity="0.45"
+          />
+        </svg>
+      </span>
+    );
+  }
+
+  if (type === "flame") {
+    return (
+      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50">
+        <svg viewBox="0 0 48 48" className="h-7 w-7" aria-hidden>
+          <path
+            d="M25 43c9-3 14-9 14-17 0-8-5-13-9-18-1 6-5 9-8 12-2-4-2-7-1-11-7 5-12 12-12 20 0 8 7 14 16 14Z"
+            fill="#f97316"
+            opacity={muted}
+          />
+          <path
+            d="M24 39c4-2 7-5 7-9 0-4-2-7-5-10-1 4-4 6-6 8-1 5 0 9 4 11Z"
+            fill="#facc15"
+          />
+        </svg>
+      </span>
+    );
+  }
+
+  return (
+    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50">
+      <svg viewBox="0 0 48 48" className="h-7 w-7" aria-hidden>
+        <path
+          d="M24 40V20"
+          stroke="#16a34a"
+          strokeWidth="4"
+          strokeLinecap="round"
+          opacity={muted}
+        />
+        <path d="M23 23C13 22 9 15 9 8c8 0 15 4 16 14" fill="#22c55e" opacity={muted} />
+        <path d="M25 25c10-1 15-7 15-14-8 0-15 4-16 13" fill="#16a34a" opacity={muted} />
+        <path d="M15 41h18" stroke="#92400e" strokeWidth="4" strokeLinecap="round" />
+      </svg>
+    </span>
   );
 }

@@ -222,11 +222,11 @@ export default function ProjectDetailPage() {
       setIsDeleting(true);
       await revertProjectToIdeaApi(projectId);
 
-      alert("프로젝트가 영감의 샘으로 이동되었습니다.");
+      alert("프로젝트가 생각의 뜰으로 이동되었습니다.");
       router.push("/ideas/pickup");
     } catch (error) {
       console.error(error);
-      alert("영감의 샘으로 보내는 데 실패했습니다.");
+      alert("생각의 뜰으로 보내는 데 실패했습니다.");
     } finally {
       setIsDeleting(false);
     }
@@ -721,7 +721,7 @@ export default function ProjectDetailPage() {
             <h2 className="text-xl font-bold text-slate-900">프로젝트 버리기</h2>
             <p className="mt-3 text-sm leading-6 text-slate-500">
               그냥 삭제하면 이 아이디어는 사라집니다. 다른 사람이 이어서 키워볼 수 있도록
-              영감의 샘에 흘려보내는 선택을 추천해요.
+              생각의 뜰에 흘려보내는 선택을 추천해요.
             </p>
 
             <div className="mt-6 space-y-2">
@@ -730,7 +730,7 @@ export default function ProjectDetailPage() {
                 disabled={isDeleting}
                 className="w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:bg-slate-300"
               >
-                영감의 샘에 흘려보내기
+                생각의 뜰에 흘려보내기
               </button>
 
               <button
