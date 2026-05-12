@@ -1,16 +1,19 @@
 // ─── BE 응답 기반 타입 ────────────────────────────────────────────────────────
 
-export type ReactionType = "like" | "interested" | "helpful" | "curious";
+export type ReactionType = "recommend" | "not_recommend";
 
 export interface ReactionStats {
-  like: number;
-  interested: number;
-  helpful: number;
-  curious: number;
+  recommend: number;
+  not_recommend: number;
 }
 
+export const EMPTY_REACTION_STATS: ReactionStats = {
+  recommend: 0,
+  not_recommend: 0,
+};
+
 export interface AuthorInfo {
-  id: number;
+  id: number | null;
   nickname: string;
   avatar_url: string | null;
 }
@@ -51,9 +54,12 @@ export interface PostFile {
 export interface CommentItem {
   id: number;
   post_id: number;
-  author_id: number;
+  author_id: number | null;
   content: string;
   parent_comment_id: number | null;
+  is_anonymous?: boolean;
+  /** 로그인한 경우, 본인 댓글 여부 (익명 댓글 수정·삭제 UI용) */
+  is_mine?: boolean;
   created_at: string;
   updated_at: string;
   author: AuthorInfo;

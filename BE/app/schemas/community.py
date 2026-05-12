@@ -39,7 +39,7 @@ class PostDetailResponse(PostResponse):
     """Detailed post response with author info and stats"""
     author: dict  # {id, nickname, avatar_url}
     comment_count: int
-    reaction_stats: dict  # {recommend: 5, not_recommend: 1}
+    reaction_stats: dict  # {recommend, not_recommend counts}
     user_reaction: str | None  # 현재 사용자의 반응
 
 

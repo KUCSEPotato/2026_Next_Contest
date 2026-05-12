@@ -27,6 +27,16 @@ from app.services.s3_upload import get_s3_service
 
 router = APIRouter()
 
+_REACTION_STATS_ZERO: dict[str, int] = {"recommend": 0, "not_recommend": 0}
+
+
+def _merge_reaction_stats(rows: list[tuple[str, int]]) -> dict[str, int]:
+    stats = dict(_REACTION_STATS_ZERO)
+    for reaction_type, count in rows:
+        if reaction_type in stats:
+            stats[reaction_type] = count
+    return stats
+
 
 # ═══════════════════════════════════════════════════════════════
 # ━━ Community Posts (CRUD)
@@ -84,7 +94,7 @@ async def list_posts(
     sort_by 옵션:
     - newest (기본값): 최신순 (created_at desc)
     - views: 조회수 높은 순 (view_count desc)
-    - likes: 추천 많은 순
+    - likes / recommend: 추천 많은 순 (likes는 recommend와 동일)
     - comments: 댓글 많은 순
     - trending/hot: 핫게 (조회수*0.1 + 추천*1.0 + 댓글*0.5)
     """
@@ -99,8 +109,8 @@ async def list_posts(
             CommunityPost.is_pinned.desc(),
             CommunityPost.view_count.desc(),
         )
-    elif sort_by in ["likes", "comments", "trending", "hot"]:
-        # likes, comments, trending은 메모리에서 정렬하므로 일단 핀만 먼저
+    elif sort_by in ["likes", "recommend", "comments", "trending", "hot"]:
+        # likes/recommend, comments, trending은 메모리에서 정렬하므로 일단 핀만 먼저
         query = query.order_by(CommunityPost.is_pinned.desc())
     else:  # newest (기본값)
         query = query.order_by(
@@ -111,7 +121,7 @@ async def list_posts(
     total = query.count()
     
     # 페이지네이션 전에 정렬 (likes, comments, trending은 메모리 정렬이므로)
-    if sort_by in ["likes", "comments", "trending", "hot"]:
+    if sort_by in ["likes", "recommend", "comments", "trending", "hot"]:
         posts = query.all()  # 모든 데이터를 먼저 가져옴
     else:
         posts = query.offset((page - 1) * page_size).limit(page_size).all()
@@ -143,12 +153,7 @@ async def list_posts(
             .group_by(CommunityPostReaction.reaction_type)
             .all()
         )
-        reaction_stats = {
-            "recommend": 0,
-            "not_recommend": 0,
-        }
-        for reaction_type, count in reactions:
-            reaction_stats[reaction_type] = count
+        reaction_stats = _merge_reaction_stats(reactions)
 
         # determine user's reaction if logged in
         user_reaction = None
@@ -182,8 +187,8 @@ async def list_posts(
             }
         )
 
-    # 메모리에서 정렬 (likes, comments, trending은 계산된 값이므로)
-    if sort_by == "likes":
+    # 메모리에서 정렬 (likes/recommend, comments, trending은 계산된 값이므로)
+    if sort_by in ("likes", "recommend"):
         # 추천순으로 정렬 (핀 된 글 우선 유지)
         pinned = [p for p in result if p["is_pinned"]]
         unpinned = [p for p in result if not p["is_pinned"]]
@@ -196,7 +201,7 @@ async def list_posts(
         unpinned.sort(key=lambda x: x["comment_count"], reverse=True)
         result = pinned + unpinned
     elif sort_by in ["trending", "hot"]:
-        # 핫게 정렬: 조회수*0.1 + 추천*1.0 + 댓글*0.5
+        # 핫게 정렬: 조회수*0.1 + 추천 수*1.0 + 댓글*0.5
         def calculate_trending_score(post):
             return (
                 post["view_count"] * 0.1 +
@@ -210,7 +215,7 @@ async def list_posts(
         result = pinned + unpinned
 
     # 페이지네이션 적용 (likes, comments, trending은 이제 정렬이 완료됨)
-    if sort_by in ["likes", "comments", "trending", "hot"]:
+    if sort_by in ["likes", "recommend", "comments", "trending", "hot"]:
         paginated_result = result[(page - 1) * page_size : page * page_size]
     else:
         paginated_result = result
@@ -258,12 +263,7 @@ async def get_post(
         .group_by(CommunityPostReaction.reaction_type)
         .all()
     )
-    reaction_stats = {
-        "recommend": 0,
-        "not_recommend": 0,
-    }
-    for reaction_type, count in reactions:
-        reaction_stats[reaction_type] = count
+    reaction_stats = _merge_reaction_stats(reactions)
 
     user_reaction = None
     if current_user_id:
@@ -417,12 +417,16 @@ async def create_comment(
         data={
             "id": comment.id,
             "post_id": comment.post_id,
-            "author_id": comment.author_id,
+            "author_id": comment.author_id if not payload.is_anonymous else None,
             "content": comment.content,
             "parent_comment_id": comment.parent_comment_id,
             "is_anonymous": comment.is_anonymous,
+            "is_mine": True,
             "created_at": comment.created_at,
+            "updated_at": comment.updated_at,
             "author": author_info,
+            "reaction_stats": dict(_REACTION_STATS_ZERO),
+            "reply_count": 0,
         },
     )
 
@@ -433,11 +437,20 @@ async def list_comments(
     page: int = 1,
     page_size: int = 20,
     db: Session = Depends(get_db),
+    authorization: str | None = Header(default=None),
 ) -> dict:
     """댓글 목록 조회"""
     post = db.get(CommunityPost, post_id)
     if not post or post.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+
+    current_user_id: int | None = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+        try:
+            current_user_id = get_current_user_id_from_token(token)
+        except HTTPException:
+            current_user_id = None
 
     query = db.query(CommunityPostComment).filter(
         CommunityPostComment.post_id == post_id,
@@ -467,12 +480,9 @@ async def list_comments(
             .group_by(CommunityCommentReaction.reaction_type)
             .all()
         )
-        reaction_stats = {
-            "recommend": 0,
-            "not_recommend": 0,
-        }
-        for reaction_type, count in reactions:
-            reaction_stats[reaction_type] = count
+        reaction_stats = _merge_reaction_stats(reactions)
+
+        is_mine = bool(current_user_id and comment.author_id == current_user_id)
 
         result.append(
             {
@@ -482,6 +492,7 @@ async def list_comments(
                 "content": comment.content,
                 "parent_comment_id": comment.parent_comment_id,
                 "is_anonymous": comment.is_anonymous,
+                "is_mine": is_mine,
                 "created_at": comment.created_at,
                 "updated_at": comment.updated_at,
                 "author": {
@@ -525,18 +536,22 @@ async def update_comment(
     db.refresh(comment)
 
     author = db.get(User, comment.author_id)
+    anon = comment.is_anonymous
     return success_response(
         data={
             "id": comment.id,
             "post_id": comment.post_id,
-            "author_id": comment.author_id,
+            "author_id": comment.author_id if not anon else None,
             "content": comment.content,
+            "parent_comment_id": comment.parent_comment_id,
+            "is_anonymous": anon,
+            "is_mine": True,
             "created_at": comment.created_at,
             "updated_at": comment.updated_at,
             "author": {
-                "id": author.id,
-                "nickname": author.nickname,
-                "avatar_url": author.avatar_url,
+                "id": author.id if not anon else None,
+                "nickname": "익명" if anon else author.nickname,
+                "avatar_url": None if anon else author.avatar_url,
             },
         },
     )
@@ -567,7 +582,7 @@ async def delete_comment(
 # ━━ Reactions
 # ═══════════════════════════════════════════════════════════════
 
-@router.post("/{post_id}/reactions", summary="게시물에 반응 추가", description="게시물에 추천/비추천 등을 표현합니다.")
+@router.post("/{post_id}/reactions", summary="게시물에 반응 추가", description="게시물에 추천 또는 비추천을 표현합니다.")
 async def add_post_reaction(
     post_id: int,
     payload: ReactionRequest,
@@ -609,7 +624,7 @@ async def add_post_reaction(
         return success_response(data={"action": "added", "reaction_type": payload.reaction_type})
 
 
-@router.post("/{post_id}/comments/{comment_id}/reactions", summary="댓글에 반응 추가", description="댓글에 추천/비추천 등을 표현합니다.")
+@router.post("/{post_id}/comments/{comment_id}/reactions", summary="댓글에 반응 추가", description="댓글에 추천 또는 비추천을 표현합니다.")
 async def add_comment_reaction(
     post_id: int,
     comment_id: int,

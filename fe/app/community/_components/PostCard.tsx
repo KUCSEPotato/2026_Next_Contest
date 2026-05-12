@@ -14,11 +14,24 @@ interface PostCardProps {
   onLoginRequired: () => void;
 }
 
-const REACTIONS: { type: ReactionType; emoji: string; activeEmoji: string }[] = [
-  { type: "like", emoji: "🤍", activeEmoji: "❤️" },
-  { type: "interested", emoji: "🤔", activeEmoji: "🤔" },
-  { type: "helpful", emoji: "👍", activeEmoji: "👍" },
-  { type: "curious", emoji: "🧐", activeEmoji: "🧐" },
+const REACTIONS: {
+  type: ReactionType;
+  label: string;
+  inactiveClass: string;
+  activeClass: string;
+}[] = [
+  {
+    type: "recommend",
+    label: "추천",
+    inactiveClass: "border-gray-200 text-gray-500 hover:border-red-200 hover:text-red-500",
+    activeClass: "border-red-300 bg-red-50 text-red-600",
+  },
+  {
+    type: "not_recommend",
+    label: "비추천",
+    inactiveClass: "border-gray-200 text-gray-500 hover:border-slate-300 hover:text-slate-600",
+    activeClass: "border-slate-400 bg-slate-100 text-slate-700",
+  },
 ];
 
 export default function PostCard({
@@ -122,25 +135,26 @@ export default function PostCard({
       )}
 
       {/* Actions */}
-      <div className="mt-3 flex items-center gap-2 border-t border-gray-50 pt-3">
-        {REACTIONS.map(({ type, emoji, activeEmoji }) => {
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-50 pt-3">
+        {REACTIONS.map(({ type, label, inactiveClass, activeClass }) => {
           const isActive = post.user_reaction === type;
           const count = post.reaction_stats[type];
           return (
             <button
               key={type}
               onClick={() => {
-                if (!currentUser) { onLoginRequired(); return; }
+                if (!currentUser) {
+                  onLoginRequired();
+                  return;
+                }
                 onReact(post.id, type);
               }}
-              className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition ${
-                isActive
-                  ? "border-red-300 bg-red-50 text-red-500"
-                  : "border-gray-200 text-gray-400 hover:border-red-200 hover:text-red-400"
+              className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition ${
+                isActive ? activeClass : inactiveClass
               }`}
             >
-              {isActive ? activeEmoji : emoji}
-              {count > 0 && <span>{count}</span>}
+              {label}
+              {count > 0 && <span className="tabular-nums">{count}</span>}
             </button>
           );
         })}

@@ -5,12 +5,25 @@ import { CommentItem as CommentItemType, ReactionType } from "../_types";
 import { timeAgo } from "../_lib/utils";
 import Avatar from "./Avatar";
 
-const REACTION_EMOJI: Record<ReactionType, string> = {
-  like: "❤️",
-  interested: "🤔",
-  helpful: "👍",
-  curious: "🧐",
-};
+const REACTION_ROW: {
+  type: ReactionType;
+  label: string;
+  activeClass: string;
+  inactiveClass: string;
+}[] = [
+  {
+    type: "recommend",
+    label: "추천",
+    activeClass: "text-red-500",
+    inactiveClass: "text-gray-400 hover:text-red-400",
+  },
+  {
+    type: "not_recommend",
+    label: "비추천",
+    activeClass: "text-slate-700",
+    inactiveClass: "text-gray-400 hover:text-slate-600",
+  },
+];
 
 export default function CommentItem({
   comment,
@@ -24,21 +37,25 @@ export default function CommentItem({
   comment: CommentItemType;
   depth?: number;
   onReact: (commentId: number, type: ReactionType) => void;
-  onReply: (parentId: number, content: string) => void;
+  onReply: (parentId: number, content: string, isAnonymous: boolean) => void;
   onEdit: (commentId: number, content: string) => void;
   onDelete: (commentId: number) => void;
   currentUserId: number;
 }) {
   const [replying, setReplying] = useState(false);
   const [replyText, setReplyText] = useState("");
+  const [replyAnonymous, setReplyAnonymous] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(comment.content);
-  const isOwn = comment.author_id === currentUserId;
+  const isOwn =
+    comment.is_mine === true ||
+    (comment.author_id != null && comment.author_id === currentUserId);
 
   const submitReply = () => {
     if (!replyText.trim()) return;
-    onReply(comment.id, replyText.trim());
+    onReply(comment.id, replyText.trim(), replyAnonymous);
     setReplyText("");
+    setReplyAnonymous(false);
     setReplying(false);
   };
 
@@ -48,7 +65,6 @@ export default function CommentItem({
     setEditing(false);
   };
 
-  const totalLikes = comment.reaction_stats.like;
   const myReaction = comment.user_reaction ?? null;
 
   return (
@@ -60,6 +76,11 @@ export default function CommentItem({
             <span className="text-xs font-semibold text-gray-800">
               {comment.author.nickname}
             </span>
+            {comment.is_anonymous && (
+              <span className="rounded bg-gray-100 px-1 py-0.5 text-[9px] text-gray-500">
+                익명
+              </span>
+            )}
             <span className="text-[10px] text-gray-400">
               {timeAgo(comment.created_at)}
             </span>
@@ -94,18 +115,20 @@ export default function CommentItem({
             </p>
           )}
 
-          <div className="mt-1 flex items-center gap-3">
-            {/* 좋아요 반응 */}
-            <button
-              onClick={() => onReact(comment.id, "like")}
-              className={`flex items-center gap-1 text-[10px] transition ${
-                myReaction === "like"
-                  ? "text-red-500"
-                  : "text-gray-400 hover:text-red-400"
-              }`}
-            >
-              {myReaction === "like" ? "❤️" : "🤍"} {totalLikes}
-            </button>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            {REACTION_ROW.map(({ type, label, activeClass, inactiveClass }) => {
+              const count = comment.reaction_stats[type];
+              const active = myReaction === type;
+              return (
+                <button
+                  key={type}
+                  onClick={() => onReact(comment.id, type)}
+                  className={`text-[10px] transition ${active ? activeClass : inactiveClass}`}
+                >
+                  {label} {count > 0 ? count : ""}
+                </button>
+              );
+            })}
 
             {depth === 0 && (
               <button
@@ -134,14 +157,23 @@ export default function CommentItem({
           </div>
 
           {replying && (
-            <div className="mt-2 flex gap-2">
+            <div className="mt-2 space-y-2">
               <input
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && submitReply()}
                 placeholder="답글을 입력하세요..."
-                className="flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs focus:border-red-400 focus:outline-none"
+                className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs focus:border-red-400 focus:outline-none"
               />
+              <label className="flex cursor-pointer items-center gap-1.5 text-[10px] text-gray-500">
+                <input
+                  type="checkbox"
+                  checked={replyAnonymous}
+                  onChange={(e) => setReplyAnonymous(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                익명으로 답글
+              </label>
               <button
                 onClick={submitReply}
                 className="rounded-lg bg-red-600 px-2.5 py-1.5 text-[10px] font-medium text-white"

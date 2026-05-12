@@ -54,10 +54,8 @@ export function removeCommentFromTree(
 }
 
 export function totalReactions(stats: {
-  like: number;
-  interested: number;
-  helpful: number;
-  curious: number;
+  recommend: number;
+  not_recommend: number;
 }): number {
-  return stats.like + stats.interested + stats.helpful + stats.curious;
+  return stats.recommend + stats.not_recommend;
 }
