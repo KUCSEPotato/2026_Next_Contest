@@ -31,6 +31,10 @@ class OAuthGithubLinkRequest(BaseModel):
     redirect_uri: str | None = None
 
 
+class OAuthGithubLinkExistingRequest(BaseModel):
+    link_token: str = Field(min_length=1)
+
+
 class OAuthGoogleLinkRequest(BaseModel):
     code: str = Field(min_length=1, description="OAuth authorization code")
     redirect_uri: str | None = None

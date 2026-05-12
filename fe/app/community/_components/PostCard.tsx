@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PostSummary, User, ReactionType } from "../_types";
 import { timeAgo } from "../_lib/utils";
 import Avatar from "./Avatar";
+import { ThumbDownIcon, ThumbUpIcon } from "./ReactionThumbIcons";
 
 interface PostCardProps {
   post: PostSummary;
@@ -13,6 +14,28 @@ interface PostCardProps {
   onDelete: (postId: number) => void;
   onLoginRequired: () => void;
 }
+
+const REACTIONS: {
+  type: ReactionType;
+  Icon: typeof ThumbUpIcon;
+  inactiveClass: string;
+  activeClass: string;
+}[] = [
+  {
+    type: "recommend",
+    Icon: ThumbUpIcon,
+    inactiveClass:
+      "border-gray-200 text-gray-500 hover:border-red-200 hover:text-red-600 [&_svg]:text-gray-400 hover:[&_svg]:text-red-600",
+    activeClass: "border-red-300 bg-red-50 text-red-600 [&_svg]:text-red-600",
+  },
+  {
+    type: "not_recommend",
+    Icon: ThumbDownIcon,
+    inactiveClass:
+      "border-gray-200 text-gray-500 hover:border-red-200 hover:text-red-600 [&_svg]:text-gray-400 hover:[&_svg]:text-red-600",
+    activeClass: "border-red-300 bg-red-50 text-red-600 [&_svg]:text-red-600",
+  },
+];
 
 export default function PostCard({
   post,
@@ -25,10 +48,17 @@ export default function PostCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const isOwn = currentUser?.id === post.author_id;
-  const totalLikes = post.reaction_stats.like;
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
-  // 목록에서는 liked 상태를 알 수 없으므로 상세에서 처리
+  const isOwn = currentUser?.id === post.author_id;
   const goToDetail = () => router.push(`/community/${post.id}`);
 
   return (
@@ -66,7 +96,7 @@ export default function PostCard({
                   <button
                     onClick={() => {
                       setMenuOpen(false);
-                      router.push(`/community/${post.id}/edit`);
+                      router.push(`/community/${post.id}`);
                     }}
                     className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
                   >
@@ -108,20 +138,33 @@ export default function PostCard({
       )}
 
       {/* Actions */}
-      <div className="mt-3 flex items-center gap-4 border-t border-gray-50 pt-3">
-        <button
-          onClick={() => {
-            if (!currentUser) { onLoginRequired(); return; }
-            onReact(post.id, "like");
-          }}
-          className="flex items-center gap-1.5 text-sm text-gray-400 transition hover:text-red-400"
-        >
-          🤍 <span className="text-xs">{totalLikes}</span>
-        </button>
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-50 pt-3">
+        {REACTIONS.map(({ type, Icon, inactiveClass, activeClass }) => {
+          const isActive = post.user_reaction === type;
+          const count = post.reaction_stats[type];
+          return (
+            <button
+              key={type}
+              onClick={() => {
+                if (!currentUser) {
+                  onLoginRequired();
+                  return;
+                }
+                onReact(post.id, type);
+              }}
+              className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition ${
+                isActive ? activeClass : inactiveClass
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5 shrink-0" />
+              {count > 0 && <span className="tabular-nums">{count}</span>}
+            </button>
+          );
+        })}
 
         <button
           onClick={goToDetail}
-          className="flex items-center gap-1.5 text-xs text-gray-400 transition hover:text-gray-600"
+          className="ml-1 flex items-center gap-1.5 text-xs text-gray-400 transition hover:text-gray-600"
         >
           💬 <span>{post.comment_count}</span>
         </button>

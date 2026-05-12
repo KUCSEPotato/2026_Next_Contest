@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { authenticatedFetch, getApiBaseUrl, saveAuthSession } from "../../lib/auth";
 
 // ─── 상수 ────────────────────────────────────────────────────────────────────
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const API_BASE = getApiBaseUrl();
 
 const SKILLS_LIST = [
   "React", "Next.js", "Vue.js", "Angular", "TypeScript", "JavaScript",
@@ -28,6 +29,25 @@ function validatePassword(pw) {
     hasLetter: /[a-zA-Z]/.test(pw),
     hasNumber: /[0-9]/.test(pw),
   };
+}
+
+// ─── [추가] FastAPI 에러 응답 파싱 헬퍼 ──────────────────────────────────────
+function parseApiError(data, fallback = "요청 처리 중 오류가 발생했습니다.") {
+  if (!data?.detail) return fallback;
+  if (typeof data.detail === "string") {
+    if (
+      data.detail === "Login id already exists" ||
+      data.detail === "Nickname already exists" ||
+      data.detail.includes("nickname")
+    ) {
+      return "이미 존재하는 닉네임입니다.";
+    }
+    return data.detail;
+  }
+  if (Array.isArray(data.detail)) {
+    return data.detail.map((e) => e.msg).join("\n");
+  }
+  return fallback;
 }
 
 // ─── Step 인디케이터 ──────────────────────────────────────────────────────────
@@ -90,6 +110,7 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [realName, setRealName] = useState("");
   const [nickname, setNickname] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -110,44 +131,79 @@ export default function SignupPage() {
   const pwChecks = validatePassword(password);
   const pwValid = pwChecks.length && pwChecks.hasLetter && pwChecks.hasNumber;
 
-  // GitHub OAuth 콜백에서 step=2로 넘어온 경우 (신규 유저)
+  // GitHub OAuth 콜백 처리
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const stepParam = params.get("step");
     const via = params.get("via");
+    const tokenFromQuery = params.get("access_token");
 
-    if (stepParam === "2" && via === "github") {
-      // callback 페이지에서 이미 토큰 저장 완료 → 바로 Step 2로
-      const token = localStorage.getItem("access_token");
-      if (token) {
-        setAccessToken(token);
-        setStep(2);
-      }
+    if (via === "github" && tokenFromQuery) {
+      queueMicrotask(() => {
+        saveAuthSession({
+          accessToken: tokenFromQuery,
+          userId: params.get("user_id"),
+        });
+        setAccessToken(tokenFromQuery);
+
+        // 신규 유저는 온보딩 Step2, 기존 유저는 메인으로 이동
+        if (stepParam === "2") {
+          setStep(2);
+        } else if (stepParam === "profile") {
+          router.push("/mainpage");
+        }
+      });
     }
-  }, []);
+  }, [router]);
 
   // ── GitHub OAuth ─────────────────────────────────────────────────────────
   const handleGithubLogin = () => {
-    // 백엔드에서 GitHub OAuth URL을 받거나 환경 변수로 설정
     const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
     const redirectUri = encodeURIComponent(
       process.env.NEXT_PUBLIC_GITHUB_REDIRECT_URI
     );
-    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=user:email`;
+
+    if (!clientId || !process.env.NEXT_PUBLIC_GITHUB_REDIRECT_URI) {
+      alert("GitHub OAuth 환경변수가 설정되지 않았습니다.");
+      return;
+    }
+
+    const scope = encodeURIComponent("read:user user:email");
+    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}`;
   };
-
-
 
   // ── Step 1 제출 ───────────────────────────────────────────────────────────
   const handleStep1Submit = async () => {
-    if (!email || !realName || !nickname || !password) {
+    // ── [추가] 프론트 유효성 검사 ──────────────────────────────────────────
+    if (!email || !realName || !nickname || !phoneNumber || !password) {
       alert("모든 항목을 입력해주세요.");
       return;
     }
+
+    // [추가] 이메일 형식 검사 — Pydantic EmailStr 검증 전에 프론트에서 차단
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      alert("올바른 이메일 형식을 입력해주세요.");
+      return;
+    }
+
+    // [추가] 닉네임 길이 검사 (백엔드 min_length=2, max_length=50)
+    if (nickname.length < 2 || nickname.length > 50) {
+      alert("닉네임은 2자 이상 50자 이하로 입력해주세요.");
+      return;
+    }
+
+    // [추가] 전화번호 길이 검사 (백엔드 min_length=5, max_length=20)
+    if (phoneNumber.length < 5 || phoneNumber.length > 20) {
+      alert("올바른 전화번호를 입력해주세요.");
+      return;
+    }
+
     if (!pwValid) {
       alert("비밀번호 조건을 확인해주세요.");
       return;
     }
+    // ─────────────────────────────────────────────────────────────────────
 
     try {
       setIsSubmitting(true);
@@ -156,20 +212,25 @@ export default function SignupPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email,
-          nickname,
+          login_id: nickname,
           name: realName,
+          phone_number: phoneNumber,
           password,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "회원가입 실패");
+
+      // [수정] detail이 문자열/배열 모두 처리
+      if (!res.ok) throw new Error(parseApiError(data, "회원가입 실패"));
 
       const token = data.data?.access_token || data.data?.onboarding_token;
       setAccessToken(token);
-      localStorage.setItem("access_token", token);
-      if (data.data?.refresh_token) {
-        localStorage.setItem("refresh_token", data.data.refresh_token);
-      }
+      saveAuthSession({
+        accessToken: token,
+        refreshToken: data.data?.refresh_token,
+        userId: data.data?.user_id,
+        user: data.data?.user,
+      });
 
       setStep(2);
     } catch (err) {
@@ -202,26 +263,26 @@ export default function SignupPage() {
         Authorization: `Bearer ${accessToken}`,
       };
 
-      // 스킬 등록
-      if (selectedSkills.length > 0) {
-        await fetch(`${API_BASE}/api/v1/users/me/skills`, {
+      // 스킬 등록 (백엔드가 건당 1개씩 받음)
+      for (const skill of selectedSkills) {
+        await authenticatedFetch(`${API_BASE}/api/v1/users/me/skills`, {
           method: "POST",
           headers,
-          body: JSON.stringify({ skills: selectedSkills }),
+          body: JSON.stringify({ name: skill }),
         });
       }
 
-      // 관심 분야 등록
-      if (selectedInterests.length > 0) {
-        await fetch(`${API_BASE}/api/v1/users/me/interests`, {
+      // 관심 분야 등록 (백엔드가 건당 1개씩 받음)
+      for (const interest of selectedInterests) {
+        await authenticatedFetch(`${API_BASE}/api/v1/users/me/interests`, {
           method: "POST",
           headers,
-          body: JSON.stringify({ interests: selectedInterests }),
+          body: JSON.stringify({ name: interest }),
         });
       }
 
       // 온보딩 완료 처리
-      await fetch(`${API_BASE}/api/v1/users/me/onboarding/ideas`, {
+      await authenticatedFetch(`${API_BASE}/api/v1/users/me/onboarding/ideas`, {
         method: "POST",
         headers,
         body: JSON.stringify({}),
@@ -230,6 +291,8 @@ export default function SignupPage() {
       setStep(3);
       setShowCompletionModal(true);
     } catch (err) {
+      // [수정] 에러 내용을 콘솔에 출력해 디버깅 용이하게 변경
+      console.error("Step2 error:", err);
       alert("프로필 저장 중 오류가 발생했습니다.");
     } finally {
       setIsSavingProfile(false);
@@ -241,7 +304,7 @@ export default function SignupPage() {
     setShowCompletionModal(false);
     setIsLoadingProjects(true);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/matching/recommend-projects`, {
+      const res = await authenticatedFetch(`${API_BASE}/api/v1/matching/recommend-projects`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       const data = await res.json();
@@ -337,6 +400,13 @@ export default function SignupPage() {
                 placeholder="닉네임"
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
+              />
+              <input
+                type="tel"
+                placeholder="전화번호 (예: 01012345678)"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
               />
 

@@ -17,11 +17,13 @@ except Exception:  # pragma: no cover - optional dependency fallback
 
 
 REFRESH_TOKEN_TTL_SECONDS = 14 * 24 * 60 * 60
+OAUTH_LINK_TOKEN_TTL_SECONDS = 10 * 60
 
 _memory_password_reset_tokens: dict[str, dict[str, datetime | int]] = {}
 _memory_refresh_token_store: dict[str, dict[str, datetime | int]] = {}
 _memory_revoked_access_tokens: dict[str, datetime | None] = {}
 _memory_revoked_refresh_tokens: dict[str, datetime | None] = {}
+_memory_oauth_link_tokens: dict[str, dict[str, Any]] = {}
 _redis_client: Any = None
 
 
@@ -61,6 +63,10 @@ def _revoked_access_key(token: str) -> str:
 
 def _revoked_refresh_key(token: str) -> str:
     return f"revoked_refresh:{token}"
+
+
+def _oauth_link_key(token: str) -> str:
+    return f"oauth_link:{token}"
 
 
 def set_password_reset_token(token: str, user_id: int, expires_at: datetime) -> None:
@@ -108,6 +114,55 @@ def delete_password_reset_token(token: str) -> None:
         except RedisError:
             pass
     _memory_password_reset_tokens.pop(token, None)
+
+
+def set_oauth_link_token(token: str, payload: dict[str, Any], expires_at: datetime) -> None:
+    token_payload = {**payload, "expires_at": expires_at.isoformat()}
+    client = _redis()
+    if client is not None:
+        try:
+            client.set(_oauth_link_key(token), json.dumps(token_payload), ex=_seconds_until(expires_at))
+            return
+        except RedisError:
+            pass
+    _memory_oauth_link_tokens[token] = {**payload, "expires_at": expires_at}
+
+
+def get_oauth_link_token(token: str) -> dict[str, Any] | None:
+    client = _redis()
+    if client is not None:
+        try:
+            raw_value = client.get(_oauth_link_key(token))
+            if raw_value is not None:
+                data = json.loads(raw_value)
+                expires_at = datetime.fromisoformat(data["expires_at"])
+                if expires_at <= _utcnow():
+                    client.delete(_oauth_link_key(token))
+                    return None
+                data["expires_at"] = expires_at
+                return data
+        except RedisError:
+            pass
+
+    token_data = _memory_oauth_link_tokens.get(token)
+    if token_data is None:
+        return None
+
+    expires_at = token_data["expires_at"]
+    if isinstance(expires_at, datetime) and expires_at <= _utcnow():
+        _memory_oauth_link_tokens.pop(token, None)
+        return None
+    return token_data
+
+
+def delete_oauth_link_token(token: str) -> None:
+    client = _redis()
+    if client is not None:
+        try:
+            client.delete(_oauth_link_key(token))
+        except RedisError:
+            pass
+    _memory_oauth_link_tokens.pop(token, None)
 
 
 def store_refresh_token(token: str, user_id: int) -> None:

@@ -10,6 +10,7 @@ from app.dependencies.auth import get_current_user_id
 from app.dependencies.auth import get_current_user_id_from_token
 from app.models import ChatMessage
 from app.models import ChatRoom
+from app.models import ChatRoomMember
 from app.models import Project
 from app.models import ProjectMember
 from app.models import User
@@ -29,6 +30,20 @@ def _ensure_project_member(db: Session, project_id: int, user_id: int) -> None:
     )
     if member is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Project member permission required")
+
+
+def _ensure_chat_room_member(db: Session, room_id: int, user_id: int) -> None:
+    """사용자가 채팅방의 ChatRoomMember인지 확인합니다."""
+    member = (
+        db.query(ChatRoomMember)
+        .filter(
+            ChatRoomMember.room_id == room_id,
+            ChatRoomMember.user_id == user_id,
+        )
+        .first()
+    )
+    if member is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chat room member permission required")
 
 
 def _serialize_chat_message(db: Session, message: ChatMessage) -> dict:
@@ -73,7 +88,7 @@ async def list_project_chat_rooms(
     )
 
 
-@router.post("/projects/{project_id}/rooms", summary="채팅방 생성", description="프로젝트 멤버가 새 채팅방을 생성합니다.")
+@router.post("/projects/{project_id}/rooms", summary="채팅방 생성", description="프로젝트 멤버가 새 채팅방을 생성하고 참여자를 선택합니다.")
 async def create_project_chat_room(
     project_id: int,
     payload: dict = Body(default={}),
@@ -84,23 +99,53 @@ async def create_project_chat_room(
 
     Swagger 테스트 방법:
     - Authorization 헤더를 설정합니다.
-    - body 예시: `{ "name": "backend-discussion" }`
+    - body 예시: `{ "name": "backend-discussion", "member_ids": [2, 3, 4] }`
 
     검증:
     - 프로젝트가 없으면 `404`
     - 프로젝트 멤버가 아니면 `403`
+    - member_ids가 없으면 모든 활성 프로젝트 멤버를 참여자로 사용
+    - member_ids의 일부가 프로젝트 멤버가 아니면 `400`
     """
-    if db.get(Project, project_id) is None:
+    project = db.get(Project, project_id)
+    if project is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    
     _ensure_project_member(db, project_id, current_user_id)
+    
+    # member_ids의 모든 멤버가 프로젝트 멤버인지 검증
+    project_member_ids = db.query(ProjectMember.user_id).filter(
+        ProjectMember.project_id == project_id,
+        ProjectMember.left_at.is_(None),
+    ).all()
+    project_member_ids = {pm[0] for pm in project_member_ids}
+
+    member_ids = payload.get("member_ids")
+    if member_ids is None:
+        member_ids = sorted(project_member_ids)
+    if not member_ids or not isinstance(member_ids, list):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="member_ids must be a non-empty list")
+    
+    for member_id in member_ids:
+        if member_id not in project_member_ids:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"User {member_id} is not a member of this project")
+    
+    # 채팅방 생성
     room = ChatRoom(project_id=project_id, name=payload.get("name"), is_active=True)
     db.add(room)
     db.commit()
     db.refresh(room)
-    return success_response(data={"id": room.id, "project_id": room.project_id, "name": room.name})
+    
+    # ChatRoomMember 생성
+    for member_id in member_ids:
+        chat_room_member = ChatRoomMember(room_id=room.id, user_id=member_id)
+        db.add(chat_room_member)
+    db.commit()
+    
+    return success_response(data={"id": room.id, "project_id": room.project_id, "name": room.name, "member_ids": member_ids})
 
 
-@router.get("/rooms/{room_id}/messages", summary="메시지 목록", description="프로젝트 멤버가 채팅방 메시지 목록을 조회합니다.")
+@router.get("/rooms/{room_id}/messages", summary="메시지 목록", description="채팅방 멤버가 채팅방 메시지 목록을 조회합니다.")
 async def list_messages(
     room_id: int,
     current_user_id: int = Depends(get_current_user_id),
@@ -114,17 +159,17 @@ async def list_messages(
 
     검증:
     - 방이 없으면 `404`
-    - 프로젝트 멤버가 아니면 `403`
+    - 채팅방 멤버가 아니면 `403`
     """
     room = db.get(ChatRoom, room_id)
     if room is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
-    _ensure_project_member(db, room.project_id, current_user_id)
+    _ensure_chat_room_member(db, room_id, current_user_id)
     messages = db.query(ChatMessage).filter(ChatMessage.room_id == room_id).order_by(ChatMessage.id.asc()).all()
     return success_response(data=[_serialize_chat_message(db, message) for message in messages])
 
 
-@router.post("/rooms/{room_id}/messages", summary="메시지 전송", description="프로젝트 멤버가 채팅 메시지를 전송합니다.")
+@router.post("/rooms/{room_id}/messages", summary="메시지 전송", description="채팅방 멤버가 채팅 메시지를 전송합니다.")
 async def create_message(
     room_id: int,
     payload: dict = Body(default={}),
@@ -140,12 +185,12 @@ async def create_message(
     검증:
     - message 누락 시 `400`
     - 방이 없으면 `404`
-    - 프로젝트 멤버가 아니면 `403`
+    - 채팅방 멤버가 아니면 `403`
     """
     room = db.get(ChatRoom, room_id)
     if room is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
-    _ensure_project_member(db, room.project_id, current_user_id)
+    _ensure_chat_room_member(db, room_id, current_user_id)
 
     message_text = payload.get("message")
     if not message_text:
@@ -186,7 +231,12 @@ async def chat_room_websocket(
         await websocket.close(code=1008)
         return
 
-    _ensure_project_member(db, project_id, current_user_id)
+    # ChatRoomMember로 권한 검증
+    try:
+        _ensure_chat_room_member(db, room_id, current_user_id)
+    except HTTPException:
+        await websocket.close(code=1008)
+        return
 
     channel = chat_room_channel(room_id)
     await realtime_hub.connect(channel, websocket)
@@ -225,14 +275,14 @@ async def chat_room_websocket(
         realtime_hub.disconnect(channel, websocket)
 
 
-@router.get("/my/rooms", summary="내 채팅방 목록", description="현재 사용자가 속한 프로젝트의 채팅방 목록을 조회합니다.")
+@router.get("/my/rooms", summary="내 채팅방 목록", description="현재 사용자가 속한 채팅방 목록을 조회합니다.")
 async def get_my_chat_rooms(
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict:
     """내 채팅방 목록 조회 API.
 
-    사용자가 ProjectMember로 참여 중인 모든 프로젝트의 채팅방을 조회합니다.
+    사용자가 ChatRoomMember로 참여 중인 모든 채팅방을 조회합니다.
     각 채팅방의 최신 메시지 정보를 포함합니다.
 
     Swagger 테스트 방법:
@@ -247,24 +297,22 @@ async def get_my_chat_rooms(
     - last_message_at: 마지막 메시지 시간
     - last_message_sender_nickname: 마지막 메시지 발송자 닉네임
     """
-    # 사용자가 속한 프로젝트 찾기 (left_at이 None인 활성 멤버만)
-    project_members = (
-        db.query(ProjectMember)
-        .filter(
-            ProjectMember.user_id == current_user_id,
-            ProjectMember.left_at.is_(None),
-        )
+    # 사용자가 ChatRoomMember인 채팅방 찾기
+    chat_room_members = (
+        db.query(ChatRoomMember)
+        .filter(ChatRoomMember.user_id == current_user_id)
         .all()
     )
 
-    project_ids = [pm.project_id for pm in project_members]
-    if not project_ids:
+    room_ids = [crm.room_id for crm in chat_room_members]
+    if not room_ids:
         return success_response(data=[])
 
-    # 각 프로젝트의 ChatRoom 찾기
-    rooms = db.query(ChatRoom).filter(ChatRoom.project_id.in_(project_ids)).all()
+    # 각 ChatRoom 찾기
+    rooms = db.query(ChatRoom).filter(ChatRoom.id.in_(room_ids)).all()
 
     # 프로젝트 정보 미리 로드
+    project_ids = [r.project_id for r in rooms]
     projects = db.query(Project).filter(Project.id.in_(project_ids)).all()
     project_map = {p.id: p for p in projects}
 

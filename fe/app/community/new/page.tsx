@@ -3,29 +3,23 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { User } from "../_types";
-import { createPost } from "../_lib/api";
+import { createPost, uploadPostFile } from "../_lib/api";
 import MediaPreview, { MediaItem } from "../_components/MediaPreview";
 
-const CATEGORIES = ["IT/소프트웨어", "경영/경제", "디자인", "AI/데이터", "기타"];
+const CATEGORIES = [
+  { label: "일반", value: "general" },
+  { label: "질문", value: "question" },
+  { label: "아이디어", value: "idea" },
+  { label: "작업 공유", value: "showcase" },
+  { label: "이벤트", value: "event" },
+  { label: "공지", value: "announcement" },
+];
 
 const MAX_FILES = 10;
 const MAX_FILE_SIZE_MB = 50;
 
-// TODO: BE 미디어 업로드 API 구현 후 아래 함수 채우기
-// async function uploadMediaFile(file: File): Promise<string> {
-//   const formData = new FormData();
-//   formData.append("file", file);
-//   const res = await fetch(
-//     `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"}/community/media/upload`,
-//     {
-//       method: "POST",
-//       headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
-//       body: formData,
-//     }
-//   );
-//   const json = await res.json();
-//   return json.data.url;
-// }
+const getErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
 
 export default function NewPostPage() {
   const router = useRouter();
@@ -40,10 +34,21 @@ export default function NewPostPage() {
   const videoRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    if (!token) { router.replace("/login"); return; }
-    const raw = localStorage.getItem("user");
-    if (raw) setCurrentUser(JSON.parse(raw));
+    Promise.resolve().then(() => {
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        router.replace("/login");
+        return;
+      }
+
+      try {
+        const raw = localStorage.getItem("user");
+        if (raw) setCurrentUser(JSON.parse(raw) as User);
+      } catch (e) {
+        console.error("유저 정보 파싱 실패", e);
+        localStorage.removeItem("user");
+      }
+    });
   }, [router]);
 
   // ── 파일 선택 ──────────────────────────────────────────────────────────────
@@ -85,30 +90,41 @@ export default function NewPostPage() {
     setError("");
 
     try {
-      // TODO: BE 미디어 업로드 API 완성 후 아래 주석 해제
-      // const mediaUrls: string[] = [];
-      // for (let i = 0; i < media.length; i++) {
-      //   setMedia((prev) =>
-      //     prev.map((m, idx) => idx === i ? { ...m, uploading: true } : m)
-      //   );
-      //   const url = await uploadMediaFile(media[i].file);
-      //   mediaUrls.push(url);
-      //   setMedia((prev) =>
-      //     prev.map((m, idx) => idx === i ? { ...m, uploading: false, uploadedUrl: url } : m)
-      //   );
-      // }
-
       const post = await createPost({
-        title: title.trim() || undefined as any,
+        title: title.trim() || content.trim().slice(0, 50),
         content: content.trim(),
         category: category || undefined,
-        // TODO: mediaUrls 추가
-        // media_urls: mediaUrls,
       });
 
+      let failedUploadCount = 0;
+      for (let i = 0; i < media.length; i += 1) {
+        setMedia((prev) =>
+          prev.map((m, idx) => idx === i ? { ...m, uploading: true } : m)
+        );
+
+        try {
+          const uploaded = await uploadPostFile(post.id, media[i].file);
+          setMedia((prev) =>
+            prev.map((m, idx) =>
+              idx === i ? { ...m, uploading: false, uploadedUrl: uploaded.s3_url } : m
+            )
+          );
+        } catch (uploadError) {
+          failedUploadCount += 1;
+          console.error("파일 업로드 실패", uploadError);
+          setMedia((prev) =>
+            prev.map((m, idx) => idx === i ? { ...m, uploading: false } : m)
+          );
+        }
+      }
+
+      if (failedUploadCount > 0) {
+        alert(`게시물은 작성됐지만 파일 ${failedUploadCount}개 업로드에 실패했어요.`);
+      }
+
       router.push(`/community/${post.id}`);
-    } catch (e: any) {
-      setError(e.message ?? "게시물 작성에 실패했어요.");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, "게시물 작성에 실패했어요."));
     } finally {
       setSubmitting(false);
     }
@@ -117,7 +133,7 @@ export default function NewPostPage() {
   if (!currentUser) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 text-gray-900" style={{ colorScheme: "light" }}>
       <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
 
         {/* Header */}
@@ -150,7 +166,7 @@ export default function NewPostPage() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="제목 (선택사항)"
-            className="mb-3 w-full border-b border-gray-100 pb-3 text-base font-semibold text-gray-900 placeholder-gray-300 outline-none"
+            className="mb-3 w-full border-b border-gray-100 bg-white pb-3 text-base font-semibold text-gray-900 outline-none placeholder:text-gray-300"
           />
           <textarea
             autoFocus
@@ -158,7 +174,7 @@ export default function NewPostPage() {
             onChange={(e) => setContent(e.target.value)}
             placeholder="무슨 생각을 하고 계신가요?"
             rows={10}
-            className="w-full resize-none text-sm leading-relaxed text-gray-800 placeholder-gray-300 outline-none"
+            className="w-full resize-none bg-white text-sm leading-relaxed text-gray-800 outline-none placeholder:text-gray-300"
           />
 
           {/* 미디어 미리보기 */}
@@ -171,15 +187,15 @@ export default function NewPostPage() {
           <div className="flex flex-wrap gap-2">
             {CATEGORIES.map((cat) => (
               <button
-                key={cat}
-                onClick={() => setCategory(category === cat ? "" : cat)}
+                key={cat.value}
+                onClick={() => setCategory(category === cat.value ? "" : cat.value)}
                 className={`rounded-full border px-3 py-1 text-xs transition ${
-                  category === cat
+                  category === cat.value
                     ? "border-red-600 bg-red-600 text-white"
                     : "border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-500"
                 }`}
               >
-                {cat}
+                {cat.label}
               </button>
             ))}
           </div>
@@ -194,11 +210,6 @@ export default function NewPostPage() {
                 ({media.length}/{MAX_FILES}) · 최대 {MAX_FILE_SIZE_MB}MB
               </span>
             </p>
-
-            {/* 업로드 비활성 안내 — BE 완성 후 제거 */}
-            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] text-amber-500">
-              ⚠️ 저장은 API 연동 후 적용
-            </span>
           </div>
 
           <div className="mt-2 flex gap-2">
@@ -212,8 +223,8 @@ export default function NewPostPage() {
               onChange={(e) => handleFileSelect(e, "image")}
             />
             <button
-              onClick={() => imageRef.current?.click()}
-              disabled={media.length >= MAX_FILES}
+            onClick={() => imageRef.current?.click()}
+              disabled={submitting || media.length >= MAX_FILES}
               className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600 transition hover:border-red-300 hover:text-red-500 disabled:opacity-40"
             >
               📷 사진
@@ -229,8 +240,8 @@ export default function NewPostPage() {
               onChange={(e) => handleFileSelect(e, "video")}
             />
             <button
-              onClick={() => videoRef.current?.click()}
-              disabled={media.length >= MAX_FILES}
+            onClick={() => videoRef.current?.click()}
+              disabled={submitting || media.length >= MAX_FILES}
               className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600 transition hover:border-red-300 hover:text-red-500 disabled:opacity-40"
             >
               🎥 동영상

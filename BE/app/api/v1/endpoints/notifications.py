@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -36,6 +38,9 @@ async def list_notifications(
                 "type": n.type,
                 "title": n.title,
                 "body": n.body,
+                "data": n.data or {},
+                "project_id": (n.data or {}).get("project_id"),
+                "url": (n.data or {}).get("url"),
                 "is_read": n.is_read,
                 "created_at": n.created_at,
             }
@@ -63,5 +68,6 @@ async def read_notification(
     if notification is None or notification.user_id != current_user_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
     notification.is_read = True
+    notification.read_at = datetime.now(timezone.utc)
     db.commit()
     return success_response(data={"id": notification.id, "is_read": True})

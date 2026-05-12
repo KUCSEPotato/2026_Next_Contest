@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import httpx
 from fastapi import HTTPException, status
+
+logger = logging.getLogger(__name__)
 
 
 async def exchange_github_code_for_access_token(
@@ -29,11 +32,13 @@ async def exchange_github_code_for_access_token(
         )
 
     if response.status_code != 200:
+        logger.warning("GitHub token exchange failed: status=%s body=%s", response.status_code, response.text[:500])
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="GitHub token exchange failed")
 
     data = response.json()
     access_token = data.get("access_token")
     if not access_token:
+        logger.warning("GitHub token exchange returned no access_token: keys=%s", sorted(data.keys()))
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid GitHub authorization code")
     return access_token
 
@@ -47,11 +52,19 @@ async def fetch_github_user_profile(access_token: str) -> dict[str, Any]:
     async with httpx.AsyncClient(timeout=10.0) as client:
         user_response = await client.get("https://api.github.com/user", headers=headers)
     if user_response.status_code != 200:
+        logger.warning(
+            "Unable to fetch GitHub user profile: status=%s body=%s",
+            user_response.status_code,
+            user_response.text[:500],
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unable to fetch GitHub user profile")
 
     user_data = user_response.json()
+    github_id = user_data.get("id")
+    github_login = user_data.get("login")
     email = user_data.get("email")
     if not email:
+        logger.info("GitHub /user returned null email; fetching /user/emails for github_id=%s login=%s", github_id, github_login)
         async with httpx.AsyncClient(timeout=10.0) as client:
             emails_response = await client.get("https://api.github.com/user/emails", headers=headers)
         if emails_response.status_code == 200:
@@ -61,14 +74,28 @@ async def fetch_github_user_profile(access_token: str) -> dict[str, Any]:
             selected = primary or fallback
             if selected:
                 email = selected.get("email")
+        else:
+            logger.info(
+                "Unable to fetch GitHub user emails; falling back to noreply email when possible: status=%s accepted_scope=%s body=%s",
+                emails_response.status_code,
+                emails_response.headers.get("x-oauth-scopes"),
+                emails_response.text[:500],
+            )
+
+    if not email and github_id:
+        # GitHub email 비공개 계정의 경우 no-reply 주소를 fallback으로 사용
+        fallback_login = github_login or "github"
+        email = f"{github_id}+{fallback_login}@users.noreply.github.com"
+        logger.info("Using GitHub noreply fallback email for github_id=%s login=%s", github_id, github_login)
 
     if not email:
+        logger.error("GitHub profile has no usable email or id fallback: keys=%s", sorted(user_data.keys()))
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="GitHub account email is required")
 
     return {
-        "provider_id": str(user_data.get("id")) if user_data.get("id") is not None else None,
+        "provider_id": str(github_id) if github_id is not None else None,
         "email": email,
-        "login": user_data.get("login"),
+        "login": github_login,
         "avatar_url": user_data.get("avatar_url"),
         "name": user_data.get("name"),
     }

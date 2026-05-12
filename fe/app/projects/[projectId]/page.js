@@ -5,9 +5,44 @@ import { useParams, useRouter } from "next/navigation";
 import {
   getProjectApi,
   applyProjectApi,
-  requestAdoptionApi,
   getMyProfileApi,
+  updateProjectApi,
+  deleteProjectApi,
+  revertProjectToIdeaApi,
+  getMyApplicationsApi,
 } from "../../../lib/api";
+
+const DIFFICULTY_OPTIONS = [
+  { value: "beginner", label: "입문" },
+  { value: "intermediate", label: "중급" },
+  { value: "advanced", label: "고급" },
+];
+
+const CATEGORY_OPTIONS = [
+  "IT/소프트웨어",
+  "경영/경제",
+  "디자인/UI·UX",
+  "AI/데이터",
+  "교육/학습",
+  "금융/핀테크",
+  "커머스/쇼핑",
+  "소셜/커뮤니티",
+  "헬스케어",
+];
+
+const getProjectMemberUserId = (member) => member.user_id || member.id || member.user?.id;
+
+const getProjectMemberDisplayName = (member) => {
+  const userId = getProjectMemberUserId(member);
+
+  return (
+    member.nickname ||
+    member.user?.nickname ||
+    member.name ||
+    member.user?.name ||
+    `User #${userId}`
+  );
+};
 
 export default function ProjectDetailPage() {
   const params = useParams();
@@ -16,25 +51,88 @@ export default function ProjectDetailPage() {
 
   const [project, setProject] = useState(null);
   const [myProfile, setMyProfile] = useState(null);
+
   const [message, setMessage] = useState("");
   const [isApplying, setIsApplying] = useState(false);
+  const [myApplication, setMyApplication] = useState(null);
 
-  const [adoptionMessage, setAdoptionMessage] = useState("");
-  const [isRequestingAdoption, setIsRequestingAdoption] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDiscardOptions, setShowDiscardOptions] = useState(false);
+
+  const [editForm, setEditForm] = useState({
+    title: "",
+    summary: "",
+    description: "",
+    difficulty: "",
+    category: "",
+    progress_percent: 0,
+    max_members: 10,
+    expected_period: "",
+    preferred_members: "",
+    tech_stack: "",
+    hashtags: "",
+    is_public: true,
+  });
 
   const textareaClassName =
     "mt-4 min-h-32 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100";
 
+  const inputClassName =
+    "w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100";
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [projectId]);
+
   useEffect(() => {
     async function fetchProject() {
       try {
-        const [projectResult, profileResult] = await Promise.all([
+        const [projectResult, profileResult, applicationsResult] = await Promise.allSettled([
           getProjectApi(projectId),
           getMyProfileApi(),
+          getMyApplicationsApi(),
         ]);
 
-        setProject(projectResult.data);
-        setMyProfile(profileResult.data);
+        if (projectResult.status !== "fulfilled") {
+          throw projectResult.reason;
+        }
+
+        const projectData = projectResult.value.data;
+
+        setProject(projectData);
+        setMyProfile(
+          profileResult.status === "fulfilled" ? profileResult.value.data : null
+        );
+        setMyApplication(
+          applicationsResult.status === "fulfilled"
+            ? (applicationsResult.value.data || []).find(
+                (application) =>
+                  String(application.project_id) === String(projectId)
+              ) || null
+            : null
+        );
+
+        setEditForm({
+          title: projectData.title || "",
+          summary: projectData.summary || "",
+          description: projectData.description || "",
+          difficulty: projectData.difficulty || "",
+          category: projectData.category || projectData.domain || "",
+          progress_percent: projectData.progress_percent ?? 0,
+          max_members:
+            projectData.max_members ??
+            projectData.maxMembers ??
+            projectData.recruitment_count ??
+            projectData.member_limit ??
+            "",
+          expected_period: projectData.expected_period || "",
+          preferred_members: projectData.preferred_members || "",
+          tech_stack: (projectData.tech_stack || projectData.techStack || []).join(", "),
+          hashtags: (projectData.hashtags || []).join(", "),
+          is_public: projectData.is_public ?? true,
+        });
       } catch (error) {
         console.error(error);
         alert("프로젝트 정보를 불러오지 못했습니다.");
@@ -45,8 +143,127 @@ export default function ProjectDetailPage() {
   }, [projectId]);
 
   const isLeader = project?.leader_id === myProfile?.id;
+  const isProjectCompleted = project?.status === "completed";
+  const hasApplied = Boolean(myApplication);
+  const acceptedMemberCount = project?.members?.length || 1;
+
+  const handleEditChange = (field, value) => {
+    setEditForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editForm.title.trim()) {
+      alert("프로젝트 제목을 입력해주세요.");
+      return;
+    }
+
+    if (!editForm.description.trim()) {
+      alert("상세 설명을 입력해주세요.");
+      return;
+    }
+
+    if (!editForm.category) {
+      alert("프로젝트 유형을 선택해주세요.");
+      return;
+    }
+
+    if (Number(editForm.max_members) < acceptedMemberCount) {
+      alert(`현재 팀원수인 ${acceptedMemberCount}명 이상으로만 변경 가능합니다.`);
+      return;
+    }
+
+    try {
+      setIsSavingEdit(true);
+
+      await updateProjectApi(projectId, {
+        title: editForm.title,
+        summary: editForm.summary,
+        description: editForm.description,
+        difficulty: editForm.difficulty,
+        category: editForm.category,
+        progress_percent: Number(editForm.progress_percent),
+        max_members: Number(editForm.max_members),
+        expected_period: editForm.expected_period.trim(),
+        preferred_members: editForm.preferred_members.trim(),
+        tech_stack: editForm.tech_stack
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+        hashtags: editForm.hashtags
+          .split(",")
+          .map((item) => item.trim().replace(/^#/, ""))
+          .filter(Boolean),
+        is_public: editForm.is_public,
+      });
+
+      const refreshed = await getProjectApi(projectId);
+      setProject(refreshed.data);
+      setIsEditing(false);
+
+      alert("프로젝트 정보가 수정되었습니다.");
+    } catch (error) {
+      console.error(error);
+      alert("프로젝트 수정에 실패했습니다.");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleRevertToIdea = async () => {
+    if (isProjectCompleted) {
+      alert("완료된 프로젝트는 버릴 수 없습니다.");
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      await revertProjectToIdeaApi(projectId);
+
+      alert("프로젝트가 생각의 뜰으로 이동되었습니다.");
+      router.push("/ideas/pickup");
+    } catch (error) {
+      console.error(error);
+      alert("생각의 뜰으로 보내는 데 실패했습니다.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    if (isProjectCompleted) {
+      alert("완료된 프로젝트는 버릴 수 없습니다.");
+      return;
+    }
+
+    const reallyDelete = window.confirm(
+      "정말 삭제하시겠습니까? 삭제한 프로젝트는 다시 이어가기 어렵습니다."
+    );
+
+    if (!reallyDelete) return;
+
+    try {
+      setIsDeleting(true);
+      await deleteProjectApi(projectId);
+
+      alert("프로젝트가 삭제되었습니다.");
+      router.push("/mainpage");
+    } catch (error) {
+      console.error(error);
+      alert("프로젝트 삭제에 실패했습니다.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleApply = async () => {
+    if (hasApplied) {
+      alert("이미 지원한 프로젝트입니다.");
+      return;
+    }
+
     if (!message.trim()) {
       alert("지원 메시지를 입력해주세요.");
       return;
@@ -55,34 +272,20 @@ export default function ProjectDetailPage() {
     try {
       setIsApplying(true);
       const result = await applyProjectApi(projectId, message);
-      console.log("지원 성공:", result);
+      setMyApplication(result.data || { project_id: Number(projectId), status: "pending" });
       alert("프로젝트 지원이 완료되었습니다.");
       setMessage("");
     } catch (error) {
       console.error(error);
+      const errorMessage = String(error?.message || "");
+      if (errorMessage.includes("Application already exists")) {
+        setMyApplication({ project_id: Number(projectId), status: "pending" });
+        alert("이미 지원한 프로젝트입니다.");
+        return;
+      }
       alert("프로젝트 지원에 실패했습니다.");
     } finally {
       setIsApplying(false);
-    }
-  };
-
-  const handleAdoptionRequest = async () => {
-    if (!adoptionMessage.trim()) {
-      alert("이어받기 요청 메시지를 입력해주세요.");
-      return;
-    }
-
-    try {
-      setIsRequestingAdoption(true);
-      const result = await requestAdoptionApi(projectId, adoptionMessage);
-      console.log("이어받기 요청 성공:", result);
-      alert("이어받기 요청이 완료되었습니다.");
-      setAdoptionMessage("");
-    } catch (error) {
-      console.error(error);
-      alert("이어받기 요청에 실패했습니다.");
-    } finally {
-      setIsRequestingAdoption(false);
     }
   };
 
@@ -94,53 +297,308 @@ export default function ProjectDetailPage() {
     );
   }
 
+  const projectMembers = project.members || [];
+  const leaderMember = projectMembers.find(
+    (member) => getProjectMemberUserId(member) === project.leader_id
+  );
+  const leaderDisplayName =
+    leaderMember
+      ? getProjectMemberDisplayName(leaderMember)
+      : project.leader?.nickname || project.leader_name || `User #${project.leader_id}`;
+
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
       <div className="mx-auto w-full max-w-5xl">
         <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-semibold text-red-700">
-              {project.status}
-            </span>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
-              난이도 {project.difficulty}
-            </span>
-          </div>
+          {isEditing ? (
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  프로젝트 제목
+                </label>
+                <input
+                  className={inputClassName}
+                  value={editForm.title}
+                  onChange={(e) => handleEditChange("title", e.target.value)}
+                  placeholder="프로젝트 제목"
+                />
+              </div>
 
-          <h1 className="text-3xl font-bold text-slate-900">
-            {project.title}
-          </h1>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  한 줄 요약
+                </label>
+                <input
+                  className={inputClassName}
+                  value={editForm.summary}
+                  onChange={(e) => handleEditChange("summary", e.target.value)}
+                  placeholder="예: 아이디어를 공유하고 협업자를 구하는 플랫폼"
+                />
+              </div>
 
-          <p className="mt-3 text-lg text-slate-600">{project.summary}</p>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  상세 설명
+                </label>
+                <textarea
+                  className={textareaClassName}
+                  value={editForm.description}
+                  onChange={(e) => handleEditChange("description", e.target.value)}
+                  placeholder="아이디어의 목적, 주요 기능, 필요한 역할 등을 설명해주세요."
+                />
+              </div>
 
-          <div className="mt-6">
-            <div className="mb-2 flex justify-between text-sm font-semibold text-slate-700">
-              <span>진행률</span>
-              <span>{project.progress_percent}%</span>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-700">
+                    난이도
+                  </label>
+                  <select
+                    className={inputClassName}
+                    value={editForm.difficulty}
+                    onChange={(e) => handleEditChange("difficulty", e.target.value)}
+                  >
+                    <option value="">난이도를 선택해주세요</option>
+                    {DIFFICULTY_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-700">
+                    프로젝트 유형
+                  </label>
+                  <select
+                    className={inputClassName}
+                    value={editForm.category}
+                    onChange={(e) => handleEditChange("category", e.target.value)}
+                  >
+                    <option value="">프로젝트 유형을 선택해주세요</option>
+                    {CATEGORY_OPTIONS.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-700">
+                    모집 인원 (리더 포함) (최대 인원: 100명)
+                  </label>
+                  <input
+                    className={inputClassName}
+                    type="number"
+                    min={acceptedMemberCount}
+                    max="100"
+                    value={editForm.max_members}
+                    onChange={(e) => handleEditChange("max_members", e.target.value)}
+                    placeholder="모집 인원 (리더 포함)"
+                  />
+                  <p className="mt-1 text-xs text-slate-500">
+                    리더 포함 총 인원입니다. {acceptedMemberCount}명(현재 팀원수) 이상으로만 설정할 수 있습니다.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-700">
+                    예상 진행 기간
+                  </label>
+                  <input
+                    className={inputClassName}
+                    value={editForm.expected_period}
+                    onChange={(e) => handleEditChange("expected_period", e.target.value)}
+                    placeholder="예: 3개월, 한 학기, 2026년 3월까지"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  이런 분과 함께하고 싶어요
+                </label>
+                <textarea
+                  className="mt-4 min-h-28 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
+                  value={editForm.preferred_members}
+                  onChange={(e) => handleEditChange("preferred_members", e.target.value)}
+                  placeholder="예: 백엔드 경험이 있는 분, 주 1회 이상 회의 가능한 분, 꾸준히 소통 가능한 분"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  기술 스택
+                </label>
+                <input
+                  className={inputClassName}
+                  value={editForm.tech_stack}
+                  onChange={(e) => handleEditChange("tech_stack", e.target.value)}
+                  placeholder="예: React, FastAPI, PostgreSQL"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  쉼표로 구분해서 입력해주세요.
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  해시태그
+                </label>
+                <input
+                  className={inputClassName}
+                  value={editForm.hashtags}
+                  onChange={(e) => handleEditChange("hashtags", e.target.value)}
+                  placeholder="예: 협업, 초보환영, AI추천"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  쉼표로 구분해서 입력해주세요.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={isSavingEdit}
+                  className="flex-1 rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:bg-slate-400"
+                >
+                  {isSavingEdit ? "저장 중..." : "수정 저장하기"}
+                </button>
+
+                <button
+                  onClick={() => setIsEditing(false)}
+                  className="flex-1 rounded-xl border border-slate-200 px-5 py-3 font-semibold text-slate-600 transition hover:bg-slate-50"
+                >
+                  취소
+                </button>
+              </div>
             </div>
+          ) : (
+            <>
+              <div className="mb-4 flex flex-wrap items-center gap-3">
+                <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-semibold text-red-700">
+                  {project.status}
+                </span>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
+                  난이도 {project.difficulty}
+                </span>
+              </div>
 
-            <div className="h-3 overflow-hidden rounded-full bg-slate-200">
-              <div
-                className="h-full rounded-full bg-red-600"
-                style={{ width: `${project.progress_percent}%` }}
-              />
-            </div>
-          </div>
+              <h1 className="text-3xl font-bold text-slate-900">
+                {project.title}
+              </h1>
 
-          <button
-            onClick={() => router.push(`/projects/${projectId}/chat`)}
-            className="mt-6 w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800"
-          >
-            팀 채팅방 들어가기
-          </button>
+              <p className="mt-3 text-lg text-slate-600">{project.summary}</p>
+
+              {isLeader && (
+                <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
+                  >
+                    수정하기
+                  </button>
+
+                  {!isProjectCompleted && (
+                    <button
+                      onClick={() => setShowDiscardOptions(true)}
+                      disabled={isDeleting}
+                      className="rounded-xl border border-red-200 bg-white px-5 py-3 font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                    >
+                      {isDeleting ? "처리 중..." : "버리기"}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <button
+                onClick={() => router.push(`/projects/${projectId}/chat`)}
+                className="mt-6 w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800"
+              >
+                팀 채팅방 들어가기
+              </button>
+            </>
+          )}
         </section>
 
         <div className="grid gap-6 lg:grid-cols-3">
           <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm lg:col-span-2">
             <h2 className="text-xl font-bold text-slate-900">프로젝트 설명</h2>
-            <p className="mt-4 whitespace-pre-line leading-7 text-slate-700">
-              {project.description}
-            </p>
+            <div
+              className="mt-4 whitespace-pre-line leading-7 text-slate-700"
+              dangerouslySetInnerHTML={{
+                __html: project.description?.replace(/\n/g, "<br />"),
+              }}
+            />
+
+            {(project.expected_period || project.preferred_members) && (
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                {project.expected_period && (
+                  <div className="rounded-xl bg-slate-50 p-4">
+                    <p className="text-sm font-semibold text-slate-900">
+                      예상 진행 기간
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      {project.expected_period}
+                    </p>
+                  </div>
+                )}
+
+                {project.preferred_members && (
+                  <div className="rounded-xl bg-slate-50 p-4">
+                    <p className="text-sm font-semibold text-slate-900">
+                      이런 분과 함께하고 싶어요
+                    </p>
+                    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">
+                      {project.preferred_members}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {((project.tech_stack || project.techStack || []).length > 0 ||
+              (project.hashtags || []).length > 0) && (
+              <div className="mt-6 space-y-3">
+                {(project.tech_stack || project.techStack || []).length > 0 && (
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      기술 스택
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {(project.tech_stack || project.techStack || []).map((tech) => (
+                        <span
+                          key={tech}
+                          className="rounded-full bg-red-50 px-3 py-1 text-sm font-semibold text-red-700"
+                        >
+                          {tech}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(project.hashtags || []).length > 0 && (
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      해시태그
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {(project.hashtags || []).map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600"
+                        >
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
 
           <aside className="space-y-6">
@@ -149,10 +607,13 @@ export default function ProjectDetailPage() {
 
               <div className="mt-4 space-y-3">
                 <p className="text-sm text-slate-600">
-                  리더 ID:{" "}
-                  <span className="font-semibold text-slate-900">
-                    {project.leader_id}
-                  </span>
+                  리더:{" "}
+                  <button
+                    onClick={() => router.push(`/users/${project.leader_id}`)}
+                    className="font-semibold text-slate-900 transition hover:text-red-600 hover:underline"
+                  >
+                    {leaderDisplayName}
+                  </button>
                 </p>
 
                 <div>
@@ -161,14 +622,32 @@ export default function ProjectDetailPage() {
                   </p>
 
                   <div className="space-y-2">
-                    {project.members.map((member) => (
-                      <div
-                        key={`${member.user_id}-${member.role_in_project}`}
-                        className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700"
-                      >
-                        User #{member.user_id} · {member.role_in_project}
-                      </div>
-                    ))}
+                    {projectMembers.map((member) => {
+                      const memberUserId = getProjectMemberUserId(member);
+
+                      return (
+                        <div
+                          key={`${memberUserId}-${member.role_in_project}`}
+                          className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700"
+                        >
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/users/${memberUserId}`);
+                              }}
+                              className="font-semibold text-slate-900 transition hover:text-red-600 hover:underline"
+                            >
+                              {getProjectMemberDisplayName(member)}
+                            </button>
+
+                            <span className="text-slate-500">
+                              · {member.role_in_project}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -197,54 +676,82 @@ export default function ProjectDetailPage() {
                   프로젝트 지원하기
                 </h2>
 
-                <p className="mt-2 text-sm text-slate-500">
-                  팀장에게 보낼 간단한 소개와 참여 의지를 적어주세요.
-                </p>
+                {hasApplied ? (
+                  <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                    이미 지원한 프로젝트입니다.
+                  </div>
+                ) : (
+                  <>
+                    <p className="mt-2 text-sm text-slate-500">
+                      팀장에게 보낼 간단한 소개와 참여 의지를 적어주세요.
+                    </p>
 
-                <textarea
-                  className={textareaClassName}
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="예: React와 UI 구현을 맡아 참여하고 싶습니다."
-                />
+                    <textarea
+                      className={textareaClassName}
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      placeholder="예: React와 UI 구현을 맡아 참여하고 싶습니다."
+                    />
 
-                <button
-                  onClick={handleApply}
-                  disabled={isApplying}
-                  className="mt-4 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-                >
-                  {isApplying ? "지원 중..." : "지원하기"}
-                </button>
+                    <button
+                      onClick={handleApply}
+                      disabled={isApplying}
+                      className="mt-4 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                    >
+                      {isApplying ? "지원 중..." : "지원하기"}
+                    </button>
+                  </>
+                )}
               </section>
             )}
-
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-900">
-                프로젝트 이어받기
-              </h2>
-
-              <p className="mt-2 text-sm text-slate-500">
-                이 프로젝트를 이어서 진행하고 싶은 이유를 작성해주세요.
-              </p>
-
-              <textarea
-                className={textareaClassName}
-                value={adoptionMessage}
-                onChange={(e) => setAdoptionMessage(e.target.value)}
-                placeholder="예: 기존 아이디어를 발전시켜 완성도 높은 서비스로 이어가고 싶습니다."
-              />
-
-              <button
-                onClick={handleAdoptionRequest}
-                disabled={isRequestingAdoption}
-                className="mt-4 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-              >
-                {isRequestingAdoption ? "요청 중..." : "이어받기 요청하기"}
-              </button>
-            </section>
           </aside>
         </div>
       </div>
+
+      {showDiscardOptions && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+            onClick={() => {
+              if (!isDeleting) setShowDiscardOptions(false);
+            }}
+          />
+
+          <div className="relative w-full max-w-md rounded-2xl bg-white p-7 shadow-2xl">
+            <h2 className="text-xl font-bold text-slate-900">프로젝트 버리기</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-500">
+              그냥 삭제하면 이 아이디어는 사라집니다. 아이디어 씨앗을 다른 사람이 이어서 키워볼 수 있도록
+              생각의 뜰에 뿌리는 선택을 추천해요.
+            </p>
+
+            <div className="mt-6 space-y-2">
+              <button
+                onClick={handleRevertToIdea}
+                disabled={isDeleting}
+                className="w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:bg-slate-300"
+              >
+                생각의 뜰에 뿌리기
+              </button>
+
+              <button
+                onClick={handleDeleteProject}
+                disabled={isDeleting}
+                className="w-full rounded-xl border border-slate-200 px-5 py-3 font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+              >
+                삭제하기
+              </button>
+
+              <button
+                onClick={() => setShowDiscardOptions(false)}
+                disabled={isDeleting}
+                className="w-full rounded-xl px-5 py-3 text-sm font-semibold text-slate-400 transition hover:bg-slate-50 disabled:cursor-not-allowed"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

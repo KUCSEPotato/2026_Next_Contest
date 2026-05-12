@@ -39,7 +39,7 @@ class PostDetailResponse(PostResponse):
     """Detailed post response with author info and stats"""
     author: dict  # {id, nickname, avatar_url}
     comment_count: int
-    reaction_stats: dict  # {like: 5, interested: 3, helpful: 2, curious: 1}
+    reaction_stats: dict  # {recommend, not_recommend counts}
     user_reaction: str | None  # 현재 사용자의 반응
 
 
@@ -51,6 +51,7 @@ class CommentCreateRequest(BaseModel):
     """Create a new comment on a post"""
     content: str = Field(..., min_length=1)
     parent_comment_id: int | None = None
+    is_anonymous: bool = Field(default=False)
 
 
 class CommentUpdateRequest(BaseModel):
@@ -72,7 +73,7 @@ class CommentResponse(BaseModel):
 class CommentDetailResponse(CommentResponse):
     """Detailed comment response with author info and stats"""
     author: dict  # {id, nickname, avatar_url}
-    reaction_stats: dict  # {like, interested, helpful, curious counts}
+    reaction_stats: dict  # {recommend, not_recommend counts}
     user_reaction: str | None
     reply_count: int
 
@@ -83,15 +84,13 @@ class CommentDetailResponse(CommentResponse):
 
 class ReactionRequest(BaseModel):
     """Add or remove a reaction"""
-    reaction_type: str = Field(..., pattern="^(like|interested|helpful|curious)$")
+    reaction_type: str = Field(..., pattern="^(recommend|not_recommend)$")
 
 
 class ReactionStatsResponse(BaseModel):
     """Reaction statistics for a post or comment"""
-    like: int
-    interested: int
-    helpful: int
-    curious: int
+    recommend: int
+    not_recommend: int
     user_reaction: str | None  # Current user's reaction or null
 
 

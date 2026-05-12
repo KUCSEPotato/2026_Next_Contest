@@ -2,14 +2,17 @@ from app.models.entities import AdoptionRequest
 from app.models.entities import Application
 from app.models.entities import ChatMessage
 from app.models.entities import ChatRoom
+from app.models.entities import ChatRoomMember
 from app.models.entities import CommunityPost
 from app.models.entities import CommunityPostComment
 from app.models.entities import CommunityPostReaction
 from app.models.entities import CommunityCommentReaction
+from app.models.entities import CommunityPostFile
 from app.models.entities import CoinTransaction
 from app.models.entities import FailureStory
 from app.models.entities import Idea
 from app.models.entities import IdeaBookmark
+from app.models.entities import IdeaFile
 from app.models.entities import IdeaLike
 from app.models.entities import Invitation
 from app.models.entities import Notification
@@ -40,14 +43,17 @@ __all__ = [
 	"Application",
 	"ChatMessage",
 	"ChatRoom",
+	"ChatRoomMember",
 	"CommunityPost",
 	"CommunityPostComment",
 	"CommunityPostReaction",
 	"CommunityCommentReaction",
+	"CommunityPostFile",
 	"CoinTransaction",
 	"FailureStory",
 	"Idea",
 	"IdeaBookmark",
+	"IdeaFile",
 	"IdeaLike",
 	"Invitation",
 	"Notification",

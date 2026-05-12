@@ -1,8 +1,11 @@
 import secrets
+import logging
 from datetime import datetime, timedelta, timezone
 import re
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -14,11 +17,15 @@ from app.core.security import decode_token
 from app.core.security import hash_password
 from app.core.security import verify_password
 from app.core.token_store import delete_password_reset_token
+from app.core.token_store import delete_oauth_link_token
 from app.core.token_store import get_password_reset_token
+from app.core.token_store import get_oauth_link_token
 from app.core.token_store import get_refresh_token_user_id
 from app.core.token_store import is_refresh_token_revoked
+from app.core.token_store import OAUTH_LINK_TOKEN_TTL_SECONDS
 from app.core.token_store import revoke_access_token
 from app.core.token_store import revoke_refresh_token
+from app.core.token_store import set_oauth_link_token
 from app.core.token_store import set_password_reset_token
 from app.core.token_store import store_refresh_token
 from app.db.session import get_db
@@ -28,6 +35,7 @@ from app.schemas.auth import ForgotPasswordRequest
 from app.schemas.auth import LoginRequest
 from app.schemas.auth import LogoutRequest
 from app.schemas.auth import OAuthGithubLoginRequest
+from app.schemas.auth import OAuthGithubLinkExistingRequest
 from app.schemas.auth import OAuthGithubLinkRequest
 from app.schemas.auth import OAuthGoogleLoginRequest
 from app.schemas.auth import OAuthGoogleLinkRequest
@@ -38,8 +46,10 @@ from app.services.oauth import exchange_github_code_for_access_token
 from app.services.oauth import exchange_google_code_for_access_token
 from app.services.oauth import fetch_github_user_profile
 from app.services.oauth import fetch_google_user_profile
+from app.services.s3_upload import resolve_avatar_url
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _normalize_nickname_seed(raw_value: str | None) -> str:
@@ -83,6 +93,10 @@ def _load_active_user(db: Session, user_id: int) -> User:
     return user
 
 
+def _get_avatar_url(user: User) -> str | None:
+    return resolve_avatar_url(user.avatar_s3_key, user.avatar_url)
+
+
 def _serialize_user_onboarding(user: User) -> dict:
     return {
         "id": user.id,
@@ -94,7 +108,43 @@ def _serialize_user_onboarding(user: User) -> dict:
         "is_verified": user.is_verified,
         "onboarding_step": user.onboarding_step,
         "onboarding_completed_at": user.onboarding_completed_at,
+        "avatar_url": _get_avatar_url(user),
     }
+
+
+def _create_github_link_confirmation(user: User, profile: dict) -> dict:
+    link_token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=OAUTH_LINK_TOKEN_TTL_SECONDS)
+    set_oauth_link_token(
+        link_token,
+        {
+            "provider": "github",
+            "user_id": user.id,
+            "email": profile["email"],
+            "github_id": profile.get("provider_id"),
+            "github_login": profile.get("login"),
+            "avatar_url": profile.get("avatar_url"),
+        },
+        expires_at,
+    )
+    return {
+        "requires_link_confirmation": True,
+        "provider": "github",
+        "email": user.email,
+        "nickname": user.nickname,
+        "link_token": link_token,
+        "expires_in": OAUTH_LINK_TOKEN_TTL_SECONDS,
+    }
+
+
+def _link_github_profile_to_user(user: User, profile: dict) -> None:
+    github_id = profile.get("provider_id")
+    avatar_url = profile.get("avatar_url")
+    if github_id:
+        user.github_id = github_id
+    if avatar_url and not user.avatar_url:
+        user.avatar_url = avatar_url
+    user.is_verified = True
 
 
 @router.post("/signup", summary="회원가입", description="이메일/아이디/이름/전화번호/비밀번호로 계정을 생성합니다.")
@@ -115,7 +165,7 @@ async def signup(payload: SignupRequest, db: Session = Depends(get_db)) -> dict:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists")
 
     if db.query(User).filter(User.nickname == login_id, User.deleted_at.is_(None)).first():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Login id already exists")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 존재하는 닉네임입니다.")
 
     user = User(
         email=email,
@@ -195,11 +245,146 @@ async def github_oauth_login(payload: OAuthGithubLoginRequest, db: Session = Dep
     user = None
     if github_id:
         user = db.query(User).filter(User.github_id == github_id, User.deleted_at.is_(None)).first()
-    if user is None:
-        user = db.query(User).filter(User.email == email, User.deleted_at.is_(None)).first()
+    if user is not None:
+        if avatar_url and not user.avatar_url:
+            user.avatar_url = avatar_url
+        user.is_verified = True
+        db.commit()
+        return success_response(data=_create_auth_tokens(user.id))
 
-    if user is None:
-        final_nickname = _build_unique_nickname(db, nickname or github_login, fallback=email.split("@")[0])
+    existing_email_user = db.query(User).filter(User.email == email, User.deleted_at.is_(None)).first()
+    if existing_email_user is not None:
+        if existing_email_user.github_id and existing_email_user.github_id != github_id:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email account is linked to another GitHub account")
+        return success_response(data=_create_github_link_confirmation(existing_email_user, profile))
+
+    final_nickname = _build_unique_nickname(db, nickname or github_login, fallback=email.split("@")[0])
+    user = User(
+        email=email,
+        nickname=final_nickname,
+        github_id=github_id,
+        avatar_url=avatar_url,
+        is_verified=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    return success_response(
+        data={
+            **_create_auth_tokens(user.id),
+            "user": _serialize_user_onboarding(user),
+            "is_new_user": True,
+        },
+    )
+
+
+@router.post("/oauth/link-existing/github", summary="기존 계정에 GitHub 연결 확정", description="GitHub OAuth 이메일이 기존 계정과 일치할 때 사용자의 확인 후 계정을 연결합니다.")
+async def confirm_existing_github_link(
+    payload: OAuthGithubLinkExistingRequest,
+    db: Session = Depends(get_db),
+) -> dict:
+    token_data = get_oauth_link_token(payload.link_token)
+    if token_data is None or token_data.get("provider") != "github":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired link token")
+
+    user = _load_active_user(db, int(token_data["user_id"]))
+    github_id = token_data.get("github_id")
+    if not github_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid GitHub account id")
+
+    existing = db.query(User).filter(User.github_id == github_id, User.id != user.id, User.deleted_at.is_(None)).first()
+    if existing:
+        delete_oauth_link_token(payload.link_token)
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="GitHub account already linked to another user")
+
+    if user.github_id and user.github_id != github_id:
+        delete_oauth_link_token(payload.link_token)
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This account is already linked to another GitHub account")
+
+    _link_github_profile_to_user(
+        user,
+        {
+            "provider_id": github_id,
+            "avatar_url": token_data.get("avatar_url"),
+        },
+    )
+    db.commit()
+    delete_oauth_link_token(payload.link_token)
+
+    return success_response(
+        data={
+            **_create_auth_tokens(user.id),
+            "user": _serialize_user_onboarding(user),
+            "linked_provider": "github",
+        },
+    )
+
+
+@router.get("/github/callback", summary="GitHub OAuth Callback", description="GitHub OAuth 인증 후 리다이렉트 처리")
+async def github_oauth_callback(
+    code: str,
+    state: str | None = None,
+    db: Session = Depends(get_db),
+) -> RedirectResponse:
+    """GitHub OAuth callback 처리.
+    
+    GitHub에서 사용자 승인 후 이 엔드포인트로 리다이렉트됩니다.
+    code를 검증하고 유저를 생성/조회한 후, 프론트엔드로 토큰과 함께 리다이렉트합니다.
+    """
+    try:
+        if not settings.github_oauth_client_id or not settings.github_oauth_client_secret:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="GitHub OAuth is not configured")
+        
+        redirect_uri = settings.github_oauth_redirect_uri
+        access_token = await exchange_github_code_for_access_token(
+            client_id=settings.github_oauth_client_id,
+            client_secret=settings.github_oauth_client_secret,
+            code=code,
+            redirect_uri=redirect_uri,
+        )
+        profile = await fetch_github_user_profile(access_token)
+        
+        github_id = profile.get("provider_id")
+        email = profile["email"]
+        github_login = profile.get("login")
+        avatar_url = profile.get("avatar_url")
+        
+        frontend_url = settings.frontend_url or "http://localhost:3000"
+
+        # 기존 유저 찾기
+        user = None
+        if github_id:
+            user = db.query(User).filter(User.github_id == github_id, User.deleted_at.is_(None)).first()
+        if user is not None:
+            if avatar_url and not user.avatar_url:
+                user.avatar_url = avatar_url
+            user.is_verified = True
+            db.commit()
+
+            tokens = _create_auth_tokens(user.id)
+            access_token_value = tokens["access_token"]
+            redirect_url = f"{frontend_url}/signup?step=profile&via=github&access_token={access_token_value}&user_id={user.id}"
+            return RedirectResponse(url=redirect_url, status_code=302)
+
+        existing_email_user = db.query(User).filter(User.email == email, User.deleted_at.is_(None)).first()
+        if existing_email_user is not None:
+            if existing_email_user.github_id and existing_email_user.github_id != github_id:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email account is linked to another GitHub account")
+
+            confirmation = _create_github_link_confirmation(existing_email_user, profile)
+            query = urlencode(
+                {
+                    "provider": "github",
+                    "link_token": confirmation["link_token"],
+                    "email": confirmation["email"],
+                    "nickname": confirmation["nickname"],
+                }
+            )
+            return RedirectResponse(url=f"{frontend_url}/auth/github/callback?{query}", status_code=302)
+        
+        # 신규 유저 생성
+        final_nickname = _build_unique_nickname(db, github_login, fallback=email.split("@")[0])
         user = User(
             email=email,
             nickname=final_nickname,
@@ -210,15 +395,21 @@ async def github_oauth_login(payload: OAuthGithubLoginRequest, db: Session = Dep
         db.add(user)
         db.commit()
         db.refresh(user)
-    else:
-        if github_id and user.github_id != github_id:
-            user.github_id = github_id
-        if avatar_url and not user.avatar_url:
-            user.avatar_url = avatar_url
-        user.is_verified = True
-        db.commit()
-
-    return success_response(data=_create_auth_tokens(user.id))
+        
+        # 토큰 발급
+        tokens = _create_auth_tokens(user.id)
+        access_token_value = tokens["access_token"]
+        
+        # 프론트엔드로 리다이렉트
+        redirect_url = f"{frontend_url}/signup?step=2&via=github&access_token={access_token_value}&user_id={user.id}"
+        
+        return RedirectResponse(url=redirect_url, status_code=302)
+    
+    except Exception as e:
+        logger.exception("GitHub OAuth callback failed: state=%s error=%s", state, e)
+        frontend_url = settings.frontend_url or "http://localhost:3000"
+        error_url = f"{frontend_url}/signup?error=oauth_failed&message={str(e)}"
+        return RedirectResponse(url=error_url, status_code=302)
 
 
 @router.post("/oauth/google", summary="Google OAuth 로그인", description="Google authorization code를 서버에서 검증해 로그인/가입을 처리합니다.")
@@ -545,6 +736,6 @@ async def get_my_auth_info(
                 else None
             ),
             "coin_balance": getattr(user, "coin_balance", None),
-            "avatar_url": user.avatar_url,
+            "avatar_url": _get_avatar_url(user),
         },
     )

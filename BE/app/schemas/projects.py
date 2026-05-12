@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
@@ -41,6 +41,10 @@ class ProjectUpdateRequest(CommonProjectUpdateRequest):
     progress_percent: float | None = Field(default=None, ge=0, le=100)
     max_members: int | None = Field(default=None, ge=1, le=100)
     min_members: int | None = Field(default=None, ge=1, le=100)
+    tech_stack: list[str] | None = None
+    hashtags: list[str] | None = None
+    expected_period: str | None = None
+    preferred_members: str | None = None
     is_public: bool | None = None
 
 
@@ -87,7 +91,7 @@ class TodoCreateRequest(BaseModel):
     description: str | None = None
     stage: str = "planning"
     status: str = "todo"
-    priority: int = Field(default=3, ge=1, le=5)
+    priority: int = Field(default=1, ge=1, le=1000)
     due_date: date | None = None
 
 
@@ -98,7 +102,7 @@ class TodoUpdateRequest(BaseModel):
     description: str | None = None
     stage: str | None = None
     status: str | None = None
-    priority: int | None = Field(default=None, ge=1, le=5)
+    priority: int | None = Field(default=None, ge=1, le=1000)
     due_date: date | None = None
 
 
@@ -108,6 +112,9 @@ class TodoUpdateRequest(BaseModel):
 class RecruitmentCreateRequest(CommonProjectRequest):
     position_name: str = Field(min_length=1, max_length=100)
     required_count: int = Field(default=1, ge=1, le=20)
+    category: str | None = None
+    difficulty: str = Field(default="normal", pattern="^(easy|normal|hard)$")
+    summary: str | None = Field(default=None, max_length=500)
     deadline: date | None = None
     status: str = "open"
 
@@ -115,5 +122,49 @@ class RecruitmentCreateRequest(CommonProjectRequest):
 class RecruitmentUpdateRequest(CommonProjectUpdateRequest):
     position_name: str | None = Field(default=None, min_length=1, max_length=100)
     required_count: int | None = Field(default=None, ge=1, le=20)
+    category: str | None = None
+    difficulty: str | None = Field(default=None, pattern="^(easy|normal|hard)$")
+    summary: str | None = None
     deadline: date | None = None
     status: str | None = None
+
+
+# ============================================
+# 회고(Memoir) 요청 클래스
+# ============================================
+class MemoirCreateRequest(BaseModel):
+    tech_stack: list[str] = Field(default=[], description="선택한 기술 스택")
+    domain: str | None = Field(default=None, max_length=100, description="분야")
+    felt_point: str = Field(min_length=1, description="느낀 점")
+    lacked_point: str = Field(min_length=1, description="부족했던 점")
+
+
+class MemoirUpdateRequest(BaseModel):
+    tech_stack: list[str] | None = None
+    domain: str | None = None
+    felt_point: str | None = None
+    lacked_point: str | None = None
+    ai_refined_felt: str | None = None
+    ai_refined_lacked: str | None = None
+
+
+class MemoirRefineRequest(BaseModel):
+    felt_point: str = Field(default="", description="AI 정제를 위한 느낀 점")
+    lacked_point: str = Field(default="", description="AI 정제를 위한 부족했던 점")
+
+
+class MemoirResponse(BaseModel):
+    id: int
+    project_id: int
+    author_id: int
+    tech_stack: list[str]
+    domain: str | None
+    felt_point: str | None
+    lacked_point: str | None
+    ai_refined_felt: str | None
+    ai_refined_lacked: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
