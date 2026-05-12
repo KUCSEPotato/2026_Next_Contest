@@ -720,8 +720,8 @@ export default function ProjectDetailPage() {
           <div className="relative w-full max-w-md rounded-2xl bg-white p-7 shadow-2xl">
             <h2 className="text-xl font-bold text-slate-900">프로젝트 버리기</h2>
             <p className="mt-3 text-sm leading-6 text-slate-500">
-              그냥 삭제하면 이 아이디어는 사라집니다. 다른 사람이 이어서 키워볼 수 있도록
-              생각의 뜰에 흘려보내는 선택을 추천해요.
+              그냥 삭제하면 이 아이디어는 사라집니다. 아이디어 씨앗을 다른 사람이 이어서 키워볼 수 있도록
+              생각의 뜰에 뿌리는 선택을 추천해요.
             </p>
 
             <div className="mt-6 space-y-2">
@@ -730,7 +730,7 @@ export default function ProjectDetailPage() {
                 disabled={isDeleting}
                 className="w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:bg-slate-300"
               >
-                생각의 뜰에 흘려보내기
+                생각의 뜰에 뿌리기
               </button>
 
               <button

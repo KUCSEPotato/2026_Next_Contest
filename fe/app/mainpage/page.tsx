@@ -100,7 +100,7 @@ const RECRUITMENT_STATUS_OPTIONS = [
 
 const SORT_OPTIONS = [
   { value: "latest", label: "최신순" },
-  { value: "recommended", label: "AI 기반 추천순" },
+  { value: "recommended", label: "추천순" },
   { value: "competition", label: "경쟁률순" },
 ];
 
