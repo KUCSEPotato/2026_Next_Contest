@@ -84,9 +84,9 @@ async def list_posts(
     sort_by 옵션:
     - newest (기본값): 최신순 (created_at desc)
     - views: 조회수 높은 순 (view_count desc)
-    - likes: 좋아요 많은 순
+    - likes: 추천 많은 순
     - comments: 댓글 많은 순
-    - trending/hot: 핫게 (조회수*0.1 + 좋아요*1.0 + 댓글*0.5)
+    - trending/hot: 핫게 (조회수*0.1 + 추천*1.0 + 댓글*0.5)
     """
     query = db.query(CommunityPost).filter(CommunityPost.deleted_at.is_(None))
 
@@ -144,10 +144,8 @@ async def list_posts(
             .all()
         )
         reaction_stats = {
-            "like": 0,
-            "interested": 0,
-            "helpful": 0,
-            "curious": 0,
+            "recommend": 0,
+            "not_recommend": 0,
         }
         for reaction_type, count in reactions:
             reaction_stats[reaction_type] = count
@@ -186,10 +184,10 @@ async def list_posts(
 
     # 메모리에서 정렬 (likes, comments, trending은 계산된 값이므로)
     if sort_by == "likes":
-        # 좋아요순으로 정렬 (핀 된 글 우선 유지)
+        # 추천순으로 정렬 (핀 된 글 우선 유지)
         pinned = [p for p in result if p["is_pinned"]]
         unpinned = [p for p in result if not p["is_pinned"]]
-        unpinned.sort(key=lambda x: x["reaction_stats"]["like"], reverse=True)
+        unpinned.sort(key=lambda x: x["reaction_stats"]["recommend"], reverse=True)
         result = pinned + unpinned
     elif sort_by == "comments":
         # 댓글순으로 정렬 (핀 된 글 우선 유지)
@@ -198,11 +196,11 @@ async def list_posts(
         unpinned.sort(key=lambda x: x["comment_count"], reverse=True)
         result = pinned + unpinned
     elif sort_by in ["trending", "hot"]:
-        # 핫게 정렬: 조회수*0.1 + 좋아요*1.0 + 댓글*0.5
+        # 핫게 정렬: 조회수*0.1 + 추천*1.0 + 댓글*0.5
         def calculate_trending_score(post):
             return (
                 post["view_count"] * 0.1 +
-                post["reaction_stats"]["like"] * 1.0 +
+                post["reaction_stats"]["recommend"] * 1.0 +
                 post["comment_count"] * 0.5
             )
         
@@ -261,10 +259,8 @@ async def get_post(
         .all()
     )
     reaction_stats = {
-        "like": 0,
-        "interested": 0,
-        "helpful": 0,
-        "curious": 0,
+        "recommend": 0,
+        "not_recommend": 0,
     }
     for reaction_type, count in reactions:
         reaction_stats[reaction_type] = count
@@ -472,10 +468,8 @@ async def list_comments(
             .all()
         )
         reaction_stats = {
-            "like": 0,
-            "interested": 0,
-            "helpful": 0,
-            "curious": 0,
+            "recommend": 0,
+            "not_recommend": 0,
         }
         for reaction_type, count in reactions:
             reaction_stats[reaction_type] = count
@@ -573,7 +567,7 @@ async def delete_comment(
 # ━━ Reactions
 # ═══════════════════════════════════════════════════════════════
 
-@router.post("/{post_id}/reactions", summary="게시물에 반응 추가", description="게시물에 좋아요/관심있어요 등을 표현합니다.")
+@router.post("/{post_id}/reactions", summary="게시물에 반응 추가", description="게시물에 추천/비추천 등을 표현합니다.")
 async def add_post_reaction(
     post_id: int,
     payload: ReactionRequest,
@@ -615,7 +609,7 @@ async def add_post_reaction(
         return success_response(data={"action": "added", "reaction_type": payload.reaction_type})
 
 
-@router.post("/{post_id}/comments/{comment_id}/reactions", summary="댓글에 반응 추가", description="댓글에 좋아요/관심있어요 등을 표현합니다.")
+@router.post("/{post_id}/comments/{comment_id}/reactions", summary="댓글에 반응 추가", description="댓글에 추천/비추천 등을 표현합니다.")
 async def add_comment_reaction(
     post_id: int,
     comment_id: int,
