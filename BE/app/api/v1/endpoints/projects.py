@@ -499,6 +499,16 @@ async def list_projects(
             Application.status == "pending",
         ).scalar() or 0
 
+        open_recruitment = (
+            db.query(ProjectRecruitment)
+            .filter(
+                ProjectRecruitment.project_id == p.id,
+                ProjectRecruitment.status == "open",
+            )
+            .order_by(ProjectRecruitment.created_at.desc())
+            .first()
+        )
+
         total_members = p.max_members or 0
         remaining_seats = max(total_members - current_members, 0)
 
@@ -524,6 +534,9 @@ async def list_projects(
             "applicantCount": applicant_count,
             "remainingSeats": remaining_seats,
             "competitionRatio": competition_ratio,
+            "openRecruitmentCount": 1 if open_recruitment else 0,
+            "openRecruitmentRequiredCount": open_recruitment.required_count if open_recruitment else 0,
+            "openRecruitmentPosition": open_recruitment.position_name if open_recruitment else None,
             "created_at": p.created_at.isoformat() if p.created_at else None,
         })
     
