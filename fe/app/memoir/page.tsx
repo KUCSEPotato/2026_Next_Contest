@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import ProgressBloom from "../../components/ProgressBloom";
 import {
   createProjectRetrospectiveApi,
   getMyProjectsApi,
@@ -924,10 +925,13 @@ function MemoirContent() {
 
         {/* 1. 할 일 달성 */}
         <Section emoji="✅" label="할 일 달성" headline={<>나는 {todoDone}개의 할 일을<br />달성했어요</>}>
-          <p style={{ fontSize: 48, fontWeight: 900, color: "#9b1c1c", lineHeight: 1, margin: 0 }}>
-            {todoDone}
-            <span style={{ fontSize: 16, color: "#c06060", marginLeft: 4 }}>개 완료</span>
-          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+            <ProgressBloom progress={todoPercent} size="md" />
+            <p style={{ fontSize: 48, fontWeight: 900, color: "#9b1c1c", lineHeight: 1, margin: 0 }}>
+              {todoDone}
+              <span style={{ fontSize: 16, color: "#c06060", marginLeft: 4 }}>개 완료</span>
+            </p>
+          </div>
           <div style={{ height: 12, background: "#fce8e8", borderRadius: 12, overflow: "hidden", margin: "12px 0 5px", border: "1px solid #f0c0c0" }}>
             <div style={{ height: "100%", background: "#c0392b", borderRadius: 12, width: `${todoPercent}%` }} />
           </div>
