@@ -389,7 +389,7 @@ function Section({ emoji, label, headline, children }: {
   children: React.ReactNode;
 }) {
   return (
-    <section style={{ margin: "20px 16px 0", background: "#fff", borderRadius: 18, border: "1px solid #f0d0d0", overflow: "hidden" }}>
+    <section style={{ margin: "20px 0 0", background: "#fff", borderRadius: 18, border: "1px solid #f0d0d0", overflow: "hidden" }}>
       <div style={{ padding: "18px 20px 0", display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ fontSize: 22, lineHeight: 1 }}>{emoji}</span>
         <span style={{ fontSize: 11, color: "#c08080", fontFamily: "'Gowun Dodum', sans-serif" }}>{label}</span>
@@ -616,7 +616,7 @@ function MemoirContent() {
       <style>{fontStyle}</style>
       <div style={{ background: "#fdf5f5", color: "#3c1010", fontFamily: "'Gowun Dodum', sans-serif" }}>
 
-        {/* ── Hero ── */}
+        {/* ── Hero (full-width) ── */}
         <section style={{ background: "#f0c4c4", padding: "28px 20px 24px", textAlign: "center", borderBottom: "1px solid #e8a8a8" }}>
           <div style={{ display: "inline-block", background: "#9b1c1c", color: "#fdf0f0", fontSize: 12, padding: "5px 16px", borderRadius: 20, marginBottom: 14, fontFamily: "'Gowun Dodum', sans-serif" }}>
             📖 개발자의 텃밭일기
@@ -629,6 +629,9 @@ function MemoirContent() {
             📅 {toDateLabel(project.created_at)} 시작 · {durationDays}일간의 여정
           </div>
         </section>
+
+        {/* ── 콘텐츠 래퍼 (max-w-6xl, 메인페이지 여백 기준) ── */}
+        <div style={{ maxWidth: 1152, margin: "0 auto", padding: "0 16px 64px" }}>
 
         {/* 1. 할 일 달성 */}
         <Section emoji="✅" label="할 일 달성" headline={<>나는 {todoDone}개의 할 일을<br />달성했어요</>}>
@@ -737,7 +740,7 @@ function MemoirContent() {
         </Section>
 
         {/* Footer — 장미 SVG + n번째 수확 */}
-        <div style={{ margin: "24px 16px 40px", textAlign: "center", padding: "28px 20px 24px", background: "#7b0f0f", borderRadius: 18, color: "#fdf0f0" }}>
+        <div style={{ margin: "24px 0 0", textAlign: "center", padding: "28px 20px 24px", background: "#7b0f0f", borderRadius: 18, color: "#fdf0f0" }}>
           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", marginBottom: 16 }}>
             <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: "50%", padding: 16, display: "inline-flex" }}>
               <RoseSVG />
@@ -750,6 +753,8 @@ function MemoirContent() {
             씨앗을 심고 꾸준히 가꾼 당신,<br />이 텃밭일지는 영원히 남아있을 거예요.
           </p>
         </div>
+
+        </div>{/* 콘텐츠 래퍼 끝 */}
 
         {/* 모달 */}
         {modalOpen && (
