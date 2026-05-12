@@ -2,12 +2,20 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getNotificationsApi, readNotificationApi } from "../../lib/api";
+import {
+  getNotificationsApi,
+  getProjectStatusApi,
+  readAllNotificationsApi,
+  readNotificationApi,
+} from "../../lib/api";
+import { useToast } from "../../components/AppFeedback";
 
 export default function NotificationsPage() {
   const router = useRouter();
+  const toast = useToast();
   const [notifications, setNotifications] = useState([]);
   const [processingId, setProcessingId] = useState(null);
+  const [processingAll, setProcessingAll] = useState(false);
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -89,6 +97,19 @@ export default function NotificationsPage() {
     return null;
   }
 
+  function getNotificationProjectId(notification, path = "") {
+    const directId =
+      notification.project_id ||
+      notification.target_project_id ||
+      notification.data?.project_id ||
+      notification.data?.target_project_id;
+
+    if (directId) return directId;
+
+    const match = String(path).match(/^\/projects\/(\d+)/);
+    return match ? match[1] : null;
+  }
+
   async function markAsRead(notificationId) {
     try {
       setProcessingId(notificationId);
@@ -102,17 +123,55 @@ export default function NotificationsPage() {
       );
     } catch (error) {
       console.error(error);
-      alert("읽음 처리에 실패했습니다.");
+      toast.error("읽음 처리에 실패했습니다.");
     } finally {
       setProcessingId(null);
     }
   }
 
+  async function markAllAsRead() {
+    try {
+      setProcessingAll(true);
+      await readAllNotificationsApi();
+      setNotifications((prev) =>
+        prev.map((item) => ({ ...item, is_read: true }))
+      );
+      toast.success("모든 알림을 읽음 처리했습니다.");
+    } catch (error) {
+      console.error(error);
+      toast.error("알림 모두 읽음 처리에 실패했습니다.");
+    } finally {
+      setProcessingAll(false);
+    }
+  }
+
   async function handleNotificationClick(notification) {
     const path = getNotificationPath(notification);
+    const projectId = getNotificationProjectId(notification, path);
 
     if (!notification.is_read) {
       await markAsRead(notification.id);
+    }
+
+    if (projectId) {
+      try {
+        const result = await getProjectStatusApi(projectId);
+        const status = result.data || {};
+
+        if (status.discarded) {
+          toast.info("생각의 뜰에 뿌린 프로젝트입니다.");
+          return;
+        }
+
+        if (status.deleted) {
+          toast.info("삭제된 프로젝트입니다.");
+          return;
+        }
+      } catch (error) {
+        console.error(error);
+        toast.error("프로젝트 상태를 확인하지 못했습니다.");
+        return;
+      }
     }
 
     if (path) {
@@ -120,10 +179,23 @@ export default function NotificationsPage() {
     }
   }
 
+  const unreadCount = notifications.filter((notification) => !notification.is_read).length;
+
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
       <div className="mx-auto w-full max-w-4xl">
         <h1 className="text-3xl font-bold text-slate-900">알림</h1>
+
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={markAllAsRead}
+            disabled={unreadCount === 0 || processingAll}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {processingAll ? "처리 중..." : "모두 읽음"}
+          </button>
+        </div>
 
         <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           {notifications.length === 0 ? (

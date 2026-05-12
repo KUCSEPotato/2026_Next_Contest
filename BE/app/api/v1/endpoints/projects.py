@@ -746,6 +746,22 @@ def _serialize_project_member(member: ProjectMember, user: User | None) -> dict:
     }
 
 
+@router.get("/{project_id}/status-check", summary="프로젝트 상태 확인", description="알림 이동 전에 프로젝트 삭제/생각의 뜰 상태를 확인합니다.")
+async def get_project_status_check(project_id: int, db: Session = Depends(get_db)) -> dict:
+    project = db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    source_idea = db.get(Idea, project.idea_id) if project.idea_id else None
+    return success_response(
+        data={
+            "id": project.id,
+            "deleted": project.deleted_at is not None,
+            "discarded": bool(source_idea and source_idea.is_discarded),
+        }
+    )
+
+
 @router.get("/{project_id}", summary="프로젝트 상세", description="프로젝트 상세와 활성 멤버 목록을 조회합니다.")
 async def get_project(project_id: int, db: Session = Depends(get_db)) -> dict:
     """프로젝트 상세 조회 API.

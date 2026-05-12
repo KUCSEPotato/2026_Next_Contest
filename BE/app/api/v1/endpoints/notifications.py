@@ -49,6 +49,24 @@ async def list_notifications(
     )
 
 
+@router.patch("/read-all", summary="알림 모두 읽음 처리", description="현재 사용자의 읽지 않은 알림을 모두 읽음 처리합니다.")
+async def read_all_notifications(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    now = datetime.now(timezone.utc)
+    updated_count = (
+        db.query(Notification)
+        .filter(Notification.user_id == current_user_id, Notification.is_read.is_(False))
+        .update(
+            {Notification.is_read: True, Notification.read_at: now},
+            synchronize_session=False,
+        )
+    )
+    db.commit()
+    return success_response(data={"updated_count": updated_count})
+
+
 @router.patch("/{notification_id}/read", summary="알림 읽음 처리", description="지정한 알림을 읽음 상태로 변경합니다.")
 async def read_notification(
     notification_id: int,
