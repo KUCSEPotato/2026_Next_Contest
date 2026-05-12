@@ -340,7 +340,7 @@ export default function InspirationWellPage() {
                   )}
                 </div>
 
-                <p className="text-sm leading-relaxed text-slate-500">
+                <p className="whitespace-pre-line text-sm leading-relaxed text-gray-500">
                   {block.description}
                 </p>
               </button>
