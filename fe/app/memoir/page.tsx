@@ -389,16 +389,16 @@ function Section({ emoji, label, headline, children }: {
   children: React.ReactNode;
 }) {
   return (
-    <section style={{ margin: "20px 0 0", background: "#fff", borderRadius: 18, border: "1px solid #f0d0d0", overflow: "hidden" }}>
-      <div style={{ padding: "18px 20px 0", display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ fontSize: 22, lineHeight: 1 }}>{emoji}</span>
-        <span style={{ fontSize: 11, color: "#c08080", fontFamily: "'Gowun Dodum', sans-serif" }}>{label}</span>
+    <section style={{ marginTop: 20, background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", overflow: "hidden", boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)" }}>
+      <div style={{ padding: "20px 24px 0", display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 18, lineHeight: 1 }}>{emoji}</span>
+        <span style={{ fontSize: 12, color: "#e60012", fontWeight: 700 }}>{label}</span>
       </div>
-      <p style={{ fontFamily: "'Nanum Myeongjo', serif", fontSize: 18, color: "#5c0a0a", padding: "8px 20px 18px", fontWeight: 700, lineHeight: 1.55, margin: 0 }}>
+      <p style={{ fontSize: 22, color: "#0f172a", padding: "8px 24px 18px", fontWeight: 800, lineHeight: 1.45, margin: 0 }}>
         {headline}
       </p>
-      <div style={{ height: 1, background: "#f5e0e0", margin: "0 20px" }} />
-      <div style={{ padding: "18px 20px" }}>{children}</div>
+      <div style={{ height: 1, background: "#e2e8f0" }} />
+      <div style={{ padding: "20px 24px" }}>{children}</div>
     </section>
   );
 }
@@ -590,7 +590,7 @@ function MemoirContent() {
   /* 로딩 / 에러 */
   if (loading) {
     return (
-      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#fdf5f5", fontSize: 14, color: "#c08080", fontFamily: "'Gowun Dodum', sans-serif" }}>
+      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#f8fafc", fontSize: 14, color: "#64748b" }}>
         회고 데이터를 불러오는 중이에요 🌹
       </div>
     );
@@ -598,10 +598,10 @@ function MemoirContent() {
 
   if (error || !project) {
     return (
-      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#fdf5f5", textAlign: "center", fontFamily: "'Gowun Dodum', sans-serif" }}>
-        <div>
-          <p style={{ fontSize: 18, fontWeight: 700, color: "#5c0a0a" }}>회고를 불러오지 못했어요</p>
-          <p style={{ marginTop: 8, fontSize: 14, color: "#c08080" }}>{error || "프로젝트 정보가 없습니다."}</p>
+      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#f8fafc", textAlign: "center", padding: 24 }}>
+        <div style={{ width: "100%", maxWidth: 420, borderRadius: 16, border: "1px solid #e2e8f0", background: "#fff", padding: 28, boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)" }}>
+          <p style={{ fontSize: 18, fontWeight: 800, color: "#0f172a" }}>회고를 불러오지 못했어요</p>
+          <p style={{ marginTop: 8, fontSize: 14, color: "#64748b" }}>{error || "프로젝트 정보가 없습니다."}</p>
         </div>
       </div>
     );
@@ -614,24 +614,27 @@ function MemoirContent() {
   return (
     <>
       <style>{fontStyle}</style>
-      <div style={{ background: "#fdf5f5", color: "#3c1010", fontFamily: "'Gowun Dodum', sans-serif" }}>
+      <div style={{ minHeight: "100vh", background: "#f8fafc", color: "#0f172a", fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", padding: "40px 24px" }}>
+        <div style={{ width: "100%", maxWidth: 1152, margin: "0 auto" }}>
 
-        {/* ── Hero (full-width) ── */}
-        <section style={{ background: "#f0c4c4", padding: "28px 20px 24px", textAlign: "center", borderBottom: "1px solid #e8a8a8" }}>
-          <div style={{ display: "inline-block", background: "#9b1c1c", color: "#fdf0f0", fontSize: 12, padding: "5px 16px", borderRadius: 20, marginBottom: 14, fontFamily: "'Gowun Dodum', sans-serif" }}>
-            📖 개발자의 텃밭일기
+        {/* ── Hero ── */}
+        <section style={{ position: "relative", overflow: "hidden", background: "#fff", padding: "34px 36px", border: "1px solid #e2e8f0", borderRadius: 18, boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)" }}>
+          <div style={{ position: "absolute", right: -10, bottom: -30, opacity: 0.13, transform: "scale(1.45)" }}>
+            <RoseSVG />
           </div>
-          <p style={{ fontFamily: "'Nanum Myeongjo', serif", fontSize: 26, fontWeight: 700, color: "#5c0a0a", marginBottom: 6, lineHeight: 1.4 }}>
-            {project.title}
-          </p>
-          <p style={{ fontSize: 14, color: "#a84444", margin: 0 }}>나의 텃밭일기를 기록해요</p>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.72)", border: "1px solid #e0a8a8", borderRadius: 20, padding: "5px 14px", fontSize: 13, color: "#9b3030", marginTop: 14 }}>
-            📅 {toDateLabel(project.created_at)} 시작 · {durationDays}일간의 여정
+          <div style={{ position: "relative", zIndex: 1 }}>
+            <div style={{ display: "inline-block", background: "#fee2e2", color: "#e60012", fontSize: 12, fontWeight: 800, padding: "6px 14px", borderRadius: 999, marginBottom: 14 }}>
+              개발자의 장미 기록
+            </div>
+            <p style={{ fontSize: 34, fontWeight: 900, color: "#0f172a", marginBottom: 8, lineHeight: 1.25 }}>
+              {project.title}
+            </p>
+            <p style={{ fontSize: 15, color: "#64748b", margin: 0 }}>프로젝트를 지나온 흔적을 차분히 남겨요.</p>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 999, padding: "7px 14px", fontSize: 13, color: "#475569", marginTop: 18 }}>
+              {toDateLabel(project.created_at)} 시작 · {durationDays}일간의 여정
+            </div>
           </div>
         </section>
-
-        {/* ── 콘텐츠 래퍼 (max-w-6xl, 메인페이지 여백 기준) ── */}
-        <div style={{ maxWidth: 1152, margin: "0 auto", padding: "0 16px 64px" }}>
 
         {/* 1. 할 일 달성 */}
         <Section emoji="✅" label="할 일 달성" headline={<>나는 {todoDone}개의 할 일을<br />달성했어요</>}>
@@ -728,7 +731,7 @@ function MemoirContent() {
             </p>
           ) : (
             <div style={{ background: "#fdf4f4", border: "1px solid #f0cccc", borderRadius: 14, padding: 18, position: "relative", overflow: "hidden" }}>
-              <span style={{ fontFamily: "'Nanum Myeongjo', serif", fontSize: 90, color: "#f0cccc", position: "absolute", top: -12, left: 10, lineHeight: 1 }}>"</span>
+              <span style={{ fontFamily: "'Nanum Myeongjo', serif", fontSize: 90, color: "#f0cccc", position: "absolute", top: -12, left: 10, lineHeight: 1 }}>&quot;</span>
               <div style={{ fontSize: 14, color: "#6b2020", lineHeight: 1.9, position: "relative", zIndex: 1, paddingLeft: 8 }}>
                 {buildFeelingText()}
               </div>
@@ -740,7 +743,7 @@ function MemoirContent() {
         </Section>
 
         {/* Footer — 장미 SVG + n번째 수확 */}
-        <div style={{ margin: "24px 0 0", textAlign: "center", padding: "28px 20px 24px", background: "#7b0f0f", borderRadius: 18, color: "#fdf0f0" }}>
+        <div style={{ margin: "24px 0 0", textAlign: "center", padding: "28px 20px 24px", background: "#991b1b", borderRadius: 18, color: "#fdf0f0", border: "1px solid #7f1d1d" }}>
           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", marginBottom: 16 }}>
             <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: "50%", padding: 16, display: "inline-flex" }}>
               <RoseSVG />
@@ -754,8 +757,6 @@ function MemoirContent() {
           </p>
         </div>
 
-        </div>{/* 콘텐츠 래퍼 끝 */}
-
         {/* 모달 */}
         {modalOpen && (
           <GrowthModal
@@ -765,6 +766,7 @@ function MemoirContent() {
             onSave={handleSaveGrowth}
           />
         )}
+      </div>
       </div>
     </>
   );
@@ -777,7 +779,7 @@ export default function MemoirPage() {
   return (
     <Suspense
       fallback={
-        <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#fdf5f5", fontSize: 14, color: "#c08080", fontFamily: "'Gowun Dodum', sans-serif" }}>
+        <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#f8fafc", fontSize: 14, color: "#64748b" }}>
           회고 데이터를 준비하는 중이에요 🌹
         </div>
       }
