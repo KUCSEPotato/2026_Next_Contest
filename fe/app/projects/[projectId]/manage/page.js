@@ -15,6 +15,8 @@ import {
   updateTodoApi,
   createTodoApi,
   createRecruitmentApi,
+  getChatRoomsApi,
+  createChatRoomApi,
   createProjectReviewApi,
   getProjectReviewsApi,
 } from "../../../../lib/api";
@@ -49,6 +51,8 @@ export default function ProjectManagePage() {
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
   const [isCompletingTeam, setIsCompletingTeam] = useState(false);
+  const [isOpeningChat, setIsOpeningChat] = useState(false);
+  const [teamChatRoomId, setTeamChatRoomId] = useState(null);
   const [todos, setTodos] = useState([]);
   const [todoLoading, setTodoLoading] = useState(false);
   const [togglingTodoId, setTogglingTodoId] = useState(null);
@@ -273,7 +277,11 @@ export default function ProjectManagePage() {
     try {
       setIsCompletingTeam(true);
 
-      await completeTeamApi(projectId);
+      const completeResult = await completeTeamApi(projectId);
+      const completeData = unwrapResponseData(completeResult);
+      if (completeData?.chat_room_id) {
+        setTeamChatRoomId(completeData.chat_room_id);
+      }
 
       const proj = await getProjectApi(projectId);
       setProject(unwrapResponseData(proj));
@@ -284,6 +292,44 @@ export default function ProjectManagePage() {
       alert("팀 결성에 실패했습니다.");
     } finally {
       setIsCompletingTeam(false);
+    }
+  };
+
+  const openTeamChat = async () => {
+    if (!isProjectMember) {
+      alert("프로젝트 팀원만 채팅방으로 이동할 수 있습니다.");
+      return;
+    }
+
+    try {
+      setIsOpeningChat(true);
+
+      if (teamChatRoomId) {
+        router.push(`/chat/${teamChatRoomId}?projectId=${projectId}`);
+        return;
+      }
+
+      const roomsResult = await getChatRoomsApi(projectId);
+      const rooms = unwrapResponseData(roomsResult, []);
+      const activeRoom = rooms.find((room) => room.is_active) || rooms[0];
+
+      if (activeRoom) {
+        setTeamChatRoomId(activeRoom.id);
+        router.push(`/chat/${activeRoom.id}?projectId=${projectId}`);
+        return;
+      }
+
+      const created = await createChatRoomApi(projectId, {
+        name: project?.title || `Project #${projectId}`,
+      });
+      const createdRoom = unwrapResponseData(created);
+      setTeamChatRoomId(createdRoom.id);
+      router.push(`/chat/${createdRoom.id}?projectId=${projectId}`);
+    } catch (error) {
+      console.error(error);
+      alert("팀 채팅방으로 이동하지 못했습니다.");
+    } finally {
+      setIsOpeningChat(false);
     }
   };
 
@@ -641,23 +687,45 @@ export default function ProjectManagePage() {
           </div>
 
           {isLeader && !isProjectCompleted && (
+            <div className={`mt-4 grid gap-3 ${isProjectInProgress ? "sm:grid-cols-2" : ""}`}>
+              <button
+                onClick={
+                  isProjectInProgress
+                    ? () => setShowRecruitmentForm((prev) => !prev)
+                    : handleCompleteTeam
+                }
+                disabled={
+                  isCompletingTeam ||
+                  (!isProjectInProgress && !canCompleteTeam)
+                }
+                className="w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+              >
+                {isProjectInProgress
+                  ? "재모집하기"
+                  : isCompletingTeam
+                  ? "팀 결성 중..."
+                  : "팀 결성하기"}
+              </button>
+
+              {isProjectInProgress && (
+                <button
+                  onClick={openTeamChat}
+                  disabled={isOpeningChat}
+                  className="w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                >
+                  {isOpeningChat ? "이동 중..." : "팀 채팅방으로 가기"}
+                </button>
+              )}
+            </div>
+          )}
+
+          {!isLeader && isProjectInProgress && !isProjectCompleted && (
             <button
-              onClick={
-                isProjectInProgress
-                  ? () => setShowRecruitmentForm((prev) => !prev)
-                  : handleCompleteTeam
-              }
-              disabled={
-                isCompletingTeam ||
-                (!isProjectInProgress && !canCompleteTeam)
-              }
-              className="mt-4 w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+              onClick={openTeamChat}
+              disabled={isOpeningChat}
+              className="mt-4 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
             >
-              {isProjectInProgress
-                ? "재모집하기"
-                : isCompletingTeam
-                ? "팀 결성 중..."
-                : "팀 결성하기"}
+              {isOpeningChat ? "이동 중..." : "팀 채팅방으로 가기"}
             </button>
           )}
 
