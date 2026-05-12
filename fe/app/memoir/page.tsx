@@ -12,6 +12,7 @@ import {
   getProjectRetrospectivesApi,
   getProjectReviewsApi,
   getProjectsApi,
+  getTodosApi,
   refineProjectMemoirApi,
   updateProjectRetrospectiveApi,
 } from "../../lib/api";
@@ -53,6 +54,19 @@ interface ProgressData {
   todo_total: number;
   todo_done: number;
   progress_percent: number;
+}
+
+interface TodoAssignment {
+  user_id?: number;
+  is_done?: boolean;
+}
+
+interface TodoData {
+  id: number;
+  title: string;
+  status?: string | null;
+  completed_at?: string | null;
+  assignments?: TodoAssignment[];
 }
 
 interface ProjectReview {
@@ -534,6 +548,7 @@ function MemoirContent() {
   const [modalOpen, setModalOpen]           = useState(false);
   const [project, setProject]               = useState<ProjectData | null>(null);
   const [progress, setProgress]             = useState<ProgressData | null>(null);
+  const [todos, setTodos]                   = useState<TodoData[]>([]);
   const [reviews, setReviews]               = useState<ProjectReview[]>([]);
   const [growth, setGrowth]                 = useState<GrowthData | null>(null);
   const [memoirList, setMemoirList]         = useState<MemoirOverviewItem[]>([]);
@@ -630,9 +645,10 @@ function MemoirContent() {
 
         const projectId = selectedProject.id;
 
-        const [progressResult, reviewsResult, retrospectivesResult, myProjectsResult] =
+        const [progressResult, todosResult, reviewsResult, retrospectivesResult, myProjectsResult] =
           await Promise.allSettled([
             getProjectProgressApi(projectId),
+            getTodosApi(projectId),
             getProjectReviewsApi(projectId),
             getProjectRetrospectivesApi(projectId),
             getMyProjectsApi(),
@@ -674,6 +690,11 @@ function MemoirContent() {
         if (ignore) return;
         setProject(selectedProject);
         setProgress(progressResult.status === "fulfilled" ? progressResult.value.data : null);
+        setTodos(
+          todosResult.status === "fulfilled" && Array.isArray(todosResult.value.data)
+            ? todosResult.value.data
+            : []
+        );
         setReviews(reviewsResult.status === "fulfilled" ? reviewsResult.value.data || [] : []);
         setGrowth(loadedGrowth);
         setRetrospectiveId(loadedRetrospectiveId);
@@ -698,6 +719,17 @@ function MemoirContent() {
   const todoTotal    = progress?.todo_total    ?? 0;
   const todoDone     = progress?.todo_done     ?? 0;
   const todoPercent  = Math.round(progress?.progress_percent ?? 0);
+  const currentUserIdForTodo = getCurrentUserId();
+  const myDoneTodos = todos.filter((todo) =>
+    (todo.assignments || []).some(
+      (assignment) =>
+        Number(assignment.user_id) === Number(currentUserIdForTodo) &&
+        assignment.is_done
+    )
+  );
+  const myTodoDone = myDoneTodos.length;
+  const myTodoPercent = todoTotal ? Math.round((myTodoDone / todoTotal) * 100) : 0;
+  const myContributionPercent = todoDone ? Math.round((myTodoDone / todoDone) * 100) : 0;
   const durationDays = daysBetween(project?.created_at);
   const hours        = durationDays * 6;
   const techStack    = project?.techStack?.length ? project.techStack : [project?.category || "프로젝트"];
@@ -924,20 +956,61 @@ function MemoirContent() {
         </section>
 
         {/* 1. 할 일 달성 */}
-        <Section emoji="✅" label="할 일 달성" headline={<>나는 {todoDone}개의 할 일을<br />달성했어요</>}>
-          <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-            <ProgressBloom progress={todoPercent} size="md" />
-            <p style={{ fontSize: 48, fontWeight: 900, color: "#9b1c1c", lineHeight: 1, margin: 0 }}>
-              {todoDone}
-              <span style={{ fontSize: 16, color: "#c06060", marginLeft: 4 }}>개 완료</span>
-            </p>
-          </div>
-          <div style={{ height: 12, background: "#fce8e8", borderRadius: 12, overflow: "hidden", margin: "12px 0 5px", border: "1px solid #f0c0c0" }}>
-            <div style={{ height: "100%", background: "#c0392b", borderRadius: 12, width: `${todoPercent}%` }} />
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#c08080" }}>
-            <span>전체 {todoTotal}개 중</span>
-            <span style={{ color: "#9b1c1c", fontWeight: 700 }}>{todoPercent}% 달성 🎉</span>
+        <Section emoji="✅" label="할 일 달성" headline={<>우리팀은 {todoDone}개를 달성했고<br />나는 그중 {myTodoDone}개를 해냈어요</>}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+            <div style={{ border: "1px solid #f0cccc", borderRadius: 14, background: "#fdf4f4", padding: 16 }}>
+              <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 800, color: "#a83030" }}>
+                우리팀이 달성한 일
+              </p>
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <ProgressBloom progress={todoPercent} size="sm" />
+                <p style={{ fontSize: 38, fontWeight: 900, color: "#9b1c1c", lineHeight: 1, margin: 0 }}>
+                  {todoDone}
+                  <span style={{ fontSize: 14, color: "#c06060", marginLeft: 4 }}>개 완료</span>
+                </p>
+              </div>
+              <div style={{ height: 10, background: "#fce8e8", borderRadius: 12, overflow: "hidden", margin: "12px 0 5px", border: "1px solid #f0c0c0" }}>
+                <div style={{ height: "100%", background: "#c0392b", borderRadius: 12, width: `${todoPercent}%` }} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#c08080" }}>
+                <span>전체 {todoTotal}개 중</span>
+                <span style={{ color: "#9b1c1c", fontWeight: 700 }}>{todoPercent}% 달성</span>
+              </div>
+            </div>
+
+            <div style={{ border: "1px solid #e2e8f0", borderRadius: 14, background: "#fff", padding: 16 }}>
+              <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 800, color: "#475569" }}>
+                내가 달성한 일
+              </p>
+              <p style={{ fontSize: 38, fontWeight: 900, color: "#0f172a", lineHeight: 1, margin: 0 }}>
+                {myTodoDone}
+                <span style={{ fontSize: 14, color: "#64748b", marginLeft: 4 }}>개 체크</span>
+              </p>
+              <div style={{ height: 10, background: "#f1f5f9", borderRadius: 12, overflow: "hidden", margin: "17px 0 5px", border: "1px solid #e2e8f0" }}>
+                <div style={{ height: "100%", background: "#0f172a", borderRadius: 12, width: `${myTodoPercent}%` }} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b" }}>
+                <span>팀 전체 Todo 기준</span>
+                <span style={{ color: "#0f172a", fontWeight: 700 }}>{myTodoPercent}% 기여</span>
+              </div>
+            </div>
+
+            <div style={{ border: "1px solid #dbeafe", borderRadius: 14, background: "#f8fbff", padding: 16 }}>
+              <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 800, color: "#1e40af" }}>
+                나의 기여도
+              </p>
+              <p style={{ fontSize: 38, fontWeight: 900, color: "#1e3a8a", lineHeight: 1, margin: 0 }}>
+                {myContributionPercent}
+                <span style={{ fontSize: 14, color: "#64748b", marginLeft: 4 }}>%</span>
+              </p>
+              <div style={{ height: 10, background: "#e0edff", borderRadius: 12, overflow: "hidden", margin: "17px 0 5px", border: "1px solid #bfdbfe" }}>
+                <div style={{ height: "100%", background: "#2563eb", borderRadius: 12, width: `${myContributionPercent}%` }} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b" }}>
+                <span>팀이 완료한 {todoDone}개 중</span>
+                <span style={{ color: "#1e3a8a", fontWeight: 700 }}>내가 {myTodoDone}개 수행</span>
+              </div>
+            </div>
           </div>
         </Section>
 

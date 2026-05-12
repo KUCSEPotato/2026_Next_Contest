@@ -149,6 +149,13 @@ export default function ProjectDetailPage() {
   const isTeamFormed = ["in_progress", "started", "completed"].includes(
     String(project?.status || "").replace("-", "_")
   );
+  const isProjectMember =
+    project &&
+    myProfile &&
+    (project.leader_id === myProfile.id ||
+      (project.members || []).some(
+        (member) => getProjectMemberUserId(member) === myProfile.id
+      ));
   const hasApplied = Boolean(myApplication);
   const acceptedMemberCount = project?.members?.length || 1;
 
@@ -551,9 +558,18 @@ export default function ProjectDetailPage() {
                 </div>
               )}
 
+              {isProjectMember && isTeamFormed && (
+                <button
+                  onClick={() => router.push(`/projects/${projectId}/manage`)}
+                  className="mt-6 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
+                >
+                  진행 관리 페이지로 가기
+                </button>
+              )}
+
               <button
                 onClick={() => router.push(`/projects/${projectId}/chat`)}
-                className="mt-6 w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800"
+                className={`${isProjectMember && isTeamFormed ? "mt-3" : "mt-6"} w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800`}
               >
                 팀 채팅방 들어가기
               </button>
