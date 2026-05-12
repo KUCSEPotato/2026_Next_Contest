@@ -3,16 +3,25 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import {
+  confirmTodosApi,
   createTodoApi,
   deleteTodoApi,
   generateAITodosApi,
   getMessagesApi,
   getProjectApi,
+  getTodoStateApi,
   getTodosApi,
   sendMessageApi,
   updateTodoApi,
 } from "../../../lib/api";
 import { useRef } from "react";
+
+const TODO_STAGES = [
+  { value: "planning", label: "기획" },
+  { value: "design", label: "설계" },
+  { value: "development", label: "개발" },
+  { value: "verification", label: "검증" },
+];
 
 export default function ChatRoomPage() {
   const params = useParams();
@@ -34,9 +43,12 @@ export default function ChatRoomPage() {
   const [project, setProject] = useState(null);
   const [todos, setTodos] = useState([]);
   const [todoTitle, setTodoTitle] = useState("");
+  const [todoStage, setTodoStage] = useState("planning");
   const [todoLoading, setTodoLoading] = useState(false);
   const [creatingTodo, setCreatingTodo] = useState(false);
   const [generatingTodos, setGeneratingTodos] = useState(false);
+  const [confirmingTodos, setConfirmingTodos] = useState(false);
+  const [isTodoFinalized, setIsTodoFinalized] = useState(false);
   const [isSelectingMessages, setIsSelectingMessages] = useState(false);
   const [selectedMessageIds, setSelectedMessageIds] = useState([]);
   const [editingTodoId, setEditingTodoId] = useState(null);
@@ -67,20 +79,77 @@ export default function ChatRoomPage() {
     try {
       setTodoLoading(true);
 
-      const [projectResult, todosResult] = await Promise.all([
+      const [projectResult, todosResult, todoStateResult] = await Promise.all([
         getProjectApi(projectId),
         getTodosApi(projectId),
+        getTodoStateApi(projectId).catch(() => ({ data: { is_finalized: false } })),
       ]);
 
       const members = projectResult.data?.members || [];
       setProject(projectResult.data);
       setProjectMembers(members);
       setTodos(Array.isArray(todosResult.data) ? todosResult.data : []);
+      setIsTodoFinalized(Boolean(todoStateResult.data?.is_finalized));
     } catch (error) {
       console.error(error);
     } finally {
       setTodoLoading(false);
     }
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) return;
+
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
+
+    const apiBaseUrl =
+      process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+    const wsBaseUrl = apiBaseUrl.replace(/^http/, "ws");
+    const socket = new WebSocket(
+      `${wsBaseUrl}/api/v1/projects/${projectId}/todos/ws?token=${token}`
+    );
+
+    socket.onmessage = (event) => {
+      const payload = JSON.parse(event.data);
+
+      if (payload.type === "todo.snapshot") {
+        setTodos(Array.isArray(payload.data) ? payload.data : []);
+      }
+
+      if (payload.type === "todo.created") {
+        setTodos((prev) => {
+          const exists = prev.some((todo) => todo.id === payload.data.id);
+          return exists
+            ? prev.map((todo) => (todo.id === payload.data.id ? payload.data : todo))
+            : [...prev, payload.data];
+        });
+      }
+
+      if (payload.type === "todo.updated") {
+        setTodos((prev) =>
+          prev.map((todo) => (todo.id === payload.data.id ? payload.data : todo))
+        );
+      }
+
+      if (payload.type === "todo.deleted") {
+        setTodos((prev) =>
+          prev.filter((todo) => todo.id !== payload.data?.todo_id)
+        );
+      }
+
+      if (payload.type === "todo.state.updated") {
+        setIsTodoFinalized(Boolean(payload.data?.is_finalized));
+      }
+    };
+
+    socket.onerror = (error) => {
+      console.error(error);
+    };
+
+    return () => {
+      socket.close();
+    };
   }, [projectId]);
 
   useEffect(() => {
@@ -162,6 +231,11 @@ export default function ChatRoomPage() {
       return;
     }
 
+    if (isTodoFinalized) {
+      alert("확정된 체크리스트는 진행 관리 페이지에서 수정할 수 있습니다.");
+      return;
+    }
+
     if (!todoTitle.trim()) {
       alert("Todo 제목을 입력해주세요.");
       return;
@@ -173,7 +247,7 @@ export default function ChatRoomPage() {
       await createTodoApi(projectId, {
         title: todoTitle.trim(),
         assignee_ids: getProjectMemberIds(),
-        stage: "planning",
+        stage: todoStage,
         status: "todo",
         priority: todos.length + 1,
       });
@@ -191,6 +265,11 @@ export default function ChatRoomPage() {
   const handleGenerateTodos = async () => {
     if (!projectId) {
       alert("프로젝트 정보를 찾을 수 없습니다.");
+      return;
+    }
+
+    if (isTodoFinalized) {
+      alert("확정된 체크리스트는 진행 관리 페이지에서 수정할 수 있습니다.");
       return;
     }
 
@@ -231,6 +310,35 @@ export default function ChatRoomPage() {
 
   const isLeader = project?.leader_id === myId;
 
+  const handleConfirmTodos = async () => {
+    if (!projectId) {
+      alert("프로젝트 정보를 찾을 수 없습니다.");
+      return;
+    }
+
+    if (isTodoFinalized) return;
+
+    if (
+      !confirm(
+        "확정하시겠습니까? 진행 관리 페이지에서 수정 가능합니다."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setConfirmingTodos(true);
+      const result = await confirmTodosApi(projectId);
+      setIsTodoFinalized(Boolean(result.data?.is_finalized));
+      alert("Todo 체크리스트가 확정되었습니다.");
+    } catch (error) {
+      console.error(error);
+      alert("Todo 확정에 실패했습니다.");
+    } finally {
+      setConfirmingTodos(false);
+    }
+  };
+
   const toggleSelectedMessage = (messageId) => {
     setSelectedMessageIds((prev) =>
       prev.includes(messageId)
@@ -240,6 +348,11 @@ export default function ChatRoomPage() {
   };
 
   const startEditingTodo = (todo) => {
+    if (isTodoFinalized) {
+      alert("확정된 체크리스트는 진행 관리 페이지에서 수정할 수 있습니다.");
+      return;
+    }
+
     setEditingTodoId(todo.id);
     setEditingTodoTitle(todo.title || "");
     setEditingTodoDescription(todo.description || "");
@@ -253,6 +366,11 @@ export default function ChatRoomPage() {
 
   const handleSaveTodoEdit = async (todo) => {
     if (!projectId) return;
+    if (isTodoFinalized) {
+      alert("확정된 체크리스트는 진행 관리 페이지에서 수정할 수 있습니다.");
+      return;
+    }
+
     if (!editingTodoTitle.trim()) {
       alert("Todo 제목을 입력해주세요.");
       return;
@@ -273,6 +391,10 @@ export default function ChatRoomPage() {
 
   const handleDeleteTodo = async (todo) => {
     if (!projectId) return;
+    if (isTodoFinalized) {
+      alert("확정된 체크리스트는 진행 관리 페이지에서 수정할 수 있습니다.");
+      return;
+    }
 
     if (!confirm(`"${todo.title}" 항목을 삭제할까요?`)) {
       return;
@@ -429,16 +551,35 @@ export default function ChatRoomPage() {
 
               <button
                 onClick={handleGenerateTodos}
-                disabled={generatingTodos || !isLeader}
+                disabled={generatingTodos || !isLeader || isTodoFinalized}
                 className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:bg-slate-400"
                 title={
-                  isLeader
+                  isTodoFinalized
+                    ? "확정된 체크리스트는 진행 관리 페이지에서 수정할 수 있습니다."
+                    : isLeader
                     ? "선택한 채팅 범위와 프로젝트 정보를 바탕으로 Todo를 생성합니다."
                     : "AI Todo 생성은 팀장만 사용할 수 있습니다."
                 }
               >
                 {generatingTodos ? "생성 중..." : "AI 생성"}
               </button>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <p className="text-xs text-slate-500">
+                {isTodoFinalized
+                  ? "확정된 체크리스트입니다. 수정/추가는 진행 관리 페이지에서 할 수 있습니다."
+                  : "채팅방에서 초안을 만들고 확정하면 진행 관리 페이지로 넘깁니다."}
+              </p>
+
+              {!isTodoFinalized && (
+                <button
+                  onClick={handleConfirmTodos}
+                  disabled={confirmingTodos}
+                  className="shrink-0 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  {confirmingTodos ? "확정 중..." : "확정"}
+                </button>
+              )}
             </div>
             {!isLeader && (
               <p className="mt-2 text-xs text-slate-500">
@@ -447,29 +588,44 @@ export default function ChatRoomPage() {
             )}
           </header>
 
-          <div className="border-b border-slate-100 p-4">
-            <div className="flex gap-2">
-              <input
-                value={todoTitle}
-                onChange={(e) => setTodoTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.nativeEvent.isComposing && !creatingTodo) {
-                    handleCreateTodo();
-                  }
-                }}
-                placeholder="새 Todo 추가"
-                className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
-              />
+          {!isTodoFinalized && (
+            <div className="border-b border-slate-100 p-4">
+              <div className="grid gap-2">
+                <select
+                  value={todoStage}
+                  onChange={(e) => setTodoStage(e.target.value)}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-600 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
+                >
+                  {TODO_STAGES.map((stage) => (
+                    <option key={stage.value} value={stage.value}>
+                      {stage.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex gap-2">
+                  <input
+                    value={todoTitle}
+                    onChange={(e) => setTodoTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.nativeEvent.isComposing && !creatingTodo) {
+                        handleCreateTodo();
+                      }
+                    }}
+                    placeholder="새 Todo 추가"
+                    className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
+                  />
 
-              <button
-                onClick={handleCreateTodo}
-                disabled={creatingTodo}
-                className="rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:bg-slate-400"
-              >
-                추가
-              </button>
+                  <button
+                    onClick={handleCreateTodo}
+                    disabled={creatingTodo}
+                    className="rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:bg-slate-400"
+                  >
+                    추가
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
 
           <section className="flex-1 space-y-3 overflow-y-auto p-4">
             {todoLoading ? (
@@ -483,7 +639,7 @@ export default function ChatRoomPage() {
                 <div key={group.stage} className="space-y-2">
                   <div className="sticky top-0 z-10 bg-white/95 py-1 backdrop-blur">
                     <h3 className="text-xs font-bold text-red-600">
-                      {group.stage}
+                      {group.label}
                     </h3>
                   </div>
 
@@ -574,9 +730,8 @@ export default function ChatRoomPage() {
                               <span />
                             )}
 
+                            {!isTodoFinalized && (
                             <div className="flex gap-1">
-                          
-
                               <button
                                 onClick={() => startEditingTodo(todo)}
                                 className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 hover:border-red-300 hover:text-red-600"
@@ -591,6 +746,7 @@ export default function ChatRoomPage() {
                                 삭제
                               </button>
                             </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -607,30 +763,41 @@ export default function ChatRoomPage() {
 }
 
 function groupTodosByStage(todos) {
-  const groups = [];
-  const groupMap = new Map();
+  const groupMap = new Map(
+    TODO_STAGES.map((stage) => [
+      stage.value,
+      { stage: stage.value, label: stage.label, items: [] },
+    ])
+  );
+  const extraGroups = [];
 
   todos.forEach((todo, index) => {
     const stage = normalizeTodoStage(todo.stage);
 
     if (!groupMap.has(stage)) {
-      const group = { stage, items: [] };
+      const group = { stage, label: stage, items: [] };
       groupMap.set(stage, group);
-      groups.push(group);
+      extraGroups.push(group);
     }
 
     groupMap.get(stage).items.push({ todo, index });
   });
 
-  return groups;
+  return [
+    ...TODO_STAGES.map((stage) => groupMap.get(stage.value)).filter(
+      (group) => group.items.length > 0
+    ),
+    ...extraGroups.filter((group) => group.items.length > 0),
+  ];
 }
 
 function normalizeTodoStage(stage) {
   const value = String(stage || "").trim();
 
-  if (!value || value === "planning") {
-    return "기획 단계";
-  }
+  if (!value || value === "planning" || value.includes("기획")) return "planning";
+  if (value === "design" || value.includes("설계")) return "design";
+  if (value === "development" || value.includes("개발")) return "development";
+  if (value === "verification" || value.includes("검증")) return "verification";
 
   return value;
 }

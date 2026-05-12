@@ -427,6 +427,23 @@ export async function getTodosApi(projectId) {
   return handleResponse(res, "Todo 목록을 불러오지 못했습니다.");
 }
 
+export async function getTodoStateApi(projectId) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/projects/${projectId}/todos/state`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "Todo 확정 상태를 불러오지 못했습니다.");
+}
+
+export async function confirmTodosApi(projectId) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/projects/${projectId}/todos/confirm`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "Todo 확정에 실패했습니다.");
+}
+
 export async function updateTodoApi(projectId, todoId, payload) {
   const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/projects/${projectId}/todos/${todoId}`,

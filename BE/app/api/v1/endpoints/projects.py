@@ -61,6 +61,8 @@ from app.core.realtime import realtime_hub
 
 router = APIRouter()
 
+TODO_FINALIZED_MARKER_TITLE = "__team_todo_finalized__"
+
 
 def _calculate_days_left(deadline: date | None) -> int | None:
     """마감일까지 남은 일수를 계산합니다. deadline이 None이면 None 반환."""
@@ -422,6 +424,35 @@ async def _broadcast_todo_snapshot(db: Session, project_id: int, todo: Todo, eve
         {
             "type": event_type,
             "data": _build_todo_response(todo, assignments),
+        },
+    )
+
+
+def _get_todo_finalized_marker(db: Session, project_id: int) -> ProjectMilestone | None:
+    return (
+        db.query(ProjectMilestone)
+        .filter(
+            ProjectMilestone.project_id == project_id,
+            ProjectMilestone.title == TODO_FINALIZED_MARKER_TITLE,
+        )
+        .first()
+    )
+
+
+def _build_todo_state_response(db: Session, project_id: int) -> dict:
+    marker = _get_todo_finalized_marker(db, project_id)
+    return {
+        "project_id": project_id,
+        "is_finalized": marker is not None,
+    }
+
+
+async def _broadcast_todo_state(db: Session, project_id: int) -> None:
+    await realtime_hub.broadcast_json(
+        project_todo_channel(project_id),
+        {
+            "type": "todo.state.updated",
+            "data": _build_todo_state_response(db, project_id),
         },
     )
 
@@ -1246,6 +1277,47 @@ async def list_todos(
     )
 
 
+@router.get("/{project_id}/todos/state", summary="Todo 확정 상태 조회", description="프로젝트 Todo 체크리스트 확정 여부를 조회합니다.")
+async def get_todo_state(
+    project_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Todo 확정 상태 조회 API(프로젝트 멤버 전용)."""
+    _get_project_or_404(db, project_id)
+    _ensure_project_member(db, project_id, current_user_id)
+    return success_response(data=_build_todo_state_response(db, project_id))
+
+
+@router.post("/{project_id}/todos/confirm", summary="Todo 체크리스트 확정", description="채팅방 Todo 체크리스트를 확정하여 채팅방에서는 읽기 전용으로 전환합니다.")
+async def confirm_todo_list(
+    project_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Todo 확정 API(프로젝트 멤버 전용).
+
+    확정 이후 수정/추가는 진행 관리 페이지에서 계속 가능합니다.
+    """
+    _get_project_or_404(db, project_id)
+    _ensure_project_member(db, project_id, current_user_id)
+
+    marker = _get_todo_finalized_marker(db, project_id)
+    if marker is None:
+        db.add(
+            ProjectMilestone(
+                project_id=project_id,
+                title=TODO_FINALIZED_MARKER_TITLE,
+                description="Team Todo checklist finalized in chat room.",
+                is_done=True,
+            )
+        )
+        db.commit()
+
+    await _broadcast_todo_state(db, project_id)
+    return success_response(data=_build_todo_state_response(db, project_id))
+
+
 @router.patch("/{project_id}/todos/{todo_id}", summary="Todo 수정", description="Todo 내용을 부분 수정하고 done 상태면 완료 시각을 기록합니다.")
 async def update_todo(
     project_id: int,
@@ -1503,6 +1575,12 @@ async def project_todos_websocket(
                 "data": [_build_todo_response(todo, assignments_by_todo.get(todo.id, [])) for todo in todos],
             }
         )
+        await websocket.send_json(
+            {
+                "type": "todo.state.updated",
+                "data": _build_todo_state_response(db, project_id),
+            }
+        )
 
         while True:
             payload = await websocket.receive_json()
@@ -1519,6 +1597,12 @@ async def project_todos_websocket(
                     {
                         "type": "todo.snapshot",
                         "data": [_build_todo_response(todo, assignments_by_todo.get(todo.id, [])) for todo in todos],
+                    }
+                )
+                await websocket.send_json(
+                    {
+                        "type": "todo.state.updated",
+                        "data": _build_todo_state_response(db, project_id),
                     }
                 )
                 continue

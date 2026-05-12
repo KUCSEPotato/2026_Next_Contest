@@ -12,6 +12,7 @@ import {
   toggleTodoDoneApi,
   updateProjectStatusApi,
   updateTodoApi,
+  createTodoApi,
   createRecruitmentApi,
   createProjectReviewApi,
   getProjectReviewsApi,
@@ -26,6 +27,13 @@ const isDoneTodo = (todo) =>
   normalizeStatus(todo?.status) === "done" ||
   Boolean(todo?.completed_at) ||
   todo?.is_done === true;
+
+const TODO_STAGES = [
+  { value: "planning", label: "기획" },
+  { value: "design", label: "설계" },
+  { value: "development", label: "개발" },
+  { value: "verification", label: "검증" },
+];
 
 export default function ProjectManagePage() {
   const params = useParams();
@@ -44,6 +52,11 @@ export default function ProjectManagePage() {
   const [editingTodoId, setEditingTodoId] = useState(null);
   const [editingTodoTitle, setEditingTodoTitle] = useState("");
   const [editingTodoDescription, setEditingTodoDescription] = useState("");
+  const [editingTodoStage, setEditingTodoStage] = useState("planning");
+  const [newTodoTitle, setNewTodoTitle] = useState("");
+  const [newTodoDescription, setNewTodoDescription] = useState("");
+  const [newTodoStage, setNewTodoStage] = useState("planning");
+  const [isCreatingTodo, setIsCreatingTodo] = useState(false);
   const [showRecruitmentForm, setShowRecruitmentForm] = useState(false);
   const [isCreatingRecruitment, setIsCreatingRecruitment] = useState(false);
   const [projectReviews, setProjectReviews] = useState([]);
@@ -122,9 +135,15 @@ export default function ProjectManagePage() {
       ? ""
       : todos.length === 0
         ? "Todo가 있어야 프로젝트 완료 처리를 할 수 있습니다."
-        : canCompleteProject
+      : canCompleteProject
           ? "완료 조건을 충족했습니다. 프로젝트 완료 버튼을 눌러 마무리하세요."
           : "Todo를 70% 이상 완료하면 프로젝트 완료 버튼을 누를 수 있습니다.";
+  const todoGroups = groupTodosByStage(todos);
+
+  const getProjectMemberIds = () =>
+    (project?.members || [])
+      .map((member) => member.user_id || member.id || member.user?.id)
+      .filter(Boolean);
 
   const reloadProjectAndTodos = async () => {
     const [proj, todoResult, reviewsResult] = await Promise.all([
@@ -271,12 +290,44 @@ export default function ProjectManagePage() {
     setEditingTodoId(todo.id);
     setEditingTodoTitle(todo.title || "");
     setEditingTodoDescription(todo.description || "");
+    setEditingTodoStage(normalizeTodoStage(todo.stage));
   };
 
   const cancelEditingTodo = () => {
     setEditingTodoId(null);
     setEditingTodoTitle("");
     setEditingTodoDescription("");
+    setEditingTodoStage("planning");
+  };
+
+  const handleCreateTodo = async () => {
+    if (!newTodoTitle.trim()) {
+      alert("Todo 제목을 입력해주세요.");
+      return;
+    }
+
+    try {
+      setIsCreatingTodo(true);
+      await createTodoApi(projectId, {
+        title: newTodoTitle.trim(),
+        description: newTodoDescription.trim() || null,
+        stage: newTodoStage,
+        status: "todo",
+        priority: todos.length + 1,
+        assignee_ids: getProjectMemberIds(),
+      });
+
+      setNewTodoTitle("");
+      setNewTodoDescription("");
+      setNewTodoStage("planning");
+      const todoResult = await getTodosApi(projectId);
+      setTodos(Array.isArray(todoResult.data) ? todoResult.data : []);
+    } catch (error) {
+      console.error(error);
+      alert("Todo 생성에 실패했습니다.");
+    } finally {
+      setIsCreatingTodo(false);
+    }
   };
 
   const handleSaveTodoEdit = async (todo) => {
@@ -290,6 +341,7 @@ export default function ProjectManagePage() {
       await updateTodoApi(projectId, todo.id, {
         title: editingTodoTitle.trim(),
         description: editingTodoDescription.trim() || null,
+        stage: editingTodoStage,
       });
       cancelEditingTodo();
       const todoResult = await getTodosApi(projectId);
@@ -845,6 +897,51 @@ export default function ProjectManagePage() {
             </div>
           </div>
 
+          {!isProjectCompleted && (
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="grid gap-3 md:grid-cols-[160px_minmax(0,1fr)_auto]">
+                <select
+                  value={newTodoStage}
+                  onChange={(e) => setNewTodoStage(e.target.value)}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-600 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-100"
+                >
+                  {TODO_STAGES.map((stage) => (
+                    <option key={stage.value} value={stage.value}>
+                      {stage.label}
+                    </option>
+                  ))}
+                </select>
+
+                <input
+                  value={newTodoTitle}
+                  onChange={(e) => setNewTodoTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.nativeEvent.isComposing && !isCreatingTodo) {
+                      handleCreateTodo();
+                    }
+                  }}
+                  placeholder="새 Todo 제목"
+                  className="min-w-0 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-red-500 focus:ring-4 focus:ring-red-100"
+                />
+
+                <button
+                  onClick={handleCreateTodo}
+                  disabled={isCreatingTodo}
+                  className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:bg-slate-300"
+                >
+                  {isCreatingTodo ? "추가 중..." : "추가"}
+                </button>
+              </div>
+
+              <textarea
+                value={newTodoDescription}
+                onChange={(e) => setNewTodoDescription(e.target.value)}
+                placeholder="필요하면 상세 내용을 적어주세요."
+                className="mt-3 min-h-20 w-full resize-y rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-red-500 focus:ring-4 focus:ring-red-100"
+              />
+            </div>
+          )}
+
           {todoLoading ? (
             <p className="mt-6 text-sm text-slate-500">Todo를 불러오는 중...</p>
           ) : todos.length === 0 ? (
@@ -852,98 +949,120 @@ export default function ProjectManagePage() {
               아직 Todo가 없습니다. chat 페이지에서 Todo를 생성하거나 AI 생성으로 확장해주세요.
             </p>
           ) : (
-            <div className="mt-6 space-y-3">
-              {todos.map((todo) => {
-                const isDone = isDoneTodo(todo);
-                const isEditing = editingTodoId === todo.id;
+            <div className="mt-6 space-y-6">
+              {todoGroups.map((group) => (
+                <div key={group.stage}>
+                  <h3 className="mb-3 text-sm font-bold text-red-600">
+                    {group.label}
+                  </h3>
 
-                return (
-                  <div
-                    key={todo.id}
-                    className="rounded-2xl border border-slate-200 p-4 transition hover:border-red-200 hover:bg-red-50/40"
-                  >
-                    <div className="flex items-start gap-3">
-                      <input
-                        type="checkbox"
-                        checked={isDone}
-                        disabled={togglingTodoId === todo.id || isProjectCompleted}
-                        onChange={() => handleToggleTodo(todo.id)}
-                        className="mt-1 h-5 w-5 shrink-0 accent-red-600 disabled:cursor-not-allowed"
-                      />
+                  <div className="space-y-3">
+                    {group.items.map(({ todo }) => {
+                      const isDone = isDoneTodo(todo);
+                      const isEditing = editingTodoId === todo.id;
 
-                      <div className="min-w-0 flex-1">
-                        {isEditing ? (
-                          <div className="space-y-3">
+                      return (
+                        <div
+                          key={todo.id}
+                          className="rounded-2xl border border-slate-200 p-4 transition hover:border-red-200 hover:bg-red-50/40"
+                        >
+                          <div className="flex items-start gap-3">
                             <input
-                              value={editingTodoTitle}
-                              onChange={(e) => setEditingTodoTitle(e.target.value)}
-                              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-red-500 focus:ring-4 focus:ring-red-100"
+                              type="checkbox"
+                              checked={isDone}
+                              disabled={togglingTodoId === todo.id || isProjectCompleted}
+                              onChange={() => handleToggleTodo(todo.id)}
+                              className="mt-1 h-5 w-5 shrink-0 accent-red-600 disabled:cursor-not-allowed"
                             />
 
-                            <textarea
-                              value={editingTodoDescription}
-                              onChange={(e) =>
-                                setEditingTodoDescription(e.target.value)
-                              }
-                              className="min-h-24 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-red-500 focus:ring-4 focus:ring-red-100"
-                              placeholder="Todo 상세 내용"
-                            />
+                            <div className="min-w-0 flex-1">
+                              {isEditing ? (
+                                <div className="space-y-3">
+                                  <select
+                                    value={editingTodoStage}
+                                    onChange={(e) => setEditingTodoStage(e.target.value)}
+                                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-600 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-100"
+                                  >
+                                    {TODO_STAGES.map((stage) => (
+                                      <option key={stage.value} value={stage.value}>
+                                        {stage.label}
+                                      </option>
+                                    ))}
+                                  </select>
 
-                            <div className="flex justify-end gap-2">
-                              <button
-                                onClick={cancelEditingTodo}
-                                className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600"
-                              >
-                                취소
-                              </button>
+                                  <input
+                                    value={editingTodoTitle}
+                                    onChange={(e) => setEditingTodoTitle(e.target.value)}
+                                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-red-500 focus:ring-4 focus:ring-red-100"
+                                  />
 
-                              <button
-                                onClick={() => handleSaveTodoEdit(todo)}
-                                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white"
-                              >
-                                저장
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                              <p
-                                className={`text-base font-semibold ${
-                                  isDone
-                                    ? "text-slate-400 line-through"
-                                    : "text-slate-900"
-                                }`}
-                              >
-                                {todo.title}
-                              </p>
+                                  <textarea
+                                    value={editingTodoDescription}
+                                    onChange={(e) =>
+                                      setEditingTodoDescription(e.target.value)
+                                    }
+                                    className="min-h-24 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-red-500 focus:ring-4 focus:ring-red-100"
+                                    placeholder="Todo 상세 내용"
+                                  />
 
-                              {todo.description && (
-                                <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">
-                                  {todo.description}
-                                </p>
+                                  <div className="flex justify-end gap-2">
+                                    <button
+                                      onClick={cancelEditingTodo}
+                                      className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600"
+                                    >
+                                      취소
+                                    </button>
+
+                                    <button
+                                      onClick={() => handleSaveTodoEdit(todo)}
+                                      className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white"
+                                    >
+                                      저장
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                  <div>
+                                    <p
+                                      className={`text-base font-semibold ${
+                                        isDone
+                                          ? "text-slate-400 line-through"
+                                          : "text-slate-900"
+                                      }`}
+                                    >
+                                      {todo.title}
+                                    </p>
+
+                                    {todo.description && (
+                                      <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">
+                                        {todo.description}
+                                      </p>
+                                    )}
+
+                                    <p className="mt-2 text-xs text-slate-400">
+                                      {group.label} · {todo.status || "todo"}
+                                    </p>
+                                  </div>
+
+                                  {!isProjectCompleted && (
+                                    <button
+                                      onClick={() => startEditingTodo(todo)}
+                                      className="self-start rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-red-300 hover:text-red-600"
+                                    >
+                                      수정
+                                    </button>
+                                  )}
+                                </div>
                               )}
-
-                              <p className="mt-2 text-xs text-slate-400">
-                                {todo.stage || "planning"} · {todo.status || "todo"}
-                              </p>
                             </div>
-
-                            {!isProjectCompleted && (
-                              <button
-                                onClick={() => startEditingTodo(todo)}
-                                className="self-start rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-red-300 hover:text-red-600"
-                              >
-                                수정
-                              </button>
-                            )}
                           </div>
-                        )}
-                      </div>
-                    </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           )}
         </section>
@@ -972,4 +1091,44 @@ function ScoreSelect({ label, value, onChange }) {
       </select>
     </label>
   );
+}
+
+function groupTodosByStage(todos) {
+  const groupMap = new Map(
+    TODO_STAGES.map((stage) => [
+      stage.value,
+      { stage: stage.value, label: stage.label, items: [] },
+    ])
+  );
+  const extraGroups = [];
+
+  todos.forEach((todo, index) => {
+    const stage = normalizeTodoStage(todo.stage);
+
+    if (!groupMap.has(stage)) {
+      const group = { stage, label: stage, items: [] };
+      groupMap.set(stage, group);
+      extraGroups.push(group);
+    }
+
+    groupMap.get(stage).items.push({ todo, index });
+  });
+
+  return [
+    ...TODO_STAGES.map((stage) => groupMap.get(stage.value)).filter(
+      (group) => group.items.length > 0
+    ),
+    ...extraGroups.filter((group) => group.items.length > 0),
+  ];
+}
+
+function normalizeTodoStage(stage) {
+  const value = String(stage || "").trim();
+
+  if (!value || value === "planning" || value.includes("기획")) return "planning";
+  if (value === "design" || value.includes("설계")) return "design";
+  if (value === "development" || value.includes("개발")) return "development";
+  if (value === "verification" || value.includes("검증")) return "verification";
+
+  return value;
 }
