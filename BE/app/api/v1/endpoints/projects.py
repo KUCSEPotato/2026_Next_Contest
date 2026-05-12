@@ -461,10 +461,12 @@ def _build_project_memoir_context(db: Session, project: Project) -> str:
 
 
 async def _call_gemini_for_memoir_refine(feelings: str, shortcomings: str, project_context: str = "") -> str:
-    if not settings.gemini_api_key:
+    gemini_api_key = os.getenv("GEMINI_API_KEY")
+
+    if not gemini_api_key:
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"There is no Gemini API key available",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="There is no Gemini API key available",
         )
         return _fallback_memoir_refine(feelings, shortcomings)
     return await asyncio.to_thread(_sync_call_gemini_for_memoir_refine, feelings, shortcomings, project_context)
