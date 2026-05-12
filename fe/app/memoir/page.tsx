@@ -390,6 +390,7 @@ function GrowthModal({
     lessons.trim() ||
     nextActions.trim()
   );
+  const hasAiMemoir = Boolean(aiMemoir.trim());
 
   return (
     <div
@@ -401,6 +402,10 @@ function GrowthModal({
         <p style={{ fontSize: 20, fontWeight: 800, color: "#5c0a0a", marginBottom: 4 }}>🌹 성장 기록하기</p>
         <p style={{ fontSize: 13, color: "#c08080", marginBottom: 22 }}>
           새롭게 도전한 점과 회고 내용을 수정한 뒤 AI 요약본을 다시 만들 수 있어요.
+        </p>
+
+        <p style={{ fontSize: 12, color: "#c08080", lineHeight: 1.6, margin: "-6px 0 14px" }}>
+          AI 요약을 받은 뒤에도 새롭게 도전한 점을 수정하고 다시 요약받을 수 있어요.
         </p>
 
         {[
@@ -456,6 +461,16 @@ function GrowthModal({
           </div>
         ))}
 
+        <div style={{ background: "#fff8f8", border: "1px solid #f4cccc", borderRadius: 14, padding: 14, marginBottom: 12 }}>
+          <p style={{ fontSize: 13, fontWeight: 800, color: "#8f1d1d", marginBottom: 6 }}>
+            AI 요약과 저장은 달라요
+          </p>
+          <p style={{ fontSize: 12, color: "#a85555", lineHeight: 1.7, margin: 0 }}>
+            위 내용을 수정한 뒤 <strong>AI에게 요약 부탁하기</strong>를 누르면 요약본만 새로 만들어져요.
+            최종으로 남기려면 아래의 <strong>수확일기 저장하기</strong>를 눌러 저장해주세요.
+          </p>
+        </div>
+
         <button
           onClick={handleGenerate}
           disabled={saving || generating || !canGenerateMemoir}
@@ -475,12 +490,12 @@ function GrowthModal({
         >
           {generating
             ? "AI 요약본 만드는 중..."
-            : aiMemoir.trim()
-              ? "AI 요약본 다시 만들기"
-              : "AI 요약본 만들기"}
+            : hasAiMemoir
+              ? "수정 내용으로 AI에게 다시 요약 부탁하기"
+              : "AI에게 요약 부탁하기"}
         </button>
 
-        {aiMemoir.trim() && (
+        {hasAiMemoir && (
           <div style={{ marginBottom: 14 }}>
             <p style={{ fontSize: 12, color: "#a83030", fontWeight: 700, marginBottom: 9 }}>
               AI 회고록 초안
@@ -496,6 +511,15 @@ function GrowthModal({
             />
           </div>
         )}
+
+        <div style={{ borderTop: "1px solid #f2d6d6", paddingTop: 12, marginTop: 4 }}>
+          <p style={{ fontSize: 12, color: "#8f1d1d", fontWeight: 800, marginBottom: 4 }}>
+            최종 저장
+          </p>
+          <p style={{ fontSize: 12, color: "#a85555", lineHeight: 1.7, margin: "0 0 10px" }}>
+            AI 요약본을 확인한 뒤 이 버튼을 눌러야 수확일기에 저장돼요.
+          </p>
+        </div>
 
         <button
           onClick={handleSave}
