@@ -10,10 +10,9 @@ import {
   requestPasswordResetApi,
   resetPasswordApi,
 } from "../../lib/api";
+import { useToast } from "../../components/AppFeedback";
 
 const validatePassword = (value) => value.length >= 8;
-import { loginApi } from "../../lib/api";
-import { useToast } from "../../components/AppFeedback";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -89,7 +88,6 @@ export default function LoginPage() {
           user: me.data,
         });
       } else {
-        console.error("/auth/me 응답 이상:", me);
         toast.error("로그인에 실패했습니다. 아이디 또는 비밀번호를 확인해주세요.");
         return;
       }
@@ -106,7 +104,7 @@ export default function LoginPage() {
 
   const handleFindLoginId = async () => {
     if (!findEmail.trim()) {
-      alert("가입한 이메일을 입력해주세요.");
+      toast.warning("가입한 이메일을 입력해주세요.");
       return;
     }
 
@@ -117,7 +115,7 @@ export default function LoginPage() {
       setFoundLoginId(nextLoginId || "해당 이메일로 가입된 아이디를 찾을 수 없습니다.");
     } catch (error) {
       console.error(error);
-      alert("아이디 찾기에 실패했습니다.");
+      toast.error("아이디 찾기에 실패했습니다.");
     } finally {
       setIsFinding(false);
     }
@@ -125,7 +123,7 @@ export default function LoginPage() {
 
   const handleRequestPasswordReset = async () => {
     if (!resetEmail.trim()) {
-      alert("가입한 이메일을 입력해주세요.");
+      toast.warning("가입한 이메일을 입력해주세요.");
       return;
     }
 
@@ -134,13 +132,14 @@ export default function LoginPage() {
       const result = await requestPasswordResetApi(resetEmail.trim());
       const token = result.data?.reset_token;
       if (!token) {
-        alert("해당 이메일로 가입된 계정을 찾을 수 없습니다.");
+        toast.error("해당 이메일로 가입된 계정을 찾을 수 없습니다.");
         return;
       }
       setResetToken(token);
+      toast.success("재설정 토큰이 발급되었습니다.");
     } catch (error) {
       console.error(error);
-      alert("비밀번호 재설정 요청에 실패했습니다.");
+      toast.error("비밀번호 재설정 요청에 실패했습니다.");
     } finally {
       setIsFinding(false);
     }
@@ -148,22 +147,22 @@ export default function LoginPage() {
 
   const handleResetPassword = async () => {
     if (!resetToken || !newPassword.trim()) {
-      alert("새 비밀번호를 입력해주세요.");
+      toast.warning("새 비밀번호를 입력해주세요.");
       return;
     }
     if (!validatePassword(newPassword)) {
-      alert("비밀번호는 8자 이상이어야 합니다.");
+      toast.warning("비밀번호는 8자 이상이어야 합니다.");
       return;
     }
 
     try {
       setIsFinding(true);
       await resetPasswordApi(resetToken, newPassword);
-      alert("비밀번호가 재설정되었습니다. 새 비밀번호로 로그인해주세요.");
+      toast.success("비밀번호가 재설정되었습니다. 새 비밀번호로 로그인해주세요.");
       closeModal();
     } catch (error) {
       console.error(error);
-      alert("비밀번호 재설정에 실패했습니다.");
+      toast.error("비밀번호 재설정에 실패했습니다.");
     } finally {
       setIsFinding(false);
     }
