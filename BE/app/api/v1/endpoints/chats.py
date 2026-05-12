@@ -296,6 +296,7 @@ async def get_my_chat_rooms(
     - last_message: 마지막 메시지 텍스트
     - last_message_at: 마지막 메시지 시간
     - last_message_sender_nickname: 마지막 메시지 발송자 닉네임
+    - message_count: 채팅방 전체 메시지 수
     """
     # 사용자가 ChatRoomMember인 채팅방 찾기
     chat_room_members = (
@@ -330,6 +331,12 @@ async def get_my_chat_rooms(
             .order_by(desc(ChatMessage.created_at))
             .first()
         )
+        message_count = (
+            db.query(func.count(ChatMessage.id))
+            .filter(ChatMessage.room_id == room.id)
+            .scalar()
+            or 0
+        )
 
         last_message_sender = None
         if latest_message and latest_message.sender_id:
@@ -344,7 +351,12 @@ async def get_my_chat_rooms(
                 "last_message": latest_message.message if latest_message else None,
                 "last_message_at": latest_message.created_at.isoformat() if latest_message else None,
                 "last_message_sender_nickname": last_message_sender.nickname if last_message_sender else None,
+                "message_count": message_count,
             }
         )
 
+    response_data.sort(
+        key=lambda room: room["last_message_at"] or "",
+        reverse=True,
+    )
     return success_response(data=response_data)
