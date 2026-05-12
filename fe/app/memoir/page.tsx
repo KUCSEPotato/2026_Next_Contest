@@ -121,6 +121,37 @@ function average(values: number[]) {
   return Number((values.reduce((s, v) => s + v, 0) / values.length).toFixed(1));
 }
 
+function getCurrentUserId() {
+  if (typeof window === "undefined") return null;
+
+  const storedUserId = localStorage.getItem("user_id");
+  if (storedUserId) {
+    const parsed = Number(storedUserId);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+
+  try {
+    const storedUser = localStorage.getItem("user");
+    const user = storedUser ? JSON.parse(storedUser) : null;
+    const parsed = Number(user?.id ?? user?.user_id);
+    return Number.isFinite(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function findMyRetrospective(
+  retrospectives: RetrospectiveSummary[],
+  currentUserId: number | null
+) {
+  if (!currentUserId) return null;
+  return (
+    retrospectives.find(
+      (retrospective) => Number(retrospective.author_id) === currentUserId
+    ) || null
+  );
+}
+
 function toDateLabel(value?: string | null) {
   if (!value) return "기록 없음";
   const d = new Date(value);
@@ -504,6 +535,7 @@ function MemoirContent() {
         setError("");
 
         let selectedProject: ProjectData | null = null;
+        const currentUserId = getCurrentUserId();
 
         if (!requestedProjectId) {
           const myProjectsResult = await getMyProjectsApi();
@@ -517,11 +549,12 @@ function MemoirContent() {
                 const retrospectivesResult = await getProjectRetrospectivesApi(
                   completedProject.id
                 );
-                const first = (retrospectivesResult.data || [])[0] as
-                  | RetrospectiveSummary
-                  | undefined;
+                const myRetrospective = findMyRetrospective(
+                  (retrospectivesResult.data || []) as RetrospectiveSummary[],
+                  currentUserId
+                );
 
-                if (!first) {
+                if (!myRetrospective) {
                   return {
                     project: completedProject,
                     retrospectiveId: null,
@@ -531,7 +564,7 @@ function MemoirContent() {
 
                 const detail = await getProjectRetrospectiveApi(
                   completedProject.id,
-                  first.id
+                  myRetrospective.id
                 );
                 const retro = detail.data as RetrospectiveDetail;
                 const ll = parseLessonsLearned(retro.lessons_learned);
@@ -600,9 +633,12 @@ function MemoirContent() {
         let loadedRetrospectiveId: number | null = null;
 
         if (retrospectivesResult.status === "fulfilled") {
-          const first = (retrospectivesResult.value.data || [])[0] as RetrospectiveSummary | undefined;
-          if (first) {
-            const detail = await getProjectRetrospectiveApi(projectId, first.id);
+          const myRetrospective = findMyRetrospective(
+            (retrospectivesResult.value.data || []) as RetrospectiveSummary[],
+            currentUserId
+          );
+          if (myRetrospective) {
+            const detail = await getProjectRetrospectiveApi(projectId, myRetrospective.id);
             const retro  = detail.data as RetrospectiveDetail;
             const ll     = parseLessonsLearned(retro.lessons_learned);
             loadedRetrospectiveId = retro.id;
