@@ -226,15 +226,22 @@ export default function AdminPage() {
 
     if (!window.confirm("정말로 해당 대상을 강제 삭제(soft delete) 하시겠습니까?")) return;
 
+    const reasonInput = window.prompt(
+      "글 주인에게 전달할 강제 내리기 사유를 입력하세요. (선택)",
+      report.reason || ""
+    );
+    if (reasonInput === null) return;
+    const payload = { reason: reasonInput.trim() || undefined };
+
     try {
       setProcessingKey(`report-takedown-${report.id}`);
 
       if (targetPostId) {
-        await adminTakedownPostApi(targetPostId);
+        await adminTakedownPostApi(targetPostId, payload);
       } else if (targetProjectId) {
-        await adminTakedownProjectApi(targetProjectId);
+        await adminTakedownProjectApi(targetProjectId, payload);
       } else if (targetIdeaId) {
-        await adminTakedownIdeaApi(targetIdeaId);
+        await adminTakedownIdeaApi(targetIdeaId, payload);
       }
 
       // mark report resolved locally
@@ -245,7 +252,7 @@ export default function AdminPage() {
           : prev
       );
 
-      alert("대상이 강제 내리기(soft delete) 처리되었습니다.");
+      alert("대상이 강제 내리기 처리되었고 작성자에게 알림을 보냈습니다.");
     } catch (err) {
       alert(err instanceof Error ? err.message : "강제 내리기에 실패했습니다.");
     } finally {
@@ -458,10 +465,12 @@ export default function AdminPage() {
 
   async function handleTakedownPost(postId) {
     if (!window.confirm("정말로 이 게시글을 강제로 내리겠습니까?")) return;
+    const reasonInput = window.prompt("글 주인에게 전달할 강제 내리기 사유를 입력하세요. (선택)", "");
+    if (reasonInput === null) return;
 
     try {
       setProcessingKey(`post-takedown-${postId}`);
-      await adminTakedownPostApi(postId);
+      await adminTakedownPostApi(postId, { reason: reasonInput.trim() || undefined });
       setPosts((prev) =>
         includeDeletedPosts
           ? prev.map((post) =>
@@ -469,7 +478,7 @@ export default function AdminPage() {
             )
           : prev.filter((post) => post.id !== postId)
       );
-      alert("게시글을 강제로 내렸습니다.");
+      alert("게시글을 강제로 내렸고 작성자에게 알림을 보냈습니다.");
     } catch (err) {
       alert(err instanceof Error ? err.message : "게시글 강제 내리기에 실패했습니다.");
     } finally {
@@ -479,10 +488,12 @@ export default function AdminPage() {
 
   async function handleTakedownProject(projectId) {
     if (!window.confirm("정말로 이 프로젝트를 강제로 내리겠습니까?")) return;
+    const reasonInput = window.prompt("리더에게 전달할 강제 내리기 사유를 입력하세요. (선택)", "");
+    if (reasonInput === null) return;
 
     try {
       setProcessingKey(`project-takedown-${projectId}`);
-      await adminTakedownProjectApi(projectId);
+      await adminTakedownProjectApi(projectId, { reason: reasonInput.trim() || undefined });
       setProjects((prev) =>
         prev.map((project) =>
           project.id === projectId
@@ -490,7 +501,7 @@ export default function AdminPage() {
             : project
         )
       );
-      alert("프로젝트를 강제로 내렸습니다.");
+      alert("프로젝트를 강제로 내렸고 리더에게 알림을 보냈습니다.");
     } catch (err) {
       alert(err instanceof Error ? err.message : "프로젝트 강제 내리기에 실패했습니다.");
     } finally {
@@ -795,6 +806,7 @@ export default function AdminPage() {
                   <tr>
                     <Th>ID</Th>
                     <Th>계정</Th>
+                    <Th>연동</Th>
                     <Th>Role</Th>
                     <Th>Coin</Th>
                     <Th>Status</Th>
@@ -808,6 +820,26 @@ export default function AdminPage() {
                       <Td>
                         <p className="font-semibold text-slate-900">{user.nickname}</p>
                         <p className="text-xs text-slate-500">{user.email}</p>
+                      </Td>
+                      <Td>
+                        <div className="flex flex-wrap gap-1.5">
+                          {user.is_github_linked ? (
+                            <span className="rounded-full bg-slate-900 px-2 py-0.5 text-xs font-semibold text-white">
+                              GitHub
+                            </span>
+                          ) : null}
+                          {user.is_google_linked ? (
+                            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                              Google
+                            </span>
+                          ) : null}
+                          {!user.is_github_linked && !user.is_google_linked ? (
+                            <span className="text-xs text-slate-400">일반</span>
+                          ) : null}
+                        </div>
+                        {user.github_id ? (
+                          <p className="mt-1 text-xs text-slate-400">github_id: {user.github_id}</p>
+                        ) : null}
                       </Td>
                       <Td>{user.role}</Td>
                       <Td>{user.coin_balance}</Td>

@@ -9,6 +9,7 @@ from app.api.v1.response import success_response
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
 from app.models import CommunityPost
+from app.models import Notification
 from app.models import PaymentEvent
 from app.models import Project
 from app.models import Idea
@@ -38,10 +39,47 @@ class AdminCoinRevokeRequest(BaseModel):
     note: str | None = Field(default=None, max_length=500)
 
 
+class AdminTakedownRequest(BaseModel):
+    reason: str | None = Field(default=None, max_length=1000)
+
+
 def _ensure_admin(db: Session, user_id: int) -> None:
     user = db.get(User, user_id)
     if user is None or user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin permission required")
+
+
+def _takedown_body(target_label: str, reason: str | None) -> str:
+    base_message = f"작성하신 {target_label}이 관리자에 의해 내려졌습니다."
+    if reason:
+        return f"{base_message}\n사유: {reason}"
+    return base_message
+
+
+def _notify_admin_takedown(
+    db: Session,
+    *,
+    user_id: int,
+    target_type: str,
+    target_id: int,
+    target_title: str,
+    target_label: str,
+    reason: str | None,
+) -> None:
+    db.add(
+        Notification(
+            user_id=user_id,
+            type="admin_takedown",
+            title=f"{target_label}이 관리자에 의해 내려졌습니다",
+            body=_takedown_body(target_label, reason),
+            data={
+                "target_type": target_type,
+                "target_id": target_id,
+                "target_title": target_title,
+                "reason": reason,
+            },
+        )
+    )
 
 
 @router.get("/overview", summary="관리자 운영 요약", description="관리자 대시보드에 필요한 핵심 운영 지표를 조회합니다.")
@@ -104,6 +142,10 @@ async def list_users_for_admin(
                 "role": u.role,
                 "is_active": u.is_active,
                 "is_verified": u.is_verified,
+                "github_id": u.github_id,
+                "google_id": u.google_id,
+                "is_github_linked": bool(u.github_id),
+                "is_google_linked": bool(u.google_id),
                 "coin_balance": u.coin_balance,
                 "created_at": u.created_at,
             }
@@ -511,6 +553,7 @@ async def run_stale_project_reminders(
 @router.post("/posts/{post_id}/takedown", summary="관리자 게시물 강제 내리기", description="관리자가 특정 게시물을 강제로 내립니다 (soft delete).")
 async def admin_takedown_post(
     post_id: int,
+    payload: AdminTakedownRequest | None = Body(default=None),
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -518,14 +561,25 @@ async def admin_takedown_post(
     post = db.get(CommunityPost, post_id)
     if post is None or post.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    reason = payload.reason.strip() if payload and payload.reason else None
     post.deleted_at = datetime.now(timezone.utc)
+    _notify_admin_takedown(
+        db,
+        user_id=post.author_id,
+        target_type="community_post",
+        target_id=post.id,
+        target_title=post.title,
+        target_label="게시글",
+        reason=reason,
+    )
     db.commit()
-    return success_response(data={"deleted": True, "post_id": post_id})
+    return success_response(data={"deleted": True, "post_id": post_id, "reason": reason})
 
 
 @router.post("/ideas/{idea_id}/takedown", summary="관리자 아이디어 강제 내리기", description="관리자가 특정 아이디어를 강제로 내립니다 (soft delete).")
 async def admin_takedown_idea(
     idea_id: int,
+    payload: AdminTakedownRequest | None = Body(default=None),
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -533,14 +587,25 @@ async def admin_takedown_idea(
     idea = db.get(Idea, idea_id)
     if idea is None or idea.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Idea not found")
+    reason = payload.reason.strip() if payload and payload.reason else None
     idea.deleted_at = datetime.now(timezone.utc)
+    _notify_admin_takedown(
+        db,
+        user_id=idea.author_id,
+        target_type="idea",
+        target_id=idea.id,
+        target_title=idea.title,
+        target_label="아이디어",
+        reason=reason,
+    )
     db.commit()
-    return success_response(data={"deleted": True, "idea_id": idea_id})
+    return success_response(data={"deleted": True, "idea_id": idea_id, "reason": reason})
 
 
 @router.post("/projects/{project_id}/takedown", summary="관리자 프로젝트 강제 내리기", description="관리자가 특정 프로젝트를 강제로 내립니다 (soft delete).")
 async def admin_takedown_project(
     project_id: int,
+    payload: AdminTakedownRequest | None = Body(default=None),
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -548,6 +613,16 @@ async def admin_takedown_project(
     project = db.get(Project, project_id)
     if project is None or project.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    reason = payload.reason.strip() if payload and payload.reason else None
     project.deleted_at = datetime.now(timezone.utc)
+    _notify_admin_takedown(
+        db,
+        user_id=project.leader_id,
+        target_type="project",
+        target_id=project.id,
+        target_title=project.title,
+        target_label="프로젝트",
+        reason=reason,
+    )
     db.commit()
-    return success_response(data={"deleted": True, "project_id": project_id})
+    return success_response(data={"deleted": True, "project_id": project_id, "reason": reason})
