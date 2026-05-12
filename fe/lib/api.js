@@ -962,6 +962,27 @@ export async function getAdminMyPostsApi() {
   return handleResponse(res, "내 공지/이벤트 목록을 불러오지 못했습니다.");
 }
 
+export async function getAdminPostsApi(params = {}) {
+  const query = new URLSearchParams();
+
+  if (params.q) query.set("q", params.q);
+  if (params.category) query.set("category", params.category);
+  if (params.include_deleted !== undefined) {
+    query.set("include_deleted", String(params.include_deleted));
+  }
+
+  const queryString = query.toString();
+  const url = queryString
+    ? `${API_BASE_URL}/api/v1/admin/posts?${queryString}`
+    : `${API_BASE_URL}/api/v1/admin/posts`;
+
+  const res = await authenticatedFetch(url, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "게시글 목록을 불러오지 못했습니다.");
+}
+
 export async function adminUpdatePostApi(postId, payload) {
   const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/posts/${postId}`, {
     method: "PATCH",
