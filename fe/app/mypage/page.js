@@ -9,6 +9,7 @@ import {
   getUserStatsApi,
   getUserReceivedReviewsApi,
   getMyProjectsApi,
+  getMyApplicationsApi,
   getMyReceivedReviewsApi,
   updateMyProfileApi,
   addMySkillApi,
@@ -30,6 +31,7 @@ export default function MyPage() {
   const [reputation, setReputation] = useState(null);
   const [stats, setStats] = useState(null);
   const [projects, setProjects] = useState([]);
+  const [appliedProjects, setAppliedProjects] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [projectStatusFilter, setProjectStatusFilter] = useState("all");
   const [projectSortOrder, setProjectSortOrder] = useState("latest");
@@ -104,8 +106,19 @@ export default function MyPage() {
   }
 
   async function reloadMyProjects() {
-    const projectsResult = await getMyProjectsApi();
-    setProjects(projectsResult.data || []);
+    const [projectsResult, applicationsResult] = await Promise.allSettled([
+      getMyProjectsApi(),
+      getMyApplicationsApi(),
+    ]);
+
+    setProjects(
+      projectsResult.status === "fulfilled" ? projectsResult.value.data || [] : []
+    );
+    setAppliedProjects(
+      applicationsResult.status === "fulfilled"
+        ? applicationsResult.value.data || []
+        : []
+    );
   }
 
   useEffect(() => {
@@ -121,11 +134,12 @@ export default function MyPage() {
         setEditBio(profileData.bio || "");
         setEditAvatarUrl(profileData.avatar_url || "");
 
-        const [reputationResult, statsResult, projectsResult] =
+        const [reputationResult, statsResult, projectsResult, applicationsResult] =
           await Promise.allSettled([
             getMyReputationApi(),
             getUserStatsApi(profileData.id),
             getMyProjectsApi(),
+            getMyApplicationsApi(),
           ]);
 
         setReputation(
@@ -148,6 +162,11 @@ export default function MyPage() {
         setProjects(
           projectsResult.status === "fulfilled"
             ? projectsResult.value.data || []
+            : []
+        );
+        setAppliedProjects(
+          applicationsResult.status === "fulfilled"
+            ? applicationsResult.value.data || []
             : []
         );
 
@@ -181,12 +200,17 @@ export default function MyPage() {
   }, [loading]);
 
   const isTeamFormedProject = (project) => {
-    return ["in_progress", "started", "completed", "paused"].includes(
+    return ["in_progress", "started", "paused"].includes(
       project?.status
     );
   };
 
   const openDiscardFlow = async (project) => {
+    if (project.status === "completed") {
+      alert("완료된 프로젝트는 버릴 수 없습니다.");
+      return;
+    }
+
     if (!project.can_discard) return;
 
     if (!isTeamFormedProject(project)) {
@@ -241,6 +265,7 @@ export default function MyPage() {
       setDiscardingId(project.id);
       await discardProjectToWellApi(project.id);
       setProjects((prev) => prev.filter((p) => p.id !== project.id));
+      await reloadMyProjects();
       setDiscardConfirm(null);
       alert(`"${project.title}" 프로젝트가 영감의 샘으로 이동되었습니다.`);
     } catch (error) {
@@ -272,6 +297,7 @@ export default function MyPage() {
       await discardProjectToWellApi(reviewProject.id);
 
       setProjects((prev) => prev.filter((p) => p.id !== reviewProject.id));
+      await reloadMyProjects();
       setReviewProject(null);
       setReviewTargets([]);
       setReviewInputs({});
@@ -383,8 +409,9 @@ export default function MyPage() {
     );
   }
 
+  const projectHistory = buildProjectHistory(projects, appliedProjects);
   const visibleProjects = getVisibleProjects(
-    projects,
+    projectHistory,
     projectStatusFilter,
     projectSortOrder
   );
@@ -708,7 +735,7 @@ export default function MyPage() {
             {visibleProjects.length ? (
               visibleProjects.map((project) => (
                 <button
-                  key={project.id}
+                  key={project.historyKey || project.id}
                   onClick={() => router.push(`/projects/${project.id}`)}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-left transition hover:border-red-300 hover:bg-red-50"
                 >
@@ -721,6 +748,8 @@ export default function MyPage() {
                         난이도 {project.difficulty || "미정"}
                         {" · "}
                         진행률 {Math.round(project.progress_percent ?? 0)}%
+                        {project.historyType === "applied" &&
+                          ` · 지원 상태 ${project.applicationStatus || "확인중"}`}
                       </p>
                     </div>
 
@@ -729,7 +758,13 @@ export default function MyPage() {
                         {project.status || "상태 없음"}
                       </span>
 
-                      {project.can_chat && (
+                      {project.historyType === "applied" && (
+                        <span className="rounded-full bg-red-50 px-3 py-1 text-sm font-semibold text-red-600">
+                          내가 지원한 프로젝트
+                        </span>
+                      )}
+
+                      {project.historyType !== "applied" && project.can_chat && (
                         <span
                           onClick={(e) => {
                             e.stopPropagation();
@@ -741,7 +776,9 @@ export default function MyPage() {
                         </span>
                       )}
 
-                      {project.can_discard && (
+                      {project.historyType !== "applied" &&
+                        project.status !== "completed" &&
+                        project.can_discard && (
                         <span
                           onClick={(e) => {
                             e.stopPropagation();
@@ -753,7 +790,7 @@ export default function MyPage() {
                         </span>
                       )}
 
-                      {project.status === "completed" ? (
+                      {project.historyType === "applied" ? null : project.status === "completed" ? (
                         <span
                           onClick={(e) => {
                             e.stopPropagation();
@@ -981,6 +1018,28 @@ async function loadReceivedReviews(userId, statsData) {
     console.error("공개 리뷰 API 재시도 실패:", error);
     return [];
   }
+}
+
+function buildProjectHistory(projects, applications) {
+  const ownedProjectIds = new Set(projects.map((project) => Number(project.id)));
+  const normalizedApplications = (applications || [])
+    .filter((application) => !ownedProjectIds.has(Number(application.project_id)))
+    .map((application) => ({
+      id: application.project_id,
+      historyKey: `applied-${application.application_id}`,
+      historyType: "applied",
+      title: application.project_title,
+      status: application.project_status || "planning",
+      applicationStatus: application.status,
+      difficulty: application.difficulty,
+      category: application.category,
+      progress_percent: application.progress_percent ?? 0,
+      created_at: application.created_at,
+      can_discard: false,
+      can_chat: false,
+    }));
+
+  return [...projects, ...normalizedApplications];
 }
 
 function getVisibleProjects(projects, statusFilter, sortOrder) {

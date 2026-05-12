@@ -330,8 +330,8 @@ async def get_my_projects(
         days_since_creation = (now - project.created_at.replace(tzinfo=timezone.utc)).days if project.created_at else 0
         time_elapsed_30_days = days_since_creation >= 30
         
-        # can_discard 조건: 팀 결성됐거나 30일 이상 경과
-        can_discard = team_formed or time_elapsed_30_days
+        # can_discard 조건: 완료 전 프로젝트 중 팀 결성됐거나 30일 이상 경과
+        can_discard = project.status != "completed" and (team_formed or time_elapsed_30_days)
         
         response_data.append({
             "id": project.id,
@@ -717,7 +717,7 @@ async def get_my_applications(
     result = []
     for app in applications:
         project = db.get(Project, app.project_id)
-        if project is None:
+        if project is None or project.deleted_at is not None:
             continue
 
         # applicant_count: 이 프로젝트에 지원한 사람 수
@@ -747,6 +747,10 @@ async def get_my_applications(
                 "project_title": project.title,
                 "message": app.message,
                 "status": app.status,
+                "project_status": project.status,
+                "difficulty": project.difficulty,
+                "category": project.category,
+                "progress_percent": float(project.progress_percent),
                 "applicant_count": applicant_count,
                 "current_members": current_members,
                 "max_members": max_members,

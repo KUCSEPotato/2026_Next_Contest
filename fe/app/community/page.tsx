@@ -75,17 +75,19 @@ export default function CommunityPage() {
   const [loadingHot, setLoadingHot] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    if (token) {
-      setIsLoggedIn(true);
-      try {
-        const raw = localStorage.getItem("user");
-        if (raw) setCurrentUser(JSON.parse(raw));
-      } catch (e) {
-        console.error("유저 정보 파싱 실패", e);
-        localStorage.removeItem("user");
+    window.setTimeout(() => {
+      const token = localStorage.getItem("access_token");
+      if (token) {
+        setIsLoggedIn(true);
+        try {
+          const raw = localStorage.getItem("user");
+          if (raw) setCurrentUser(JSON.parse(raw));
+        } catch (e) {
+          console.error("유저 정보 파싱 실패", e);
+          localStorage.removeItem("user");
+        }
       }
-    }
+    }, 0);
   }, []);
 
   const loadPosts = useCallback(async () => {
@@ -104,7 +106,11 @@ export default function CommunityPage() {
   }, [selectedCategory, page]);
 
   useEffect(() => {
-    loadPosts();
+    const timer = window.setTimeout(() => {
+      loadPosts();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [loadPosts]);
 
   const loadHotPosts = useCallback(async () => {
@@ -121,7 +127,11 @@ export default function CommunityPage() {
 
   useEffect(() => {
     if (tab === "hot" && !hotPosts) {
-      loadHotPosts();
+      const timer = window.setTimeout(() => {
+        loadHotPosts();
+      }, 0);
+
+      return () => window.clearTimeout(timer);
     }
   }, [tab, hotPosts, loadHotPosts]);
 
