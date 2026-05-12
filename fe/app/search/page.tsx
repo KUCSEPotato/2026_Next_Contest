@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useState, useEffect } from 'react'
+import { Dispatch, SetStateAction, Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 // ─── 타입 ──────────────────────────────────────────────────────
@@ -279,7 +279,7 @@ function SearchPageContent() {
           {/* 결과 헤더 */}
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-gray-500">
-              {query && <span className="font-medium text-gray-900">"{query}" </span>}
+              {query && <span className="font-medium text-gray-900">&quot;{query}&quot; </span>}
               {results.length > 0
                 ? <span>검색 결과 <span className="text-blue-600 font-medium">{results.length}개</span></span>
                 : query || hasFilter ? '검색 결과가 없어요' : '전체 프로젝트'
@@ -392,6 +392,22 @@ function SearchPageContent() {
 }
 
 // ─── 필터 패널 ─────────────────────────────────────────────────
+type FilterPanelProps = {
+  selectedCategories: string[]
+  setSelectedCategories: Dispatch<SetStateAction<string[]>>
+  selectedStacks: string[]
+  setSelectedStacks: Dispatch<SetStateAction<string[]>>
+  selectedDifficulties: string[]
+  setSelectedDifficulties: Dispatch<SetStateAction<string[]>>
+  selectedDuration: string | null
+  setSelectedDuration: Dispatch<SetStateAction<string | null>>
+  selectedPurposes: string[]
+  setSelectedPurposes: Dispatch<SetStateAction<string[]>>
+  hasFilter: boolean
+  onReset: () => void
+  toggle: <T>(arr: T[], item: T) => T[]
+}
+
 function FilterPanel({
   selectedCategories, setSelectedCategories,
   selectedStacks, setSelectedStacks,
@@ -399,7 +415,7 @@ function FilterPanel({
   selectedDuration, setSelectedDuration,
   selectedPurposes, setSelectedPurposes,
   hasFilter, onReset, toggle,
-}: any) {
+}: FilterPanelProps) {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
