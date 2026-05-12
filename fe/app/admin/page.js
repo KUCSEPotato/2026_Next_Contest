@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  createAdminNoticeApi,
+  grantAdminUserCoinsApi,
   getAdminOverviewApi,
   getAdminPaymentsApi,
   getAdminProjectsApi,
@@ -18,11 +20,19 @@ const TABS = [
   { id: "reports", label: "신고" },
   { id: "payments", label: "결제" },
   { id: "users", label: "사용자" },
+  { id: "notices", label: "공지" },
   { id: "projects", label: "프로젝트" },
 ];
 
 const REPORT_STATUSES = ["open", "reviewing", "resolved", "rejected"];
 const USER_ROLES = ["user", "leader", "admin"];
+const REPORT_SCOPES = [
+  { value: "all", label: "전체" },
+  { value: "user", label: "사용자" },
+  { value: "project", label: "프로젝트" },
+  { value: "post", label: "게시글" },
+  { value: "chat", label: "채팅" },
+];
 
 function formatDate(value) {
   if (!value) return "-";
@@ -54,6 +64,15 @@ export default function AdminPage() {
   const [projects, setProjects] = useState([]);
   const [reports, setReports] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [userSearch, setUserSearch] = useState("");
+  const [userRoleFilter, setUserRoleFilter] = useState("");
+  const [userActiveFilter, setUserActiveFilter] = useState("");
+  const [reportScope, setReportScope] = useState("all");
+  const [noticeForm, setNoticeForm] = useState({
+    title: "",
+    content: "",
+    isPinned: true,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [processingKey, setProcessingKey] = useState("");
@@ -68,16 +87,23 @@ export default function AdminPage() {
     [payments]
   );
 
-  async function loadAdminData() {
+  const loadAdminData = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
       const [overviewResult, usersResult, projectsResult, reportsResult, paymentsResult] =
         await Promise.all([
           getAdminOverviewApi(),
-          getAdminUsersApi(),
+          getAdminUsersApi({
+            q: userSearch.trim() || undefined,
+            role: userRoleFilter || undefined,
+            is_active:
+              userActiveFilter === ""
+                ? undefined
+                : userActiveFilter === "true",
+          }),
           getAdminProjectsApi(),
-          getAdminReportsApi(),
+          getAdminReportsApi({ scope: reportScope }),
           getAdminPaymentsApi(),
         ]);
 
@@ -96,7 +122,7 @@ export default function AdminPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [reportScope, userActiveFilter, userSearch, userRoleFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -129,7 +155,11 @@ export default function AdminPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadAdminData]);
+
+  async function handleRefreshUsersAndReports() {
+    await loadAdminData();
+  }
 
   async function handleReportStatus(reportId, status) {
     try {
@@ -216,6 +246,74 @@ export default function AdminPage() {
     }
   }
 
+  async function handleGrantCoins(userId) {
+    const targetUser = users.find((user) => user.id === userId);
+    const amountInput = window.prompt(
+      `${targetUser?.nickname || `User #${userId}`}에게 지급할 코인 수를 입력하세요.`,
+      "100"
+    );
+
+    if (amountInput === null) return;
+
+    const amount = Number(amountInput);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert("코인 수는 1 이상의 숫자여야 합니다.");
+      return;
+    }
+
+    const noteInput = window.prompt("지급 사유를 입력하세요. (선택)", "") || "";
+
+    try {
+      setProcessingKey(`coin-${userId}`);
+      const result = await grantAdminUserCoinsApi(userId, {
+        amount,
+        note: noteInput.trim() || undefined,
+      });
+
+      setUsers((prev) =>
+        prev.map((user) =>
+          user.id === userId
+            ? { ...user, coin_balance: result.data?.coin_balance ?? user.coin_balance }
+            : user
+        )
+      );
+
+      alert("코인을 지급했습니다.");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "코인 지급에 실패했습니다.");
+    } finally {
+      setProcessingKey("");
+    }
+  }
+
+  async function handleCreateNotice() {
+    if (!noticeForm.title.trim()) {
+      alert("공지 제목을 입력해주세요.");
+      return;
+    }
+
+    if (!noticeForm.content.trim()) {
+      alert("공지 내용을 입력해주세요.");
+      return;
+    }
+
+    try {
+      setProcessingKey("notice-create");
+      await createAdminNoticeApi({
+        title: noticeForm.title.trim(),
+        content: noticeForm.content.trim(),
+        is_pinned: noticeForm.isPinned,
+      });
+
+      setNoticeForm({ title: "", content: "", isPinned: true });
+      alert("공지글을 작성했습니다.");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "공지 작성에 실패했습니다.");
+    } finally {
+      setProcessingKey("");
+    }
+  }
+
   if (isAuthorized === false) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6">
@@ -280,7 +378,7 @@ export default function AdminPage() {
                 <div key={report.id} className="flex items-start justify-between gap-3 py-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900">
-                      신고 #{report.id}
+                      신고 #{report.id} · {report.target_scope || "user"}
                     </p>
                     <p className="mt-1 line-clamp-2 text-xs text-slate-500">
                       {report.reason}
@@ -344,7 +442,31 @@ export default function AdminPage() {
 
           <div className="overflow-x-auto">
             {activeTab === "reports" && (
-              <table className="min-w-full text-left text-sm">
+              <div className="p-4">
+                <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-600">신고 범위</label>
+                    <select
+                      value={reportScope}
+                      onChange={(e) => setReportScope(e.target.value)}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    >
+                      {REPORT_SCOPES.map((scope) => (
+                        <option key={scope.value} value={scope.value}>
+                          {scope.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    onClick={handleRefreshUsersAndReports}
+                    className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+                  >
+                    필터 적용
+                  </button>
+                </div>
+
+                <table className="min-w-full text-left text-sm">
                 <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
                   <tr>
                     <Th>ID</Th>
@@ -359,9 +481,18 @@ export default function AdminPage() {
                     <tr key={report.id}>
                       <Td>#{report.id}</Td>
                       <Td>
-                        {report.target_user_id ? `User #${report.target_user_id}` : ""}
-                        {report.target_project_id ? `Project #${report.target_project_id}` : ""}
-                        {!report.target_user_id && !report.target_project_id ? "-" : ""}
+                        <div className="space-y-1">
+                          <p className="text-xs font-semibold uppercase text-slate-500">
+                            {report.target_scope || "user"}
+                          </p>
+                          <p>
+                            {report.target_user_id ? `User #${report.target_user_id}` : ""}
+                            {report.target_project_id ? `Project #${report.target_project_id}` : ""}
+                            {report.target_post_id ? `Post #${report.target_post_id}` : ""}
+                            {report.target_chat_room_id ? `Chat Room #${report.target_chat_room_id}` : ""}
+                            {!report.target_user_id && !report.target_project_id && !report.target_post_id && !report.target_chat_room_id ? "-" : ""}
+                          </p>
+                        </div>
                       </Td>
                       <Td className="max-w-md">
                         <span className="line-clamp-2">{report.reason}</span>
@@ -381,7 +512,8 @@ export default function AdminPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             )}
 
             {activeTab === "payments" && (
@@ -419,7 +551,53 @@ export default function AdminPage() {
             )}
 
             {activeTab === "users" && (
-              <table className="min-w-full text-left text-sm">
+              <div className="p-4">
+                <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="min-w-64 flex-1">
+                    <label className="mb-1 block text-xs font-semibold text-slate-600">검색</label>
+                    <input
+                      value={userSearch}
+                      onChange={(e) => setUserSearch(e.target.value)}
+                      placeholder="이메일 또는 닉네임"
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-600">Role</label>
+                    <select
+                      value={userRoleFilter}
+                      onChange={(e) => setUserRoleFilter(e.target.value)}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="">전체</option>
+                      {USER_ROLES.map((role) => (
+                        <option key={role} value={role}>
+                          {role}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-600">활성 상태</label>
+                    <select
+                      value={userActiveFilter}
+                      onChange={(e) => setUserActiveFilter(e.target.value)}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="">전체</option>
+                      <option value="true">활성</option>
+                      <option value="false">비활성</option>
+                    </select>
+                  </div>
+                  <button
+                    onClick={handleRefreshUsersAndReports}
+                    className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+                  >
+                    검색
+                  </button>
+                </div>
+
+                <table className="min-w-full text-left text-sm">
                 <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
                   <tr>
                     <Th>ID</Th>
@@ -462,12 +640,77 @@ export default function AdminPage() {
                           >
                             {user.is_active ? "정지" : "복구"}
                           </button>
+                          <button
+                            onClick={() => handleGrantCoins(user.id)}
+                            disabled={processingKey === `coin-${user.id}`}
+                            className="rounded-md bg-amber-500 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
+                          >
+                            코인 지급
+                          </button>
                         </div>
                       </Td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
+            )}
+
+            {activeTab === "notices" && (
+              <div className="p-4">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <h2 className="text-base font-bold text-slate-950">공지 작성</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    작성된 공지는 커뮤니티의 공지 게시글로 등록됩니다.
+                  </p>
+
+                  <div className="mt-4 space-y-3">
+                    <input
+                      value={noticeForm.title}
+                      onChange={(e) =>
+                        setNoticeForm((prev) => ({ ...prev, title: e.target.value }))
+                      }
+                      placeholder="공지 제목"
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none"
+                    />
+                    <textarea
+                      value={noticeForm.content}
+                      onChange={(e) =>
+                        setNoticeForm((prev) => ({ ...prev, content: e.target.value }))
+                      }
+                      placeholder="공지 내용을 입력하세요."
+                      rows={8}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none"
+                    />
+                    <label className="flex items-center gap-2 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={noticeForm.isPinned}
+                        onChange={(e) =>
+                          setNoticeForm((prev) => ({ ...prev, isPinned: e.target.checked }))
+                        }
+                      />
+                      상단 고정
+                    </label>
+
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => setNoticeForm({ title: "", content: "", isPinned: true })}
+                        className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+                      >
+                        초기화
+                      </button>
+                      <button
+                        onClick={handleCreateNotice}
+                        disabled={processingKey === "notice-create"}
+                        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                      >
+                        공지 작성
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
 
             {activeTab === "projects" && (

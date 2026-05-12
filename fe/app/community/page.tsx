@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { PostSummary, User, ReactionType } from "./_types";
 import { getPosts, deletePost, reactToPost, getHotPosts } from "./_lib/api";
 import PostCard from "./_components/PostCard";
 import LoginModal from "./_components/LoginModal";
+import { ThumbUpIcon } from "./_components/ReactionThumbIcons";
 
 const CATEGORIES = [
   { label: "전체", value: undefined },
@@ -36,17 +37,17 @@ const SERVICE_BLOCKS = [
 ];
 
 type HotSection = {
-  key: "popular" | "most_liked" | "most_commented" | "most_viewed" | "latest";
+  key: "popular" | "most_recommended" | "most_commented" | "most_viewed" | "latest";
   label: string;
   emoji: string;
 };
 
 const HOT_SECTIONS: HotSection[] = [
-  { key: "popular",       label: "인기게시물",   emoji: "🔥" },
-  { key: "most_liked",    label: "좋아요 TOP",   emoji: "❤️" },
-  { key: "most_commented",label: "댓글 TOP",     emoji: "💬" },
-  { key: "most_viewed",   label: "조회수 TOP",   emoji: "👀" },
-  { key: "latest",        label: "최신글",       emoji: "🆕" },
+  { key: "popular", label: "인기게시물", emoji: "🔥" },
+  { key: "most_recommended", label: "TOP", emoji: "" },
+  { key: "most_commented", label: "댓글 TOP", emoji: "💬" },
+  { key: "most_viewed", label: "조회수 TOP", emoji: "👀" },
+  { key: "latest", label: "최신글", emoji: "🆕" },
 ];
 
 type Tab = "board" | "hot";
@@ -67,12 +68,13 @@ export default function CommunityPage() {
 
   const [hotPosts, setHotPosts] = useState<{
     popular: PostSummary | null;
-    most_liked: PostSummary | null;
+    most_recommended: PostSummary | null;
     most_commented: PostSummary | null;
     most_viewed: PostSummary | null;
     latest: PostSummary | null;
   } | null>(null);
   const [loadingHot, setLoadingHot] = useState(false);
+  const reactingPostIds = useRef(new Set<number>());
 
   useEffect(() => {
     window.setTimeout(() => {
@@ -136,25 +138,39 @@ export default function CommunityPage() {
   }, [tab, hotPosts, loadHotPosts]);
 
   const handleReact = async (postId: number, type: ReactionType) => {
-    if (!currentUser) { setShowLoginModal(true); return; }
+    if (!currentUser) {
+      setShowLoginModal(true);
+      return;
+    }
+    if (reactingPostIds.current.has(postId)) return;
+    reactingPostIds.current.add(postId);
     try {
       const result = await reactToPost(postId, type);
       setPosts((prev) =>
         prev.map((p) => {
           if (p.id !== postId) return p;
-          const isAdded = result.action === "added";
+          const newStats = { ...p.reaction_stats };
+          if (result.action === "removed") {
+            const rt = result.reaction_type;
+            newStats[rt] = Math.max(0, newStats[rt] - 1);
+            return { ...p, user_reaction: null, reaction_stats: newStats };
+          }
+          const prevReaction = p.user_reaction;
+          if (prevReaction && prevReaction !== type) {
+            newStats[prevReaction] = Math.max(0, newStats[prevReaction] - 1);
+          }
+          newStats[type] = newStats[type] + 1;
           return {
             ...p,
-            user_reaction: isAdded ? type : null,
-            reaction_stats: {
-              ...p.reaction_stats,
-              [type]: p.reaction_stats[type] + (isAdded ? 1 : -1),
-            },
+            user_reaction: type,
+            reaction_stats: newStats,
           };
         })
       );
     } catch (e) {
       console.error(e);
+    } finally {
+      reactingPostIds.current.delete(postId);
     }
   };
 
@@ -370,7 +386,11 @@ export default function CommunityPage() {
                   return (
                     <div key={key} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                       <div className="mb-3 flex items-center gap-2">
-                        <span className="text-base">{emoji}</span>
+                        {key === "most_recommended" ? (
+                          <ThumbUpIcon className="h-4 w-4 shrink-0 text-red-600" />
+                        ) : (
+                          <span className="text-base">{emoji}</span>
+                        )}
                         <span className="text-sm font-bold text-gray-800">{label}</span>
                       </div>
                       <PostCard

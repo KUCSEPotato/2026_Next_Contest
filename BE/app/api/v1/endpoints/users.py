@@ -182,11 +182,11 @@ async def upload_my_avatar(
 
     content = await file.read()
 
-    upload_result = await s3_service.upload_file(
+    upload_result = await s3_service.upload_avatar(
         content,
+        user.id,
         file.filename or "avatar",
         content_type,
-        f"avatars/{user.id}",
     )
 
     user.avatar_s3_key = upload_result["s3_key"]

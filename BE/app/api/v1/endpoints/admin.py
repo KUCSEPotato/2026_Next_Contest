@@ -1,19 +1,34 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.api.v1.response import success_response
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
+from app.models import CommunityPost
 from app.models import PaymentEvent
 from app.models import Project
 from app.models import Report
 from app.models import UserSubscription
 from app.models import User
+from app.services.economy import award_coins
 from app.services.economy import send_stale_project_notifications
 
 router = APIRouter()
+
+
+class AdminCoinGrantRequest(BaseModel):
+    amount: int = Field(gt=0)
+    note: str | None = Field(default=None, max_length=500)
+
+
+class AdminNoticeCreateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=300)
+    content: str = Field(min_length=1)
+    is_pinned: bool = False
 
 
 def _ensure_admin(db: Session, user_id: int) -> None:
@@ -47,6 +62,9 @@ async def get_admin_overview(
 
 @router.get("/users", summary="관리자 사용자 목록", description="관리자 권한으로 전체 사용자 목록을 조회합니다.")
 async def list_users_for_admin(
+    q: str | None = Query(default=None, description="이메일 또는 닉네임 검색어"),
+    role: str | None = Query(default=None, description="필터할 역할"),
+    is_active: bool | None = Query(default=None, description="활성 상태 필터"),
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -59,7 +77,17 @@ async def list_users_for_admin(
     - admin 역할이 아니면 `403`
     """
     _ensure_admin(db, current_user_id)
-    users = db.query(User).order_by(User.id.desc()).all()
+    query = db.query(User)
+
+    if q:
+        search = f"%{q.strip()}%"
+        query = query.filter(or_(User.email.ilike(search), User.nickname.ilike(search)))
+    if role:
+        query = query.filter(User.role == role)
+    if is_active is not None:
+        query = query.filter(User.is_active.is_(is_active))
+
+    users = query.order_by(User.id.desc()).all()
     return success_response(
         data=[
             {
@@ -75,6 +103,31 @@ async def list_users_for_admin(
             for u in users
         ]
     )
+
+
+@router.post("/users/{user_id}/coins", summary="관리자 코인 지급", description="관리자가 특정 사용자에게 코인을 지급합니다.")
+async def grant_user_coins_for_admin(
+    user_id: int,
+    payload: AdminCoinGrantRequest,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    _ensure_admin(db, current_user_id)
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    balance = award_coins(
+        db,
+        user_id=user_id,
+        amount=payload.amount,
+        event_type="admin.manual_grant",
+        source_type="admin",
+        source_id=int(datetime.now(timezone.utc).timestamp() * 1_000_000),
+        note=payload.note or "Admin manual coin grant",
+    )
+    db.commit()
+    return success_response(data={"id": user.id, "coin_balance": balance, "amount": payload.amount})
 
 
 @router.patch("/users/{user_id}/status", summary="관리자 사용자 상태 변경", description="관리자 권한으로 사용자 활성 상태/역할을 수정합니다.")
@@ -140,6 +193,7 @@ async def list_projects_for_admin(
 
 @router.get("/reports", summary="관리자 신고 목록", description="신고 목록을 조회해 모더레이션 대상을 확인합니다.")
 async def list_reports_for_admin(
+    scope: str | None = Query(default=None, description="user/project/post/chat/all 중 하나"),
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -150,7 +204,21 @@ async def list_reports_for_admin(
     - 신고 상태와 사유를 포함해 최신순으로 반환합니다.
     """
     _ensure_admin(db, current_user_id)
-    reports = db.query(Report).order_by(Report.id.desc()).all()
+    query = db.query(Report)
+
+    if scope and scope != "all":
+        if scope == "user":
+            query = query.filter(Report.target_user_id.isnot(None))
+        elif scope == "project":
+            query = query.filter(Report.target_project_id.isnot(None))
+        elif scope == "post":
+            query = query.filter(Report.target_post_id.isnot(None))
+        elif scope == "chat":
+            query = query.filter(Report.target_chat_room_id.isnot(None))
+        else:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid scope")
+
+    reports = query.order_by(Report.id.desc()).all()
     return success_response(
         data=[
             {
@@ -158,6 +226,19 @@ async def list_reports_for_admin(
                 "reporter_id": r.reporter_id,
                 "target_user_id": r.target_user_id,
                 "target_project_id": r.target_project_id,
+                "target_post_id": r.target_post_id,
+                "target_chat_room_id": r.target_chat_room_id,
+                "target_scope": (
+                    "chat"
+                    if r.target_chat_room_id is not None
+                    else "post"
+                    if r.target_post_id is not None
+                    else "project"
+                    if r.target_project_id is not None
+                    else "user"
+                    if r.target_user_id is not None
+                    else "unknown"
+                ),
                 "status": r.status,
                 "reason": r.reason,
                 "handled_by": r.handled_by,
@@ -165,6 +246,37 @@ async def list_reports_for_admin(
             }
             for r in reports
         ]
+    )
+
+
+@router.post("/notices", summary="관리자 공지 작성", description="공지 게시물을 작성합니다.")
+async def create_notice_for_admin(
+    payload: AdminNoticeCreateRequest,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    _ensure_admin(db, current_user_id)
+
+    post = CommunityPost(
+        author_id=current_user_id,
+        title=payload.title,
+        content=payload.content,
+        category="announcement",
+        is_pinned=payload.is_pinned,
+    )
+    db.add(post)
+    db.commit()
+    db.refresh(post)
+
+    return success_response(
+        data={
+            "id": post.id,
+            "title": post.title,
+            "content": post.content,
+            "category": post.category,
+            "is_pinned": post.is_pinned,
+            "created_at": post.created_at,
+        }
     )
 
 

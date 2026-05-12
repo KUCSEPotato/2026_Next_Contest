@@ -15,8 +15,10 @@ export default function Avatar({
   user: AuthorInfo | User;
   size?: number;
 }) {
-  const bg = BG_COLORS[user.id % BG_COLORS.length];
+  const idNum = typeof user.id === "number" ? user.id : 0;
+  const bg = BG_COLORS[Math.abs(idNum) % BG_COLORS.length];
   const avatarUrl = "avatar_url" in user ? user.avatar_url : null;
+  const initial = user.nickname?.charAt(0) || "?";
 
   if (avatarUrl) {
     return (
@@ -34,7 +36,7 @@ export default function Avatar({
       className={`flex-shrink-0 rounded-full ${bg} flex items-center justify-center font-bold text-white`}
       style={{ width: size, height: size, fontSize: size * 0.4 }}
     >
-      {user.nickname.charAt(0)}
+      {initial}
     </div>
   );
 }
