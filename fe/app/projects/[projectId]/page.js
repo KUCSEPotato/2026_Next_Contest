@@ -69,6 +69,10 @@ export default function ProjectDetailPage() {
     category: "",
     progress_percent: 0,
     max_members: 10,
+    expected_period: "",
+    preferred_members: "",
+    tech_stack: "",
+    hashtags: "",
     is_public: true,
   });
 
@@ -119,9 +123,14 @@ export default function ProjectDetailPage() {
           progress_percent: projectData.progress_percent ?? 0,
           max_members:
             projectData.max_members ??
+            projectData.maxMembers ??
             projectData.recruitment_count ??
             projectData.member_limit ??
             "",
+          expected_period: projectData.expected_period || "",
+          preferred_members: projectData.preferred_members || "",
+          tech_stack: (projectData.tech_stack || projectData.techStack || []).join(", "),
+          hashtags: (projectData.hashtags || []).join(", "),
           is_public: projectData.is_public ?? true,
         });
       } catch (error) {
@@ -152,12 +161,12 @@ export default function ProjectDetailPage() {
     }
 
     if (!editForm.description.trim()) {
-      alert("프로젝트 설명을 입력해주세요.");
+      alert("상세 설명을 입력해주세요.");
       return;
     }
 
     if (!editForm.category) {
-      alert("카테고리를 선택해주세요.");
+      alert("프로젝트 유형을 선택해주세요.");
       return;
     }
 
@@ -177,6 +186,16 @@ export default function ProjectDetailPage() {
         category: editForm.category,
         progress_percent: Number(editForm.progress_percent),
         max_members: Number(editForm.max_members),
+        expected_period: editForm.expected_period.trim(),
+        preferred_members: editForm.preferred_members.trim(),
+        tech_stack: editForm.tech_stack
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+        hashtags: editForm.hashtags
+          .split(",")
+          .map((item) => item.trim().replace(/^#/, ""))
+          .filter(Boolean),
         is_public: editForm.is_public,
       });
 
@@ -307,25 +326,25 @@ export default function ProjectDetailPage() {
 
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  프로젝트 요약
+                  한 줄 요약
                 </label>
                 <input
                   className={inputClassName}
                   value={editForm.summary}
                   onChange={(e) => handleEditChange("summary", e.target.value)}
-                  placeholder="프로젝트 요약"
+                  placeholder="예: 아이디어를 공유하고 협업자를 구하는 플랫폼"
                 />
               </div>
 
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  프로젝트 설명
+                  상세 설명
                 </label>
                 <textarea
                   className={textareaClassName}
                   value={editForm.description}
                   onChange={(e) => handleEditChange("description", e.target.value)}
-                  placeholder="프로젝트 설명"
+                  placeholder="아이디어의 목적, 주요 기능, 필요한 역할 등을 설명해주세요."
                 />
               </div>
 
@@ -350,14 +369,14 @@ export default function ProjectDetailPage() {
 
                 <div>
                   <label className="mb-1 block text-sm font-semibold text-slate-700">
-                    카테고리
+                    프로젝트 유형
                   </label>
                   <select
                     className={inputClassName}
                     value={editForm.category}
                     onChange={(e) => handleEditChange("category", e.target.value)}
                   >
-                    <option value="">카테고리를 선택해주세요</option>
+                    <option value="">프로젝트 유형을 선택해주세요</option>
                     {CATEGORY_OPTIONS.map((category) => (
                       <option key={category} value={category}>
                         {category}
@@ -383,6 +402,60 @@ export default function ProjectDetailPage() {
                     리더 포함 총 인원입니다. {acceptedMemberCount}명(현재 팀원수) 이상으로만 설정할 수 있습니다.
                   </p>
                 </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-700">
+                    예상 진행 기간
+                  </label>
+                  <input
+                    className={inputClassName}
+                    value={editForm.expected_period}
+                    onChange={(e) => handleEditChange("expected_period", e.target.value)}
+                    placeholder="예: 3개월, 한 학기, 2026년 3월까지"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  이런 분과 함께하고 싶어요
+                </label>
+                <textarea
+                  className="mt-4 min-h-28 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
+                  value={editForm.preferred_members}
+                  onChange={(e) => handleEditChange("preferred_members", e.target.value)}
+                  placeholder="예: 백엔드 경험이 있는 분, 주 1회 이상 회의 가능한 분, 꾸준히 소통 가능한 분"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  기술 스택
+                </label>
+                <input
+                  className={inputClassName}
+                  value={editForm.tech_stack}
+                  onChange={(e) => handleEditChange("tech_stack", e.target.value)}
+                  placeholder="예: React, FastAPI, PostgreSQL"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  쉼표로 구분해서 입력해주세요.
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  해시태그
+                </label>
+                <input
+                  className={inputClassName}
+                  value={editForm.hashtags}
+                  onChange={(e) => handleEditChange("hashtags", e.target.value)}
+                  placeholder="예: 협업, 초보환영, AI추천"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  쉼표로 구분해서 입력해주세요.
+                </p>
               </div>
 
               <div className="flex gap-3">
@@ -459,6 +532,73 @@ export default function ProjectDetailPage() {
                 __html: project.description?.replace(/\n/g, "<br />"),
               }}
             />
+
+            {(project.expected_period || project.preferred_members) && (
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                {project.expected_period && (
+                  <div className="rounded-xl bg-slate-50 p-4">
+                    <p className="text-sm font-semibold text-slate-900">
+                      예상 진행 기간
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      {project.expected_period}
+                    </p>
+                  </div>
+                )}
+
+                {project.preferred_members && (
+                  <div className="rounded-xl bg-slate-50 p-4">
+                    <p className="text-sm font-semibold text-slate-900">
+                      이런 분과 함께하고 싶어요
+                    </p>
+                    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">
+                      {project.preferred_members}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {((project.tech_stack || project.techStack || []).length > 0 ||
+              (project.hashtags || []).length > 0) && (
+              <div className="mt-6 space-y-3">
+                {(project.tech_stack || project.techStack || []).length > 0 && (
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      기술 스택
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {(project.tech_stack || project.techStack || []).map((tech) => (
+                        <span
+                          key={tech}
+                          className="rounded-full bg-red-50 px-3 py-1 text-sm font-semibold text-red-700"
+                        >
+                          {tech}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(project.hashtags || []).length > 0 && (
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      해시태그
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {(project.hashtags || []).map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600"
+                        >
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
 
           <aside className="space-y-6">

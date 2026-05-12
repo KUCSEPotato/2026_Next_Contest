@@ -54,6 +54,24 @@ def _project_notification_data(project_id: int) -> dict:
     }
 
 
+def _compose_idea_description(
+    description: str,
+    expected_period: str | None = None,
+    preferred_members: str | None = None,
+) -> str:
+    parts = [description.strip()]
+    if expected_period and expected_period.strip():
+        parts.append(f"<b>[ 예상 진행 기간 ]</b>\n{expected_period.strip()}")
+    if preferred_members and preferred_members.strip():
+        parts.append(f"<b>[ 이런 분과 함께하고 싶어요 ]</b>\n{preferred_members.strip()}")
+    return "\n\n".join(part for part in parts if part)
+
+
+def _strip_idea_description_sections(description: str) -> str:
+    marker_pattern = r"\n*\s*<b>\[\s*(?:예상 진행 기간|이런 분과 함께하고 싶어요)\s*\]</b>[\s\S]*$"
+    return re.sub(marker_pattern, "", description or "").strip()
+
+
 def _notify_project_registered(db: Session, project: Project) -> None:
     db.add(
         Notification(
@@ -72,7 +90,7 @@ def _create_project_from_idea(db: Session, idea: Idea, current_user_id: int) -> 
         leader_id=current_user_id,
         title=idea.title,
         summary=idea.summary,
-        description=idea.description,
+        description=_strip_idea_description_sections(idea.description),
         category=idea.domain,
         difficulty=idea.difficulty,
         status="planning",
@@ -107,7 +125,11 @@ async def create_idea(
         author_id=current_user_id,
         title=payload.title,
         summary=payload.summary,
-        description=payload.description,
+        description=_compose_idea_description(
+            payload.description,
+            payload.expected_period,
+            payload.preferred_members,
+        ),
         domain=payload.domain,
         tech_stack=payload.tech_stack,
         hashtags=payload.hashtags,
@@ -408,7 +430,7 @@ async def convert_idea_to_project(
         leader_id=current_user_id,
         title=payload.title,
         summary=payload.summary,
-        description=payload.description,
+        description=_strip_idea_description_sections(payload.description),
         category=payload.category,
         difficulty=payload.difficulty,
         status=payload.status,
