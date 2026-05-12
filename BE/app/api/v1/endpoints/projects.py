@@ -462,7 +462,7 @@ def _build_project_memoir_context(db: Session, project: Project) -> str:
 
 
 async def _call_gemini_for_memoir_refine(feelings: str, shortcomings: str, project_context: str = "") -> str:
-    gemini_api_key = os.getenv("GEMINI_API_KEY")
+    gemini_api_key = settings.gemini_api_key
 
     if not gemini_api_key:
         raise HTTPException(
