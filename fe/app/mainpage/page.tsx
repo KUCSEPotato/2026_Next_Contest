@@ -108,7 +108,7 @@ const SERVICE_BLOCKS = [
   {
     title: "개발의 땅",
     subtitle: "Devory",
-    description: "진행 중인 프로젝트가 자라는 땅에서 함께할 팀을 찾아보세요.",
+    description: "진행 중인 프로젝트가 자라는 땅에서\n 함께할 팀을 찾아보세요.",
     path: "/mainpage",
     icon: "sprout",
     isActive: true,
@@ -116,7 +116,7 @@ const SERVICE_BLOCKS = [
   {
     title: "생각의 뜰",
     subtitle: "IdeaYard",
-    description: "잠시 멈춘 아이디어 씨앗을 살펴보고 다시 싹틔워보세요.",
+    description: "잠시 멈춘 아이디어 씨앗을 살펴보고\n 다시 싹틔워보세요.",
     path: "/ideas/pickup",
     icon: "seed",
     isActive: false,
@@ -124,7 +124,7 @@ const SERVICE_BLOCKS = [
   {
     title: "모닥불",
     subtitle: "Campfire",
-    description: "팀원 모집, 질문, 회고를 불빛 곁에서 편하게 나눠보세요.",
+    description: "팀원 모집, 질문, 회고를 불빛 곁에서 \n편하게 나눠보세요.",
     path: "/community",
     icon: "flame",
     isActive: false,
