@@ -29,6 +29,7 @@ class AdminCoinGrantRequest(BaseModel):
 class AdminNoticeCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=300)
     content: str = Field(min_length=1)
+    category: str = Field(default="announcement", pattern="^(announcement|event)$")
     is_pinned: bool = False
 
 
@@ -267,7 +268,7 @@ async def create_notice_for_admin(
         author_id=current_user_id,
         title=payload.title,
         content=payload.content,
-        category="announcement",
+        category=payload.category or "announcement",
         is_pinned=payload.is_pinned,
     )
     db.add(post)
