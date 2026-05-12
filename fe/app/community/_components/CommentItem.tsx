@@ -93,7 +93,7 @@ export default function CommentItem({
                 value={editText}
                 onChange={(e) => setEditText(e.target.value)}
                 rows={2}
-                className="w-full resize-none rounded-lg border border-gray-200 px-2 py-1 text-xs focus:border-red-400 focus:outline-none"
+                className="w-full resize-none rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 placeholder:text-gray-400 focus:border-red-400 focus:outline-none"
               />
               <div className="mt-1 flex gap-1">
                 <button
@@ -167,7 +167,7 @@ export default function CommentItem({
                 onChange={(e) => setReplyText(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && submitReply()}
                 placeholder="답글을 입력하세요..."
-                className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs focus:border-red-400 focus:outline-none"
+                className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-900 placeholder:text-gray-400 focus:border-red-400 focus:outline-none"
               />
               <label className="flex cursor-pointer items-center gap-1.5 text-[10px] text-gray-500">
                 <input

@@ -197,7 +197,7 @@ export default function CommunityPage() {
   };
 
   return (
-    <div className="min-h-screen bg-orange-50/30">
+    <div className="min-h-screen bg-orange-50/30 text-gray-900" style={{ colorScheme: "light" }}>
       <header className="mx-auto flex max-w-6xl items-center justify-end gap-3 px-4 py-4">
         <button
           onClick={() => router.push("/notifications")}
@@ -214,17 +214,18 @@ export default function CommunityPage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 pb-16">
-        <section className="py-10 text-center sm:py-14">
+        <section className="pb-10 pt-6 text-center">
           <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center">
             <CampfireHeroIcon />
           </div>
 
-          <h1 className="mb-3 text-2xl font-bold leading-tight text-gray-900 sm:text-4xl">
-            모닥불 곁에서,
-            <br className="sm:hidden" /> 함께 나누는 이야기
+          <h1 className="mb-3 text-3xl font-bold leading-tight tracking-tight text-gray-900 sm:text-4xl">
+            모닥불
           </h1>
-          <p className="mb-8 text-sm text-gray-500 sm:text-base">
-            팀원 모집, 질문, 회고, 작업 공유까지 편하게 이야기해보세요
+          <p className="mx-auto mb-8 max-w-md text-sm leading-7 text-gray-500 sm:text-base">
+            모닥불 곁에서 팀원 모집, 질문, 회고를 나눠요.
+            <br />
+            Campfire에서 편하게 이야기를 이어가세요.
           </p>
           <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 text-left sm:grid-cols-3">
             {SERVICE_BLOCKS.map((block) => {
@@ -445,16 +446,18 @@ function CampfireHeroIcon() {
       aria-hidden
       style={{ animation: "floatCampfire 3s ease-in-out infinite" }}
     >
-      <path
-        d="M48 85c18-6 28-18 28-34 0-15-10-25-18-36-2 12-10 18-16 24-4-8-4-15-2-23-15 11-24 25-24 41 0 16 14 28 32 28Z"
-        fill="#f97316"
-      />
-      <path
-        d="M47 79c9-4 14-11 14-19 0-8-5-14-10-19-2 8-7 12-12 16-2 10 1 18 8 22Z"
-        fill="#facc15"
-      />
-      <path d="M25 82l46-20" stroke="#92400e" strokeWidth="7" strokeLinecap="round" />
-      <path d="M71 82L25 62" stroke="#78350f" strokeWidth="7" strokeLinecap="round" />
+      <g transform="translate(-5 -5) scale(1.12)">
+        <path
+          d="M48 85c18-6 28-18 28-34 0-15-10-25-18-36-2 12-10 18-16 24-4-8-4-15-2-23-15 11-24 25-24 41 0 16 14 28 32 28Z"
+          fill="#f97316"
+        />
+        <path
+          d="M47 79c9-4 14-11 14-19 0-8-5-14-10-19-2 8-7 12-12 16-2 10 1 18 8 22Z"
+          fill="#facc15"
+        />
+        <path d="M25 82l46-20" stroke="#92400e" strokeWidth="7" strokeLinecap="round" />
+        <path d="M71 82L25 62" stroke="#78350f" strokeWidth="7" strokeLinecap="round" />
+      </g>
       <style jsx>{`
         @keyframes floatCampfire {
           0%,

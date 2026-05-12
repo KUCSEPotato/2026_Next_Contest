@@ -368,7 +368,7 @@ export default function MainPage() {
     sortBy !== "latest";
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 text-gray-900" style={{ colorScheme: "light" }}>
       <header className="mx-auto flex max-w-6xl items-center justify-end gap-3 px-4 py-4">
         <button
           onClick={() => router.push("/notifications")}
@@ -386,16 +386,16 @@ export default function MainPage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 pb-16">
-        <section className="py-10 text-center sm:py-14">
+        <section className="pb-10 pt-6 text-center">
           <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center">
             <SproutHeroIcon />
           </div>
 
-          <h1 className="mb-3 text-2xl font-bold leading-tight text-gray-900 sm:text-4xl">
+          <h1 className="mb-3 text-3xl font-bold leading-tight tracking-tight text-gray-900 sm:text-4xl">
             개발의 땅
           </h1>
 
-          <p className="mb-8 text-sm text-gray-500 sm:text-base">
+          <p className="mx-auto mb-8 max-w-md text-sm leading-7 text-gray-500 sm:text-base">
             아이디어가 팀이 되고, 팀이 프로젝트로 자라는 곳.
             <br />
             Devory에서 함께할 팀을 찾아보세요.
@@ -468,7 +468,7 @@ export default function MainPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="프로젝트 제목이나 기술 스택을 검색해보세요"
-            className="mb-4 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-400"
+            className="mb-4 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-red-400"
           />
 
           <div className="flex flex-wrap gap-2">
@@ -579,7 +579,7 @@ export default function MainPage() {
                 value={memberMin}
                 onChange={(e) => setMemberMin(e.target.value)}
                 placeholder="최소 인원"
-                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-400"
+                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-red-400"
               />
 
               <span className="hidden text-center text-sm text-gray-400 sm:block">
@@ -593,7 +593,7 @@ export default function MainPage() {
                 value={memberMax}
                 onChange={(e) => setMemberMax(e.target.value)}
                 placeholder="최대 인원"
-                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-400"
+                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-red-400"
               />
             </div>
           </div>
@@ -692,16 +692,18 @@ function SproutHeroIcon() {
           <stop offset="100%" stopColor="#16a34a" />
         </linearGradient>
       </defs>
-      <path d="M48 82V38" stroke="url(#sproutStem)" strokeWidth="8" strokeLinecap="round" />
-      <path
-        d="M45 41C23 39 15 24 15 11c19 0 33 9 36 29"
-        fill="#22c55e"
-      />
-      <path
-        d="M51 45c23-2 34-16 34-33-20 0-35 10-38 32"
-        fill="#16a34a"
-      />
-      <ellipse cx="48" cy="84" rx="27" ry="7" fill="#92400e" opacity="0.22" />
+      <g transform="translate(-7 -5) scale(1.15)">
+        <path d="M48 82V38" stroke="url(#sproutStem)" strokeWidth="8" strokeLinecap="round" />
+        <path
+          d="M45 41C23 39 15 24 15 11c19 0 33 9 36 29"
+          fill="#22c55e"
+        />
+        <path
+          d="M51 45c23-2 34-16 34-33-20 0-35 10-38 32"
+          fill="#16a34a"
+        />
+        <ellipse cx="48" cy="84" rx="27" ry="7" fill="#92400e" opacity="0.22" />
+      </g>
       <style jsx>{`
         @keyframes floatSprout {
           0%,
