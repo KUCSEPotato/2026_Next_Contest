@@ -35,6 +35,9 @@ function validatePassword(pw) {
 function parseApiError(data, fallback = "요청 처리 중 오류가 발생했습니다.") {
   if (!data?.detail) return fallback;
   if (typeof data.detail === "string") {
+    if (data.detail === "중복된 아이디입니다.") {
+      return "중복된 아이디입니다.";
+    }
     if (
       data.detail === "Login id already exists" ||
       data.detail === "Nickname already exists" ||

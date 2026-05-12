@@ -17,6 +17,17 @@ function clampProgress(value?: number | null) {
   return Math.min(100, Math.max(0, Math.round(Number(value))));
 }
 
+export function getProgressBloomMessage(progress?: number | null) {
+  const pct = clampProgress(progress);
+
+  if (pct >= 100) return "마침내 장미가 활짝 피었어요.";
+  if (pct >= 90) return "장미가 피어나기 직전이에요.";
+  if (pct >= 65) return "꽃봉오리가 단단하게 맺히고 있어요.";
+  if (pct >= 35) return "줄기와 잎이 힘 있게 뻗어나가고 있어요.";
+  if (pct >= 10) return "아이디어 새싹이 무럭무럭 자라나고 있어요.";
+  return "작은 씨앗이 조용히 싹틀 준비를 하고 있어요.";
+}
+
 export default function ProgressBloom({
   progress = 0,
   size = "md",
