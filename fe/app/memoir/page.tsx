@@ -716,8 +716,25 @@ function MemoirContent() {
 
     try {
       setGeneratingMemoir(true);
+      const projectContext = [
+        `프로젝트 제목: ${project.title}`,
+        project.summary ? `한줄 소개: ${project.summary}` : "",
+        project.description ? `상세 설명: ${project.description}` : "",
+        project.category ? `분야: ${project.category}` : "",
+        data.chips.length ? `사용자가 고른 키워드: ${data.chips.join(", ")}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      const userReflection = [
+        data.good ? `느낀 점:\n${data.good}` : "",
+        data.lessons ? `배운 점:\n${data.lessons}` : "",
+        data.nextActions ? `다음 액션:\n${data.nextActions}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+
       const result = await refineProjectMemoirApi(project.id, {
-        felt_point: [data.good, data.lessons, data.nextActions]
+        felt_point: [projectContext, userReflection]
           .filter((value) => value?.trim())
           .join("\n\n")
           .trim(),
