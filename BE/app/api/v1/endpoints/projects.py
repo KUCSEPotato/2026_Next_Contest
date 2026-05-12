@@ -516,7 +516,7 @@ def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str, projec
                 "max_output_tokens": 520,
             },
         )
-    except Exception:
+    except Exception as error:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Gemini API request failed: {str(error)}",
@@ -533,7 +533,7 @@ def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str, projec
     if not text:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"No Text in Gemini Response: {str(error)}",
+            detail=f"No Text in Gemini Response",
         )
     
     #cleaned_text = _clean_memoir_refine_output((text or "").strip())
