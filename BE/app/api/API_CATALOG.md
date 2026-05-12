@@ -216,9 +216,9 @@
   - `sort_by` 옵션:
     - `newest` (기본값): 최신순
     - `views`: 조회수 순
-    - `likes`: 좋아요 순
+    - `likes`: 추천 순
     - `comments`: 댓글 순
-    - `trending` 또는 `hot`: 핫게 (조회수×0.1 + 좋아요 + 댓글×0.5)
+    - `trending` 또는 `hot`: 핫게 (조회수×0.1 + 추천 + 댓글×0.5)
   - 핀 된 글은 항상 상단에 표시
 - GET /community/{post_id}: 게시물 상세(조회수 자동 증가, 반응 통계 포함)
 - PATCH /community/{post_id}: 게시물 수정(작성자만)
@@ -233,7 +233,7 @@
 - PATCH /community/{post_id}/comments/{comment_id}: 댓글 수정(작성자만)
 - DELETE /community/{post_id}/comments/{comment_id}: 댓글 삭제(소프트 삭제)
 
-### 반응(게시물/댓글에 like, interested, helpful, curious)
+### 반응(게시물/댓글에 recommend, not_recommend)
 - POST /community/{post_id}/reactions: 게시물 반응 추가/토글
 - POST /community/{post_id}/comments/{comment_id}/reactions: 댓글 반응 추가/토글
 
