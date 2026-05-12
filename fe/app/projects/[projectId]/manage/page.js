@@ -12,6 +12,7 @@ import {
   toggleTodoDoneApi,
   updateProjectStatusApi,
   updateTodoApi,
+  createRecruitmentApi,
 } from "../../../../lib/api";
 
 const unwrapResponseData = (result, fallback = null) =>
@@ -34,6 +35,12 @@ export default function ProjectManagePage() {
   const [editingTodoId, setEditingTodoId] = useState(null);
   const [editingTodoTitle, setEditingTodoTitle] = useState("");
   const [editingTodoDescription, setEditingTodoDescription] = useState("");
+  const [showRecruitmentForm, setShowRecruitmentForm] = useState(false);
+  const [isCreatingRecruitment, setIsCreatingRecruitment] = useState(false);
+  const [recruitmentPosition, setRecruitmentPosition] = useState("");
+  const [recruitmentCount, setRecruitmentCount] = useState(1);
+  const [recruitmentSummary, setRecruitmentSummary] = useState("");
+  const [recruitmentDescription, setRecruitmentDescription] = useState("");
 
   useEffect(() => {
     async function loadData() {
@@ -217,6 +224,51 @@ export default function ProjectManagePage() {
     }
   };
 
+  const handleCreateRecruitment = async () => {
+    if (!recruitmentPosition.trim()) {
+      alert("재모집 포지션을 입력해주세요.");
+      return;
+    }
+
+    const count = Number(recruitmentCount);
+    if (!Number.isInteger(count) || count < 1 || count > 20) {
+      alert("재모집 인원은 1명 이상 20명 이하로 입력해주세요.");
+      return;
+    }
+
+    const description = recruitmentDescription.trim() || recruitmentSummary.trim();
+    if (!description) {
+      alert("재모집 설명을 입력해주세요.");
+      return;
+    }
+
+    try {
+      setIsCreatingRecruitment(true);
+      await createRecruitmentApi(projectId, {
+        title: `${project?.title || "프로젝트"} 재모집`,
+        position_name: recruitmentPosition.trim(),
+        required_count: count,
+        category: project?.category || null,
+        difficulty: "normal",
+        summary: recruitmentSummary.trim() || `${recruitmentPosition.trim()} 포지션을 재모집합니다.`,
+        description,
+        status: "open",
+      });
+
+      setShowRecruitmentForm(false);
+      setRecruitmentPosition("");
+      setRecruitmentCount(1);
+      setRecruitmentSummary("");
+      setRecruitmentDescription("");
+      alert("재모집이 등록되었습니다. 프로젝트 탐색에 모집중으로 표시됩니다.");
+    } catch (error) {
+      console.error(error);
+      alert("재모집 등록에 실패했습니다.");
+    } finally {
+      setIsCreatingRecruitment(false);
+    }
+  };
+
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-50 px-6 py-10">
@@ -267,16 +319,95 @@ export default function ProjectManagePage() {
 
           {!isProjectCompleted && (
             <button
-              onClick={handleCompleteTeam}
-              disabled={isCompletingTeam || !canCompleteTeam}
+              onClick={
+                project?.status === "in_progress"
+                  ? () => setShowRecruitmentForm((prev) => !prev)
+                  : handleCompleteTeam
+              }
+              disabled={
+                isCompletingTeam ||
+                (project?.status !== "in_progress" && !canCompleteTeam)
+              }
               className="mt-4 w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
             >
               {project?.status === "in_progress"
-                ? "이미 팀 결성이 완료되었습니다"
+                ? "재모집하기"
                 : isCompletingTeam
                 ? "팀 결성 중..."
                 : "팀 결성하기"}
             </button>
+          )}
+
+          {project?.status === "in_progress" && showRecruitmentForm && (
+            <div className="mt-4 rounded-xl border border-red-100 bg-red-50/40 p-4">
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_160px]">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-600">
+                    재모집 포지션
+                  </label>
+                  <input
+                    value={recruitmentPosition}
+                    onChange={(e) => setRecruitmentPosition(e.target.value)}
+                    placeholder="예: 백엔드 개발자"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-red-500 focus:ring-4 focus:ring-red-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-600">
+                    모집 인원 (최대 인원: 20명)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={recruitmentCount}
+                    onChange={(e) => setRecruitmentCount(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-red-500 focus:ring-4 focus:ring-red-100"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <label className="mb-1 block text-xs font-semibold text-slate-600">
+                  한 줄 요약
+                </label>
+                <input
+                  value={recruitmentSummary}
+                  onChange={(e) => setRecruitmentSummary(e.target.value)}
+                  placeholder="예: 결원 보충을 위한 백엔드 포지션 재모집"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-red-500 focus:ring-4 focus:ring-red-100"
+                />
+              </div>
+
+              <div className="mt-3">
+                <label className="mb-1 block text-xs font-semibold text-slate-600">
+                  재모집 설명
+                </label>
+                <textarea
+                  value={recruitmentDescription}
+                  onChange={(e) => setRecruitmentDescription(e.target.value)}
+                  placeholder="필요한 역할, 합류 후 맡을 일, 회의 방식 등을 적어주세요."
+                  className="min-h-28 w-full resize-y rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-red-500 focus:ring-4 focus:ring-red-100"
+                />
+              </div>
+
+              <div className="mt-3 flex justify-end gap-2">
+                <button
+                  onClick={() => setShowRecruitmentForm(false)}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleCreateRecruitment}
+                  disabled={isCreatingRecruitment}
+                  className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:bg-slate-400"
+                >
+                  {isCreatingRecruitment ? "등록 중..." : "재모집 등록"}
+                </button>
+              </div>
+            </div>
           )}
 
           <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
