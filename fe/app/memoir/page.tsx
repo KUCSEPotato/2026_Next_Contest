@@ -14,11 +14,6 @@ import {
   updateProjectRetrospectiveApi,
 } from "../../lib/api";
 
-/* ── 폰트 인젝션 (layout.tsx에 추가하면 더 깔끔해요) ── */
-const fontStyle = `
-  @import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Nanum+Myeongjo:wght@400;700&display=swap');
-`;
-
 /* ────────────────────────────────────────────────────────────
    타입
 ──────────────────────────────────────────────────────────── */
@@ -220,7 +215,7 @@ function Stars({ score, avg }: { score: number; avg: number }) {
       {[1, 2, 3, 4, 5].map((i) => (
         <span key={i} style={{ fontSize: 13, opacity: i <= score ? 1 : 0.2, color: "#c0392b" }}>⭐</span>
       ))}
-      <span style={{ fontSize: 11, color: "#c08080", marginLeft: 5, fontFamily: "'Gowun Dodum', sans-serif" }}>
+      <span style={{ fontSize: 11, color: "#c08080", marginLeft: 5 }}>
         {avg.toFixed(1)}
       </span>
     </div>
@@ -244,10 +239,10 @@ function ReviewSection({ rating }: { rating: Rating }) {
         return (
           <div key={label} style={{ background: "#fdf4f4", border: "1px solid #f0cccc", borderRadius: 14, padding: "14px 16px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 7 }}>
-              <span style={{ fontSize: 12, color: "#a83030", fontWeight: 700, fontFamily: "'Gowun Dodum', sans-serif" }}>{label}</span>
+              <span style={{ fontSize: 12, color: "#a83030", fontWeight: 700 }}>{label}</span>
               <Stars score={score} avg={avg || 0} />
             </div>
-            <p style={{ margin: 0, fontSize: 13, color: "#6b2020", lineHeight: 1.7, fontFamily: "'Gowun Dodum', sans-serif" }}>
+            <p style={{ margin: 0, fontSize: 13, color: "#6b2020", lineHeight: 1.7 }}>
               {avg > 0 ? REVIEW_MESSAGES[label][score] : "아직 이 항목의 리뷰 데이터가 없어요."}
             </p>
           </div>
@@ -296,7 +291,7 @@ function GrowthModal({
 
   const inputStyle: React.CSSProperties = {
     width: "100%", border: "1px solid #f0c8c8", borderRadius: 10,
-    padding: "10px 14px", fontSize: 13, fontFamily: "'Gowun Dodum', sans-serif",
+    padding: "10px 14px", fontSize: 13,
     color: "#3c1010", background: "#fdf8f8", outline: "none", boxSizing: "border-box",
   };
 
@@ -307,15 +302,15 @@ function GrowthModal({
     >
       <div style={{ background: "#fff", borderRadius: "24px 24px 0 0", width: "100%", maxWidth: 480, padding: "22px 22px 40px", maxHeight: "85vh", overflowY: "auto" }}>
         <div style={{ width: 38, height: 4, background: "#f0d0d0", borderRadius: 4, margin: "0 auto 18px" }} />
-        <p style={{ fontFamily: "'Nanum Myeongjo', serif", fontSize: 20, fontWeight: 700, color: "#5c0a0a", marginBottom: 4 }}>🌹 성장 기록하기</p>
-        <p style={{ fontSize: 13, color: "#c08080", marginBottom: 22, fontFamily: "'Gowun Dodum', sans-serif" }}>이 프로젝트에서 새롭게 도전한 것들을 골라봐요</p>
+        <p style={{ fontSize: 20, fontWeight: 800, color: "#5c0a0a", marginBottom: 4 }}>🌹 성장 기록하기</p>
+        <p style={{ fontSize: 13, color: "#c08080", marginBottom: 22 }}>이 프로젝트에서 새롭게 도전한 것들을 골라봐요</p>
 
         {[
           { title: "기술 스택", chips: TECH_CHIPS, selected: selectedTech, setSelected: setSelectedTech },
           { title: "분야",     chips: FIELD_CHIPS, selected: selectedField, setSelected: setSelectedField },
         ].map(({ title, chips, selected, setSelected }) => (
           <div key={title} style={{ marginBottom: 18 }}>
-            <p style={{ fontSize: 12, color: "#a83030", fontWeight: 700, marginBottom: 9, fontFamily: "'Gowun Dodum', sans-serif" }}>
+            <p style={{ fontSize: 12, color: "#a83030", fontWeight: 700, marginBottom: 9 }}>
               {title} <span style={{ fontWeight: 400, color: "#c08080" }}>(복수 선택)</span>
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
@@ -325,7 +320,7 @@ function GrowthModal({
                   onClick={() => toggle(selected, setSelected, chip)}
                   style={{
                     padding: "7px 15px", borderRadius: 20, border: "1px solid", cursor: "pointer",
-                    fontSize: 13, fontFamily: "'Gowun Dodum', sans-serif", transition: "all .15s",
+                    fontSize: 13, transition: "all .15s",
                     background: selected.includes(chip) ? "#9b1c1c" : "#fdf4f4",
                     color:      selected.includes(chip) ? "#fdf0f0" : "#9b1c1c",
                     borderColor: selected.includes(chip) ? "#9b1c1c" : "#f0c0c0",
@@ -338,7 +333,7 @@ function GrowthModal({
           </div>
         ))}
 
-        <p style={{ fontSize: 12, color: "#a83030", fontWeight: 700, marginBottom: 9, fontFamily: "'Gowun Dodum', sans-serif" }}>
+        <p style={{ fontSize: 12, color: "#a83030", fontWeight: 700, marginBottom: 9 }}>
           직접 입력 <span style={{ fontWeight: 400, color: "#c08080" }}>(쉼표로 구분)</span>
         </p>
         <input value={customInput} onChange={(e) => setCustomInput(e.target.value)} placeholder="예: GraphQL, 외부 API 연동, 코드 리뷰" style={{ ...inputStyle, marginBottom: 14 }} />
@@ -350,7 +345,7 @@ function GrowthModal({
           { label: "다음 액션",   value: nextActions, setValue: setNextActions, ph: "다음에 시도할 구체적인 행동을 적어주세요" },
         ].map(({ label, value, setValue, ph }) => (
           <div key={label} style={{ marginBottom: 14 }}>
-            <p style={{ fontSize: 12, color: "#a83030", fontWeight: 700, marginBottom: 9, fontFamily: "'Gowun Dodum', sans-serif" }}>
+            <p style={{ fontSize: 12, color: "#a83030", fontWeight: 700, marginBottom: 9 }}>
               {label} <span style={{ fontWeight: 400, color: "#c08080" }}>(선택)</span>
             </p>
             <textarea
@@ -369,7 +364,7 @@ function GrowthModal({
           style={{
             width: "100%", background: saving ? "#f0a0a0" : "#9b1c1c", color: "#fdf0f0",
             border: "none", borderRadius: 14, padding: 16, fontSize: 16,
-            fontFamily: "'Gowun Dodum', sans-serif", cursor: saving ? "not-allowed" : "pointer", marginTop: 6,
+            cursor: saving ? "not-allowed" : "pointer", marginTop: 6,
           }}
         >
           {saving ? "저장 중..." : "수확 기록 저장하기 🌹"}
@@ -613,7 +608,6 @@ function MemoirContent() {
 
   return (
     <>
-      <style>{fontStyle}</style>
       <div style={{ minHeight: "100vh", background: "#f8fafc", color: "#0f172a", fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", padding: "40px 24px" }}>
         <div style={{ width: "100%", maxWidth: 1152, margin: "0 auto" }}>
 
@@ -638,7 +632,7 @@ function MemoirContent() {
 
         {/* 1. 할 일 달성 */}
         <Section emoji="✅" label="할 일 달성" headline={<>나는 {todoDone}개의 할 일을<br />달성했어요</>}>
-          <p style={{ fontFamily: "'Nanum Myeongjo', serif", fontSize: 48, fontWeight: 700, color: "#9b1c1c", lineHeight: 1, margin: 0 }}>
+          <p style={{ fontSize: 48, fontWeight: 900, color: "#9b1c1c", lineHeight: 1, margin: 0 }}>
             {todoDone}
             <span style={{ fontSize: 16, color: "#c06060", marginLeft: 4 }}>개 완료</span>
           </p>
@@ -672,7 +666,7 @@ function MemoirContent() {
 
         {/* 4. n시간 동안 수행했어요 */}
         <Section emoji="⏱️" label="투자한 시간" headline={<>나는 약 {hours}시간 동안<br />프로젝트를 수행했어요</>}>
-          <p style={{ fontFamily: "'Nanum Myeongjo', serif", fontSize: 52, fontWeight: 700, color: "#9b1c1c", lineHeight: 1, margin: 0 }}>
+          <p style={{ fontSize: 52, fontWeight: 900, color: "#9b1c1c", lineHeight: 1, margin: 0 }}>
             {hours}
             <span style={{ fontSize: 18, color: "#c06060", marginLeft: 6 }}>시간</span>
           </p>
@@ -715,7 +709,7 @@ function MemoirContent() {
               </div>
               <button
                 onClick={() => setModalOpen(true)}
-                style={{ alignSelf: "flex-start", fontSize: 12, color: "#a83030", background: "none", border: "1px solid #f0c0c0", borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontFamily: "'Gowun Dodum', sans-serif" }}
+                style={{ alignSelf: "flex-start", fontSize: 12, color: "#a83030", background: "none", border: "1px solid #f0c0c0", borderRadius: 8, padding: "7px 14px", cursor: "pointer" }}
               >
                 ✏️ 수정하기
               </button>
@@ -731,7 +725,7 @@ function MemoirContent() {
             </p>
           ) : (
             <div style={{ background: "#fdf4f4", border: "1px solid #f0cccc", borderRadius: 14, padding: 18, position: "relative", overflow: "hidden" }}>
-              <span style={{ fontFamily: "'Nanum Myeongjo', serif", fontSize: 90, color: "#f0cccc", position: "absolute", top: -12, left: 10, lineHeight: 1 }}>&quot;</span>
+              <span style={{ fontSize: 90, color: "#f0cccc", position: "absolute", top: -12, left: 10, lineHeight: 1 }}>&quot;</span>
               <div style={{ fontSize: 14, color: "#6b2020", lineHeight: 1.9, position: "relative", zIndex: 1, paddingLeft: 8 }}>
                 {buildFeelingText()}
               </div>
@@ -749,7 +743,7 @@ function MemoirContent() {
               <RoseSVG />
             </div>
           </div>
-          <p style={{ fontFamily: "'Nanum Myeongjo', serif", fontSize: 20, fontWeight: 700, marginBottom: 8 }}>
+          <p style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>
             {ordinalKo(harvestCount)} 수확을 축하해요!
           </p>
           <p style={{ fontSize: 13, opacity: 0.85, lineHeight: 1.8, margin: 0 }}>
