@@ -944,6 +944,43 @@ export async function createAdminNoticeApi(payload) {
   return handleResponse(res, "공지 작성에 실패했습니다.");
 }
 
+export async function revokeAdminUserCoinsApi(userId, payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/users/${userId}/coins/revoke`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "코인 환수에 실패했습니다.");
+}
+
+export async function getAdminMyPostsApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/posts/mine`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "내 공지/이벤트 목록을 불러오지 못했습니다.");
+}
+
+export async function adminUpdatePostApi(postId, payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/posts/${postId}`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "게시물 수정에 실패했습니다.");
+}
+
+export async function adminDeletePostApi(postId) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/posts/${postId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "게시물 삭제에 실패했습니다.");
+}
+
 export async function getMyChatRoomsApi() {
   const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/chats/my/rooms`, {
     headers: authHeaders(),
