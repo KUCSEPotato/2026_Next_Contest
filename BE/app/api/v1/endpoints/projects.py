@@ -519,8 +519,8 @@ def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str, projec
             candidate = candidates[0]
             text = getattr(candidate, "content", None) or getattr(candidate, "output", None) or ""
 
-    cleaned_text = _clean_memoir_refine_output((text or "").strip())
-    return cleaned_text or _fallback_memoir_refine(feelings, shortcomings)
+    #cleaned_text = _clean_memoir_refine_output((text or "").strip())
+    return text or _fallback_memoir_refine(feelings, shortcomings)
 
 
 def _split_ai_todo_item(raw_title: str) -> tuple[str, str, str | None]:
