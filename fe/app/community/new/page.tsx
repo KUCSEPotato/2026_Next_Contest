@@ -133,7 +133,7 @@ export default function NewPostPage() {
   if (!currentUser) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 text-gray-900" style={{ colorScheme: "light" }}>
       <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
 
         {/* Header */}
@@ -166,7 +166,7 @@ export default function NewPostPage() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="제목 (선택사항)"
-            className="mb-3 w-full border-b border-gray-100 pb-3 text-base font-semibold text-gray-900 placeholder-gray-300 outline-none"
+            className="mb-3 w-full border-b border-gray-100 bg-white pb-3 text-base font-semibold text-gray-900 outline-none placeholder:text-gray-300"
           />
           <textarea
             autoFocus
@@ -174,7 +174,7 @@ export default function NewPostPage() {
             onChange={(e) => setContent(e.target.value)}
             placeholder="무슨 생각을 하고 계신가요?"
             rows={10}
-            className="w-full resize-none text-sm leading-relaxed text-gray-800 placeholder-gray-300 outline-none"
+            className="w-full resize-none bg-white text-sm leading-relaxed text-gray-800 outline-none placeholder:text-gray-300"
           />
 
           {/* 미디어 미리보기 */}

@@ -170,7 +170,10 @@ export default function InspirationWellPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#f7fbf3]">
+    <div
+      className="relative min-h-screen overflow-hidden bg-[#f7fbf3] text-slate-900"
+      style={{ colorScheme: "light" }}
+    >
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 z-0"
@@ -204,17 +207,17 @@ export default function InspirationWellPage() {
             <SeedIcon />
           </div>
 
-          <h1 className="mb-2 text-3xl font-bold tracking-tight text-slate-800 sm:text-4xl">
+          <h1 className="mb-3 text-3xl font-bold leading-tight tracking-tight text-slate-800 sm:text-4xl">
             생각의 뜰
           </h1>
 
-          <p className="mx-auto max-w-md text-sm leading-relaxed text-slate-500">
+          <p className="mx-auto mb-8 max-w-md text-sm leading-7 text-slate-500 sm:text-base">
             버려진 아이디어들이 잠들어 있는 곳.
             <br />
             당신의 손길로 다시 꽃피울 씨앗을 살펴보세요.
           </p>
 
-          <div className="mx-auto mt-8 grid max-w-5xl grid-cols-1 gap-4 text-left sm:grid-cols-3">
+          <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 text-left sm:grid-cols-3">
             {SERVICE_BLOCKS.map((block) => (
               <button
                 key={block.title}
