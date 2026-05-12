@@ -397,18 +397,26 @@ async def _generate_ai_todo_titles(context_text: str, project: Project) -> list[
 
 
 def _fallback_memoir_refine(feelings: str, shortcomings: str) -> str:
+    feeling_text = feelings.strip()
+    shortcoming_text = shortcomings.strip()
     parts: list[str] = []
-    if feelings:
+
+    if feeling_text:
         parts.append(
-            "이번 프로젝트를 통해 "
-            f"{feelings.strip()}라는 점을 분명히 느꼈습니다."
+            "이번 회고에서 가장 먼저 보이는 것은, 단순히 결과를 남겼다는 사실보다 "
+            "새로운 역할과 상황 안으로 직접 들어가 보았다는 점입니다. "
+            f"당신이 적어둔 '{feeling_text}'라는 기록에는 낯선 일을 시작하며 얻은 감각과, "
+            "그 경험을 다음 성장의 재료로 삼으려는 마음이 함께 담겨 있습니다."
         )
-    if shortcomings:
+    if shortcoming_text:
         parts.append(
-            "아쉬웠던 부분은 "
-            f"{shortcomings.strip()}였고, 이 경험을 바탕으로 다음 프로젝트에서는 더 구체적으로 개선해보고자 합니다."
+            f"아쉬움으로 남긴 '{shortcoming_text}' 역시 실패의 표시라기보다 다음번에 더 선명하게 준비할 수 있는 단서에 가깝습니다. "
+            "무엇이 막혔는지 알아차렸다는 것은 이미 개선의 출발선을 잡았다는 뜻이니까요."
         )
-    parts.append("이번 경험은 다음 도전을 위한 좋은 기준점이 되었습니다.")
+    parts.append(
+        "다음 프로젝트에서는 이번에 발견한 감각을 조금 더 구체적인 행동으로 옮겨보면 좋겠습니다. "
+        "작게 계획하고, 자주 확인하고, 팀원들과 더 이른 시점에 공유한다면 이번 경험은 훨씬 단단한 자신감으로 이어질 수 있습니다."
+    )
     return "\n\n".join(parts)
 
 
@@ -420,22 +428,24 @@ async def _call_gemini_for_memoir_refine(feelings: str, shortcomings: str) -> st
 
 def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str) -> str:
     prompt = (
-        "당신은 프로젝트 회고문을 자연스럽고 감성적인 한국어 문장으로 다듬는 AI입니다.\n"
-        "사용자가 작성한 내용을 바탕으로 프로젝트를 진행하며 느꼈던 감정과 배움을 진솔하게 표현해주세요.\n\n"
+        "당신은 사용자의 프로젝트 회고를 함께 읽고 대화하듯 정리해주는 성장 코치입니다.\n"
+        "목표는 원문을 예쁘게 끼워 넣는 것이 아니라, 사용자가 적은 경험의 의미를 이해하고 "
+        "그 안의 감정, 배움, 아쉬움, 다음 성장 방향을 선명하게 정리해주는 것입니다.\n\n"
 
-        "작성 지침:\n"
-        "1. 원문의 핵심 의미와 경험은 유지하세요.\n"
-        "2. 어색한 표현, 반복, 문법, 띄어쓰기를 자연스럽게 수정하세요.\n"
-        "3. 프로젝트 과정에서의 고민, 성장, 아쉬움이 드러나도록 작성하세요.\n"
-        "4. 지나치게 과장된 표현이나 오글거리는 문체는 피하세요.\n"
-        "5. 자연스럽고 읽기 편한 한국어 회고문 스타일로 작성하세요.\n"
-        "6. '느낀 점'과 '부족했던 점'은 각각 문단으로 구분하세요.\n"
-        "7. 입력 내용을 단순 나열하지 말고 하나의 회고문처럼 자연스럽게 이어서 작성하세요.\n"
-        "8. 출력에는 제목, 설명, JSON, 마크다운, 따옴표를 포함하지 마세요.\n"
-        "9. 정제된 회고문만 출력하세요.\n\n"
+        "응답 방식:\n"
+        "1. 사용자가 쓴 표현을 그대로 반복하거나 템플릿 문장에 끼워 넣지 마세요.\n"
+        "2. 입력에 담긴 맥락을 해석해 '왜 이 경험이 의미 있었는지'를 짚어주세요.\n"
+        "3. 아쉬운 점은 비난하지 말고, 다음에 시도할 수 있는 구체적인 개선 방향으로 바꿔주세요.\n"
+        "4. 근거 없는 성과나 사용자가 말하지 않은 사실을 지어내지 마세요.\n"
+        "5. 너무 감상적이거나 과장된 문체는 피하고, 따뜻하지만 담백한 말투로 작성하세요.\n"
+        "6. 3~5개의 짧은 문단으로 작성하세요. 각 문단은 2~4문장 정도가 좋습니다.\n"
+        "7. 마지막 문단에는 다음 프로젝트에서 시도해볼 만한 구체적인 행동을 1~2개 자연스럽게 제안하세요.\n"
+        "8. 제목, JSON, 마크다운, 따옴표, 불릿 목록은 쓰지 마세요.\n\n"
 
-        f"느낀 점:\n{feelings}\n\n"
-        f"부족했던 점:\n{shortcomings}\n"
+        "사용자가 남긴 회고 자료:\n"
+        f"{feelings}\n\n"
+        "사용자가 아쉬움으로 남긴 내용:\n"
+        f"{shortcomings}\n"
     )
 
     client = genai.Client(api_key=settings.gemini_api_key)
@@ -444,8 +454,8 @@ def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str) -> str
             model="gemini-3.1-flash-lite",
             contents=prompt,
             config={
-                    "temperature": 0.7,
-                    "max_output_tokens": 512,
+                    "temperature": 0.85,
+                    "max_output_tokens": 900,
                 },
         )
     except Exception:
