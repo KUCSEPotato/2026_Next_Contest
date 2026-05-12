@@ -145,8 +145,8 @@ class MemoirUpdateRequest(BaseModel):
 
 
 class MemoirRefineRequest(BaseModel):
-    felt_point: str = Field(min_length=1, description="AI 정제를 위한 느낀 점")
-    lacked_point: str = Field(min_length=1, description="AI 정제를 위한 부족했던 점")
+    felt_point: str = Field(default="", description="AI 정제를 위한 느낀 점")
+    lacked_point: str = Field(default="", description="AI 정제를 위한 부족했던 점")
 
 
 class MemoirResponse(BaseModel):

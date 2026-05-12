@@ -11,6 +11,7 @@ import {
   getProjectRetrospectivesApi,
   getProjectReviewsApi,
   getProjectsApi,
+  refineProjectMemoirApi,
   updateProjectRetrospectiveApi,
 } from "../../lib/api";
 
@@ -29,6 +30,7 @@ interface GrowthData {
   bad: string;
   lessons?: string;
   nextActions?: string;
+  aiMemoir?: string;
 }
 
 interface ProjectData {
@@ -133,22 +135,35 @@ function daysBetween(start?: string | null) {
   return Math.max(1, Math.ceil((Date.now() - d.getTime()) / 86400000));
 }
 
-function parseLessonsLearned(value?: string | null): { chips: string[]; lessons: string } {
-  if (!value) return { chips: [], lessons: "" };
+function parseLessonsLearned(value?: string | null): {
+  chips: string[];
+  lessons: string;
+  aiMemoir: string;
+} {
+  if (!value) return { chips: [], lessons: "", aiMemoir: "" };
   try {
     const parsed = JSON.parse(value);
     if (parsed && typeof parsed === "object") {
       return {
         chips: Array.isArray(parsed.chips) ? parsed.chips.filter(Boolean) : [],
         lessons: typeof parsed.lessons === "string" ? parsed.lessons : "",
+        aiMemoir: typeof parsed.aiMemoir === "string" ? parsed.aiMemoir : "",
       };
     }
   } catch {}
-  return { chips: value.split(",").map((c) => c.trim()).filter(Boolean), lessons: "" };
+  return {
+    chips: value.split(",").map((c) => c.trim()).filter(Boolean),
+    lessons: "",
+    aiMemoir: "",
+  };
 }
 
 function stringifyLessonsLearned(data: GrowthData) {
-  return JSON.stringify({ chips: data.chips, lessons: data.lessons || "" });
+  return JSON.stringify({
+    chips: data.chips,
+    lessons: data.lessons || "",
+    aiMemoir: data.aiMemoir || "",
+  });
 }
 
 /* ── 서수 (1번째, 2번째…) ── */
@@ -255,13 +270,17 @@ function ReviewSection({ rating }: { rating: Rating }) {
 function GrowthModal({
   initialData,
   saving,
+  generating,
   onClose,
   onSave,
+  onGenerate,
 }: {
   initialData: GrowthData | null;
   saving: boolean;
+  generating: boolean;
   onClose: () => void;
   onSave: (data: GrowthData) => void;
+  onGenerate: (data: GrowthData) => Promise<string>;
 }) {
   const init = initialData?.chips || [];
   const [selectedTech, setSelectedTech]   = useState<string[]>(init.filter((c) => TECH_CHIPS.includes(c)));
@@ -271,6 +290,7 @@ function GrowthModal({
   const [bad, setBad]                     = useState(initialData?.bad || "");
   const [lessons, setLessons]             = useState(initialData?.lessons || "");
   const [nextActions, setNextActions]     = useState(initialData?.nextActions || "");
+  const [aiMemoir, setAiMemoir]           = useState(initialData?.aiMemoir || "");
 
   function toggle(arr: string[], setArr: (v: string[]) => void, val: string) {
     setArr(arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val]);
@@ -279,11 +299,28 @@ function GrowthModal({
   function handleSave() {
     const custom = customInput.split(",").map((s) => s.trim()).filter(Boolean);
     const chips  = [...selectedTech, ...selectedField, ...custom];
-    if (!chips.length && !good.trim() && !bad.trim() && !lessons.trim() && !nextActions.trim()) {
+    if (!chips.length && !good.trim() && !bad.trim() && !lessons.trim() && !nextActions.trim() && !aiMemoir.trim()) {
       alert("하나 이상 선택하거나 입력해주세요 🌹");
       return;
     }
-    onSave({ chips, good, bad, lessons, nextActions });
+    onSave({ chips, good, bad, lessons, nextActions, aiMemoir });
+  }
+
+  async function handleGenerate() {
+    const custom = customInput.split(",").map((s) => s.trim()).filter(Boolean);
+    const chips = [...selectedTech, ...selectedField, ...custom];
+    if (!good.trim() && !bad.trim()) {
+      alert("느낀 점이나 부족했던 점을 먼저 입력해주세요.");
+      return;
+    }
+
+    try {
+      const result = await onGenerate({ chips, good, bad, lessons, nextActions, aiMemoir });
+      setAiMemoir(result);
+    } catch (error) {
+      console.error(error);
+      alert(error instanceof Error ? error.message : "AI 회고록 생성에 실패했습니다.");
+    }
   }
 
   const inputStyle: React.CSSProperties = {
@@ -356,6 +393,40 @@ function GrowthModal({
         ))}
 
         <button
+          onClick={handleGenerate}
+          disabled={saving || generating || (!good.trim() && !bad.trim())}
+          style={{
+            width: "100%",
+            background: generating ? "#f0a0a0" : "#fff",
+            color: generating ? "#fff" : "#9b1c1c",
+            border: "1px solid #f0c0c0",
+            borderRadius: 14,
+            padding: 14,
+            fontSize: 15,
+            fontWeight: 700,
+            cursor: saving || generating || (!good.trim() && !bad.trim()) ? "not-allowed" : "pointer",
+            marginTop: 2,
+            marginBottom: 12,
+          }}
+        >
+          {generating ? "AI가 회고록을 만드는 중..." : "AI에게 회고록 만들기"}
+        </button>
+
+        {aiMemoir.trim() && (
+          <div style={{ marginBottom: 14 }}>
+            <p style={{ fontSize: 12, color: "#a83030", fontWeight: 700, marginBottom: 9 }}>
+              AI 회고록 초안
+            </p>
+            <textarea
+              value={aiMemoir}
+              onChange={(e) => setAiMemoir(e.target.value)}
+              rows={5}
+              style={{ ...inputStyle, resize: "vertical", lineHeight: 1.8, minHeight: 120 }}
+            />
+          </div>
+        )}
+
+        <button
           onClick={handleSave}
           disabled={saving}
           style={{
@@ -412,6 +483,7 @@ function MemoirContent() {
   const [harvestCount, setHarvestCount]     = useState(1); // 몇 번째 수확
   const [loading, setLoading]               = useState(true);
   const [saving, setSaving]                 = useState(false);
+  const [generatingMemoir, setGeneratingMemoir] = useState(false);
   const [error, setError]                   = useState("");
 
   useEffect(() => {
@@ -530,6 +602,7 @@ function MemoirContent() {
               good: retro.what_went_well || "",
               bad: retro.what_went_badly || "",
               lessons: ll.lessons,
+              aiMemoir: ll.aiMemoir,
               nextActions: retro.next_actions || "",
             };
           }
@@ -593,9 +666,37 @@ function MemoirContent() {
     }
   }
 
+  async function handleGenerateMemoir(data: GrowthData) {
+    if (!project) throw new Error("프로젝트 정보가 없습니다.");
+
+    try {
+      setGeneratingMemoir(true);
+      const result = await refineProjectMemoirApi(project.id, {
+        felt_point: [data.good, data.lessons, data.nextActions]
+          .filter((value) => value?.trim())
+          .join("\n\n")
+          .trim(),
+        lacked_point: data.bad.trim(),
+      });
+      const refined = result.data?.refined_memoir?.trim();
+      if (!refined) throw new Error("AI 회고록 응답이 비어 있습니다.");
+      return refined;
+    } finally {
+      setGeneratingMemoir(false);
+    }
+  }
+
   /* AI 정제 느낀 점 (프리뷰와 동일 멘트) */
   function buildFeelingText(): React.ReactNode {
     if (!growth) return null;
+    if (growth.aiMemoir?.trim()) {
+      return growth.aiMemoir.split("\n").filter(Boolean).map((line, index) => (
+        <p key={`ai-${index}`} style={{ margin: index === 0 ? "0 0 14px" : "0 0 14px" }}>
+          {line}
+        </p>
+      ));
+    }
+
     const parts: React.ReactNode[] = [];
     if (growth.good.trim()) {
       const s = growth.good.length > 40 ? growth.good.slice(0, 40) + "..." : growth.good;
@@ -877,8 +978,10 @@ function MemoirContent() {
           <GrowthModal
             initialData={growth}
             saving={saving}
+            generating={generatingMemoir}
             onClose={() => setModalOpen(false)}
             onSave={handleSaveGrowth}
+            onGenerate={handleGenerateMemoir}
           />
         )}
       </div>

@@ -330,12 +330,25 @@ async def _generate_ai_todo_titles(context_text: str, project: Project) -> list[
     return deduped_titles[:18] or _fallback_ai_todo_titles(project)
 
 
+def _fallback_memoir_refine(feelings: str, shortcomings: str) -> str:
+    parts: list[str] = []
+    if feelings:
+        parts.append(
+            "이번 프로젝트를 통해 "
+            f"{feelings.strip()}라는 점을 분명히 느꼈습니다."
+        )
+    if shortcomings:
+        parts.append(
+            "아쉬웠던 부분은 "
+            f"{shortcomings.strip()}였고, 이 경험을 바탕으로 다음 프로젝트에서는 더 구체적으로 개선해보고자 합니다."
+        )
+    parts.append("이번 경험은 다음 도전을 위한 좋은 기준점이 되었습니다.")
+    return "\n\n".join(parts)
+
+
 async def _call_gemini_for_memoir_refine(feelings: str, shortcomings: str) -> str:
     if not settings.gemini_api_key:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Gemini API key is not configured",
-        )
+        return _fallback_memoir_refine(feelings, shortcomings)
     return await asyncio.to_thread(_sync_call_gemini_for_memoir_refine, feelings, shortcomings)
 
 
@@ -371,11 +384,8 @@ def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str) -> str
                     "max_output_tokens": 512,
                 },
         )
-    except Exception as error:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Gemini API request failed: {str(error)}",
-        )
+    except Exception:
+        return _fallback_memoir_refine(feelings, shortcomings)
 
     text = getattr(response, "text", None) or getattr(response, "content", None)
     if not text:
