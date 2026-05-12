@@ -335,10 +335,51 @@ async def list_my_admin_posts(
             {
                 "id": p.id,
                 "title": p.title,
+                "content": p.content,
                 "category": p.category,
                 "is_pinned": p.is_pinned,
                 "created_at": p.created_at,
                 "updated_at": p.updated_at,
+                "deleted_at": p.deleted_at,
+            }
+            for p in posts
+        ]
+    )
+
+
+@router.get("/posts", summary="관리자 게시물 목록", description="관리자 권한으로 커뮤니티 게시물을 조회합니다.")
+async def list_posts_for_admin(
+    q: str | None = Query(default=None, description="제목 또는 내용 검색어"),
+    category: str | None = Query(default=None, description="게시글 카테고리"),
+    include_deleted: bool = Query(default=False, description="삭제된 게시물 포함 여부"),
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    _ensure_admin(db, current_user_id)
+    query = db.query(CommunityPost)
+
+    if not include_deleted:
+        query = query.filter(CommunityPost.deleted_at.is_(None))
+    if q:
+        search = f"%{q.strip()}%"
+        query = query.filter(or_(CommunityPost.title.ilike(search), CommunityPost.content.ilike(search)))
+    if category:
+        query = query.filter(CommunityPost.category == category)
+
+    posts = query.order_by(CommunityPost.id.desc()).all()
+    return success_response(
+        data=[
+            {
+                "id": p.id,
+                "author_id": p.author_id,
+                "title": p.title,
+                "content": p.content,
+                "category": p.category,
+                "is_pinned": p.is_pinned,
+                "view_count": p.view_count,
+                "created_at": p.created_at,
+                "updated_at": p.updated_at,
+                "deleted_at": p.deleted_at,
             }
             for p in posts
         ]

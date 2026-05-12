@@ -11,12 +11,16 @@ import {
   getAdminProjectsApi,
   getAdminReportsApi,
   getAdminUsersApi,
+  getAdminPostsApi,
   updateAdminPaymentApi,
   updateAdminReportApi,
   updateAdminUserStatusApi,
   getAdminMyPostsApi,
   adminUpdatePostApi,
   adminDeletePostApi,
+  adminTakedownPostApi,
+  adminTakedownIdeaApi,
+  adminTakedownProjectApi,
 } from "../../lib/api";
 import { getStoredUser, getToken, loadCurrentUser } from "../../lib/auth";
 
@@ -25,6 +29,7 @@ const TABS = [
   { id: "payments", label: "결제" },
   { id: "users", label: "사용자" },
   { id: "notices", label: "공지" },
+  { id: "posts", label: "게시글" },
   { id: "projects", label: "프로젝트" },
 ];
 
@@ -69,10 +74,14 @@ export default function AdminPage() {
   const [reports, setReports] = useState([]);
   const [payments, setPayments] = useState([]);
   const [adminPosts, setAdminPosts] = useState([]);
+  const [posts, setPosts] = useState([]);
   const [userSearch, setUserSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState("");
   const [userActiveFilter, setUserActiveFilter] = useState("");
   const [reportScope, setReportScope] = useState("all");
+  const [postSearch, setPostSearch] = useState("");
+  const [postCategoryFilter, setPostCategoryFilter] = useState("");
+  const [includeDeletedPosts, setIncludeDeletedPosts] = useState(false);
   const [noticeForm, setNoticeForm] = useState({
     title: "",
     content: "",
@@ -97,7 +106,7 @@ export default function AdminPage() {
     try {
       setLoading(true);
       setError("");
-      const [overviewResult, usersResult, projectsResult, reportsResult, paymentsResult, adminPostsResult] =
+      const [overviewResult, usersResult, projectsResult, reportsResult, paymentsResult, adminPostsResult, postsResult] =
         await Promise.all([
           getAdminOverviewApi(),
           getAdminUsersApi({
@@ -112,6 +121,11 @@ export default function AdminPage() {
           getAdminReportsApi({ scope: reportScope }),
           getAdminPaymentsApi(),
           getAdminMyPostsApi(),
+          getAdminPostsApi({
+            q: postSearch.trim() || undefined,
+            category: postCategoryFilter || undefined,
+            include_deleted: includeDeletedPosts,
+          }),
         ]);
 
       setOverview(overviewResult.data || null);
@@ -120,6 +134,7 @@ export default function AdminPage() {
       setReports(reportsResult.data || []);
       setPayments(paymentsResult.data || []);
       setAdminPosts(adminPostsResult.data || []);
+      setPosts(postsResult.data || []);
     } catch (err) {
       console.error(err);
       setError(
@@ -130,7 +145,7 @@ export default function AdminPage() {
     } finally {
       setLoading(false);
     }
-  }, [reportScope, userActiveFilter, userSearch, userRoleFilter]);
+  }, [includeDeletedPosts, postCategoryFilter, postSearch, reportScope, userActiveFilter, userSearch, userRoleFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -397,6 +412,7 @@ export default function AdminPage() {
       });
 
       setNoticeForm({ title: "", content: "", category: "announcement", isPinned: true });
+      await loadAdminData();
       alert("공지글을 작성했습니다.");
     } catch (err) {
       alert(err instanceof Error ? err.message : "공지 작성에 실패했습니다.");
@@ -435,6 +451,48 @@ export default function AdminPage() {
       alert("게시물을 삭제했습니다.");
     } catch (err) {
       alert(err instanceof Error ? err.message : "게시물 삭제에 실패했습니다.");
+    } finally {
+      setProcessingKey("");
+    }
+  }
+
+  async function handleTakedownPost(postId) {
+    if (!window.confirm("정말로 이 게시글을 강제로 내리겠습니까?")) return;
+
+    try {
+      setProcessingKey(`post-takedown-${postId}`);
+      await adminTakedownPostApi(postId);
+      setPosts((prev) =>
+        includeDeletedPosts
+          ? prev.map((post) =>
+              post.id === postId ? { ...post, deleted_at: new Date().toISOString() } : post
+            )
+          : prev.filter((post) => post.id !== postId)
+      );
+      alert("게시글을 강제로 내렸습니다.");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "게시글 강제 내리기에 실패했습니다.");
+    } finally {
+      setProcessingKey("");
+    }
+  }
+
+  async function handleTakedownProject(projectId) {
+    if (!window.confirm("정말로 이 프로젝트를 강제로 내리겠습니까?")) return;
+
+    try {
+      setProcessingKey(`project-takedown-${projectId}`);
+      await adminTakedownProjectApi(projectId);
+      setProjects((prev) =>
+        prev.map((project) =>
+          project.id === projectId
+            ? { ...project, deleted_at: new Date().toISOString() }
+            : project
+        )
+      );
+      alert("프로젝트를 강제로 내렸습니다.");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "프로젝트 강제 내리기에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
@@ -848,7 +906,14 @@ export default function AdminPage() {
 
                     <div className="flex justify-end gap-2">
                       <button
-                        onClick={() => setNoticeForm({ title: "", content: "", isPinned: true })}
+                        onClick={() =>
+                          setNoticeForm({
+                            title: "",
+                            content: "",
+                            category: "announcement",
+                            isPinned: true,
+                          })
+                        }
                         className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
                       >
                         초기화
@@ -885,6 +950,97 @@ export default function AdminPage() {
               </div>
             )}
 
+            {activeTab === "posts" && (
+              <div className="p-4">
+                <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="min-w-64 flex-1">
+                    <label className="mb-1 block text-xs font-semibold text-slate-600">검색</label>
+                    <input
+                      value={postSearch}
+                      onChange={(e) => setPostSearch(e.target.value)}
+                      placeholder="제목 또는 내용"
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-600">카테고리</label>
+                    <select
+                      value={postCategoryFilter}
+                      onChange={(e) => setPostCategoryFilter(e.target.value)}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="">전체</option>
+                      <option value="general">자유</option>
+                      <option value="question">질문</option>
+                      <option value="idea">아이디어</option>
+                      <option value="showcase">쇼케이스</option>
+                      <option value="event">이벤트</option>
+                      <option value="announcement">공지</option>
+                    </select>
+                  </div>
+                  <label className="flex items-center gap-2 pb-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={includeDeletedPosts}
+                      onChange={(e) => setIncludeDeletedPosts(e.target.checked)}
+                    />
+                    삭제 포함
+                  </label>
+                  <button
+                    onClick={loadAdminData}
+                    className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+                  >
+                    검색
+                  </button>
+                </div>
+
+                <table className="min-w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+                    <tr>
+                      <Th>ID</Th>
+                      <Th>게시글</Th>
+                      <Th>분류</Th>
+                      <Th>작성자</Th>
+                      <Th>상태</Th>
+                      <Th>생성일</Th>
+                      <Th>처리</Th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {posts.map((post) => (
+                      <tr key={post.id}>
+                        <Td>#{post.id}</Td>
+                        <Td className="max-w-md">
+                          <p className="font-semibold text-slate-900">{post.title}</p>
+                          <p className="mt-1 line-clamp-2 text-xs text-slate-500">{post.content}</p>
+                        </Td>
+                        <Td>{post.category}</Td>
+                        <Td>User #{post.author_id}</Td>
+                        <Td><StatusBadge value={post.deleted_at ? "deleted" : "active"} /></Td>
+                        <Td>{formatDate(post.created_at)}</Td>
+                        <Td>
+                          <button
+                            onClick={() => handleTakedownPost(post.id)}
+                            disabled={Boolean(post.deleted_at) || processingKey === `post-takedown-${post.id}`}
+                            className="rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                          >
+                            강제내리기
+                          </button>
+                        </Td>
+                      </tr>
+                    ))}
+                    {posts.length === 0 && (
+                      <tr>
+                        <Td colSpan={7}>
+                          <EmptyLine text="조건에 맞는 게시글이 없습니다." />
+                        </Td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
             {activeTab === "projects" && (
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
@@ -895,6 +1051,7 @@ export default function AdminPage() {
                     <Th>리더</Th>
                     <Th>분야</Th>
                     <Th>생성일</Th>
+                    <Th>처리</Th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -906,6 +1063,15 @@ export default function AdminPage() {
                       <Td>User #{project.leader_id}</Td>
                       <Td>{project.category || "-"}</Td>
                       <Td>{formatDate(project.created_at)}</Td>
+                      <Td>
+                        <button
+                          onClick={() => handleTakedownProject(project.id)}
+                          disabled={Boolean(project.deleted_at) || processingKey === `project-takedown-${project.id}`}
+                          className="rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                        >
+                          강제내리기
+                        </button>
+                      </Td>
                     </tr>
                   ))}
                 </tbody>
@@ -955,8 +1121,8 @@ function Th({ children }) {
   return <th className="whitespace-nowrap px-4 py-3">{children}</th>;
 }
 
-function Td({ children, className = "" }) {
-  return <td className={`px-4 py-3 align-top text-slate-700 ${className}`}>{children}</td>;
+function Td({ children, className = "", ...props }) {
+  return <td {...props} className={`px-4 py-3 align-top text-slate-700 ${className}`}>{children}</td>;
 }
 
 function StatusBadge({ value }) {
