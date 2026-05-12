@@ -50,6 +50,11 @@ async def create_post(
     db: Session = Depends(get_db),
 ) -> dict:
     """새로운 커뮤니티 게시물 작성"""
+    # Restrict certain categories to admin only
+    if payload.category in ("announcement", "event"):
+        user = db.get(User, current_user_id)
+        if user is None or user.role != "admin":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admin can create announcement or event posts")
     post = CommunityPost(
         author_id=current_user_id,
         title=payload.title,
