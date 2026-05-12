@@ -18,6 +18,13 @@ import {
 const unwrapResponseData = (result, fallback = null) =>
   result?.data?.data ?? result?.data ?? fallback;
 
+const normalizeStatus = (status) => String(status || "").replace("-", "_");
+
+const isDoneTodo = (todo) =>
+  normalizeStatus(todo?.status) === "done" ||
+  Boolean(todo?.completed_at) ||
+  todo?.is_done === true;
+
 export default function ProjectManagePage() {
   const params = useParams();
   const router = useRouter();
@@ -83,14 +90,24 @@ export default function ProjectManagePage() {
     project?.currentMembers ?? project?.current_members ?? project?.members?.length ?? 1;
   const displayCurrentMemberCount = Math.max(currentMemberCount, acceptedCount + 1);
   const canAcceptMore = !maxMembers || displayCurrentMemberCount < maxMembers;
-  const doneTodoCount = todos.filter((todo) => todo.status === "done").length;
+  const projectStatus = normalizeStatus(project?.status);
+  const isProjectInProgress = ["in_progress", "started"].includes(projectStatus);
+  const doneTodoCount = todos.filter(isDoneTodo).length;
   const todoCompletionRate = todos.length
     ? Math.round((doneTodoCount / todos.length) * 100)
     : 0;
   const canCompleteProject =
-    project?.status === "in_progress" && todos.length > 0 && todoCompletionRate >= 70;
-  const isProjectCompleted = project?.status === "completed";
-  const canCompleteTeam = project?.status !== "in_progress" && !isProjectCompleted;
+    isProjectInProgress && todos.length > 0 && todoCompletionRate >= 70;
+  const isProjectCompleted = projectStatus === "completed";
+  const canCompleteTeam = !isProjectInProgress && !isProjectCompleted;
+  const completionHelpText =
+    !isProjectInProgress
+      ? ""
+      : todos.length === 0
+        ? "Todo가 있어야 프로젝트 완료 처리를 할 수 있습니다."
+        : canCompleteProject
+          ? "완료 조건을 충족했습니다. 프로젝트 완료 버튼을 눌러 마무리하세요."
+          : "Todo를 70% 이상 완료하면 프로젝트 완료 버튼을 누를 수 있습니다.";
 
   const reloadProjectAndTodos = async () => {
     const [proj, todoResult] = await Promise.all([
@@ -320,17 +337,17 @@ export default function ProjectManagePage() {
           {!isProjectCompleted && (
             <button
               onClick={
-                project?.status === "in_progress"
+                isProjectInProgress
                   ? () => setShowRecruitmentForm((prev) => !prev)
                   : handleCompleteTeam
               }
               disabled={
                 isCompletingTeam ||
-                (project?.status !== "in_progress" && !canCompleteTeam)
+                (!isProjectInProgress && !canCompleteTeam)
               }
               className="mt-4 w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
             >
-              {project?.status === "in_progress"
+              {isProjectInProgress
                 ? "재모집하기"
                 : isCompletingTeam
                 ? "팀 결성 중..."
@@ -338,7 +355,7 @@ export default function ProjectManagePage() {
             </button>
           )}
 
-          {project?.status === "in_progress" && showRecruitmentForm && (
+          {isProjectInProgress && showRecruitmentForm && (
             <div className="mt-4 rounded-xl border border-red-100 bg-red-50/40 p-4">
               <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_160px]">
                 <div>
@@ -421,13 +438,13 @@ export default function ProjectManagePage() {
                 </p>
               </div>
 
-              {canCompleteProject && (
+              {isProjectInProgress && !isProjectCompleted && (
                 <button
                   onClick={handleCompleteProject}
-                  disabled={isCompletingTeam}
-                  className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:bg-slate-400"
+                  disabled={isCompletingTeam || !canCompleteProject}
+                  className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                 >
-                  {isCompletingTeam ? "완료 처리 중..." : "complete"}
+                  {isCompletingTeam ? "완료 처리 중..." : "프로젝트 완료"}
                 </button>
               )}
 
@@ -448,9 +465,13 @@ export default function ProjectManagePage() {
               />
             </div>
 
-            {project?.status === "in_progress" && todos.length > 0 && todoCompletionRate < 70 && (
-              <p className="mt-2 text-xs text-slate-500">
-                Todo를 70% 이상 완료하면 팀장에게 complete 버튼이 표시됩니다.
+            {completionHelpText && (
+              <p
+                className={`mt-2 text-xs ${
+                  canCompleteProject ? "text-red-600" : "text-slate-500"
+                }`}
+              >
+                {completionHelpText}
               </p>
             )}
           </div>
@@ -542,8 +563,20 @@ export default function ProjectManagePage() {
               </p>
             </div>
 
-            <div className="rounded-full bg-red-50 px-4 py-2 text-sm font-semibold text-red-700">
-              {todoCompletionRate}% 완료
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="rounded-full bg-red-50 px-4 py-2 text-sm font-semibold text-red-700">
+                {todoCompletionRate}% 완료
+              </div>
+
+              {isProjectInProgress && !isProjectCompleted && (
+                <button
+                  onClick={handleCompleteProject}
+                  disabled={isCompletingTeam || !canCompleteProject}
+                  className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {isCompletingTeam ? "완료 처리 중..." : "프로젝트 완료"}
+                </button>
+              )}
             </div>
           </div>
 
@@ -556,7 +589,7 @@ export default function ProjectManagePage() {
           ) : (
             <div className="mt-6 space-y-3">
               {todos.map((todo) => {
-                const isDone = todo.status === "done";
+                const isDone = isDoneTodo(todo);
                 const isEditing = editingTodoId === todo.id;
 
                 return (
