@@ -20,9 +20,22 @@ from app.models import UserSkill
 from app.models import Interest
 from app.schemas.users import OnboardingIdeaSelectionRequest
 from app.schemas.users import UserProfileUpdateRequest
+from app.services.s3_upload import extract_s3_key_from_url
+from app.services.s3_upload import generate_presigned_get_url
 from app.services.s3_upload import get_s3_service
 
 router = APIRouter()
+
+
+def _get_avatar_url(user: User | None) -> str | None:
+    if user is None:
+        return None
+
+    s3_key = user.avatar_s3_key or extract_s3_key_from_url(user.avatar_url)
+    if s3_key:
+        return generate_presigned_get_url(s3_key)
+
+    return user.avatar_url
 
 
 def _serialize_review(db: Session, review: Review) -> dict:
@@ -34,7 +47,7 @@ def _serialize_review(db: Session, review: Review) -> dict:
         "reviewer": {
             "id": reviewer.id if reviewer else review.reviewer_id,
             "nickname": reviewer.nickname if reviewer else "탈퇴한 사용자",
-            "avatar_url": reviewer.avatar_url if reviewer else None,
+            "avatar_url": _get_avatar_url(reviewer),
         },
         "project": {
             "id": project.id if project else review.project_id,
@@ -111,7 +124,8 @@ async def get_my_profile(
             "phone_number": user.phone_number,
             "coin_balance": user.coin_balance,
             "bio": user.bio,
-            "avatar_url": user.avatar_url,
+            "avatar_url": _get_avatar_url(user),
+            "avatar_s3_key": user.avatar_s3_key,
             "skills": [name for (name,) in skills],
             "interests": [name for (name,) in interests],
             "selected_idea_ids": [idea_id for (idea_id,) in selected_idea_ids],
@@ -141,7 +155,8 @@ async def upload_my_avatar(
     """사용자 아바타 업로드 API.
 
     - Accepts image files only (content-type starts with `image/`).
-    - Uploads to S3 under `avatars/` folder and saves the public URL to `user.avatar_url`.
+    - Uploads to a private S3 bucket and stores only the object key.
+    - Returns a temporary presigned GET URL as `avatar_url`.
     """
     user = db.get(User, current_user_id)
     if user is None or user.deleted_at is not None:
@@ -153,13 +168,24 @@ async def upload_my_avatar(
 
     content = await file.read()
 
-    upload_result = await s3_service.upload_file(content, file.filename, content_type, "avatars")
+    upload_result = await s3_service.upload_file(
+        content,
+        file.filename or "avatar",
+        content_type,
+        f"avatars/{user.id}",
+    )
 
-    user.avatar_url = upload_result["s3_url"]
+    user.avatar_s3_key = upload_result["s3_key"]
+    user.avatar_url = None
     db.commit()
     db.refresh(user)
 
-    return success_response(data={"avatar_url": user.avatar_url})
+    return success_response(
+        data={
+            "avatar_url": _get_avatar_url(user),
+            "avatar_s3_key": user.avatar_s3_key,
+        }
+    )
 
 
 @router.get("/me/onboarding", summary="내 온보딩 상태 조회", description="회원가입/프로필/관심 아이디어 선택 진행 상태를 조회합니다.")
@@ -227,7 +253,8 @@ async def update_my_profile(
             "phone_number": user.phone_number,
             "coin_balance": user.coin_balance,
             "bio": user.bio,
-            "avatar_url": user.avatar_url,
+            "avatar_url": _get_avatar_url(user),
+            "avatar_s3_key": user.avatar_s3_key,
             "onboarding_step": user.onboarding_step,
         },
     )
@@ -330,8 +357,8 @@ async def get_my_projects(
         days_since_creation = (now - project.created_at.replace(tzinfo=timezone.utc)).days if project.created_at else 0
         time_elapsed_30_days = days_since_creation >= 30
         
-        # can_discard 조건: 팀 결성됐거나 30일 이상 경과
-        can_discard = team_formed or time_elapsed_30_days
+        # can_discard 조건: 완료 전 프로젝트 중 팀 결성됐거나 30일 이상 경과
+        can_discard = project.status != "completed" and (team_formed or time_elapsed_30_days)
         
         response_data.append({
             "id": project.id,
@@ -339,6 +366,7 @@ async def get_my_projects(
             "status": project.status,
             "difficulty": project.difficulty,
             "category": project.category,
+            "progress_percent": float(project.progress_percent),
             "created_at": project.created_at.isoformat() if project.created_at else None,
             "can_discard": can_discard,
             "can_chat": project.id in active_chat_project_ids,
@@ -376,7 +404,7 @@ async def get_user_profile(user_id: int, db: Session = Depends(get_db)) -> dict:
             "id": user.id,
             "nickname": user.nickname,
             "bio": user.bio,
-            "avatar_url": user.avatar_url,
+            "avatar_url": _get_avatar_url(user),
             "role": user.role,
             "interests": [name for (name,) in interests],
         },
@@ -427,6 +455,7 @@ async def get_user_projects(user_id: int, db: Session = Depends(get_db)) -> dict
                 "title": project.title,
                 "status": project.status,
                 "difficulty": project.difficulty,
+                "progress_percent": float(project.progress_percent),
                 "created_at": project.created_at,
             }
             for project in projects
@@ -658,27 +687,37 @@ async def get_my_reputation(
     - 리뷰가 있으면 teamwork/contribution/responsibility 평균과 종합 score를 반환
     """
     aggregate = db.get(UserRatingAggregate, current_user_id)
+    return success_response(data=_build_reputation_response(aggregate))
+
+
+def _build_reputation_response(aggregate: UserRatingAggregate | None) -> dict:
     if aggregate is None:
-        return success_response(
-            data={
-                "review_count": 0,
-                "avg_teamwork": 0.0,
-                "avg_contribution": 0.0,
-                "avg_responsibility": 0.0,
-                "score": 0.0,
-            }
-        )
+        return {
+            "review_count": 0,
+            "avg_teamwork": 0.0,
+            "avg_contribution": 0.0,
+            "avg_responsibility": 0.0,
+            "score": 0.0,
+        }
 
     score = float((aggregate.avg_teamwork + aggregate.avg_contribution + aggregate.avg_responsibility) / 3)
-    return success_response(
-        data={
-            "review_count": aggregate.review_count,
-            "avg_teamwork": round(float(aggregate.avg_teamwork), 2),
-            "avg_contribution": round(float(aggregate.avg_contribution), 2),
-            "avg_responsibility": round(float(aggregate.avg_responsibility), 2),
-            "score": round(score, 2),
-        },
-    )
+    return {
+        "review_count": aggregate.review_count,
+        "avg_teamwork": round(float(aggregate.avg_teamwork), 2),
+        "avg_contribution": round(float(aggregate.avg_contribution), 2),
+        "avg_responsibility": round(float(aggregate.avg_responsibility), 2),
+        "score": round(score, 2),
+    }
+
+
+@router.get("/{user_id}/reputation", summary="사용자 신뢰도 조회", description="특정 사용자의 리뷰 기반 평점 요약을 반환합니다.")
+async def get_user_reputation(user_id: int, db: Session = Depends(get_db)) -> dict:
+    user = db.get(User, user_id)
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    aggregate = db.get(UserRatingAggregate, user_id)
+    return success_response(data=_build_reputation_response(aggregate))
 
 
 @router.get("/me/applications", summary="내가 지원한 프로젝트 목록", description="사용자가 지원한 프로젝트들의 지원 현황을 조회합니다.")
@@ -705,7 +744,7 @@ async def get_my_applications(
     result = []
     for app in applications:
         project = db.get(Project, app.project_id)
-        if project is None:
+        if project is None or project.deleted_at is not None:
             continue
 
         # applicant_count: 이 프로젝트에 지원한 사람 수
@@ -735,6 +774,10 @@ async def get_my_applications(
                 "project_title": project.title,
                 "message": app.message,
                 "status": app.status,
+                "project_status": project.status,
+                "difficulty": project.difficulty,
+                "category": project.category,
+                "progress_percent": float(project.progress_percent),
                 "applicant_count": applicant_count,
                 "current_members": current_members,
                 "max_members": max_members,

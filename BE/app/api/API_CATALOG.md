@@ -45,10 +45,12 @@
 ## 2) Users
 
 - GET /users/me/profile: 내 프로필 + 기술 스택 + 선택한 아이디어 조회
+  - S3 아바타는 `avatar_s3_key`를 기반으로 매 응답마다 presigned GET URL을 `avatar_url`로 반환합니다.
 - GET /users/me/onboarding: 회원가입/프로필/아이디어 선택 상태 조회
 - PATCH /users/me/profile: 닉네임/이름/전화번호/소개/아바타 수정
- - PATCH /users/me/profile: 닉네임/이름/전화번호/소개/아바타 수정
- - POST /users/me/avatar: 아바타(프로필 사진) 파일 업로드 (multipart/form-data, S3에 저장)
+- POST /users/me/avatar: 아바타(프로필 사진) 파일 업로드 (multipart/form-data, private S3에 저장)
+  - DB에는 presigned URL이 아니라 `avatar_s3_key`만 저장합니다.
+  - 응답의 `avatar_url`은 만료 시간이 있는 presigned GET URL입니다.
 - GET /users/{user_id}/profile: 공개 프로필 조회
 - GET /users/{user_id}/stats: 활동 통계 조회
 - GET /users/{user_id}/projects: 사용자 프로젝트 이력

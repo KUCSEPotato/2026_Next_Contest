@@ -2,6 +2,7 @@
 
 import os
 from io import BytesIO
+from urllib.parse import unquote, urlparse
 from uuid import uuid4
 
 import boto3
@@ -32,7 +33,7 @@ class S3FileUploadService:
         file_type: str,
         folder: str,  # e.g., "community" or "ideas"
     ) -> dict:
-        """Upload a file to S3 and return S3 key and URL.
+        """Upload a file to S3 and return S3 key and raw object URL.
 
         Args:
             file_content: File binary content
@@ -89,6 +90,23 @@ class S3FileUploadService:
                 detail=f"File upload failed: {str(e)}",
             )
 
+    def generate_presigned_get_url(self, s3_key: str, expires_in: int = 3600) -> str:
+        """Generate a temporary GET URL for a private S3 object."""
+        try:
+            return self.s3_client.generate_presigned_url(
+                ClientMethod="get_object",
+                Params={
+                    "Bucket": self.bucket_name,
+                    "Key": s3_key,
+                },
+                ExpiresIn=expires_in,
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to generate presigned URL: {str(e)}",
+            )
+
     async def delete_file(self, s3_key: str) -> None:
         """Delete a file from S3.
 
@@ -127,3 +145,34 @@ def get_s3_service() -> S3FileUploadService:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="AWS S3 service not configured",
         )
+
+
+def extract_s3_key_from_url(url: str | None) -> str | None:
+    """Extract object key from common S3 object URL shapes."""
+    if not url:
+        return None
+
+    parsed = urlparse(url)
+    if not parsed.netloc or not parsed.path:
+        return None
+
+    path = unquote(parsed.path.lstrip("/"))
+    bucket = settings.aws_s3_bucket
+
+    if ".amazonaws.com" not in parsed.netloc:
+        return None
+
+    if bucket and parsed.netloc.startswith(f"{bucket}."):
+        return path or None
+
+    if bucket and path.startswith(f"{bucket}/"):
+        return path[len(bucket) + 1 :] or None
+
+    return path or None
+
+
+def generate_presigned_get_url(s3_key: str | None, expires_in: int = 3600) -> str | None:
+    """Generate a temporary GET URL for a private S3 object key."""
+    if not s3_key:
+        return None
+    return get_s3_service().generate_presigned_get_url(s3_key, expires_in=expires_in)

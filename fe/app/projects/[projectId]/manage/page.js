@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   getProjectApi,
@@ -13,6 +13,8 @@ import {
   updateProjectStatusApi,
   updateTodoApi,
   createRecruitmentApi,
+  createProjectReviewApi,
+  getProjectReviewsApi,
 } from "../../../../lib/api";
 
 const unwrapResponseData = (result, fallback = null) =>
@@ -44,6 +46,12 @@ export default function ProjectManagePage() {
   const [editingTodoDescription, setEditingTodoDescription] = useState("");
   const [showRecruitmentForm, setShowRecruitmentForm] = useState(false);
   const [isCreatingRecruitment, setIsCreatingRecruitment] = useState(false);
+  const [projectReviews, setProjectReviews] = useState([]);
+  const [completionReviewOpen, setCompletionReviewOpen] = useState(false);
+  const [completionReviewTargets, setCompletionReviewTargets] = useState([]);
+  const [completionReviewInputs, setCompletionReviewInputs] = useState({});
+  const [isSubmittingCompletionReviews, setIsSubmittingCompletionReviews] = useState(false);
+  const [hasPromptedCompletionReview, setHasPromptedCompletionReview] = useState(false);
   const [recruitmentPosition, setRecruitmentPosition] = useState("");
   const [recruitmentCount, setRecruitmentCount] = useState(1);
   const [recruitmentSummary, setRecruitmentSummary] = useState("");
@@ -58,14 +66,18 @@ export default function ProjectManagePage() {
           await Promise.all([
             getProjectApi(projectId),
             getMyProfileApi(),
-            getProjectApplicationsApi(projectId),
+            getProjectApplicationsApi(projectId).catch(() => ({ data: [] })),
             getTodosApi(projectId),
           ]);
+        const reviewsResult = await getProjectReviewsApi(projectId).catch(() => ({
+          data: [],
+        }));
 
         setProject(projectResult.data);
         setProfile(profileResult.data);
         setApplications(applicationsResult.data || []);
         setTodos(Array.isArray(todosResult.data) ? todosResult.data : []);
+        setProjectReviews(Array.isArray(reviewsResult.data) ? reviewsResult.data : []);
       } catch (error) {
         console.error(error);
         alert("프로젝트 관리 정보를 불러오지 못했습니다.");
@@ -80,6 +92,11 @@ export default function ProjectManagePage() {
   }, [projectId]);
 
   const isLeader = project && profile && project.leader_id === profile.id;
+  const isProjectMember =
+    project &&
+    profile &&
+    (project.leader_id === profile.id ||
+      (project.members || []).some((member) => member.user_id === profile.id));
 
   const acceptedCount = applications.filter(
     (application) => application.status === "accepted"
@@ -110,14 +127,78 @@ export default function ProjectManagePage() {
           : "Todo를 70% 이상 완료하면 프로젝트 완료 버튼을 누를 수 있습니다.";
 
   const reloadProjectAndTodos = async () => {
-    const [proj, todoResult] = await Promise.all([
+    const [proj, todoResult, reviewsResult] = await Promise.all([
       getProjectApi(projectId),
       getTodosApi(projectId),
+      getProjectReviewsApi(projectId).catch(() => ({ data: [] })),
     ]);
 
     setProject(unwrapResponseData(proj));
     setTodos(Array.isArray(todoResult.data) ? todoResult.data : []);
+    setProjectReviews(Array.isArray(reviewsResult.data) ? reviewsResult.data : []);
   };
+
+  const getPendingReviewTargets = useCallback(() => {
+    if (!project || !profile) return [];
+
+    const reviewedUserIds = new Set(
+      projectReviews
+        .filter((review) => review.reviewer_id === profile.id)
+        .map((review) => review.reviewee_id)
+    );
+
+    return (project.members || []).filter(
+      (member) => member.user_id !== profile.id && !reviewedUserIds.has(member.user_id)
+    );
+  }, [project, profile, projectReviews]);
+
+  const openCompletionReview = () => {
+    const targets = getPendingReviewTargets();
+
+    if (!targets.length) {
+      alert("이미 모든 팀원 평가를 완료했습니다.");
+      return;
+    }
+
+    const initialInputs = {};
+    targets.forEach((member) => {
+      initialInputs[member.user_id] = {
+        teamwork_score: 3,
+        contribution_score: 3,
+        responsibility_score: 3,
+        comment: "",
+      };
+    });
+
+    setCompletionReviewTargets(targets);
+    setCompletionReviewInputs(initialInputs);
+    setCompletionReviewOpen(true);
+  };
+
+  useEffect(() => {
+    if (!isProjectCompleted || !isProjectMember || hasPromptedCompletionReview) {
+      return;
+    }
+
+    const targets = getPendingReviewTargets();
+    if (!targets.length) return;
+
+    const initialInputs = {};
+    targets.forEach((member) => {
+      initialInputs[member.user_id] = {
+        teamwork_score: 3,
+        contribution_score: 3,
+        responsibility_score: 3,
+        comment: "",
+      };
+    });
+    window.setTimeout(() => {
+      setHasPromptedCompletionReview(true);
+      setCompletionReviewTargets(targets);
+      setCompletionReviewInputs(initialInputs);
+      setCompletionReviewOpen(true);
+    }, 0);
+  }, [isProjectCompleted, isProjectMember, hasPromptedCompletionReview, getPendingReviewTargets]);
 
   const handleDecision = async (applicationId, status) => {
     if (status === "accepted" && !canAcceptMore) {
@@ -221,6 +302,56 @@ export default function ProjectManagePage() {
     }
   };
 
+  const updateCompletionReviewInput = (userId, field, value) => {
+    setCompletionReviewInputs((prev) => ({
+      ...prev,
+      [userId]: {
+        ...prev[userId],
+        [field]: value,
+      },
+    }));
+  };
+
+  const submitCompletionReviews = async () => {
+    if (!completionReviewTargets.length) return;
+
+    try {
+      setIsSubmittingCompletionReviews(true);
+
+      for (const target of completionReviewTargets) {
+        const input = completionReviewInputs[target.user_id] || {
+          teamwork_score: 3,
+          contribution_score: 3,
+          responsibility_score: 3,
+          comment: "",
+        };
+
+        await createProjectReviewApi(projectId, {
+          reviewee_id: target.user_id,
+          teamwork_score: Number(input.teamwork_score),
+          contribution_score: Number(input.contribution_score),
+          responsibility_score: Number(input.responsibility_score),
+          comment: input.comment,
+        }).catch((error) => {
+          if (!String(error?.message || "").includes("Review already exists")) {
+            throw error;
+          }
+        });
+      }
+
+      await reloadProjectAndTodos();
+      setCompletionReviewOpen(false);
+      setCompletionReviewTargets([]);
+      setCompletionReviewInputs({});
+      alert("팀원 평가가 저장되었습니다.");
+    } catch (error) {
+      console.error(error);
+      alert("팀원 평가 저장에 실패했습니다.");
+    } finally {
+      setIsSubmittingCompletionReviews(false);
+    }
+  };
+
   const handleCompleteProject = async () => {
     if (!canCompleteProject) return;
 
@@ -232,7 +363,11 @@ export default function ProjectManagePage() {
       setIsCompletingTeam(true);
       await updateProjectStatusApi(projectId, "completed");
       await reloadProjectAndTodos();
-      alert("프로젝트가 완료되었습니다.");
+      alert("프로젝트가 완료되었습니다. 함께한 팀원 평가를 남겨주세요.");
+      setHasPromptedCompletionReview(true);
+      setTimeout(() => {
+        openCompletionReview();
+      }, 0);
     } catch (error) {
       console.error(error);
       alert("프로젝트 완료 처리에 실패했습니다.");
@@ -294,7 +429,100 @@ export default function ProjectManagePage() {
     );
   }
 
-  if (!isLeader) {
+  const completionReviewModal = completionReviewOpen && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+        onClick={() => {
+          if (!isSubmittingCompletionReviews) {
+            setCompletionReviewOpen(false);
+          }
+        }}
+      />
+
+      <div className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-7 shadow-2xl">
+        <h2 className="text-xl font-bold text-slate-900">팀원 평가</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-500">
+          프로젝트가 완료되었습니다. 함께한 팀원들의 협업, 기여, 책임감을 평가해주세요.
+          평가는 각 사용자의 신뢰도에 반영됩니다.
+        </p>
+
+        <div className="mt-6 space-y-5">
+          {completionReviewTargets.map((member) => {
+            const input = completionReviewInputs[member.user_id] || {
+              teamwork_score: 3,
+              contribution_score: 3,
+              responsibility_score: 3,
+              comment: "",
+            };
+
+            return (
+              <div
+                key={member.user_id}
+                className="rounded-2xl border border-slate-200 p-5"
+              >
+                <p className="font-bold text-slate-900">
+                  {member.nickname || member.user?.nickname || `User #${member.user_id}`} · {member.role_in_project}
+                </p>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <ScoreSelect
+                    label="협업"
+                    value={input.teamwork_score}
+                    onChange={(value) =>
+                      updateCompletionReviewInput(member.user_id, "teamwork_score", value)
+                    }
+                  />
+                  <ScoreSelect
+                    label="기여"
+                    value={input.contribution_score}
+                    onChange={(value) =>
+                      updateCompletionReviewInput(member.user_id, "contribution_score", value)
+                    }
+                  />
+                  <ScoreSelect
+                    label="책임"
+                    value={input.responsibility_score}
+                    onChange={(value) =>
+                      updateCompletionReviewInput(member.user_id, "responsibility_score", value)
+                    }
+                  />
+                </div>
+
+                <textarea
+                  value={input.comment}
+                  onChange={(e) =>
+                    updateCompletionReviewInput(member.user_id, "comment", e.target.value)
+                  }
+                  placeholder="함께한 경험을 짧게 남겨주세요."
+                  className="mt-4 min-h-24 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-6 flex gap-2">
+          <button
+            onClick={() => setCompletionReviewOpen(false)}
+            disabled={isSubmittingCompletionReviews}
+            className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-medium text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            나중에 하기
+          </button>
+          <button
+            onClick={submitCompletionReviews}
+            disabled={isSubmittingCompletionReviews}
+            className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+          >
+            {isSubmittingCompletionReviews ? "저장 중..." : "평가 저장"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (!isLeader && !(isProjectCompleted && isProjectMember)) {
     return (
       <main className="min-h-screen bg-slate-50 px-6 py-10">
         <div className="mx-auto w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
@@ -309,6 +537,38 @@ export default function ProjectManagePage() {
             프로젝트 상세로 돌아가기
           </button>
         </div>
+      </main>
+    );
+  }
+
+  if (!isLeader && isProjectCompleted && isProjectMember) {
+    return (
+      <main className="min-h-screen bg-slate-50 px-6 py-10">
+        <div className="mx-auto w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+          <p className="text-sm font-semibold text-red-600">Project #{projectId}</p>
+          <h1 className="mt-2 text-3xl font-bold text-slate-900">
+            프로젝트가 완료되었습니다
+          </h1>
+          <p className="mt-3 text-slate-500">
+            함께한 팀원 평가를 남기고, 프로젝트 회고를 작성해보세요.
+          </p>
+
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <button
+              onClick={openCompletionReview}
+              className="flex-1 rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
+            >
+              팀원 평가하기
+            </button>
+            <button
+              onClick={() => router.push(`/memoir?projectId=${projectId}`)}
+              className="flex-1 rounded-xl border border-slate-200 px-5 py-3 font-semibold text-slate-600 transition hover:bg-slate-50"
+            >
+              개발자의 텃밭일기
+            </button>
+          </div>
+        </div>
+        {completionReviewModal}
       </main>
     );
   }
@@ -495,11 +755,16 @@ export default function ProjectManagePage() {
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <p className="text-lg font-bold text-slate-900">
-                          {applicant?.nickname ||
-                            applicant?.name ||
-                            `User #${application.applicant_id}`}
-                        </p>
+                        <button
+                          onClick={() =>
+                            router.push(`/users/${application.applicant_id}`)
+                          }
+                          className="text-left text-lg font-bold text-slate-900 transition hover:text-red-600 hover:underline"
+                        >
+                          User #{application.applicant_id}
+                          {(applicant?.nickname || applicant?.name) &&
+                            ` · ${applicant.nickname || applicant.name}`}
+                        </button>
 
                         {applicant?.email && (
                           <p className="mt-1 text-sm text-slate-500">
@@ -683,6 +948,28 @@ export default function ProjectManagePage() {
           )}
         </section>
       </div>
+      {completionReviewModal}
     </main>
+  );
+}
+
+function ScoreSelect({ label, value, onChange }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs font-semibold text-slate-500">
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-red-500 focus:ring-4 focus:ring-red-100"
+      >
+        {[1, 2, 3, 4, 5].map((score) => (
+          <option key={score} value={score}>
+            {score}점
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
