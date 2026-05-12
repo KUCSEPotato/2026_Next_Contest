@@ -9,6 +9,7 @@ import {
   updateProjectApi,
   deleteProjectApi,
   revertProjectToIdeaApi,
+  getMyApplicationsApi,
 } from "../../../lib/api";
 
 const DIFFICULTY_OPTIONS = [
@@ -53,10 +54,12 @@ export default function ProjectDetailPage() {
 
   const [message, setMessage] = useState("");
   const [isApplying, setIsApplying] = useState(false);
+  const [myApplication, setMyApplication] = useState(null);
 
   const [isEditing, setIsEditing] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDiscardOptions, setShowDiscardOptions] = useState(false);
 
   const [editForm, setEditForm] = useState({
     title: "",
@@ -82,15 +85,30 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     async function fetchProject() {
       try {
-        const [projectResult, profileResult] = await Promise.all([
+        const [projectResult, profileResult, applicationsResult] = await Promise.allSettled([
           getProjectApi(projectId),
           getMyProfileApi(),
+          getMyApplicationsApi(),
         ]);
 
-        const projectData = projectResult.data;
+        if (projectResult.status !== "fulfilled") {
+          throw projectResult.reason;
+        }
+
+        const projectData = projectResult.value.data;
 
         setProject(projectData);
-        setMyProfile(profileResult.data);
+        setMyProfile(
+          profileResult.status === "fulfilled" ? profileResult.value.data : null
+        );
+        setMyApplication(
+          applicationsResult.status === "fulfilled"
+            ? (applicationsResult.value.data || []).find(
+                (application) =>
+                  String(application.project_id) === String(projectId)
+              ) || null
+            : null
+        );
 
         setEditForm({
           title: projectData.title || "",
@@ -116,6 +134,8 @@ export default function ProjectDetailPage() {
   }, [projectId]);
 
   const isLeader = project?.leader_id === myProfile?.id;
+  const isProjectCompleted = project?.status === "completed";
+  const hasApplied = Boolean(myApplication);
   const acceptedMemberCount = project?.members?.length || 1;
 
   const handleEditChange = (field, value) => {
@@ -174,11 +194,10 @@ export default function ProjectDetailPage() {
   };
 
   const handleRevertToIdea = async () => {
-    const ok = window.confirm(
-      "이 프로젝트를 영감의 샘에 흘려보낼까요?\n\n프로젝트는 삭제 처리되고, 원본 아이디어는 다른 사람들이 주울 수 있는 상태로 돌아갑니다."
-    );
-
-    if (!ok) return;
+    if (isProjectCompleted) {
+      alert("완료된 프로젝트는 버릴 수 없습니다.");
+      return;
+    }
 
     try {
       setIsDeleting(true);
@@ -195,17 +214,13 @@ export default function ProjectDetailPage() {
   };
 
   const handleDeleteProject = async () => {
-    const suggestWell = window.confirm(
-      "정말 삭제하시겠습니까?\n\n그냥 삭제하기보다, 다른 사람들이 이어갈 수 있도록 '영감의 샘'에 흘려보내는 건 어떨까요?\n\n확인: 영감의 샘에 흘려보내기\n취소: 삭제 계속 진행"
-    );
-
-    if (suggestWell) {
-      await handleRevertToIdea();
+    if (isProjectCompleted) {
+      alert("완료된 프로젝트는 버릴 수 없습니다.");
       return;
     }
 
     const reallyDelete = window.confirm(
-      "영감의 샘에 보내지 않고 정말 삭제하시겠습니까?"
+      "정말 삭제하시겠습니까? 삭제한 프로젝트는 다시 이어가기 어렵습니다."
     );
 
     if (!reallyDelete) return;
@@ -225,6 +240,11 @@ export default function ProjectDetailPage() {
   };
 
   const handleApply = async () => {
+    if (hasApplied) {
+      alert("이미 지원한 프로젝트입니다.");
+      return;
+    }
+
     if (!message.trim()) {
       alert("지원 메시지를 입력해주세요.");
       return;
@@ -232,11 +252,18 @@ export default function ProjectDetailPage() {
 
     try {
       setIsApplying(true);
-      await applyProjectApi(projectId, message);
+      const result = await applyProjectApi(projectId, message);
+      setMyApplication(result.data || { project_id: Number(projectId), status: "pending" });
       alert("프로젝트 지원이 완료되었습니다.");
       setMessage("");
     } catch (error) {
       console.error(error);
+      const errorMessage = String(error?.message || "");
+      if (errorMessage.includes("Application already exists")) {
+        setMyApplication({ project_id: Number(projectId), status: "pending" });
+        alert("이미 지원한 프로젝트입니다.");
+        return;
+      }
       alert("프로젝트 지원에 실패했습니다.");
     } finally {
       setIsApplying(false);
@@ -393,7 +420,7 @@ export default function ProjectDetailPage() {
               <p className="mt-3 text-lg text-slate-600">{project.summary}</p>
 
               {isLeader && (
-                <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                <div className="mt-6 grid gap-3 sm:grid-cols-2">
                   <button
                     onClick={() => setIsEditing(true)}
                     className="rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
@@ -401,21 +428,15 @@ export default function ProjectDetailPage() {
                     수정하기
                   </button>
 
-                  <button
-                    onClick={handleRevertToIdea}
-                    disabled={isDeleting}
-                    className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                  >
-                    영감의 샘에 흘려보내기
-                  </button>
-
-                  <button
-                    onClick={handleDeleteProject}
-                    disabled={isDeleting}
-                    className="rounded-xl border border-red-200 bg-white px-5 py-3 font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                  >
-                    {isDeleting ? "처리 중..." : "삭제하기"}
-                  </button>
+                  {!isProjectCompleted && (
+                    <button
+                      onClick={() => setShowDiscardOptions(true)}
+                      disabled={isDeleting}
+                      className="rounded-xl border border-red-200 bg-white px-5 py-3 font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                    >
+                      {isDeleting ? "처리 중..." : "버리기"}
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -515,29 +536,82 @@ export default function ProjectDetailPage() {
                   프로젝트 지원하기
                 </h2>
 
-                <p className="mt-2 text-sm text-slate-500">
-                  팀장에게 보낼 간단한 소개와 참여 의지를 적어주세요.
-                </p>
+                {hasApplied ? (
+                  <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                    이미 지원한 프로젝트입니다.
+                  </div>
+                ) : (
+                  <>
+                    <p className="mt-2 text-sm text-slate-500">
+                      팀장에게 보낼 간단한 소개와 참여 의지를 적어주세요.
+                    </p>
 
-                <textarea
-                  className={textareaClassName}
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="예: React와 UI 구현을 맡아 참여하고 싶습니다."
-                />
+                    <textarea
+                      className={textareaClassName}
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      placeholder="예: React와 UI 구현을 맡아 참여하고 싶습니다."
+                    />
 
-                <button
-                  onClick={handleApply}
-                  disabled={isApplying}
-                  className="mt-4 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-                >
-                  {isApplying ? "지원 중..." : "지원하기"}
-                </button>
+                    <button
+                      onClick={handleApply}
+                      disabled={isApplying}
+                      className="mt-4 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                    >
+                      {isApplying ? "지원 중..." : "지원하기"}
+                    </button>
+                  </>
+                )}
               </section>
             )}
           </aside>
         </div>
       </div>
+
+      {showDiscardOptions && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+            onClick={() => {
+              if (!isDeleting) setShowDiscardOptions(false);
+            }}
+          />
+
+          <div className="relative w-full max-w-md rounded-2xl bg-white p-7 shadow-2xl">
+            <h2 className="text-xl font-bold text-slate-900">프로젝트 버리기</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-500">
+              그냥 삭제하면 이 아이디어는 사라집니다. 다른 사람이 이어서 키워볼 수 있도록
+              영감의 샘에 흘려보내는 선택을 추천해요.
+            </p>
+
+            <div className="mt-6 space-y-2">
+              <button
+                onClick={handleRevertToIdea}
+                disabled={isDeleting}
+                className="w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:bg-slate-300"
+              >
+                영감의 샘에 흘려보내기
+              </button>
+
+              <button
+                onClick={handleDeleteProject}
+                disabled={isDeleting}
+                className="w-full rounded-xl border border-slate-200 px-5 py-3 font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+              >
+                삭제하기
+              </button>
+
+              <button
+                onClick={() => setShowDiscardOptions(false)}
+                disabled={isDeleting}
+                className="w-full rounded-xl px-5 py-3 text-sm font-semibold text-slate-400 transition hover:bg-slate-50 disabled:cursor-not-allowed"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

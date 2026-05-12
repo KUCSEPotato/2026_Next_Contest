@@ -813,6 +813,11 @@ async def delete_project(
     """
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
+    if project.status == "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Completed projects cannot be discarded",
+        )
     if project.idea_id is not None and project.status != "completed":
         reward_project_recycled(db, project)
     project.deleted_at = datetime.now(timezone.utc)
@@ -848,6 +853,11 @@ async def revert_project_to_idea(
     """
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
+    if project.status == "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Completed projects cannot be discarded",
+        )
     
     # 원본 Idea 복원 (있으면)
     idea_reverted = False
@@ -903,6 +913,25 @@ async def update_project_status(
         project.ended_at = completed_at
         project.completed_at = completed_at
         reward_project_completed(db, project)
+        members = (
+            db.query(ProjectMember)
+            .filter(ProjectMember.project_id == project_id, ProjectMember.left_at.is_(None))
+            .all()
+        )
+        for member in members:
+            db.add(
+                Notification(
+                    user_id=member.user_id,
+                    type="project_completed_review_requested",
+                    title="팀원 평가를 남겨주세요",
+                    body=f"'{project.title}' 프로젝트가 완료되었습니다. 함께한 팀원들을 평가해주세요.",
+                    data={
+                        **_project_notification_data(project_id),
+                        "project_id": project_id,
+                        "action": "review_teammates",
+                    },
+                )
+            )
 
     db.commit()
     return success_response(data={"id": project.id, "status": project.status})

@@ -904,6 +904,14 @@ export async function getMyProjectsApi() {
   return handleResponse(res, "내 프로젝트 목록을 불러오지 못했습니다.");
 }
 
+export async function getMyApplicationsApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/users/me/applications`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "내 지원 목록을 불러오지 못했습니다.");
+}
+
 export async function discardProjectToWellApi(projectId) {
   return revertProjectToIdeaApi(projectId);
 }
