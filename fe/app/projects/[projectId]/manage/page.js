@@ -33,6 +33,18 @@ const isDoneTodo = (todo) =>
 
 const getMemberUserId = (member) => member?.user_id || member?.user?.id;
 
+const getDoneAssignmentNames = (todo) =>
+  (todo?.assignments || [])
+    .filter((assignment) => assignment.is_done)
+    .map(
+      (assignment) =>
+        assignment.nickname ||
+        assignment.user?.nickname ||
+        assignment.name ||
+        assignment.user?.name ||
+        `User #${assignment.user_id}`
+    );
+
 const TODO_STAGES = [
   { value: "planning", label: "기획" },
   { value: "design", label: "설계" },
@@ -1038,6 +1050,7 @@ export default function ProjectManagePage() {
                     {group.items.map(({ todo }) => {
                       const isDone = isDoneTodo(todo);
                       const isEditing = editingTodoId === todo.id;
+                      const doneAssignmentNames = getDoneAssignmentNames(todo);
 
                       return (
                         <div
@@ -1121,6 +1134,12 @@ export default function ProjectManagePage() {
                                     <p className="mt-2 text-xs text-slate-400">
                                       {group.label} · {todo.status || "todo"}
                                     </p>
+
+                                    {doneAssignmentNames.length > 0 && (
+                                      <p className="mt-2 text-xs font-semibold text-red-600">
+                                        수행: {doneAssignmentNames.join(", ")}
+                                      </p>
+                                    )}
                                   </div>
 
                                   {!isProjectCompleted && (
