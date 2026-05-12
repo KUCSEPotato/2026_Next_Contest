@@ -23,6 +23,7 @@ import {
   adminTakedownProjectApi,
 } from "../../lib/api";
 import { getStoredUser, getToken, loadCurrentUser } from "../../lib/auth";
+import { useDialog, useToast } from "../../components/AppFeedback";
 
 const TABS = [
   { id: "reports", label: "신고" },
@@ -67,6 +68,8 @@ function shortJson(value) {
 
 export default function AdminPage() {
   const router = useRouter();
+  const toast = useToast();
+  const { confirm, prompt } = useDialog();
   const [activeTab, setActiveTab] = useState("reports");
   const [overview, setOverview] = useState(null);
   const [users, setUsers] = useState([]);
@@ -205,7 +208,7 @@ export default function AdminPage() {
           : prev
       );
     } catch (err) {
-      alert(err instanceof Error ? err.message : "신고 처리에 실패했습니다.");
+      toast.error(err instanceof Error ? err.message : "신고 처리에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
@@ -220,16 +223,26 @@ export default function AdminPage() {
     const targetIdeaId = report.target_idea_id || null;
 
     if (!targetPostId && !targetProjectId && !targetIdeaId) {
-      alert("이 신고에 대해 강제 내릴 수 있는 대상이 없습니다.");
+      toast.warning("이 신고에 대해 강제 내릴 수 있는 대상이 없습니다.");
       return;
     }
 
-    if (!window.confirm("정말로 해당 대상을 강제 삭제(soft delete) 하시겠습니까?")) return;
+    const ok = await confirm({
+      title: "신고 대상 강제 내리기",
+      message: "정말로 해당 대상을 강제 삭제(soft delete) 하시겠습니까?",
+      confirmText: "강제내리기",
+      tone: "danger",
+    });
+    if (!ok) return;
 
-    const reasonInput = window.prompt(
-      "글 주인에게 전달할 강제 내리기 사유를 입력하세요. (선택)",
-      report.reason || ""
-    );
+    const reasonInput = await prompt({
+      title: "강제 내리기 사유",
+      message: "글 주인에게 전달할 사유를 입력하세요.",
+      defaultValue: report.reason || "",
+      placeholder: "사유를 입력하세요.",
+      confirmText: "전달",
+      multiline: true,
+    });
     if (reasonInput === null) return;
     const payload = { reason: reasonInput.trim() || undefined };
 
@@ -252,9 +265,9 @@ export default function AdminPage() {
           : prev
       );
 
-      alert("대상이 강제 내리기 처리되었고 작성자에게 알림을 보냈습니다.");
+      toast.success("대상이 강제 내리기 처리되었고 작성자에게 알림을 보냈습니다.");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "강제 내리기에 실패했습니다.");
+      toast.error(err instanceof Error ? err.message : "강제 내리기에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
@@ -272,7 +285,7 @@ export default function AdminPage() {
         )
       );
     } catch (err) {
-      alert(err instanceof Error ? err.message : "결제 이벤트 처리에 실패했습니다.");
+      toast.error(err instanceof Error ? err.message : "결제 이벤트 처리에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
@@ -288,7 +301,7 @@ export default function AdminPage() {
         )
       );
     } catch (err) {
-      alert(err instanceof Error ? err.message : "사용자 상태 변경에 실패했습니다.");
+      toast.error(err instanceof Error ? err.message : "사용자 상태 변경에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
@@ -301,7 +314,12 @@ export default function AdminPage() {
         ? `${targetUser?.nickname || `User #${userId}`} 사용자를 관리자로 승격할까요?`
         : `${targetUser?.nickname || `User #${userId}`} 사용자의 권한을 ${role}로 변경할까요?`;
 
-    if (!window.confirm(message)) return;
+    const ok = await confirm({
+      title: "사용자 권한 변경",
+      message,
+      confirmText: "변경",
+    });
+    if (!ok) return;
 
     try {
       setProcessingKey(`user-role-${userId}`);
@@ -312,7 +330,7 @@ export default function AdminPage() {
         )
       );
     } catch (err) {
-      alert(err instanceof Error ? err.message : "사용자 권한 변경에 실패했습니다.");
+      toast.error(err instanceof Error ? err.message : "사용자 권한 변경에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
@@ -320,24 +338,33 @@ export default function AdminPage() {
 
   async function handleGrantCoins(userId) {
     const targetUser = users.find((user) => user.id === userId);
-    const amountInput = window.prompt(
-      `${targetUser?.nickname || `User #${userId}`}에게 지급할 코인 수를 입력하세요.`,
-      "100"
-    );
+    const amountInput = await prompt({
+      title: "코인 지급",
+      message: `${targetUser?.nickname || `User #${userId}`}에게 지급할 코인 수를 입력하세요.`,
+      defaultValue: "100",
+      inputType: "number",
+      required: true,
+    });
 
     if (amountInput === null) return;
 
     const amount = Number(amountInput);
     if (!Number.isFinite(amount) || amount <= 0) {
-      alert("코인 수는 1 이상의 숫자여야 합니다.");
+      toast.warning("코인 수는 1 이상의 숫자여야 합니다.");
       return;
     }
 
-    const noteInput = window.prompt("지급 사유를 입력하세요. 사용자에게 알림으로 전달됩니다.", "");
+    const noteInput = await prompt({
+      title: "코인 지급 사유",
+      message: "사용자에게 알림으로 전달됩니다.",
+      placeholder: "지급 사유를 입력하세요.",
+      required: true,
+      multiline: true,
+    });
     if (noteInput === null) return;
     const note = noteInput.trim();
     if (!note) {
-      alert("코인 지급 사유를 입력해주세요.");
+      toast.warning("코인 지급 사유를 입력해주세요.");
       return;
     }
 
@@ -356,9 +383,9 @@ export default function AdminPage() {
         )
       );
 
-      alert("코인을 지급했고 사용자에게 알림을 보냈습니다.");
+      toast.success("코인을 지급했고 사용자에게 알림을 보냈습니다.");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "코인 지급에 실패했습니다.");
+      toast.error(err instanceof Error ? err.message : "코인 지급에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
@@ -366,24 +393,33 @@ export default function AdminPage() {
 
   async function handleRevokeCoins(userId) {
     const targetUser = users.find((user) => user.id === userId);
-    const amountInput = window.prompt(
-      `${targetUser?.nickname || `User #${userId}`}으로부터 환수할 코인 수를 입력하세요.`,
-      "100"
-    );
+    const amountInput = await prompt({
+      title: "코인 환수",
+      message: `${targetUser?.nickname || `User #${userId}`}으로부터 환수할 코인 수를 입력하세요.`,
+      defaultValue: "100",
+      inputType: "number",
+      required: true,
+    });
 
     if (amountInput === null) return;
 
     const amount = Number(amountInput);
     if (!Number.isFinite(amount) || amount <= 0) {
-      alert("환수할 코인 수는 1 이상의 숫자여야 합니다.");
+      toast.warning("환수할 코인 수는 1 이상의 숫자여야 합니다.");
       return;
     }
 
-    const noteInput = window.prompt("환수 사유를 입력하세요. 사용자에게 알림으로 전달됩니다.", "");
+    const noteInput = await prompt({
+      title: "코인 환수 사유",
+      message: "사용자에게 알림으로 전달됩니다.",
+      placeholder: "환수 사유를 입력하세요.",
+      required: true,
+      multiline: true,
+    });
     if (noteInput === null) return;
     const note = noteInput.trim();
     if (!note) {
-      alert("코인 환수 사유를 입력해주세요.");
+      toast.warning("코인 환수 사유를 입력해주세요.");
       return;
     }
 
@@ -402,9 +438,9 @@ export default function AdminPage() {
         )
       );
 
-      alert("코인을 환수했고 사용자에게 알림을 보냈습니다.");
+      toast.success("코인을 환수했고 사용자에게 알림을 보냈습니다.");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "코인 환수에 실패했습니다.");
+      toast.error(err instanceof Error ? err.message : "코인 환수에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
@@ -412,12 +448,12 @@ export default function AdminPage() {
 
   async function handleCreateNotice() {
     if (!noticeForm.title.trim()) {
-      alert("공지 제목을 입력해주세요.");
+      toast.warning("공지 제목을 입력해주세요.");
       return;
     }
 
     if (!noticeForm.content.trim()) {
-      alert("공지 내용을 입력해주세요.");
+      toast.warning("공지 내용을 입력해주세요.");
       return;
     }
 
@@ -432,9 +468,9 @@ export default function AdminPage() {
 
       setNoticeForm({ title: "", content: "", category: "announcement", isPinned: true });
       await loadAdminData();
-      alert("공지글을 작성했습니다.");
+      toast.success("공지글을 작성했습니다.");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "공지 작성에 실패했습니다.");
+      toast.error(err instanceof Error ? err.message : "공지 작성에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
@@ -444,40 +480,67 @@ export default function AdminPage() {
     const post = adminPosts.find((p) => p.id === postId);
     if (!post) return;
 
-    const newTitle = window.prompt("제목을 입력하세요", post.title);
+    const newTitle = await prompt({
+      title: "게시물 제목 수정",
+      defaultValue: post.title,
+      required: true,
+    });
     if (newTitle === null) return;
-    const newContent = window.prompt("내용을 입력하세요", post.content);
+    const newContent = await prompt({
+      title: "게시물 내용 수정",
+      defaultValue: post.content,
+      required: true,
+      multiline: true,
+    });
     if (newContent === null) return;
 
     try {
       setProcessingKey(`admin-post-edit-${postId}`);
       await adminUpdatePostApi(postId, { title: newTitle.trim(), content: newContent.trim() });
       setAdminPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, title: newTitle, content: newContent } : p)));
-      alert("게시물을 수정했습니다.");
+      toast.success("게시물을 수정했습니다.");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "게시물 수정에 실패했습니다.");
+      toast.error(err instanceof Error ? err.message : "게시물 수정에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
   }
 
   async function handleDeleteAdminPost(postId) {
-    if (!window.confirm("정말로 삭제하시겠습니까? (soft delete)")) return;
+    const ok = await confirm({
+      title: "게시물 삭제",
+      message: "정말로 삭제하시겠습니까? (soft delete)",
+      confirmText: "삭제",
+      tone: "danger",
+    });
+    if (!ok) return;
     try {
       setProcessingKey(`admin-post-delete-${postId}`);
       await adminDeletePostApi(postId);
       setAdminPosts((prev) => prev.filter((p) => p.id !== postId));
-      alert("게시물을 삭제했습니다.");
+      toast.success("게시물을 삭제했습니다.");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "게시물 삭제에 실패했습니다.");
+      toast.error(err instanceof Error ? err.message : "게시물 삭제에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
   }
 
   async function handleTakedownPost(postId) {
-    if (!window.confirm("정말로 이 게시글을 강제로 내리겠습니까?")) return;
-    const reasonInput = window.prompt("글 주인에게 전달할 강제 내리기 사유를 입력하세요. (선택)", "");
+    const ok = await confirm({
+      title: "게시글 강제 내리기",
+      message: "정말로 이 게시글을 강제로 내리겠습니까?",
+      confirmText: "강제내리기",
+      tone: "danger",
+    });
+    if (!ok) return;
+    const reasonInput = await prompt({
+      title: "강제 내리기 사유",
+      message: "글 주인에게 전달할 사유를 입력하세요.",
+      placeholder: "사유를 입력하세요.",
+      confirmText: "전달",
+      multiline: true,
+    });
     if (reasonInput === null) return;
 
     try {
@@ -490,17 +553,29 @@ export default function AdminPage() {
             )
           : prev.filter((post) => post.id !== postId)
       );
-      alert("게시글을 강제로 내렸고 작성자에게 알림을 보냈습니다.");
+      toast.success("게시글을 강제로 내렸고 작성자에게 알림을 보냈습니다.");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "게시글 강제 내리기에 실패했습니다.");
+      toast.error(err instanceof Error ? err.message : "게시글 강제 내리기에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
   }
 
   async function handleTakedownProject(projectId) {
-    if (!window.confirm("정말로 이 프로젝트를 강제로 내리겠습니까?")) return;
-    const reasonInput = window.prompt("리더에게 전달할 강제 내리기 사유를 입력하세요. (선택)", "");
+    const ok = await confirm({
+      title: "프로젝트 강제 내리기",
+      message: "정말로 이 프로젝트를 강제로 내리겠습니까?",
+      confirmText: "강제내리기",
+      tone: "danger",
+    });
+    if (!ok) return;
+    const reasonInput = await prompt({
+      title: "강제 내리기 사유",
+      message: "리더에게 전달할 사유를 입력하세요.",
+      placeholder: "사유를 입력하세요.",
+      confirmText: "전달",
+      multiline: true,
+    });
     if (reasonInput === null) return;
 
     try {
@@ -513,9 +588,9 @@ export default function AdminPage() {
             : project
         )
       );
-      alert("프로젝트를 강제로 내렸고 리더에게 알림을 보냈습니다.");
+      toast.success("프로젝트를 강제로 내렸고 리더에게 알림을 보냈습니다.");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "프로젝트 강제 내리기에 실패했습니다.");
+      toast.error(err instanceof Error ? err.message : "프로젝트 강제 내리기에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }

@@ -25,6 +25,7 @@ export function getApiBaseUrl() {
 const API_BASE_URL = getApiBaseUrl();
 
 export const AUTH_CHANGED_EVENT = "auth:changed";
+export const APP_TOAST_EVENT = "app:toast";
 
 let refreshPromise = null;
 let lastSessionExpiredNoticeAt = 0;
@@ -243,5 +244,14 @@ export async function loadCurrentUser() {
 
 export function notifySessionExpiredIfNeeded() {
   if (!shouldNotifySessionExpired()) return;
-  window.alert("로그인 시간이 만료되었습니다. 다시 로그인해주세요.");
+  window.dispatchEvent(
+    new CustomEvent(APP_TOAST_EVENT, {
+      detail: {
+        type: "warning",
+        title: "로그인이 만료되었습니다",
+        message: "다시 로그인해주세요.",
+        duration: 4200,
+      },
+    })
+  );
 }
