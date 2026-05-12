@@ -36,17 +36,17 @@ const SERVICE_BLOCKS = [
 ];
 
 type HotSection = {
-  key: "popular" | "most_liked" | "most_commented" | "most_viewed" | "latest";
+  key: "popular" | "most_recommended" | "most_commented" | "most_viewed" | "latest";
   label: string;
   emoji: string;
 };
 
 const HOT_SECTIONS: HotSection[] = [
-  { key: "popular",       label: "인기게시물",   emoji: "🔥" },
-  { key: "most_liked",    label: "좋아요 TOP",   emoji: "❤️" },
-  { key: "most_commented",label: "댓글 TOP",     emoji: "💬" },
-  { key: "most_viewed",   label: "조회수 TOP",   emoji: "👀" },
-  { key: "latest",        label: "최신글",       emoji: "🆕" },
+  { key: "popular", label: "인기게시물", emoji: "🔥" },
+  { key: "most_recommended", label: "추천 TOP", emoji: "👍" },
+  { key: "most_commented", label: "댓글 TOP", emoji: "💬" },
+  { key: "most_viewed", label: "조회수 TOP", emoji: "👀" },
+  { key: "latest", label: "최신글", emoji: "🆕" },
 ];
 
 type Tab = "board" | "hot";
@@ -67,7 +67,7 @@ export default function CommunityPage() {
 
   const [hotPosts, setHotPosts] = useState<{
     popular: PostSummary | null;
-    most_liked: PostSummary | null;
+    most_recommended: PostSummary | null;
     most_commented: PostSummary | null;
     most_viewed: PostSummary | null;
     latest: PostSummary | null;
@@ -136,20 +136,29 @@ export default function CommunityPage() {
   }, [tab, hotPosts, loadHotPosts]);
 
   const handleReact = async (postId: number, type: ReactionType) => {
-    if (!currentUser) { setShowLoginModal(true); return; }
+    if (!currentUser) {
+      setShowLoginModal(true);
+      return;
+    }
     try {
       const result = await reactToPost(postId, type);
       setPosts((prev) =>
         prev.map((p) => {
           if (p.id !== postId) return p;
-          const isAdded = result.action === "added";
+          const prevReaction = p.user_reaction;
+          const newStats = { ...p.reaction_stats };
+          if (result.action === "removed") {
+            newStats[type] = Math.max(0, newStats[type] - 1);
+            return { ...p, user_reaction: null, reaction_stats: newStats };
+          }
+          if (prevReaction && prevReaction !== type) {
+            newStats[prevReaction] = Math.max(0, newStats[prevReaction] - 1);
+          }
+          newStats[type] = newStats[type] + 1;
           return {
             ...p,
-            user_reaction: isAdded ? type : null,
-            reaction_stats: {
-              ...p.reaction_stats,
-              [type]: p.reaction_stats[type] + (isAdded ? 1 : -1),
-            },
+            user_reaction: type,
+            reaction_stats: newStats,
           };
         })
       );
