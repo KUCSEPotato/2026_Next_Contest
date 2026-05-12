@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import ProgressBloom from "../../../../components/ProgressBloom";
+import ProgressBloom, { getProgressBloomMessage } from "../../../../components/ProgressBloom";
 import {
   getProjectApi,
   getProjectApplicationsApi,
@@ -745,7 +745,7 @@ export default function ProjectManagePage() {
                     {doneTodoCount} / {todos.length}개 완료
                   </p>
                   <p className="mt-1 text-xs text-rose-500">
-                    프로젝트가 장미처럼 자라고 있어요.
+                    {getProgressBloomMessage(todoCompletionRate)}
                   </p>
                 </div>
               </div>
