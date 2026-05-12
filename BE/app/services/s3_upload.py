@@ -2,6 +2,7 @@
 
 import os
 from io import BytesIO
+from pathlib import Path
 from urllib.parse import unquote, urlparse
 from uuid import uuid4
 
@@ -88,6 +89,59 @@ class S3FileUploadService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"File upload failed: {str(e)}",
+            )
+
+    async def upload_avatar(
+        self,
+        file_content: bytes,
+        user_id: int,
+        filename: str,
+        file_type: str,
+    ) -> dict:
+        """Upload an avatar with an ASCII-only UUID object key.
+
+        Original filenames are intentionally not included in the object key.
+        Non-ASCII filenames can break SigV4 verification when clients or
+        proxies normalize/encode the presigned URL differently.
+        """
+        file_size = len(file_content)
+        max_size_bytes = settings.max_file_size_mb * 1024 * 1024
+        if file_size > max_size_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File size exceeds {settings.max_file_size_mb}MB limit",
+            )
+
+        ext = Path(filename or "").suffix.lower()
+        allowed_exts = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+        if ext not in allowed_exts:
+            content_type_exts = {
+                "image/jpeg": ".jpg",
+                "image/jpg": ".jpg",
+                "image/png": ".png",
+                "image/webp": ".webp",
+                "image/gif": ".gif",
+            }
+            ext = content_type_exts.get(file_type, "")
+
+        s3_key = f"avatars/{user_id}/{uuid4().hex}{ext}"
+
+        try:
+            self.s3_client.put_object(
+                Bucket=self.bucket_name,
+                Key=s3_key,
+                Body=file_content,
+                ContentType=file_type,
+            )
+
+            return {
+                "s3_key": s3_key,
+                "file_size": file_size,
+            }
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Avatar upload failed: {str(e)}",
             )
 
     def generate_presigned_get_url(self, s3_key: str, expires_in: int = 3600) -> str:
