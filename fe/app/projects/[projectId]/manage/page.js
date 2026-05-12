@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import ProgressBloom from "../../../../components/ProgressBloom";
 import {
   getProjectApi,
   getProjectApplicationsApi,
@@ -734,13 +735,19 @@ export default function ProjectManagePage() {
 
           <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold text-slate-900">
-                  Todo 진행률 {todoCompletionRate}%
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  {doneTodoCount} / {todos.length}개 완료
-                </p>
+              <div className="flex items-center gap-4">
+                <ProgressBloom progress={todoCompletionRate} size="md" />
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    Todo 진행률 {todoCompletionRate}%
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {doneTodoCount} / {todos.length}개 완료
+                  </p>
+                  <p className="mt-1 text-xs text-rose-500">
+                    프로젝트가 장미처럼 자라고 있어요.
+                  </p>
+                </div>
               </div>
 
               {isLeader && isProjectInProgress && !isProjectCompleted && (

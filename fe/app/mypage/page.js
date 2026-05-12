@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import ProgressBloom from "../../components/ProgressBloom";
 import { updateStoredUser } from "../../lib/auth";
 import {
   getMyProfileApi,
@@ -753,7 +754,13 @@ export default function MyPage() {
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-left transition hover:border-red-300 hover:bg-red-50"
                 >
                   <div className="flex items-center justify-between gap-4">
-                    <div>
+                    <div className="flex items-center gap-3">
+                      <ProgressBloom
+                        progress={project.progress_percent ?? 0}
+                        size="sm"
+                        showLabel={false}
+                      />
+                      <div>
                       <p className="font-semibold text-slate-900">
                         {project.title}
                       </p>
@@ -764,6 +771,7 @@ export default function MyPage() {
                         {project.historyType === "applied" &&
                           ` · 지원 상태 ${project.applicationStatus || "확인중"}`}
                       </p>
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-2">
