@@ -3,6 +3,7 @@ import re
 from datetime import datetime, timezone, date
 from collections import defaultdict
 from math import ceil
+import os
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from fastapi import WebSocket, WebSocketDisconnect
@@ -461,39 +462,47 @@ def _build_project_memoir_context(db: Session, project: Project) -> str:
 
 
 async def _call_gemini_for_memoir_refine(feelings: str, shortcomings: str, project_context: str = "") -> str:
-    if not settings.gemini_api_key:
+    gemini_api_key = settings.gemini_api_key
+
+    if not gemini_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="There is no Gemini API key available",
+        )
         return _fallback_memoir_refine(feelings, shortcomings)
     return await asyncio.to_thread(_sync_call_gemini_for_memoir_refine, feelings, shortcomings, project_context)
 
 
 def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str, project_context: str = "") -> str:
     prompt = (
-        "당신은 사용자의 프로젝트 경험을 바탕으로 성장 회고를 작성해주는 AI 코치입니다.\n"
-        "목표는 입력 내용을 요약하거나 예쁘게 고쳐 쓰는 것이 아니라, "
-        "프로젝트 정보와 사용자의 성장 기록을 해석하여 이 사용자가 무엇을 배우고, 무엇을 느꼈고, "
-        "앞으로 어떤 방향으로 발전할 수 있는지 통찰력 있게 정리하는 것입니다.\n\n"
+        "당신은 대학생 개발자의 프로젝트 경험을 바탕으로 "
+        "자연스럽고 진솔한 프로젝트 회고록 본문을 작성하는 작가입니다.\n\n"
 
-        "작성 원칙:\n"
-        "1. 프로젝트 제목, 한줄소개, 상세 설명, 기술 스택, 분야를 그대로 나열하지 마세요.\n"
-        "2. 프로젝트 정보는 회고의 배경으로만 사용하고, 본문은 사용자의 성장과 변화에 집중하세요.\n"
-        "3. 사용자가 입력한 문장을 그대로 반복하지 말고, 그 안에 담긴 의미를 해석하세요.\n"
-        "4. 기술 스택은 단순 언급이 아니라 어떤 역량 성장과 연결되는지 설명할 때만 자연스럽게 사용하세요.\n"
-        "5. 부족했던 점은 실패처럼 표현하지 말고, 다음 성장을 위한 구체적인 개선 방향으로 바꿔주세요.\n"
-        "6. 사용자가 말하지 않은 성과나 경험을 지어내지 마세요.\n"
-        "7. 문체는 따뜻하지만 담백하게 작성하세요. 과장된 감성 표현은 피하세요.\n"
-        "8. 전체 분량은 450~650자 정도로 작성하세요.\n"
-        "9. 2~3개의 짧은 문단으로 작성하세요.\n"
-        "10. 마지막 문단은 반드시 '다음엔 ... 어떨까요?' 형태의 AI 제안으로 마무리하세요.\n"
-        "    이 제안에는 다음에 해볼 만한 프로젝트 유형과, 그 프로젝트가 어떤 역량을 성장시킬 수 있는지 포함하세요.\n"
-        "11. 제목, JSON, 마크다운, 따옴표, 불릿 목록은 쓰지 마세요.\n\n"
+        "중요:\n"
+        "입력 내용을 분석하거나 평가하지 마세요.\n"
+        "사용자가 작성한 문장을 그대로 인용하거나 반복하지 마세요.\n"
+        "'~라는 기록', '~라고 느꼈다', '~라고 적었다' 같은 메타 표현을 절대 사용하지 마세요.\n"
+        "입력은 회고록 작성을 위한 참고 메모일 뿐이며, "
+        "출력은 하나의 완성된 회고문이어야 합니다.\n\n"
 
-        "아래 프로젝트 맥락은 내부 참고용입니다. 출력에 이 항목명이나 값을 직접 쓰지 마세요.\n"
-        f"[내부 참고 맥락]\n{project_context or '별도 프로젝트 맥락 없음'}\n\n"
+        "작성 규칙:\n"
+        "1. 실제 사용자가 직접 작성한 회고록처럼 자연스럽게 작성하세요.\n"
+        "2. 짧은 메모들을 하나의 흐름 있는 글로 재구성하세요.\n"
+        "3. 프로젝트 과정에서의 고민, 배움, 아쉬움, 성장을 자연스럽게 녹여내세요.\n"
+        "4. 입력 내용을 단순 나열하지 말고 문맥 속에 자연스럽게 통합하세요.\n"
+        "5. 지나치게 감성적이거나 AI스러운 문체는 피하세요.\n"
+        "6. 담백하고 진솔한 회고 스타일로 작성하세요.\n"
+        "7. 입력에 없는 경험을 새로 지어내지 마세요.\n"
+        "8. 2~3문단 분량으로 작성하세요.\n"
+        "9. 제목, JSON, 마크다운, 불릿포인트 없이 본문만 출력하세요.\n\n"
 
-        "[사용자의 성장 기록]\n"
+        f"[프로젝트 정보]\n"
+        f"{project_context or '없음'}\n\n"
+
+        f"[회고 메모]\n"
         f"{feelings}\n\n"
 
-        "[사용자가 아쉬움으로 남긴 내용]\n"
+        f"[아쉬웠던 점]\n"
         f"{shortcomings}\n"
     )
 
@@ -507,8 +516,12 @@ def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str, projec
                 "max_output_tokens": 520,
             },
         )
-    except Exception:
-        return _fallback_memoir_refine(feelings, shortcomings)
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Gemini API request failed: {str(error)}",
+        )
+        #return _fallback_memoir_refine(feelings, shortcomings)
 
     text = getattr(response, "text", None) or getattr(response, "content", None)
     if not text:
@@ -517,8 +530,14 @@ def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str, projec
             candidate = candidates[0]
             text = getattr(candidate, "content", None) or getattr(candidate, "output", None) or ""
 
-    cleaned_text = _clean_memoir_refine_output((text or "").strip())
-    return cleaned_text or _fallback_memoir_refine(feelings, shortcomings)
+    if not text:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"No Text in Gemini Response",
+        )
+    
+    #cleaned_text = _clean_memoir_refine_output((text or "").strip())
+    return text # or _fallback_memoir_refine(feelings, shortcomings)
 
 
 def _split_ai_todo_item(raw_title: str) -> tuple[str, str, str | None]:

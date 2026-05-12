@@ -12,9 +12,12 @@ import {
 } from "../../lib/api";
 
 const validatePassword = (value) => value.length >= 8;
+import { loginApi } from "../../lib/api";
+import { useToast } from "../../components/AppFeedback";
 
 export default function LoginPage() {
   const router = useRouter();
+  const toast = useToast();
 
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
@@ -44,14 +47,14 @@ export default function LoginPage() {
       `${window.location.origin}/auth/github/callback`;
 
     if (!clientId) {
-      alert("GitHub OAuth 환경변수가 설정되지 않았습니다.");
+      toast.error("GitHub OAuth 환경변수가 설정되지 않았습니다.");
       return;
     }
 
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: redirectUri,
-      scope: "user:email",
+      scope: "read:user user:email",
     });
 
     window.location.href = `https://github.com/login/oauth/authorize?${params.toString()}`;
@@ -59,7 +62,7 @@ export default function LoginPage() {
 
   const handleLogin = async () => {
     if (!loginId.trim() || !password.trim()) {
-      alert("아이디와 비밀번호를 모두 입력해주세요.");
+      toast.warning("아이디와 비밀번호를 모두 입력해주세요.");
       return;
     }
 
@@ -86,15 +89,16 @@ export default function LoginPage() {
           user: me.data,
         });
       } else {
-        alert("로그인에 실패했습니다. 아이디 또는 비밀번호를 확인해주세요.");
+        console.error("/auth/me 응답 이상:", me);
+        toast.error("로그인에 실패했습니다. 아이디 또는 비밀번호를 확인해주세요.");
         return;
       }
 
-      alert("로그인되었습니다.");
+      toast.success("로그인되었습니다.");
       router.push("/mainpage");
     } catch (error) {
       console.error(error);
-      alert("로그인에 실패했습니다. 아이디 또는 비밀번호를 확인해주세요.");
+      toast.error("로그인에 실패했습니다. 아이디 또는 비밀번호를 확인해주세요.");
     } finally {
       setIsLoggingIn(false);
     }
