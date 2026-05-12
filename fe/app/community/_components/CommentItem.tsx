@@ -4,24 +4,25 @@ import { useState } from "react";
 import { CommentItem as CommentItemType, ReactionType } from "../_types";
 import { timeAgo } from "../_lib/utils";
 import Avatar from "./Avatar";
+import { ThumbDownIcon, ThumbUpIcon } from "./ReactionThumbIcons";
 
 const REACTION_ROW: {
   type: ReactionType;
-  label: string;
+  Icon: typeof ThumbUpIcon;
   activeClass: string;
   inactiveClass: string;
 }[] = [
   {
     type: "recommend",
-    label: "⬆️",
-    activeClass: "text-red-500",
-    inactiveClass: "text-gray-400 hover:text-red-400",
+    Icon: ThumbUpIcon,
+    activeClass: "text-red-600 [&_svg]:text-red-600",
+    inactiveClass: "text-gray-400 [&_svg]:text-gray-400 hover:text-red-600 hover:[&_svg]:text-red-600",
   },
   {
     type: "not_recommend",
-    label: "⬇️",
-    activeClass: "text-slate-700",
-    inactiveClass: "text-gray-400 hover:text-slate-600",
+    Icon: ThumbDownIcon,
+    activeClass: "text-red-600 [&_svg]:text-red-600",
+    inactiveClass: "text-gray-400 [&_svg]:text-gray-400 hover:text-red-600 hover:[&_svg]:text-red-600",
   },
 ];
 
@@ -116,16 +117,19 @@ export default function CommentItem({
           )}
 
           <div className="mt-1 flex flex-wrap items-center gap-2">
-            {REACTION_ROW.map(({ type, label, activeClass, inactiveClass }) => {
+            {REACTION_ROW.map(({ type, Icon, activeClass, inactiveClass }) => {
               const count = comment.reaction_stats[type];
               const active = myReaction === type;
               return (
                 <button
                   key={type}
                   onClick={() => onReact(comment.id, type)}
-                  className={`text-[10px] transition ${active ? activeClass : inactiveClass}`}
+                  className={`flex items-center gap-0.5 text-[10px] transition ${
+                    active ? activeClass : inactiveClass
+                  }`}
                 >
-                  {label} {count > 0 ? count : ""}
+                  <Icon className="h-3 w-3 shrink-0" />
+                  {count > 0 ? <span className="tabular-nums">{count}</span> : null}
                 </button>
               );
             })}
