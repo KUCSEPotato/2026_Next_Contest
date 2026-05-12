@@ -250,7 +250,7 @@ async def update_my_profile(
     if payload.nickname is not None and payload.nickname != user.nickname:
         duplicate = db.query(User).filter(User.nickname == payload.nickname, User.id != user.id, User.deleted_at.is_(None)).first()
         if duplicate:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nickname already exists")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 존재하는 닉네임입니다.")
 
     for field in ("nickname", "name", "phone_number", "bio", "avatar_url"):
         value = getattr(payload, field)

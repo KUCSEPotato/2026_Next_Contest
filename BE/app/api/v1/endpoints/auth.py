@@ -165,7 +165,7 @@ async def signup(payload: SignupRequest, db: Session = Depends(get_db)) -> dict:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists")
 
     if db.query(User).filter(User.nickname == login_id, User.deleted_at.is_(None)).first():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Login id already exists")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 존재하는 닉네임입니다.")
 
     user = User(
         email=email,

@@ -34,7 +34,16 @@ function validatePassword(pw) {
 // ─── [추가] FastAPI 에러 응답 파싱 헬퍼 ──────────────────────────────────────
 function parseApiError(data, fallback = "요청 처리 중 오류가 발생했습니다.") {
   if (!data?.detail) return fallback;
-  if (typeof data.detail === "string") return data.detail;
+  if (typeof data.detail === "string") {
+    if (
+      data.detail === "Login id already exists" ||
+      data.detail === "Nickname already exists" ||
+      data.detail.includes("nickname")
+    ) {
+      return "이미 존재하는 닉네임입니다.";
+    }
+    return data.detail;
+  }
   if (Array.isArray(data.detail)) {
     return data.detail.map((e) => e.msg).join("\n");
   }
