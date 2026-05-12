@@ -2,7 +2,14 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { getIdeasApi } from "../../../lib/api";
+import {
+  bookmarkIdeaApi,
+  getIdeasApi,
+  likeIdeaApi,
+  unbookmarkIdeaApi,
+  unlikeIdeaApi,
+} from "../../../lib/api";
+import { getToken } from "../../../lib/auth";
 
 interface Idea {
   id: number;
@@ -11,6 +18,8 @@ interface Idea {
   hashtags: string[];
   like_count: number;
   bookmark_count: number;
+  is_liked: boolean;
+  is_bookmarked: boolean;
   domain?: string;
   difficulty?: string;
   created_at?: string;
@@ -25,6 +34,8 @@ interface IdeaListItem {
   tech_stack?: string[];
   like_count?: number;
   bookmark_count?: number;
+  is_liked?: boolean;
+  is_bookmarked?: boolean;
   domain?: string;
   category?: string;
   difficulty?: string;
@@ -77,6 +88,7 @@ export default function InspirationWellPage() {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("전체");
+  const [collectionFilter, setCollectionFilter] = useState<"all" | "liked" | "bookmarked">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [coinModal, setCoinModal] = useState<{ open: boolean; idea: Idea | null }>({
     open: false,
@@ -115,6 +127,8 @@ export default function InspirationWellPage() {
             hashtags: item.hashtags || item.tech_stack || [],
             like_count: item.like_count ?? 0,
             bookmark_count: item.bookmark_count ?? 0,
+            is_liked: Boolean(item.is_liked),
+            is_bookmarked: Boolean(item.is_bookmarked),
             domain: item.domain || item.category || "IT/소프트웨어",
             difficulty: item.difficulty,
             created_at: item.created_at,
@@ -133,6 +147,12 @@ export default function InspirationWellPage() {
   const filtered = ideas.filter((idea) => {
     const matchCat =
       selectedCategory === "전체" ? true : idea.domain === selectedCategory;
+    const matchCollection =
+      collectionFilter === "liked"
+        ? idea.is_liked
+        : collectionFilter === "bookmarked"
+          ? idea.is_bookmarked
+          : true;
 
     const matchQ = searchQuery
       ? idea.title.includes(searchQuery) ||
@@ -142,8 +162,11 @@ export default function InspirationWellPage() {
         )
       : true;
 
-    return matchCat && matchQ;
+    return matchCat && matchCollection && matchQ;
   });
+
+  const likedCount = ideas.filter((idea) => idea.is_liked).length;
+  const bookmarkedCount = ideas.filter((idea) => idea.is_bookmarked).length;
 
   const handleServiceClick = (path: string) => {
     router.push(path);
@@ -151,6 +174,71 @@ export default function InspirationWellPage() {
 
   const handleIdeaClick = (idea: Idea) => {
     setCoinModal({ open: true, idea });
+  };
+
+  const updateIdeaReaction = (
+    ideaId: number,
+    updater: (idea: Idea) => Idea
+  ) => {
+    setIdeas((prev) => prev.map((idea) => (idea.id === ideaId ? updater(idea) : idea)));
+  };
+
+  const handleToggleLike = async (idea: Idea) => {
+    if (!getToken()) {
+      alert("로그인 후 좋아요를 누를 수 있어요.");
+      return;
+    }
+
+    const nextLiked = !idea.is_liked;
+    updateIdeaReaction(idea.id, (current) => ({
+      ...current,
+      is_liked: nextLiked,
+      like_count: Math.max(0, current.like_count + (nextLiked ? 1 : -1)),
+    }));
+
+    try {
+      if (nextLiked) {
+        await likeIdeaApi(idea.id);
+      } else {
+        await unlikeIdeaApi(idea.id);
+      }
+    } catch (error) {
+      updateIdeaReaction(idea.id, (current) => ({
+        ...current,
+        is_liked: idea.is_liked,
+        like_count: idea.like_count,
+      }));
+      alert(error instanceof Error ? error.message : "좋아요 처리에 실패했습니다.");
+    }
+  };
+
+  const handleToggleBookmark = async (idea: Idea) => {
+    if (!getToken()) {
+      alert("로그인 후 북마크할 수 있어요.");
+      return;
+    }
+
+    const nextBookmarked = !idea.is_bookmarked;
+    updateIdeaReaction(idea.id, (current) => ({
+      ...current,
+      is_bookmarked: nextBookmarked,
+      bookmark_count: Math.max(0, current.bookmark_count + (nextBookmarked ? 1 : -1)),
+    }));
+
+    try {
+      if (nextBookmarked) {
+        await bookmarkIdeaApi(idea.id);
+      } else {
+        await unbookmarkIdeaApi(idea.id);
+      }
+    } catch (error) {
+      updateIdeaReaction(idea.id, (current) => ({
+        ...current,
+        is_bookmarked: idea.is_bookmarked,
+        bookmark_count: idea.bookmark_count,
+      }));
+      alert(error instanceof Error ? error.message : "북마크 처리에 실패했습니다.");
+    }
   };
 
   const handleConfirmView = async () => {
@@ -330,6 +418,26 @@ export default function InspirationWellPage() {
             )}
           </div>
 
+          <div className="mb-4 flex flex-wrap gap-2">
+            {[
+              { value: "all", label: "전체", count: ideas.length },
+              { value: "liked", label: "좋아요", count: likedCount },
+              { value: "bookmarked", label: "북마크", count: bookmarkedCount },
+            ].map((filter) => (
+              <button
+                key={filter.value}
+                onClick={() => setCollectionFilter(filter.value as "all" | "liked" | "bookmarked")}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                  collectionFilter === filter.value
+                    ? "border-emerald-600 bg-emerald-600 text-white shadow-sm shadow-emerald-100"
+                    : "border-emerald-100 bg-white/80 text-slate-500 hover:border-emerald-300 hover:text-emerald-700"
+                }`}
+              >
+                {filter.label} {filter.count}
+              </button>
+            ))}
+          </div>
+
           {loading ? (
             <LoadingGarden />
           ) : filtered.length === 0 ? (
@@ -345,6 +453,8 @@ export default function InspirationWellPage() {
                     triggerSeedBurst(e);
                     handleIdeaClick(idea);
                   }}
+                  onToggleLike={handleToggleLike}
+                  onToggleBookmark={handleToggleBookmark}
                 />
               ))}
             </div>
@@ -526,13 +636,17 @@ function IdeaCard({
   idea,
   index,
   onClick,
+  onToggleLike,
+  onToggleBookmark,
 }: {
   idea: Idea;
   index: number;
   onClick: (e: React.MouseEvent) => void;
+  onToggleLike: (idea: Idea) => void;
+  onToggleBookmark: (idea: Idea) => void;
 }) {
   return (
-    <button
+    <article
       onClick={onClick}
       className="card-fadeup group relative flex w-full cursor-pointer flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white/80 p-5 text-left shadow-sm backdrop-blur-sm transition-all hover:-translate-y-1 hover:border-emerald-300 hover:shadow-lg hover:shadow-emerald-100/60"
       style={{ animationDelay: `${index * 0.05}s` }}
@@ -574,17 +688,45 @@ function IdeaCard({
         </div>
       )}
 
-      <div className="mt-auto flex items-center justify-between border-t border-emerald-50 pt-3">
-        <div className="flex items-center gap-3 text-[11px] text-slate-400">
-          <span>❤️ {idea.like_count}</span>
-          <span>🔖 {idea.bookmark_count}</span>
+      <div className="mt-auto flex items-center justify-between gap-3 border-t border-emerald-50 pt-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleLike(idea);
+            }}
+            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
+              idea.is_liked
+                ? "border-rose-200 bg-rose-50 text-rose-600"
+                : "border-slate-100 bg-white text-slate-400 hover:border-rose-200 hover:text-rose-500"
+            }`}
+            aria-label={idea.is_liked ? "좋아요 취소" : "좋아요"}
+          >
+            ♥ {idea.like_count}
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleBookmark(idea);
+            }}
+            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
+              idea.is_bookmarked
+                ? "border-amber-200 bg-amber-50 text-amber-600"
+                : "border-slate-100 bg-white text-slate-400 hover:border-amber-200 hover:text-amber-500"
+            }`}
+            aria-label={idea.is_bookmarked ? "북마크 해제" : "북마크"}
+          >
+            ★ {idea.bookmark_count}
+          </button>
         </div>
 
-        <span className="rounded-lg bg-emerald-600 px-3 py-1 text-[11px] font-semibold text-white shadow-sm shadow-emerald-200 transition group-hover:bg-emerald-700">
+        <span className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1 text-[11px] font-semibold text-white shadow-sm shadow-emerald-200 transition group-hover:bg-emerald-700">
           살펴보기
         </span>
       </div>
-    </button>
+    </article>
   );
 }
 
