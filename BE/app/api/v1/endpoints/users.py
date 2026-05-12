@@ -339,6 +339,7 @@ async def get_my_projects(
             "status": project.status,
             "difficulty": project.difficulty,
             "category": project.category,
+            "progress_percent": float(project.progress_percent),
             "created_at": project.created_at.isoformat() if project.created_at else None,
             "can_discard": can_discard,
             "can_chat": project.id in active_chat_project_ids,
@@ -427,6 +428,7 @@ async def get_user_projects(user_id: int, db: Session = Depends(get_db)) -> dict
                 "title": project.title,
                 "status": project.status,
                 "difficulty": project.difficulty,
+                "progress_percent": float(project.progress_percent),
                 "created_at": project.created_at,
             }
             for project in projects
@@ -658,27 +660,37 @@ async def get_my_reputation(
     - 리뷰가 있으면 teamwork/contribution/responsibility 평균과 종합 score를 반환
     """
     aggregate = db.get(UserRatingAggregate, current_user_id)
+    return success_response(data=_build_reputation_response(aggregate))
+
+
+def _build_reputation_response(aggregate: UserRatingAggregate | None) -> dict:
     if aggregate is None:
-        return success_response(
-            data={
-                "review_count": 0,
-                "avg_teamwork": 0.0,
-                "avg_contribution": 0.0,
-                "avg_responsibility": 0.0,
-                "score": 0.0,
-            }
-        )
+        return {
+            "review_count": 0,
+            "avg_teamwork": 0.0,
+            "avg_contribution": 0.0,
+            "avg_responsibility": 0.0,
+            "score": 0.0,
+        }
 
     score = float((aggregate.avg_teamwork + aggregate.avg_contribution + aggregate.avg_responsibility) / 3)
-    return success_response(
-        data={
-            "review_count": aggregate.review_count,
-            "avg_teamwork": round(float(aggregate.avg_teamwork), 2),
-            "avg_contribution": round(float(aggregate.avg_contribution), 2),
-            "avg_responsibility": round(float(aggregate.avg_responsibility), 2),
-            "score": round(score, 2),
-        },
-    )
+    return {
+        "review_count": aggregate.review_count,
+        "avg_teamwork": round(float(aggregate.avg_teamwork), 2),
+        "avg_contribution": round(float(aggregate.avg_contribution), 2),
+        "avg_responsibility": round(float(aggregate.avg_responsibility), 2),
+        "score": round(score, 2),
+    }
+
+
+@router.get("/{user_id}/reputation", summary="사용자 신뢰도 조회", description="특정 사용자의 리뷰 기반 평점 요약을 반환합니다.")
+async def get_user_reputation(user_id: int, db: Session = Depends(get_db)) -> dict:
+    user = db.get(User, user_id)
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    aggregate = db.get(UserRatingAggregate, user_id)
+    return success_response(data=_build_reputation_response(aggregate))
 
 
 @router.get("/me/applications", summary="내가 지원한 프로젝트 목록", description="사용자가 지원한 프로젝트들의 지원 현황을 조회합니다.")

@@ -495,11 +495,16 @@ export default function ProjectManagePage() {
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <p className="text-lg font-bold text-slate-900">
-                          {applicant?.nickname ||
-                            applicant?.name ||
-                            `User #${application.applicant_id}`}
-                        </p>
+                        <button
+                          onClick={() =>
+                            router.push(`/users/${application.applicant_id}`)
+                          }
+                          className="text-left text-lg font-bold text-slate-900 transition hover:text-red-600 hover:underline"
+                        >
+                          User #{application.applicant_id}
+                          {(applicant?.nickname || applicant?.name) &&
+                            ` · ${applicant.nickname || applicant.name}`}
+                        </button>
 
                         {applicant?.email && (
                           <p className="mt-1 text-sm text-slate-500">
