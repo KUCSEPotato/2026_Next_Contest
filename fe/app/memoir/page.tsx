@@ -733,28 +733,19 @@ function MemoirContent() {
 
     try {
       setGeneratingMemoir(true);
-      const projectContext = [
-        "아래 프로젝트 맥락은 해석을 위한 배경입니다. 결과 문장에 그대로 인용하거나 나열하지 마세요.",
-        project.category ? `프로젝트 분야: ${project.category}` : "",
-        project.difficulty ? `프로젝트 난이도: ${project.difficulty}` : "",
-        techStack.length ? `프로젝트 기술/키워드: ${techStack.join(", ")}` : "",
-        data.chips.length ? `사용자가 고른 키워드: ${data.chips.join(", ")}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
       const userReflection = [
-        data.good ? `느낀 점:\n${data.good}` : "",
-        data.lessons ? `배운 점:\n${data.lessons}` : "",
-        data.nextActions ? `다음 액션:\n${data.nextActions}` : "",
+        data.chips.length
+          ? `이번 회고에서 중요하게 표시한 성장 키워드는 ${data.chips.join(", ")}입니다.`
+          : "",
+        data.good ? `좋았던 경험과 느낀 점은 ${data.good}` : "",
+        data.lessons ? `새롭게 배운 점은 ${data.lessons}` : "",
+        data.nextActions ? `앞으로 해보고 싶은 다음 행동은 ${data.nextActions}` : "",
       ]
         .filter(Boolean)
         .join("\n\n");
 
       const result = await refineProjectMemoirApi(project.id, {
-        felt_point: [projectContext, userReflection]
-          .filter((value) => value?.trim())
-          .join("\n\n")
-          .trim(),
+        felt_point: userReflection.trim(),
         lacked_point: data.bad.trim(),
       });
       const refined = result.data?.refined_memoir?.trim();
