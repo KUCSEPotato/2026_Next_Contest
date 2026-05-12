@@ -24,6 +24,7 @@ import {
 } from "../_lib/api";
 import {
   timeAgo,
+  buildCommentTree,
   updateCommentInTree,
   removeCommentFromTree,
 } from "../_lib/utils";
@@ -133,7 +134,7 @@ export default function PostDetailPage() {
     setLoadingComments(true);
     try {
       const res = await getComments(pid, { page_size: 100 });
-      setComments(res.comments.map((c) => ({ ...c, replies: [] })));
+      setComments(buildCommentTree(res.comments));
     } catch (e) {
       console.error(e);
     } finally {
@@ -155,6 +156,13 @@ export default function PostDetailPage() {
       const result = await reactToPost(pid, type);
       setPost((p) => {
         if (!p) return p;
+        if (result.reaction_stats) {
+          return {
+            ...p,
+            user_reaction: result.user_reaction ?? null,
+            reaction_stats: result.reaction_stats,
+          };
+        }
         const newStats = { ...p.reaction_stats };
         if (result.action === "removed") {
           const rt = result.reaction_type;
@@ -271,6 +279,13 @@ export default function PostDetailPage() {
       const result = await reactToComment(pid, commentId, type);
       setComments((prev) =>
         updateCommentInTree(prev, commentId, (c) => {
+          if (result.reaction_stats) {
+            return {
+              ...c,
+              user_reaction: result.user_reaction ?? null,
+              reaction_stats: result.reaction_stats,
+            };
+          }
           const newStats = { ...c.reaction_stats };
           if (result.action === "removed") {
             const rt = result.reaction_type;

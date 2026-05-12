@@ -39,6 +39,81 @@ def _merge_reaction_stats(rows: list[tuple[str, int]]) -> dict[str, int]:
     return stats
 
 
+def _post_reaction_snapshot(db: Session, post_id: int, user_id: int | None = None) -> dict:
+    reactions = (
+        db.query(CommunityPostReaction.reaction_type, func.count(CommunityPostReaction.id))
+        .filter(CommunityPostReaction.post_id == post_id)
+        .group_by(CommunityPostReaction.reaction_type)
+        .all()
+    )
+    user_reaction = None
+    if user_id:
+        user_reaction_record = db.query(CommunityPostReaction).filter(
+            CommunityPostReaction.post_id == post_id,
+            CommunityPostReaction.user_id == user_id,
+        ).first()
+        if user_reaction_record:
+            user_reaction = user_reaction_record.reaction_type
+    return {
+        "reaction_stats": _merge_reaction_stats(reactions),
+        "user_reaction": user_reaction,
+    }
+
+
+def _comment_reaction_snapshot(db: Session, comment_id: int, user_id: int | None = None) -> dict:
+    reactions = (
+        db.query(CommunityCommentReaction.reaction_type, func.count(CommunityCommentReaction.id))
+        .filter(CommunityCommentReaction.comment_id == comment_id)
+        .group_by(CommunityCommentReaction.reaction_type)
+        .all()
+    )
+    user_reaction = None
+    if user_id:
+        user_reaction_record = db.query(CommunityCommentReaction).filter(
+            CommunityCommentReaction.comment_id == comment_id,
+            CommunityCommentReaction.user_id == user_id,
+        ).first()
+        if user_reaction_record:
+            user_reaction = user_reaction_record.reaction_type
+    return {
+        "reaction_stats": _merge_reaction_stats(reactions),
+        "user_reaction": user_reaction,
+    }
+
+
+def _serialize_comment(db: Session, comment: CommunityPostComment, current_user_id: int | None = None) -> dict:
+    author = db.get(User, comment.author_id)
+    reply_count = (
+        db.query(func.count(CommunityPostComment.id))
+        .filter(
+            CommunityPostComment.parent_comment_id == comment.id,
+            CommunityPostComment.deleted_at.is_(None),
+        )
+        .scalar() or 0
+    )
+    anon = comment.is_anonymous
+    snapshot = _comment_reaction_snapshot(db, comment.id, current_user_id)
+    return {
+        "id": comment.id,
+        "post_id": comment.post_id,
+        "author_id": comment.author_id if not anon else None,
+        "content": comment.content,
+        "parent_comment_id": comment.parent_comment_id,
+        "is_anonymous": anon,
+        "is_mine": bool(current_user_id and comment.author_id == current_user_id),
+        "created_at": comment.created_at,
+        "updated_at": comment.updated_at,
+        "author": {
+            "id": author.id if not anon else None,
+            "nickname": "?듬챸" if anon else author.nickname,
+            "avatar_url": None if anon else author.avatar_url,
+        },
+        "reaction_stats": snapshot["reaction_stats"],
+        "user_reaction": snapshot["user_reaction"],
+        "reply_count": reply_count,
+    }
+
+
 # ═══════════════════════════════════════════════════════════════
 # ━━ Community Posts (CRUD)
 # ═══════════════════════════════════════════════════════════════
@@ -385,6 +460,16 @@ async def create_comment(
     if not post or post.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
 
+    if payload.parent_comment_id is not None:
+        parent = db.get(CommunityPostComment, payload.parent_comment_id)
+        if (
+            parent is None
+            or parent.post_id != post_id
+            or parent.parent_comment_id is not None
+            or parent.deleted_at is not None
+        ):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid parent comment")
+
     comment = CommunityPostComment(
         post_id=post_id,
         author_id=current_user_id,
@@ -432,6 +517,7 @@ async def create_comment(
             "updated_at": comment.updated_at,
             "author": author_info,
             "reaction_stats": dict(_REACTION_STATS_ZERO),
+            "user_reaction": None,
             "reply_count": 0,
         },
     )
@@ -458,17 +544,41 @@ async def list_comments(
         except HTTPException:
             current_user_id = None
 
-    query = db.query(CommunityPostComment).filter(
+    root_query = db.query(CommunityPostComment).filter(
         CommunityPostComment.post_id == post_id,
         CommunityPostComment.deleted_at.is_(None),
         CommunityPostComment.parent_comment_id.is_(None),  # 최상위 댓글만
     )
 
-    total = query.count()
-    comments = query.order_by(CommunityPostComment.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    total = root_query.count()
+    root_comments = (
+        root_query.order_by(CommunityPostComment.created_at.asc(), CommunityPostComment.id.asc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    root_ids = [comment.id for comment in root_comments]
+    if root_ids:
+        comments = (
+            db.query(CommunityPostComment)
+            .filter(
+                CommunityPostComment.post_id == post_id,
+                CommunityPostComment.deleted_at.is_(None),
+                (
+                    CommunityPostComment.id.in_(root_ids)
+                    | CommunityPostComment.parent_comment_id.in_(root_ids)
+                ),
+            )
+            .order_by(CommunityPostComment.created_at.asc(), CommunityPostComment.id.asc())
+            .all()
+        )
+    else:
+        comments = []
 
     result = []
     for comment in comments:
+        result.append(_serialize_comment(db, comment, current_user_id))
+        continue
         author = db.get(User, comment.author_id)
         reply_count = (
             db.query(func.count(CommunityPostComment.id))
@@ -609,11 +719,19 @@ async def add_post_reaction(
         if existing.reaction_type == payload.reaction_type:
             db.delete(existing)
             db.commit()
-            return success_response(data={"action": "removed", "reaction_type": payload.reaction_type})
+            return success_response(data={
+                "action": "removed",
+                "reaction_type": payload.reaction_type,
+                **_post_reaction_snapshot(db, post_id, current_user_id),
+            })
 
         existing.reaction_type = payload.reaction_type
         db.commit()
-        return success_response(data={"action": "updated", "reaction_type": payload.reaction_type})
+        return success_response(data={
+            "action": "updated",
+            "reaction_type": payload.reaction_type,
+            **_post_reaction_snapshot(db, post_id, current_user_id),
+        })
 
     reaction = CommunityPostReaction(
         post_id=post_id,
@@ -623,7 +741,11 @@ async def add_post_reaction(
     db.add(reaction)
     try:
         db.commit()
-        return success_response(data={"action": "added", "reaction_type": payload.reaction_type})
+        return success_response(data={
+            "action": "added",
+            "reaction_type": payload.reaction_type,
+            **_post_reaction_snapshot(db, post_id, current_user_id),
+        })
     except IntegrityError:
         db.rollback()
         existing = db.query(CommunityPostReaction).filter(
@@ -634,7 +756,11 @@ async def add_post_reaction(
             raise
         existing.reaction_type = payload.reaction_type
         db.commit()
-        return success_response(data={"action": "updated", "reaction_type": payload.reaction_type})
+        return success_response(data={
+            "action": "updated",
+            "reaction_type": payload.reaction_type,
+            **_post_reaction_snapshot(db, post_id, current_user_id),
+        })
 
 
 @router.post("/{post_id}/comments/{comment_id}/reactions", summary="댓글에 반응 추가", description="댓글에 추천 또는 비추천을 표현합니다.")
@@ -647,7 +773,7 @@ async def add_comment_reaction(
 ) -> dict:
     """댓글 반응 추가/토글"""
     comment = db.get(CommunityPostComment, comment_id)
-    if not comment or comment.deleted_at is not None:
+    if not comment or comment.post_id != post_id or comment.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
 
     existing = db.query(CommunityCommentReaction).filter(
@@ -659,11 +785,19 @@ async def add_comment_reaction(
         if existing.reaction_type == payload.reaction_type:
             db.delete(existing)
             db.commit()
-            return success_response(data={"action": "removed", "reaction_type": payload.reaction_type})
+            return success_response(data={
+                "action": "removed",
+                "reaction_type": payload.reaction_type,
+                **_comment_reaction_snapshot(db, comment_id, current_user_id),
+            })
 
         existing.reaction_type = payload.reaction_type
         db.commit()
-        return success_response(data={"action": "updated", "reaction_type": payload.reaction_type})
+        return success_response(data={
+            "action": "updated",
+            "reaction_type": payload.reaction_type,
+            **_comment_reaction_snapshot(db, comment_id, current_user_id),
+        })
 
     reaction = CommunityCommentReaction(
         comment_id=comment_id,
@@ -673,7 +807,11 @@ async def add_comment_reaction(
     db.add(reaction)
     try:
         db.commit()
-        return success_response(data={"action": "added", "reaction_type": payload.reaction_type})
+        return success_response(data={
+            "action": "added",
+            "reaction_type": payload.reaction_type,
+            **_comment_reaction_snapshot(db, comment_id, current_user_id),
+        })
     except IntegrityError:
         db.rollback()
         existing = db.query(CommunityCommentReaction).filter(
@@ -684,7 +822,11 @@ async def add_comment_reaction(
             raise
         existing.reaction_type = payload.reaction_type
         db.commit()
-        return success_response(data={"action": "updated", "reaction_type": payload.reaction_type})
+        return success_response(data={
+            "action": "updated",
+            "reaction_type": payload.reaction_type,
+            **_comment_reaction_snapshot(db, comment_id, current_user_id),
+        })
 
 
 # ═══════════════════════════════════════════════════════════════
