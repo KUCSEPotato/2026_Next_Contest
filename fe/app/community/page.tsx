@@ -197,7 +197,7 @@ export default function CommunityPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-orange-50/30">
       <header className="mx-auto flex max-w-6xl items-center justify-end gap-3 px-4 py-4">
         <button
           onClick={() => router.push("/notifications")}
@@ -215,6 +215,10 @@ export default function CommunityPage() {
 
       <main className="mx-auto max-w-6xl px-4 pb-16">
         <section className="py-10 text-center sm:py-14">
+          <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center">
+            <CampfireHeroIcon />
+          </div>
+
           <h1 className="mb-3 text-2xl font-bold leading-tight text-gray-900 sm:text-4xl">
             모닥불 곁에서,
             <br className="sm:hidden" /> 함께 나누는 이야기
@@ -430,6 +434,39 @@ export default function CommunityPage() {
         />
       )}
     </div>
+  );
+}
+
+function CampfireHeroIcon() {
+  return (
+    <svg
+      viewBox="0 0 96 96"
+      className="h-24 w-24"
+      aria-hidden
+      style={{ animation: "floatCampfire 3s ease-in-out infinite" }}
+    >
+      <path
+        d="M48 85c18-6 28-18 28-34 0-15-10-25-18-36-2 12-10 18-16 24-4-8-4-15-2-23-15 11-24 25-24 41 0 16 14 28 32 28Z"
+        fill="#f97316"
+      />
+      <path
+        d="M47 79c9-4 14-11 14-19 0-8-5-14-10-19-2 8-7 12-12 16-2 10 1 18 8 22Z"
+        fill="#facc15"
+      />
+      <path d="M25 82l46-20" stroke="#92400e" strokeWidth="7" strokeLinecap="round" />
+      <path d="M71 82L25 62" stroke="#78350f" strokeWidth="7" strokeLinecap="round" />
+      <style jsx>{`
+        @keyframes floatCampfire {
+          0%,
+          100% {
+            transform: translateY(0) scale(1);
+          }
+          50% {
+            transform: translateY(-8px) scale(1.03);
+          }
+        }
+      `}</style>
+    </svg>
   );
 }
 
