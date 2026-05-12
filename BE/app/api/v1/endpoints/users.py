@@ -260,12 +260,12 @@ async def get_my_onboarding_state(
     )
 
 
-@router.get("/me/projects", summary="내가 리더인 프로젝트 목록", description="현재 사용자가 리더인 프로젝트를 반환합니다.")
+@router.get("/me/projects", summary="내 프로젝트 목록", description="현재 사용자가 리더이거나 팀원인 프로젝트를 반환합니다.")
 async def get_my_projects(
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict:
-    """내가 리더인 프로젝트 목록 조회 API.
+    """내 프로젝트 목록 조회 API.
     
     각 프로젝트에 can_discard 필드를 포함합니다.
     can_discard 조건:
@@ -277,10 +277,47 @@ async def get_my_projects(
     """
     projects = (
         db.query(Project)
-        .filter(Project.leader_id == current_user_id, Project.deleted_at.is_(None))
+        .join(ProjectMember, ProjectMember.project_id == Project.id)
+        .filter(
+            ProjectMember.user_id == current_user_id,
+            ProjectMember.left_at.is_(None),
+            Project.deleted_at.is_(None),
+        )
         .order_by(Project.created_at.desc())
         .all()
     )
+
+    if not projects:
+        projects = (
+            db.query(Project)
+            .filter(Project.leader_id == current_user_id, Project.deleted_at.is_(None))
+            .order_by(Project.created_at.desc())
+            .all()
+        )
+
+    project_ids = [project.id for project in projects]
+    active_chat_project_ids = set()
+    if project_ids:
+        active_chat_project_ids = {
+            project_id
+            for (project_id,) in (
+                db.query(Project.id)
+                .join(ProjectMember, ProjectMember.project_id == Project.id)
+                .filter(
+                    Project.id.in_(project_ids),
+                    ProjectMember.user_id == current_user_id,
+                    ProjectMember.left_at.is_(None),
+                )
+                .all()
+            )
+        }
+
+    member_counts = dict(
+        db.query(ProjectMember.project_id, func.count(ProjectMember.id))
+        .filter(ProjectMember.project_id.in_(project_ids), ProjectMember.left_at.is_(None))
+        .group_by(ProjectMember.project_id)
+        .all()
+    ) if project_ids else {}
     
     response_data = []
     now = datetime.now(timezone.utc)
@@ -304,6 +341,10 @@ async def get_my_projects(
             "category": project.category,
             "created_at": project.created_at.isoformat() if project.created_at else None,
             "can_discard": can_discard,
+            "can_chat": project.id in active_chat_project_ids,
+            "is_leader": project.leader_id == current_user_id,
+            "currentMembers": member_counts.get(project.id, 0),
+            "maxMembers": project.max_members,
         })
     
     return success_response(data=response_data)
