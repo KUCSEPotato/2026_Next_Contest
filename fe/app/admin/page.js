@@ -333,13 +333,19 @@ export default function AdminPage() {
       return;
     }
 
-    const noteInput = window.prompt("지급 사유를 입력하세요. (선택)", "") || "";
+    const noteInput = window.prompt("지급 사유를 입력하세요. 사용자에게 알림으로 전달됩니다.", "");
+    if (noteInput === null) return;
+    const note = noteInput.trim();
+    if (!note) {
+      alert("코인 지급 사유를 입력해주세요.");
+      return;
+    }
 
     try {
       setProcessingKey(`coin-${userId}`);
       const result = await grantAdminUserCoinsApi(userId, {
         amount,
-        note: noteInput.trim() || undefined,
+        note,
       });
 
       setUsers((prev) =>
@@ -350,7 +356,7 @@ export default function AdminPage() {
         )
       );
 
-      alert("코인을 지급했습니다.");
+      alert("코인을 지급했고 사용자에게 알림을 보냈습니다.");
     } catch (err) {
       alert(err instanceof Error ? err.message : "코인 지급에 실패했습니다.");
     } finally {
@@ -373,13 +379,19 @@ export default function AdminPage() {
       return;
     }
 
-    const noteInput = window.prompt("환수 사유를 입력하세요. (선택)", "") || "";
+    const noteInput = window.prompt("환수 사유를 입력하세요. 사용자에게 알림으로 전달됩니다.", "");
+    if (noteInput === null) return;
+    const note = noteInput.trim();
+    if (!note) {
+      alert("코인 환수 사유를 입력해주세요.");
+      return;
+    }
 
     try {
       setProcessingKey(`revoke-coin-${userId}`);
       const result = await revokeAdminUserCoinsApi(userId, {
         amount,
-        note: noteInput.trim() || undefined,
+        note,
       });
 
       setUsers((prev) =>
@@ -390,7 +402,7 @@ export default function AdminPage() {
         )
       );
 
-      alert("코인을 환수했습니다.");
+      alert("코인을 환수했고 사용자에게 알림을 보냈습니다.");
     } catch (err) {
       alert(err instanceof Error ? err.message : "코인 환수에 실패했습니다.");
     } finally {
@@ -1047,7 +1059,12 @@ export default function AdminPage() {
                           <p className="mt-1 line-clamp-2 text-xs text-slate-500">{post.content}</p>
                         </Td>
                         <Td>{post.category}</Td>
-                        <Td>User #{post.author_id}</Td>
+                        <Td>
+                          <p className="font-semibold text-slate-900">
+                            {post.author_nickname || `User #${post.author_id}`}
+                          </p>
+                          <p className="text-xs text-slate-500">User #{post.author_id}</p>
+                        </Td>
                         <Td><StatusBadge value={post.deleted_at ? "deleted" : "active"} /></Td>
                         <Td>{formatDate(post.created_at)}</Td>
                         <Td>
@@ -1092,7 +1109,12 @@ export default function AdminPage() {
                       <Td>#{project.id}</Td>
                       <Td className="font-semibold text-slate-900">{project.title}</Td>
                       <Td><StatusBadge value={project.deleted_at ? "deleted" : project.status} /></Td>
-                      <Td>User #{project.leader_id}</Td>
+                      <Td>
+                        <p className="font-semibold text-slate-900">
+                          {project.leader_nickname || `User #${project.leader_id}`}
+                        </p>
+                        <p className="text-xs text-slate-500">User #{project.leader_id}</p>
+                      </Td>
                       <Td>{project.category || "-"}</Td>
                       <Td>{formatDate(project.created_at)}</Td>
                       <Td>
