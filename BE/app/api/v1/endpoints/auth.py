@@ -45,8 +45,7 @@ from app.services.oauth import exchange_github_code_for_access_token
 from app.services.oauth import exchange_google_code_for_access_token
 from app.services.oauth import fetch_github_user_profile
 from app.services.oauth import fetch_google_user_profile
-from app.services.s3_upload import extract_s3_key_from_url
-from app.services.s3_upload import generate_presigned_get_url
+from app.services.s3_upload import resolve_avatar_url
 
 router = APIRouter()
 
@@ -93,10 +92,7 @@ def _load_active_user(db: Session, user_id: int) -> User:
 
 
 def _get_avatar_url(user: User) -> str | None:
-    s3_key = user.avatar_s3_key or extract_s3_key_from_url(user.avatar_url)
-    if s3_key:
-        return generate_presigned_get_url(s3_key)
-    return user.avatar_url
+    return resolve_avatar_url(user.avatar_s3_key, user.avatar_url)
 
 
 def _serialize_user_onboarding(user: User) -> dict:
