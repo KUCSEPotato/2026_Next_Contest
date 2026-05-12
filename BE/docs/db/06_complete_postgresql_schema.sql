@@ -13,6 +13,7 @@
 -- 7. 11_emergency_sync_ideas_table.sql
 -- 8. 12_add_user_onboarding_fields.sql
 -- 9. 13_add_coin_wallet_and_project_reminders.sql
+-- 10. Additional numbered backfills through 22_add_user_avatar_s3_key.sql
 --
 -- Use `psql` so relative includes resolve from this file's directory.
 
@@ -31,3 +32,4 @@
 \ir 19_extend_recruitment_fields.sql
 \ir 20_create_chat_room_members.sql
 \ir 21_add_memoir_fields_to_retrospectives.sql
+\ir 22_add_user_avatar_s3_key.sql

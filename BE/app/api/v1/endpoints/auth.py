@@ -45,6 +45,8 @@ from app.services.oauth import exchange_github_code_for_access_token
 from app.services.oauth import exchange_google_code_for_access_token
 from app.services.oauth import fetch_github_user_profile
 from app.services.oauth import fetch_google_user_profile
+from app.services.s3_upload import extract_s3_key_from_url
+from app.services.s3_upload import generate_presigned_get_url
 
 router = APIRouter()
 
@@ -90,6 +92,13 @@ def _load_active_user(db: Session, user_id: int) -> User:
     return user
 
 
+def _get_avatar_url(user: User) -> str | None:
+    s3_key = user.avatar_s3_key or extract_s3_key_from_url(user.avatar_url)
+    if s3_key:
+        return generate_presigned_get_url(s3_key)
+    return user.avatar_url
+
+
 def _serialize_user_onboarding(user: User) -> dict:
     return {
         "id": user.id,
@@ -101,6 +110,7 @@ def _serialize_user_onboarding(user: User) -> dict:
         "is_verified": user.is_verified,
         "onboarding_step": user.onboarding_step,
         "onboarding_completed_at": user.onboarding_completed_at,
+        "avatar_url": _get_avatar_url(user),
     }
 
 
@@ -727,6 +737,6 @@ async def get_my_auth_info(
                 else None
             ),
             "coin_balance": getattr(user, "coin_balance", None),
-            "avatar_url": user.avatar_url,
+            "avatar_url": _get_avatar_url(user),
         },
     )

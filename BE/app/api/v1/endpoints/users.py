@@ -20,9 +20,22 @@ from app.models import UserSkill
 from app.models import Interest
 from app.schemas.users import OnboardingIdeaSelectionRequest
 from app.schemas.users import UserProfileUpdateRequest
+from app.services.s3_upload import extract_s3_key_from_url
+from app.services.s3_upload import generate_presigned_get_url
 from app.services.s3_upload import get_s3_service
 
 router = APIRouter()
+
+
+def _get_avatar_url(user: User | None) -> str | None:
+    if user is None:
+        return None
+
+    s3_key = user.avatar_s3_key or extract_s3_key_from_url(user.avatar_url)
+    if s3_key:
+        return generate_presigned_get_url(s3_key)
+
+    return user.avatar_url
 
 
 def _serialize_review(db: Session, review: Review) -> dict:
@@ -34,7 +47,7 @@ def _serialize_review(db: Session, review: Review) -> dict:
         "reviewer": {
             "id": reviewer.id if reviewer else review.reviewer_id,
             "nickname": reviewer.nickname if reviewer else "탈퇴한 사용자",
-            "avatar_url": reviewer.avatar_url if reviewer else None,
+            "avatar_url": _get_avatar_url(reviewer),
         },
         "project": {
             "id": project.id if project else review.project_id,
@@ -111,7 +124,8 @@ async def get_my_profile(
             "phone_number": user.phone_number,
             "coin_balance": user.coin_balance,
             "bio": user.bio,
-            "avatar_url": user.avatar_url,
+            "avatar_url": _get_avatar_url(user),
+            "avatar_s3_key": user.avatar_s3_key,
             "skills": [name for (name,) in skills],
             "interests": [name for (name,) in interests],
             "selected_idea_ids": [idea_id for (idea_id,) in selected_idea_ids],
@@ -141,7 +155,8 @@ async def upload_my_avatar(
     """사용자 아바타 업로드 API.
 
     - Accepts image files only (content-type starts with `image/`).
-    - Uploads to S3 under `avatars/` folder and saves the public URL to `user.avatar_url`.
+    - Uploads to a private S3 bucket and stores only the object key.
+    - Returns a temporary presigned GET URL as `avatar_url`.
     """
     user = db.get(User, current_user_id)
     if user is None or user.deleted_at is not None:
@@ -153,13 +168,24 @@ async def upload_my_avatar(
 
     content = await file.read()
 
-    upload_result = await s3_service.upload_file(content, file.filename, content_type, "avatars")
+    upload_result = await s3_service.upload_file(
+        content,
+        file.filename or "avatar",
+        content_type,
+        f"avatars/{user.id}",
+    )
 
-    user.avatar_url = upload_result["s3_url"]
+    user.avatar_s3_key = upload_result["s3_key"]
+    user.avatar_url = None
     db.commit()
     db.refresh(user)
 
-    return success_response(data={"avatar_url": user.avatar_url})
+    return success_response(
+        data={
+            "avatar_url": _get_avatar_url(user),
+            "avatar_s3_key": user.avatar_s3_key,
+        }
+    )
 
 
 @router.get("/me/onboarding", summary="내 온보딩 상태 조회", description="회원가입/프로필/관심 아이디어 선택 진행 상태를 조회합니다.")
@@ -227,7 +253,8 @@ async def update_my_profile(
             "phone_number": user.phone_number,
             "coin_balance": user.coin_balance,
             "bio": user.bio,
-            "avatar_url": user.avatar_url,
+            "avatar_url": _get_avatar_url(user),
+            "avatar_s3_key": user.avatar_s3_key,
             "onboarding_step": user.onboarding_step,
         },
     )
@@ -377,7 +404,7 @@ async def get_user_profile(user_id: int, db: Session = Depends(get_db)) -> dict:
             "id": user.id,
             "nickname": user.nickname,
             "bio": user.bio,
-            "avatar_url": user.avatar_url,
+            "avatar_url": _get_avatar_url(user),
             "role": user.role,
             "interests": [name for (name,) in interests],
         },
