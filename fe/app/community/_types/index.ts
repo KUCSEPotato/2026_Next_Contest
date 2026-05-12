@@ -37,6 +37,16 @@ export interface PostDetail extends PostSummary {
   user_reaction: ReactionType | null;
 }
 
+/** GET /community/{post_id}/files 첨부 파일 */
+export interface PostFile {
+  id: number;
+  filename: string;
+  file_size: number;
+  file_type: string;
+  s3_url: string;
+  uploaded_at: string;
+}
+
 /** GET /community/{post_id}/comments 댓글 아이템 */
 export interface CommentItem {
   id: number;

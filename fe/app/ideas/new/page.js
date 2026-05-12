@@ -182,7 +182,7 @@ export default function NewIdeaPage() {
           <div className="grid gap-6 md:grid-cols-2">
             <div>
               <label className="mb-2 block text-sm font-semibold text-slate-700">
-                모집 인원 (리더 포함)
+                모집 인원 (리더 포함) (최대 인원: 100명)
               </label>
               <input
                 type="number"

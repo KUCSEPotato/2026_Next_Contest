@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import {
   PostDetail,
   CommentItem as CommentItemType,
+  PostFile,
   User,
   ReactionType,
 } from "../_types";
@@ -18,11 +19,10 @@ import {
   updateComment,
   deleteComment,
   reactToComment,
+  getPostFiles,
 } from "../_lib/api";
 import {
   timeAgo,
-  tempId,
-  buildCommentTree,
   updateCommentInTree,
   removeCommentFromTree,
 } from "../_lib/utils";
@@ -46,17 +46,20 @@ const REACTIONS: { type: ReactionType; emoji: string }[] = [
   { type: "curious", emoji: "🧐" },
 ];
 
+const getErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
+
 export default function PostDetailPage() {
   const router = useRouter();
   const { postId } = useParams<{ postId: string }>();
   const pid = Number(postId);
 
   const [post, setPost] = useState<PostDetail | null>(null);
+  const [files, setFiles] = useState<PostFile[]>([]);
   const [comments, setComments] = useState<CommentItemType[]>([]);
   const [loadingPost, setLoadingPost] = useState(true);
   const [loadingComments, setLoadingComments] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const [commentText, setCommentText] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
@@ -71,25 +74,30 @@ export default function PostDetailPage() {
   const [showLoginModal, setShowLoginModal] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    if (token) {
-      setIsLoggedIn(true);
-      try {
-        const raw = localStorage.getItem("user");
-        if (raw) setCurrentUser(JSON.parse(raw));
-      } catch (e) {
-        console.error("유저 정보 파싱 실패", e);
-        localStorage.removeItem("user");
+    Promise.resolve().then(() => {
+      const token = localStorage.getItem("access_token");
+      if (token) {
+        try {
+          const raw = localStorage.getItem("user");
+          if (raw) setCurrentUser(JSON.parse(raw) as User);
+        } catch (e) {
+          console.error("유저 정보 파싱 실패", e);
+          localStorage.removeItem("user");
+        }
       }
-    }
+    });
   }, []);
 
   useEffect(() => {
     (async () => {
       setLoadingPost(true);
       try {
-        const data = await getPost(pid);
+        const [data, fileData] = await Promise.all([
+          getPost(pid),
+          getPostFiles(pid).catch(() => []),
+        ]);
         setPost(data);
+        setFiles(fileData);
         setEditTitle(data.title ?? "");
         setEditContent(data.content);
         setEditCategory(data.category ?? "");
@@ -114,7 +122,7 @@ export default function PostDetailPage() {
   }, [pid]);
 
   useEffect(() => {
-    loadComments();
+    Promise.resolve().then(() => loadComments());
   }, [loadComments]);
 
   // ── 게시물 반응 (단일 선택) ──────────────────────────────────────────────────
@@ -156,8 +164,8 @@ export default function PostDetailPage() {
       });
       setPost(updated as PostDetail);
       setEditing(false);
-    } catch (e: any) {
-      alert(e.message ?? "수정에 실패했어요.");
+    } catch (e: unknown) {
+      alert(getErrorMessage(e, "수정에 실패했어요."));
     } finally {
       setSavingEdit(false);
     }
@@ -168,8 +176,8 @@ export default function PostDetailPage() {
     try {
       await deletePost(pid);
       router.push("/community");
-    } catch (e: any) {
-      alert(e.message ?? "삭제에 실패했어요.");
+    } catch (e: unknown) {
+      alert(getErrorMessage(e, "삭제에 실패했어요."));
     }
   };
 
@@ -190,8 +198,8 @@ export default function PostDetailPage() {
       }]);
       setCommentText("");
       setPost((p) => p ? { ...p, comment_count: p.comment_count + 1 } : p);
-    } catch (e: any) {
-      alert(e.message ?? "댓글 작성에 실패했어요.");
+    } catch (e: unknown) {
+      alert(getErrorMessage(e, "댓글 작성에 실패했어요."));
     } finally {
       setSubmittingComment(false);
     }
@@ -218,8 +226,8 @@ export default function PostDetailPage() {
         }))
       );
       setPost((p) => p ? { ...p, comment_count: p.comment_count + 1 } : p);
-    } catch (e: any) {
-      alert(e.message ?? "답글 작성에 실패했어요.");
+    } catch (e: unknown) {
+      alert(getErrorMessage(e, "답글 작성에 실패했어요."));
     }
   };
 
@@ -257,8 +265,8 @@ export default function PostDetailPage() {
       setComments((prev) =>
         updateCommentInTree(prev, commentId, (c) => ({ ...c, content: updated.content }))
       );
-    } catch (e: any) {
-      alert(e.message ?? "수정에 실패했어요.");
+    } catch (e: unknown) {
+      alert(getErrorMessage(e, "수정에 실패했어요."));
     }
   };
 
@@ -268,8 +276,8 @@ export default function PostDetailPage() {
       await deleteComment(pid, commentId);
       setComments((prev) => removeCommentFromTree(prev, commentId));
       setPost((p) => p ? { ...p, comment_count: Math.max(0, p.comment_count - 1) } : p);
-    } catch (e: any) {
-      alert(e.message ?? "삭제에 실패했어요.");
+    } catch (e: unknown) {
+      alert(getErrorMessage(e, "삭제에 실패했어요."));
     }
   };
 
@@ -411,6 +419,48 @@ export default function PostDetailPage() {
               <p className="mb-3 whitespace-pre-wrap text-sm leading-relaxed text-gray-800">
                 {post.content}
               </p>
+              {files.length > 0 && (
+                <div
+                  className={`mt-4 grid gap-2 ${
+                    files.length === 1 ? "grid-cols-1" : "grid-cols-2"
+                  }`}
+                >
+                  {files.map((file) => {
+                    const isImage = file.file_type.startsWith("image/");
+                    const isVideo = file.file_type.startsWith("video/");
+
+                    return (
+                      <div
+                        key={file.id}
+                        className="overflow-hidden rounded-xl bg-gray-100"
+                      >
+                        {isImage ? (
+                          <img
+                            src={file.s3_url}
+                            alt={file.filename}
+                            className="h-48 w-full object-cover"
+                          />
+                        ) : isVideo ? (
+                          <video
+                            src={file.s3_url}
+                            controls
+                            className="h-48 w-full object-cover"
+                          />
+                        ) : (
+                          <a
+                            href={file.s3_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block px-4 py-3 text-xs font-medium text-gray-600 hover:text-red-500"
+                          >
+                            {file.filename}
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </>
           )}
 

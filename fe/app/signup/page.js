@@ -3,10 +3,10 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { authenticatedFetch, saveAuthSession } from "../../lib/auth";
+import { authenticatedFetch, getApiBaseUrl, saveAuthSession } from "../../lib/auth";
 
 // ─── 상수 ────────────────────────────────────────────────────────────────────
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const API_BASE = getApiBaseUrl();
 
 const SKILLS_LIST = [
   "React", "Next.js", "Vue.js", "Angular", "TypeScript", "JavaScript",

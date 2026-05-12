@@ -1,9 +1,11 @@
+import asyncio
 from datetime import datetime, timezone, date
 from collections import defaultdict
 from math import ceil
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from fastapi import WebSocket, WebSocketDisconnect
+from google import genai
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -263,14 +265,14 @@ def _build_memoir_response(memoir: Retrospective) -> dict:
 
 def _fallback_ai_todo_titles(project: Project) -> list[str]:
     return [
-        f"기획 - {project.title} 핵심 사용자 흐름과 완료 기준 정리",
-        "기획 - 팀원별 역할, 담당 영역, 리뷰 방식을 문서화",
-        "설계 - 화면/기능 단위로 구현 범위를 세분화하고 우선순위 결정",
-        "설계 - 필요한 API, 데이터 모델, 상태 흐름 목록화",
-        "구현 - 가장 작은 MVP 기능을 먼저 구현하고 팀 리뷰 진행",
-        "구현 - 주요 사용자 액션별 예외 처리와 빈 상태 구현",
-        "검증 - 핵심 플로우를 실제 계정으로 점검하고 수정사항 기록",
-        "검증 - 배포 전 남은 이슈와 다음 스프린트 Todo 정리",
+        f"기획 단계 - {project.title} 핵심 사용자 흐름 확정하기 :: 프로젝트를 처음 사용하는 사용자가 어떤 순서로 기능을 이용하고, 어떤 상태가 완료 기준인지 문서로 정리한다.",
+        "기획 단계 - 프로젝트 세부 계획과 MVP 범위 결정하기 :: 반드시 구현할 기능, 시간이 남으면 구현할 기능, 제외할 기능을 나누어 팀이 같은 기준으로 개발하도록 한다.",
+        "기획 단계 - 팀원별 역할과 담당 영역 기록하기 :: 프론트엔드, 백엔드, 디자인, 검증 등 담당자를 정하고 각자가 맡을 산출물을 Todo 상세에 남긴다.",
+        "설계 단계 - 화면 단위 기능 목록과 이동 흐름 만들기 :: 주요 페이지별 입력값, 버튼, 빈 상태, 오류 상태를 정리해 구현 순서를 잡는다.",
+        "설계 단계 - API와 데이터 모델 목록 작성하기 :: 필요한 엔드포인트, 요청/응답 필드, 저장해야 할 테이블 또는 컬럼을 기능별로 정리한다.",
+        "개발 단계 - 백엔드 핵심 API 구현하기 :: 프로젝트 생성, 조회, 수정처럼 MVP에 필요한 API를 우선 구현하고 응답 형식을 프론트와 맞춘다.",
+        "개발 단계 - 프론트엔드 주요 화면 구현하기 :: 사용자가 가장 먼저 접하는 목록, 상세, 작성 화면을 연결하고 실제 API 데이터로 렌더링한다.",
+        "검증 단계 - 핵심 플로우 테스트와 수정 사항 기록하기 :: 실제 계정으로 생성부터 완료까지 진행해보고 실패한 케이스와 수정 담당자를 남긴다.",
     ]
 
 
@@ -325,18 +327,82 @@ async def _generate_ai_todo_titles(context_text: str, project: Project) -> list[
                 titles.append(todo.strip())
 
     deduped_titles = list(dict.fromkeys(titles))
-    return deduped_titles[:8] or _fallback_ai_todo_titles(project)
+    return deduped_titles[:18] or _fallback_ai_todo_titles(project)
 
 
-def _split_ai_todo_title(raw_title: str) -> tuple[str, str]:
+async def _call_gemini_for_memoir_refine(feelings: str, shortcomings: str) -> str:
+    if not settings.gemini_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Gemini API key is not configured",
+        )
+    return await asyncio.to_thread(_sync_call_gemini_for_memoir_refine, feelings, shortcomings)
+
+
+def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str) -> str:
+    prompt = (
+        "당신은 프로젝트 회고를 작성하는 데 도움을 주는 AI입니다.\n"
+        "다음 두 항목을 읽고 자연스럽고 매끄러운 한국어 **감성적** 회고 문장으로 정제하세요.\n"
+        "1) 느낀 점\n"
+        "2) 부족했던 점\n\n"
+
+        "지침:\n"
+        "1. 텍스트의 핵심 의미를 유지하면서 표현을 개선해주세요.\n"
+        "2. 구체적이고 행동 지향적인 표현으로 변경하세요.\n"
+        "3. 문법과 띄어쓰기를 수정하세요.\n"
+        "4. 불필요한 반복을 제거하세요.\n"
+        "5. 전문적이고 이해하기 쉬운 한국어로 작성하세요.\n"
+        "6. 원문보다 더 짧고 명확하게 작성하세요.\n"
+        "7. 정제된 텍스트만 반환하고, 설명이나 추가 문장을 포함하지 마세요.\n\n"
+        
+        "반드시 의미를 유지하고, 문단을 분리해서 전달합니다.\n"
+        "출력은 오직 정제된 회고 텍스트 하나로만 하고, JSON이나 마크다운 포맷을 포함하지 마세요.\n\n"
+        f"느낀 점:\n{feelings}\n\n"
+        f"부족했던 점:\n{shortcomings}\n"
+    )
+
+    client = genai.Client(api_key=settings.gemini_api_key)
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.1-flash-lite",
+            contents=prompt,
+            config={
+                    "temperature": 0.0,
+                    "max_output_tokens": 512,
+                },
+        )
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Gemini API request failed: {str(error)}",
+        )
+
+    text = getattr(response, "text", None) or getattr(response, "content", None)
+    if not text:
+        candidates = getattr(response, "candidates", None)
+        if isinstance(candidates, list) and len(candidates) > 0:
+            candidate = candidates[0]
+            text = getattr(candidate, "content", None) or getattr(candidate, "output", None) or ""
+
+    return (text or "").strip()
+
+
+def _split_ai_todo_item(raw_title: str) -> tuple[str, str, str | None]:
     normalized = raw_title.strip().strip("-• ")
+    detail = None
+    for separator in (" :: ", " - 상세: ", " 상세: "):
+        if separator in normalized:
+            normalized, detail = normalized.split(separator, 1)
+            detail = detail.strip()[:500] or None
+            break
+
     if " - " in normalized:
         stage, title = normalized.split(" - ", 1)
-        return stage.strip()[:30] or "planning", title.strip()[:200]
+        return stage.strip()[:30] or "planning", title.strip()[:200], detail
     if ":" in normalized:
         stage, title = normalized.split(":", 1)
-        return stage.strip()[:30] or "planning", title.strip()[:200]
-    return "AI 추천", normalized[:200]
+        return stage.strip()[:30] or "planning", title.strip()[:200], detail
+    return "AI 추천", normalized[:200], detail
 
 
 async def _broadcast_todo_snapshot(db: Session, project_id: int, todo: Todo, event_type: str) -> None:
@@ -433,6 +499,16 @@ async def list_projects(
             Application.status == "pending",
         ).scalar() or 0
 
+        open_recruitment = (
+            db.query(ProjectRecruitment)
+            .filter(
+                ProjectRecruitment.project_id == p.id,
+                ProjectRecruitment.status == "open",
+            )
+            .order_by(ProjectRecruitment.created_at.desc())
+            .first()
+        )
+
         total_members = p.max_members or 0
         remaining_seats = max(total_members - current_members, 0)
 
@@ -458,6 +534,9 @@ async def list_projects(
             "applicantCount": applicant_count,
             "remainingSeats": remaining_seats,
             "competitionRatio": competition_ratio,
+            "openRecruitmentCount": 1 if open_recruitment else 0,
+            "openRecruitmentRequiredCount": open_recruitment.required_count if open_recruitment else 0,
+            "openRecruitmentPosition": open_recruitment.position_name if open_recruitment else None,
             "created_at": p.created_at.isoformat() if p.created_at else None,
         })
     
@@ -1221,7 +1300,7 @@ async def generate_project_todos_with_ai(
 
     created_todos: list[Todo] = []
     for index, raw_title in enumerate(titles, start=1):
-        stage, title = _split_ai_todo_title(raw_title)
+        stage, title, description = _split_ai_todo_item(raw_title)
         if title.lower() in existing_titles:
             continue
 
@@ -1230,7 +1309,7 @@ async def generate_project_todos_with_ai(
             creator_id=current_user_id,
             assignee_id=member_ids[0] if member_ids else None,
             title=title,
-            description="AI가 선택한 채팅 범위와 프로젝트 상세 정보를 바탕으로 생성한 Todo입니다.",
+            description=description,
             stage=stage,
             status="todo",
             priority=max_priority + index,
@@ -1444,6 +1523,29 @@ async def create_retrospective(
     return success_response(data={"id": retro.id, "title": retro.title})
 
 
+@router.post(
+    "/{project_id}/memoir/ai-refine",
+    summary="Memoir AI 정제",
+    description="느낀 점과 부족했던 점 텍스트를 AI가 정제해서 반환합니다.",
+)
+async def refine_memoir(
+    project_id: int,
+    payload: MemoirRefineRequest,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    _get_project_or_404(db, project_id)
+    _ensure_project_member(db, project_id, current_user_id)
+
+    feelings = payload.felt_point.strip()
+    shortcomings = payload.lacked_point.strip()
+    if not feelings and not shortcomings:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="felt_point and lacked_point are required")
+
+    refined_text = await _call_gemini_for_memoir_refine(feelings, shortcomings)
+    return success_response(data={"refined_memoir": refined_text})
+
+
 @router.get("/{project_id}/retrospectives", summary="회고 목록", description="프로젝트 멤버가 회고 목록을 조회합니다.")
 async def list_retrospectives(
     project_id: int,
@@ -1592,6 +1694,14 @@ async def create_review(
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Review already exists")
 
+    raw_comment = (
+        payload.get("comment")
+        or payload.get("message")
+        or payload.get("review_message")
+        or payload.get("content")
+    )
+    comment = raw_comment.strip() if isinstance(raw_comment, str) else raw_comment
+
     review = Review(
         project_id=project_id,
         reviewer_id=current_user_id,
@@ -1599,7 +1709,7 @@ async def create_review(
         teamwork_score=payload.get("teamwork_score", 3),
         contribution_score=payload.get("contribution_score", 3),
         responsibility_score=payload.get("responsibility_score", 3),
-        comment=payload.get("comment"),
+        comment=comment or None,
     )
     db.add(review)
     db.flush()
@@ -1682,9 +1792,7 @@ async def complete_team(
 
     동작:
     - 리더 권한 확인
-    - 현재 활성 ProjectMember 수가 min_members 이상인지 확인
-    - 부족하면 400 반환
-    - 충분하면 project.status를 in_progress로 변경
+    - project.status를 in_progress로 변경
     - 팀원들에게 알림 생성
     - 프로젝트 이름으로 팀 채팅방 생성
     - 팀 채팅방에 시스템 메시지 추가
@@ -1693,11 +1801,7 @@ async def complete_team(
     _ensure_project_leader(project, current_user_id)
 
     active_members = _get_active_project_member_ids(db, project_id)
-    if len(active_members) < project.min_members:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Not enough members to complete team",
-        )
+    active_members.add(project.leader_id)
 
     project.status = "in_progress"
 
@@ -1900,36 +2004,6 @@ async def get_my_memoir(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Memoir not found")
     
     return success_response(data=_build_memoir_response(memoir))
-
-
-@router.post(
-    "/{project_id}/memoir/ai-refine",
-    summary="회고 텍스트 AI 정제",
-    description="느낀 점과 부족했던 점을 AI가 정제합니다.",
-)
-async def refine_memoir_text(
-    project_id: int,
-    payload: MemoirRefineRequest,
-    current_user_id: int = Depends(get_current_user_id),
-    db: Session = Depends(get_db),
-) -> dict:
-    """회고 AI 정제 API."""
-    project = _get_project_or_404(db, project_id)
-    
-    # LLM 서비스 호출
-    from app.api.v1.endpoints.llm import _call_gemini_for_memoir_refine
-    
-    refined_felt = await _call_gemini_for_memoir_refine(payload.felt_point)
-    refined_lacked = await _call_gemini_for_memoir_refine(payload.lacked_point)
-    
-    return success_response(
-        data={
-            "original_felt": payload.felt_point,
-            "refined_felt": refined_felt,
-            "original_lacked": payload.lacked_point,
-            "refined_lacked": refined_lacked,
-        }
-    )
 
 
 @router.get(

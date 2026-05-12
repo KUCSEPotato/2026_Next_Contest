@@ -10,7 +10,9 @@ import {
   loadCurrentUser,
   refreshAccessToken,
   removeToken,
+  updateStoredUser,
 } from "../lib/auth";
+import { getMyProfileApi } from "../lib/api";
 
 export default function Navbar() {
   const router = useRouter();
@@ -18,6 +20,7 @@ export default function Navbar() {
 
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
+  const [authStatus, setAuthStatus] = useState("checking");
 
   useEffect(() => {
     let cancelled = false;
@@ -29,6 +32,7 @@ export default function Navbar() {
       if (!cancelled) {
         setToken(currentToken);
         setUser(storedUser);
+        setAuthStatus(currentToken ? "authenticated" : "anonymous");
       }
 
       if (!currentToken || storedUser?.role) {
@@ -36,14 +40,19 @@ export default function Navbar() {
       }
 
       try {
+        if (!cancelled) {
+          setAuthStatus("checking");
+        }
         const currentUser = await loadCurrentUser();
         if (!cancelled) {
           setToken(getToken());
           setUser(currentUser);
+          setAuthStatus("authenticated");
         }
       } catch {
         if (!cancelled) {
           setUser(getStoredUser());
+          setAuthStatus(getToken() ? "authenticated" : "anonymous");
         }
       }
     };
@@ -67,6 +76,41 @@ export default function Navbar() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!token) return;
+
+    let ignore = false;
+
+    async function syncLatestProfile() {
+      try {
+        const result = await getMyProfileApi();
+        if (ignore || !result?.data) return;
+
+        const latestUser = result.data;
+        const storedUser = getStoredUser();
+        const hasChanged =
+          storedUser?.id !== latestUser.id ||
+          storedUser?.email !== latestUser.email ||
+          storedUser?.nickname !== latestUser.nickname ||
+          storedUser?.avatar_url !== latestUser.avatar_url;
+
+        if (hasChanged) {
+          updateStoredUser(latestUser);
+        } else {
+          setUser(storedUser);
+        }
+      } catch {
+        // Keep the last stored user visible if profile sync fails.
+      }
+    }
+
+    syncLatestProfile();
+
+    return () => {
+      ignore = true;
+    };
+  }, [token]);
+
   if (pathname === "/login" || pathname === "/signup") {
     return null;
   }
@@ -75,8 +119,11 @@ export default function Navbar() {
     removeToken();
     setToken(null);
     setUser(null);
+    setAuthStatus("anonymous");
     router.push("/login");
   };
+
+  const isAuthenticated = authStatus === "authenticated" && token;
 
   return (
     <nav className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur">
@@ -93,11 +140,20 @@ export default function Navbar() {
         </button>
 
         <div className="flex items-center gap-3 text-sm font-semibold">
+          {isAuthenticated && (
+            <button
+              onClick={() => router.push("/mypage")}
+              className="text-slate-700 transition hover:text-red-600"
+            >
+              마이페이지
+            </button>
+          )}
+
           <button
-            onClick={() => router.push("/mypage")}
+            onClick={() => router.push("/mypage?section=projects")}
             className="text-slate-700 transition hover:text-red-600"
           >
-            마이페이지
+            나의 프로젝트
           </button>
 
           {user?.role === "admin" && (
@@ -109,7 +165,11 @@ export default function Navbar() {
             </button>
           )}
 
-          {token ? (
+          {authStatus === "checking" ? (
+            <span className="rounded-lg border border-slate-200 px-4 py-2 text-slate-500">
+              로그인 확인 중
+            </span>
+          ) : isAuthenticated ? (
             <>
               <span className="hidden max-w-[180px] truncate text-slate-500 sm:inline">
                 {user?.nickname || user?.email || "로그인됨"}

@@ -99,11 +99,24 @@ def create_app() -> FastAPI:
 
     app.include_router(api_router, prefix="/api/v1")
 
-    allowed_origins = [
-        origin.strip()
-        for origin in [settings.frontend_origin, "http://localhost:3000", "http://127.0.0.1:3000", "http://3.37.87.121:3000", ]
-        if origin
+    configured_origins = [
+        settings.frontend_origin,
+        settings.frontend_url,
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://3.37.87.121:3000",
+        "https://devory.kr",
+        "https://www.devory.kr",
     ]
+    allowed_origins = []
+    for value in configured_origins:
+        if not value:
+            continue
+        for origin in value.split(","):
+            origin = origin.strip()
+            if origin and origin not in allowed_origins:
+                allowed_origins.append(origin)
+
     if allowed_origins:
         app.add_middleware(
             CORSMiddleware,

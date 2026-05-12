@@ -1,17 +1,36 @@
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+export function getApiBaseUrl() {
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    return process.env.NEXT_PUBLIC_API_BASE_URL;
+  }
+
+  if (typeof window !== "undefined") {
+    const { protocol, hostname } = window.location;
+    if (hostname === "devory.kr" || hostname === "www.devory.kr") {
+      return "https://api.devory.kr";
+    }
+
+    if (hostname && hostname !== "localhost" && hostname !== "127.0.0.1") {
+      return `${protocol}//${hostname}:8000`;
+    }
+  }
+
+  return "http://localhost:8000";
+}
+
+const API_BASE_URL = getApiBaseUrl();
 
 export const AUTH_CHANGED_EVENT = "auth:changed";
 
 let refreshPromise = null;
+let lastSessionExpiredNoticeAt = 0;
 
 function canUseStorage() {
   return typeof window !== "undefined" && typeof localStorage !== "undefined";
 }
 
-function notifyAuthChanged() {
+function notifyAuthChanged(detail = {}) {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
+  window.dispatchEvent(new CustomEvent(AUTH_CHANGED_EVENT, { detail }));
 }
 
 function decodeJwtPayload(token) {
@@ -42,7 +61,7 @@ export function saveToken(token) {
   if (!canUseStorage()) return;
 
   localStorage.setItem("access_token", token);
-  notifyAuthChanged();
+  notifyAuthChanged({ status: "authenticated", reason: "token_saved" });
 }
 
 export function saveAuthSession({ accessToken, refreshToken, userId, user }) {
@@ -59,7 +78,7 @@ export function saveAuthSession({ accessToken, refreshToken, userId, user }) {
     localStorage.setItem("user", JSON.stringify(user));
   }
 
-  notifyAuthChanged();
+  notifyAuthChanged({ status: "authenticated", reason: "session_saved" });
 }
 
 export function getToken() {
@@ -84,14 +103,39 @@ export function getStoredUser() {
   }
 }
 
-export function removeToken() {
+export function updateStoredUser(user) {
+  if (!canUseStorage() || !user) return;
+
+  const currentUser = getStoredUser() || {};
+  localStorage.setItem("user", JSON.stringify({ ...currentUser, ...user }));
+  notifyAuthChanged({ status: "authenticated", reason: "user_updated" });
+}
+
+export function removeToken(options = {}) {
   if (!canUseStorage()) return;
+
+  const reason =
+    typeof options === "string" ? options : options.reason || "manual";
+  const hadSession = Boolean(
+    localStorage.getItem("access_token") ||
+      localStorage.getItem("refresh_token") ||
+      localStorage.getItem("user")
+  );
 
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
   localStorage.removeItem("user_id");
   localStorage.removeItem("user");
-  notifyAuthChanged();
+  notifyAuthChanged({ status: "anonymous", reason, hadSession });
+}
+
+function shouldNotifySessionExpired() {
+  const now = Date.now();
+  if (now - lastSessionExpiredNoticeAt < 2000) {
+    return false;
+  }
+  lastSessionExpiredNoticeAt = now;
+  return true;
 }
 
 export async function refreshAccessToken() {
@@ -117,7 +161,7 @@ export async function refreshAccessToken() {
         return accessToken;
       })
       .catch((error) => {
-        removeToken();
+        removeToken({ reason: "expired" });
         throw error;
       })
       .finally(() => {
@@ -137,33 +181,38 @@ export async function getValidAccessToken() {
 }
 
 export async function authenticatedFetch(input, init = {}) {
+  const { suppressAuthExpiredAlert, ...fetchInit } = init;
+  const hadAuthBeforeRequest = Boolean(getToken() || getRefreshToken());
   const token = await getValidAccessToken().catch(() => null);
-  const headers = new Headers(init.headers || {});
+  const headers = new Headers(fetchInit.headers || {});
 
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const firstResponse = await fetch(input, { ...init, headers });
+  const firstResponse = await fetch(input, { ...fetchInit, headers });
   if (firstResponse.status !== 401) {
     return firstResponse;
   }
 
   const refreshedToken = await refreshAccessToken().catch(() => null);
   if (!refreshedToken) {
+    if (hadAuthBeforeRequest && !suppressAuthExpiredAlert) {
+      removeToken({ reason: "expired" });
+    }
     return firstResponse;
   }
 
-  const retryHeaders = new Headers(init.headers || {});
+  const retryHeaders = new Headers(fetchInit.headers || {});
   retryHeaders.set("Authorization", `Bearer ${refreshedToken}`);
-  return fetch(input, { ...init, headers: retryHeaders });
+  return fetch(input, { ...fetchInit, headers: retryHeaders });
 }
 
 export async function loadCurrentUser() {
   const response = await authenticatedFetch(`${API_BASE_URL}/api/v1/auth/me`);
   if (!response.ok) {
     if (response.status === 401) {
-      removeToken();
+      removeToken({ reason: "expired" });
     }
     throw new Error("현재 로그인 정보를 불러오지 못했습니다.");
   }
@@ -185,4 +234,9 @@ export async function loadCurrentUser() {
   }
 
   return user;
+}
+
+export function notifySessionExpiredIfNeeded() {
+  if (!shouldNotifySessionExpired()) return;
+  window.alert("로그인 시간이 만료되었습니다. 다시 로그인해주세요.");
 }

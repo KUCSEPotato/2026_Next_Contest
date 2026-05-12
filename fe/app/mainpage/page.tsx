@@ -22,6 +22,9 @@ interface Project {
   applicantCount: number;
   remainingSeats: number;
   competitionRatio: number;
+  openRecruitmentCount: number;
+  openRecruitmentRequiredCount: number;
+  openRecruitmentPosition?: string | null;
   createdAt: string;
 }
 
@@ -43,6 +46,12 @@ interface ApiProject {
   remaining_seats?: number;
   competitionRatio?: number;
   competition_ratio?: number;
+  openRecruitmentCount?: number;
+  open_recruitment_count?: number;
+  openRecruitmentRequiredCount?: number;
+  open_recruitment_required_count?: number;
+  openRecruitmentPosition?: string | null;
+  open_recruitment_position?: string | null;
   created_at?: string;
   createdAt?: string;
   status?: string;
@@ -150,6 +159,11 @@ function normalizeProject(project: ApiProject): Project {
     applicantCount: project.applicantCount ?? project.applicant_count ?? 0,
     remainingSeats: project.remainingSeats ?? project.remaining_seats ?? 0,
     competitionRatio: project.competitionRatio ?? project.competition_ratio ?? 0,
+    openRecruitmentCount: project.openRecruitmentCount ?? project.open_recruitment_count ?? 0,
+    openRecruitmentRequiredCount:
+      project.openRecruitmentRequiredCount ?? project.open_recruitment_required_count ?? 0,
+    openRecruitmentPosition:
+      project.openRecruitmentPosition ?? project.open_recruitment_position ?? null,
     status: project.status || "planning",
     difficulty: project.difficulty ?? "beginner",
     isUrgent: false,
@@ -158,6 +172,8 @@ function normalizeProject(project: ApiProject): Project {
 }
 
 function isProjectRecruiting(project: Project) {
+  if (project.openRecruitmentCount > 0) return true;
+
   return (
     project.status !== "in_progress" &&
     project.status !== "completed" &&
@@ -725,13 +741,18 @@ function ProjectCard({
                 : "font-medium text-gray-500"
             }
           >
-            {isRecruiting ? "모집중" : "모집완료"}
+            {project.openRecruitmentCount > 0 ? "재모집중" : isRecruiting ? "모집중" : "모집완료"}
           </span>
         </div>
 
         {isRecruiting && competitionRate && (
           <span className="rounded-full bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-600">
             경쟁률 {competitionRate}:1
+          </span>
+        )}
+        {project.openRecruitmentCount > 0 && (
+          <span className="rounded-full bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-600">
+            {project.openRecruitmentPosition || "재모집"} {project.openRecruitmentRequiredCount}명
           </span>
         )}
       </div>

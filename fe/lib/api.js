@@ -1,7 +1,6 @@
-import { authenticatedFetch, getToken } from "./auth";
+import { authenticatedFetch, getToken, getApiBaseUrl } from "./auth";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const API_BASE_URL = getApiBaseUrl();
 
 export function getImageUrl(url) {
   if (!url) return "";
@@ -560,6 +559,54 @@ export async function getProjectReviewsApi(projectId) {
   return handleResponse(res, "프로젝트 리뷰 목록을 불러오지 못했습니다.");
 }
 
+export async function createProjectRetrospectiveApi(projectId, payload) {
+  const res = await authenticatedFetch(
+    `${API_BASE_URL}/api/v1/projects/${projectId}/retrospectives`,
+    {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    }
+  );
+
+  return handleResponse(res, "회고 작성에 실패했습니다.");
+}
+
+export async function getProjectRetrospectivesApi(projectId) {
+  const res = await authenticatedFetch(
+    `${API_BASE_URL}/api/v1/projects/${projectId}/retrospectives`,
+    {
+      headers: authHeaders(),
+    }
+  );
+
+  return handleResponse(res, "회고 목록을 불러오지 못했습니다.");
+}
+
+export async function getProjectRetrospectiveApi(projectId, retrospectiveId) {
+  const res = await authenticatedFetch(
+    `${API_BASE_URL}/api/v1/projects/${projectId}/retrospectives/${retrospectiveId}`,
+    {
+      headers: authHeaders(),
+    }
+  );
+
+  return handleResponse(res, "회고 상세를 불러오지 못했습니다.");
+}
+
+export async function updateProjectRetrospectiveApi(projectId, retrospectiveId, payload) {
+  const res = await authenticatedFetch(
+    `${API_BASE_URL}/api/v1/projects/${projectId}/retrospectives/${retrospectiveId}`,
+    {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    }
+  );
+
+  return handleResponse(res, "회고 수정에 실패했습니다.");
+}
+
 /* =========================
    Chat
 ========================= */
@@ -866,7 +913,7 @@ export async function getUserProfileApi(userId) {
 
 export async function getUserReceivedReviewsApi(userId) {
   const res = await authenticatedFetch(
-    `${API_BASE_URL}/api/v1/users/${userId}/reviews/received`,
+    `${API_BASE_URL}/api/v1/users/${userId}/reviews`,
     {
       headers: authHeaders(),
     }

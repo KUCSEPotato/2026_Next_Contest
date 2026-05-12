@@ -341,7 +341,7 @@ export default function ProjectDetailPage() {
 
                 <div>
                   <label className="mb-1 block text-sm font-semibold text-slate-700">
-                    모집 인원 (리더 포함)
+                    모집 인원 (리더 포함) (최대 인원: 100명)
                   </label>
                   <input
                     className={inputClassName}
