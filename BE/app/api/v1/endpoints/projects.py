@@ -462,6 +462,10 @@ def _build_project_memoir_context(db: Session, project: Project) -> str:
 
 async def _call_gemini_for_memoir_refine(feelings: str, shortcomings: str, project_context: str = "") -> str:
     if not settings.gemini_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"There is no Gemini API key available",
+        )
         return _fallback_memoir_refine(feelings, shortcomings)
     return await asyncio.to_thread(_sync_call_gemini_for_memoir_refine, feelings, shortcomings, project_context)
 
@@ -514,7 +518,7 @@ def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str, projec
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Gemini API request failed: {str(error)}",
         )
-        return _fallback_memoir_refine(feelings, shortcomings)
+        #return _fallback_memoir_refine(feelings, shortcomings)
 
     text = getattr(response, "text", None) or getattr(response, "content", None)
     if not text:
@@ -530,7 +534,7 @@ def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str, projec
         )
     
     #cleaned_text = _clean_memoir_refine_output((text or "").strip())
-    return text or _fallback_memoir_refine(feelings, shortcomings)
+    return text # or _fallback_memoir_refine(feelings, shortcomings)
 
 
 def _split_ai_todo_item(raw_title: str) -> tuple[str, str, str | None]:
