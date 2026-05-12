@@ -7,6 +7,7 @@ from urllib.parse import unquote, urlparse
 from uuid import uuid4
 
 import boto3
+from botocore.config import Config
 from fastapi import HTTPException, status
 
 from app.core.config import settings
@@ -19,13 +20,21 @@ class S3FileUploadService:
         if not settings.aws_access_key_id or not settings.aws_secret_access_key or not settings.aws_s3_bucket:
             raise RuntimeError("AWS S3 credentials not configured")
 
+        s3_region = settings.aws_s3_region or "ap-northeast-2"
+
         self.s3_client = boto3.client(
             "s3",
-            region_name=settings.aws_s3_region,
+            region_name=s3_region,
+            endpoint_url=f"https://s3.{s3_region}.amazonaws.com",
             aws_access_key_id=settings.aws_access_key_id,
             aws_secret_access_key=settings.aws_secret_access_key,
+            config=Config(
+                signature_version="s3v4",
+                s3={"addressing_style": "virtual"},
+            ),
         )
         self.bucket_name = settings.aws_s3_bucket
+        self.region_name = s3_region
 
     async def upload_file(
         self,
@@ -78,7 +87,7 @@ class S3FileUploadService:
             )
 
             # Generate public URL
-            s3_url = f"https://{self.bucket_name}.s3.{settings.aws_s3_region}.amazonaws.com/{s3_key}"
+            s3_url = f"https://{self.bucket_name}.s3.{self.region_name}.amazonaws.com/{s3_key}"
 
             return {
                 "s3_key": s3_key,
