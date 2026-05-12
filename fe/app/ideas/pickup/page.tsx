@@ -214,11 +214,6 @@ export default function InspirationWellPage() {
             당신의 손길로 다시 꽃피울 씨앗을 살펴보세요.
           </p>
 
-          <div className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50/70 px-4 py-1.5 text-xs font-medium text-amber-700 backdrop-blur-sm">
-            <span>🪙</span>
-            <span>아이디어 열람 시 코인 1개가 차감됩니다</span>
-          </div>
-
           <div className="mx-auto mt-8 grid max-w-5xl grid-cols-1 gap-4 text-left sm:grid-cols-3">
             {SERVICE_BLOCKS.map((block) => (
               <button
@@ -305,12 +300,19 @@ export default function InspirationWellPage() {
         </section>
 
         <section>
-          <div className="mb-4 flex items-center justify-between">
-            <p className="text-sm font-semibold text-slate-600">
-              {searchQuery || selectedCategory !== "전체"
-                ? `검색 결과 (${filtered.length})`
-                : `${filtered.length}개의 아이디어가 잠들어 있어요`}
-            </p>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-semibold text-slate-600">
+                {searchQuery || selectedCategory !== "전체"
+                  ? `검색 결과 (${filtered.length})`
+                  : `${filtered.length}개의 아이디어가 잠들어 있어요`}
+              </p>
+
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50/80 px-3 py-1 text-xs font-medium text-amber-700">
+                <span>🪙</span>
+                <span>아이디어 열람 시 코인 1개가 차감됩니다</span>
+              </span>
+            </div>
 
             {(searchQuery || selectedCategory !== "전체") && (
               <button
