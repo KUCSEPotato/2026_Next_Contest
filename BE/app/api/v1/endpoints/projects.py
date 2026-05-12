@@ -1779,9 +1779,7 @@ async def complete_team(
 
     동작:
     - 리더 권한 확인
-    - 현재 활성 ProjectMember 수가 min_members 이상인지 확인
-    - 부족하면 400 반환
-    - 충분하면 project.status를 in_progress로 변경
+    - project.status를 in_progress로 변경
     - 팀원들에게 알림 생성
     - 프로젝트 이름으로 팀 채팅방 생성
     - 팀 채팅방에 시스템 메시지 추가
@@ -1790,11 +1788,7 @@ async def complete_team(
     _ensure_project_leader(project, current_user_id)
 
     active_members = _get_active_project_member_ids(db, project_id)
-    if len(active_members) < project.min_members:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Not enough members to complete team",
-        )
+    active_members.add(project.leader_id)
 
     project.status = "in_progress"
 

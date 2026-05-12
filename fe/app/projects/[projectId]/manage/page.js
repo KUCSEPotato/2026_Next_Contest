@@ -75,7 +75,6 @@ export default function ProjectManagePage() {
   const currentMemberCount =
     project?.currentMembers ?? project?.current_members ?? project?.members?.length ?? 1;
   const displayCurrentMemberCount = Math.max(currentMemberCount, acceptedCount + 1);
-  const isTeamFull = maxMembers > 0 && displayCurrentMemberCount >= maxMembers;
   const canAcceptMore = !maxMembers || displayCurrentMemberCount < maxMembers;
   const doneTodoCount = todos.filter((todo) => todo.status === "done").length;
   const todoCompletionRate = todos.length
@@ -84,6 +83,7 @@ export default function ProjectManagePage() {
   const canCompleteProject =
     project?.status === "in_progress" && todos.length > 0 && todoCompletionRate >= 70;
   const isProjectCompleted = project?.status === "completed";
+  const canCompleteTeam = project?.status !== "in_progress" && !isProjectCompleted;
 
   const reloadProjectAndTodos = async () => {
     const [proj, todoResult] = await Promise.all([
@@ -265,10 +265,10 @@ export default function ProjectManagePage() {
             {maxMembers ? `${maxMembers}명 (리더 포함)` : "제한 없음"}
           </div>
 
-          {(isTeamFull || project?.status === "in_progress") && !isProjectCompleted && (
+          {!isProjectCompleted && (
             <button
               onClick={handleCompleteTeam}
-              disabled={isCompletingTeam || project?.status === "in_progress"}
+              disabled={isCompletingTeam || !canCompleteTeam}
               className="mt-4 w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
             >
               {project?.status === "in_progress"
