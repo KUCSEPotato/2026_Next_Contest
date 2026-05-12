@@ -1,4 +1,5 @@
 import asyncio
+import re
 from datetime import datetime, timezone, date
 from collections import defaultdict
 from math import ceil
@@ -62,6 +63,69 @@ from app.core.realtime import realtime_hub
 router = APIRouter()
 
 TODO_FINALIZED_MARKER_TITLE = "__team_todo_finalized__"
+
+
+IDEA_DESCRIPTION_SECTION_LABELS = (
+    "예상 진행 기간",
+    "이런 분과 함께하고 싶어요",
+)
+
+
+def _normalize_skill_name(skill_name: str) -> str:
+    return re.sub(r"\s+", " ", skill_name.strip()).lower()
+
+
+def _extract_idea_description_parts(description: str | None) -> dict[str, str]:
+    text = description or ""
+    labels = "|".join(re.escape(label) for label in IDEA_DESCRIPTION_SECTION_LABELS)
+    pattern = re.compile(
+        rf"<b>\[\s*(?P<label>{labels})\s*\]</b>\s*(?P<value>.*?)(?=\n\s*<b>\[|$)",
+        re.DOTALL,
+    )
+    sections = {match.group("label"): match.group("value").strip() for match in pattern.finditer(text)}
+    clean_description = pattern.sub("", text).strip()
+
+    return {
+        "description": clean_description,
+        "expected_period": sections.get("예상 진행 기간", ""),
+        "preferred_members": sections.get("이런 분과 함께하고 싶어요", ""),
+    }
+
+
+def _compose_idea_description(
+    description: str,
+    expected_period: str | None = None,
+    preferred_members: str | None = None,
+) -> str:
+    parts = [description.strip()]
+    if expected_period and expected_period.strip():
+        parts.append(f"<b>[ 예상 진행 기간 ]</b>\n{expected_period.strip()}")
+    if preferred_members and preferred_members.strip():
+        parts.append(f"<b>[ 이런 분과 함께하고 싶어요 ]</b>\n{preferred_members.strip()}")
+    return "\n\n".join(part for part in parts if part)
+
+
+def _sync_project_skills(db: Session, project_id: int, tech_stack: list[str]) -> None:
+    db.query(ProjectSkill).filter(ProjectSkill.project_id == project_id).delete()
+    seen_skill_ids: set[int] = set()
+
+    for skill_name in tech_stack:
+        skill_name = skill_name.strip()
+        if not skill_name:
+            continue
+
+        normalized_name = _normalize_skill_name(skill_name)
+        skill = db.query(Skill).filter(Skill.normalized_name == normalized_name).first()
+        if skill is None:
+            skill = Skill(name=skill_name, normalized_name=normalized_name)
+            db.add(skill)
+            db.flush()
+
+        if skill.id in seen_skill_ids:
+            continue
+
+        db.add(ProjectSkill(project_id=project_id, skill_id=skill.id))
+        seen_skill_ids.add(skill.id)
 
 
 def _calculate_days_left(deadline: date | None) -> int | None:
@@ -627,20 +691,31 @@ async def get_project(project_id: int, db: Session = Depends(get_db)) -> dict:
         ProjectSkill, ProjectSkill.skill_id == Skill.id
     ).filter(ProjectSkill.project_id == project_id).all()
     tech_stack_list = [s[0] for s in tech_stack]
+    source_idea = db.get(Idea, project.idea_id) if project.idea_id else None
+    idea_parts = _extract_idea_description_parts(source_idea.description if source_idea else "")
+    project_parts = _extract_idea_description_parts(project.description)
     
     return success_response(
         data={
             "id": project.id,
+            "idea_id": project.idea_id,
             "title": project.title,
             "summary": project.summary,
-            "description": project.description,
+            "description": project_parts["description"] or idea_parts["description"],
             "status": project.status,
             "difficulty": project.difficulty,
+            "category": project.category,
+            "domain": project.category,
             "progress_percent": float(project.progress_percent),
             "leader_id": project.leader_id,
             "currentMembers": len(members),
             "maxMembers": project.max_members,
+            "max_members": project.max_members,
             "techStack": tech_stack_list,
+            "tech_stack": tech_stack_list,
+            "hashtags": source_idea.hashtags if source_idea else [],
+            "expected_period": idea_parts["expected_period"] or project_parts["expected_period"],
+            "preferred_members": idea_parts["preferred_members"] or project_parts["preferred_members"],
             "members": [
                 _serialize_project_member(member, member_users.get(member.user_id))
                 for member in members
@@ -832,8 +907,42 @@ async def update_project(
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
 
-    for field, value in payload.model_dump(exclude_none=True).items():
+    payload_data = payload.model_dump(exclude_none=True)
+    tech_stack = payload_data.pop("tech_stack", None)
+    hashtags = payload_data.pop("hashtags", None)
+    expected_period = payload_data.pop("expected_period", None)
+    preferred_members = payload_data.pop("preferred_members", None)
+
+    for field, value in payload_data.items():
         setattr(project, field, value)
+
+    if tech_stack is not None:
+        _sync_project_skills(db, project_id, tech_stack)
+
+    source_idea = db.get(Idea, project.idea_id) if project.idea_id else None
+    if source_idea is not None:
+        if "title" in payload_data:
+            source_idea.title = project.title
+        if "summary" in payload_data:
+            source_idea.summary = project.summary
+        if "difficulty" in payload_data:
+            source_idea.difficulty = project.difficulty
+        if "category" in payload_data:
+            source_idea.domain = project.category
+        if "max_members" in payload_data:
+            source_idea.required_members = project.max_members
+        if tech_stack is not None:
+            source_idea.tech_stack = tech_stack
+        if hashtags is not None:
+            source_idea.hashtags = hashtags
+
+        idea_parts = _extract_idea_description_parts(source_idea.description)
+        clean_description = payload_data.get("description", idea_parts["description"])
+        source_idea.description = _compose_idea_description(
+            clean_description,
+            expected_period if expected_period is not None else idea_parts["expected_period"],
+            preferred_members if preferred_members is not None else idea_parts["preferred_members"],
+        )
 
     db.commit()
     db.refresh(project)
