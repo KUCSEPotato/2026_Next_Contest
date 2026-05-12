@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { PostSummary, User, ReactionType } from "./_types";
 import { getPosts, deletePost, reactToPost, getHotPosts } from "./_lib/api";
@@ -73,6 +73,7 @@ export default function CommunityPage() {
     latest: PostSummary | null;
   } | null>(null);
   const [loadingHot, setLoadingHot] = useState(false);
+  const reactingPostIds = useRef(new Set<number>());
 
   useEffect(() => {
     window.setTimeout(() => {
@@ -140,17 +141,20 @@ export default function CommunityPage() {
       setShowLoginModal(true);
       return;
     }
+    if (reactingPostIds.current.has(postId)) return;
+    reactingPostIds.current.add(postId);
     try {
       const result = await reactToPost(postId, type);
       setPosts((prev) =>
         prev.map((p) => {
           if (p.id !== postId) return p;
-          const prevReaction = p.user_reaction;
           const newStats = { ...p.reaction_stats };
           if (result.action === "removed") {
-            newStats[type] = Math.max(0, newStats[type] - 1);
+            const rt = result.reaction_type;
+            newStats[rt] = Math.max(0, newStats[rt] - 1);
             return { ...p, user_reaction: null, reaction_stats: newStats };
           }
+          const prevReaction = p.user_reaction;
           if (prevReaction && prevReaction !== type) {
             newStats[prevReaction] = Math.max(0, newStats[prevReaction] - 1);
           }
@@ -164,6 +168,8 @@ export default function CommunityPage() {
       );
     } catch (e) {
       console.error(e);
+    } finally {
+      reactingPostIds.current.delete(postId);
     }
   };
 

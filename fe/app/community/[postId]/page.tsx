@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import {
   PostDetail,
@@ -87,6 +87,8 @@ export default function PostDetailPage() {
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const postReactBusy = useRef(false);
+  const commentReactBusy = useRef(new Set<number>());
 
   useEffect(() => {
     Promise.resolve().then(() => {
@@ -144,27 +146,33 @@ export default function PostDetailPage() {
   const handleReactPost = async (type: ReactionType) => {
     if (!currentUser) { setShowLoginModal(true); return; }
     if (!post) return;
+    if (postReactBusy.current) return;
+    postReactBusy.current = true;
     try {
-      await reactToPost(pid, type);
+      const result = await reactToPost(pid, type);
       setPost((p) => {
         if (!p) return p;
-        const prevReaction = p.user_reaction;
-        const isRemoving = prevReaction === type;
         const newStats = { ...p.reaction_stats };
-        if (prevReaction) {
+        if (result.action === "removed") {
+          const rt = result.reaction_type;
+          newStats[rt] = Math.max(0, newStats[rt] - 1);
+          return { ...p, user_reaction: null, reaction_stats: newStats };
+        }
+        const prevReaction = p.user_reaction;
+        if (prevReaction && prevReaction !== type) {
           newStats[prevReaction] = Math.max(0, newStats[prevReaction] - 1);
         }
-        if (!isRemoving) {
-          newStats[type] = newStats[type] + 1;
-        }
+        newStats[type] = newStats[type] + 1;
         return {
           ...p,
-          user_reaction: isRemoving ? null : type,
+          user_reaction: type,
           reaction_stats: newStats,
         };
       });
     } catch (e) {
       console.error(e);
+    } finally {
+      postReactBusy.current = false;
     }
   };
 
@@ -254,28 +262,38 @@ export default function PostDetailPage() {
   // ── 댓글 반응 (단일 선택) ────────────────────────────────────────────────────
   const handleReactComment = async (commentId: number, type: ReactionType) => {
     if (!currentUser) { setShowLoginModal(true); return; }
+    if (commentReactBusy.current.has(commentId)) return;
+    commentReactBusy.current.add(commentId);
     try {
-      await reactToComment(pid, commentId, type);
+      const result = await reactToComment(pid, commentId, type);
       setComments((prev) =>
         updateCommentInTree(prev, commentId, (c) => {
-          const prevReaction = c.user_reaction;
-          const isRemoving = prevReaction === type;
           const newStats = { ...c.reaction_stats };
-          if (prevReaction) {
+          if (result.action === "removed") {
+            const rt = result.reaction_type;
+            newStats[rt] = Math.max(0, newStats[rt] - 1);
+            return {
+              ...c,
+              user_reaction: null,
+              reaction_stats: newStats,
+            };
+          }
+          const prevReaction = c.user_reaction;
+          if (prevReaction && prevReaction !== type) {
             newStats[prevReaction] = Math.max(0, newStats[prevReaction] - 1);
           }
-          if (!isRemoving) {
-            newStats[type] = newStats[type] + 1;
-          }
+          newStats[type] = newStats[type] + 1;
           return {
             ...c,
-            user_reaction: isRemoving ? null : type,
+            user_reaction: type,
             reaction_stats: newStats,
           };
         })
       );
     } catch (e) {
       console.error(e);
+    } finally {
+      commentReactBusy.current.delete(commentId);
     }
   };
 

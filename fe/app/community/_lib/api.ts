@@ -115,7 +115,7 @@ export async function getHotPosts(): Promise<{
   latest: PostSummary | null;
 }> {
   const fetchTop1 = async (sort_by: string): Promise<PostSummary | null> => {
-    const res = await fetch(`${BASE}?sort_by=${sort_by}&page=1&page_size=1`, {
+    const res = await authenticatedFetch(`${BASE}?sort_by=${sort_by}&page=1&page_size=1`, {
       headers: authHeaders(),
     });
     const data = await handleResponse<{ posts: PostSummary[] }>(res);
