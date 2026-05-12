@@ -217,7 +217,7 @@ export async function authenticatedFetch(input, init = {}) {
 export async function loadCurrentUser() {
   const response = await authenticatedFetch(`${API_BASE_URL}/api/v1/auth/me`);
   if (!response.ok) {
-    if (response.status === 401) {
+    if (response.status === 401 || response.status === 403 || response.status === 404) {
       removeToken({ reason: "expired" });
     }
     throw new Error("현재 로그인 정보를 불러오지 못했습니다.");

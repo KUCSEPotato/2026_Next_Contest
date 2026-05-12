@@ -3,7 +3,13 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { authenticatedFetch, getApiBaseUrl, saveAuthSession } from "../../lib/auth";
+import {
+  authenticatedFetch,
+  getApiBaseUrl,
+  loadCurrentUser,
+  removeToken,
+  saveAuthSession,
+} from "../../lib/auth";
 
 // ─── 상수 ────────────────────────────────────────────────────────────────────
 const API_BASE = getApiBaseUrl();
@@ -141,12 +147,18 @@ export default function SignupPage() {
     const via = params.get("via");
     const tokenFromQuery = params.get("access_token");
 
-    if (via === "github" && tokenFromQuery) {
-      queueMicrotask(() => {
+    if (via !== "github" || !tokenFromQuery) {
+      removeToken({ reason: "signup_entry" });
+      return;
+    }
+
+    queueMicrotask(async () => {
+      try {
         saveAuthSession({
           accessToken: tokenFromQuery,
           userId: params.get("user_id"),
         });
+        await loadCurrentUser();
         setAccessToken(tokenFromQuery);
 
         // 신규 유저는 온보딩 Step2, 기존 유저는 메인으로 이동
@@ -155,8 +167,13 @@ export default function SignupPage() {
         } else if (stepParam === "profile") {
           router.push("/mainpage");
         }
-      });
-    }
+      } catch (error) {
+        console.error(error);
+        removeToken({ reason: "invalid_signup_token" });
+        setAccessToken("");
+        window.history.replaceState(null, "", "/signup");
+      }
+    });
   }, [router]);
 
   // ── GitHub OAuth ─────────────────────────────────────────────────────────
