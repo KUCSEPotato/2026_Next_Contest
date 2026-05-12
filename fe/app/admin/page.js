@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   createAdminNoticeApi,
   grantAdminUserCoinsApi,
+  revokeAdminUserCoinsApi,
   getAdminOverviewApi,
   getAdminPaymentsApi,
   getAdminProjectsApi,
@@ -13,6 +14,9 @@ import {
   updateAdminPaymentApi,
   updateAdminReportApi,
   updateAdminUserStatusApi,
+  getAdminMyPostsApi,
+  adminUpdatePostApi,
+  adminDeletePostApi,
 } from "../../lib/api";
 import { getStoredUser, getToken, loadCurrentUser } from "../../lib/auth";
 
@@ -64,6 +68,7 @@ export default function AdminPage() {
   const [projects, setProjects] = useState([]);
   const [reports, setReports] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [adminPosts, setAdminPosts] = useState([]);
   const [userSearch, setUserSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState("");
   const [userActiveFilter, setUserActiveFilter] = useState("");
@@ -105,6 +110,7 @@ export default function AdminPage() {
           getAdminProjectsApi(),
           getAdminReportsApi({ scope: reportScope }),
           getAdminPaymentsApi(),
+          getAdminMyPostsApi(),
         ]);
 
       setOverview(overviewResult.data || null);
@@ -112,6 +118,9 @@ export default function AdminPage() {
       setProjects(projectsResult.data || []);
       setReports(reportsResult.data || []);
       setPayments(paymentsResult.data || []);
+      setAdminPosts((paymentsResult && paymentsResult.data) || (typeof paymentsResult === 'undefined' ? [] : []));
+      // above is placeholder; set adminPosts from the correct result below
+      setAdminPosts((await getAdminMyPostsApi().then(r=>r.data).catch(()=>[])) || []);
     } catch (err) {
       console.error(err);
       setError(
@@ -309,6 +318,41 @@ export default function AdminPage() {
       alert("공지글을 작성했습니다.");
     } catch (err) {
       alert(err instanceof Error ? err.message : "공지 작성에 실패했습니다.");
+    } finally {
+      setProcessingKey("");
+    }
+  }
+
+  async function handleEditAdminPost(postId) {
+    const post = adminPosts.find((p) => p.id === postId);
+    if (!post) return;
+
+    const newTitle = window.prompt("제목을 입력하세요", post.title);
+    if (newTitle === null) return;
+    const newContent = window.prompt("내용을 입력하세요", post.content);
+    if (newContent === null) return;
+
+    try {
+      setProcessingKey(`admin-post-edit-${postId}`);
+      await adminUpdatePostApi(postId, { title: newTitle.trim(), content: newContent.trim() });
+      setAdminPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, title: newTitle, content: newContent } : p)));
+      alert("게시물을 수정했습니다.");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "게시물 수정에 실패했습니다.");
+    } finally {
+      setProcessingKey("");
+    }
+  }
+
+  async function handleDeleteAdminPost(postId) {
+    if (!window.confirm("정말로 삭제하시겠습니까? (soft delete)")) return;
+    try {
+      setProcessingKey(`admin-post-delete-${postId}`);
+      await adminDeletePostApi(postId);
+      setAdminPosts((prev) => prev.filter((p) => p.id !== postId));
+      alert("게시물을 삭제했습니다.");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "게시물 삭제에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
@@ -708,6 +752,25 @@ export default function AdminPage() {
                         공지 작성
                       </button>
                     </div>
+                  </div>
+                </div>
+                <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4">
+                  <h2 className="text-base font-bold text-slate-950">내가 작성한 공지/이벤트</h2>
+                  <p className="mt-1 text-sm text-slate-500">관리자 계정으로 작성한 공지 및 이벤트 글을 수정하거나 삭제할 수 있습니다.</p>
+                  <div className="mt-4 divide-y divide-slate-100">
+                    {adminPosts.length === 0 && <EmptyLine text="작성한 공지/이벤트 글이 없습니다." />}
+                    {adminPosts.map((p) => (
+                      <div key={p.id} className="flex items-start justify-between gap-3 py-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-900">{p.title} · {p.category}</p>
+                          <p className="mt-1 line-clamp-2 text-xs text-slate-500">{p.content}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => handleEditAdminPost(p.id)} className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white">수정</button>
+                          <button onClick={() => handleDeleteAdminPost(p.id)} className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white">삭제</button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
