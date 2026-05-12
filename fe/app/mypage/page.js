@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ProgressBloom from "../../components/ProgressBloom";
 import { removeToken, updateStoredUser } from "../../lib/auth";
-import { useToast } from "../../components/AppFeedback";
+import { useDialog, useToast } from "../../components/AppFeedback";
 import {
   getMyProfileApi,
   getMyReputationApi,
@@ -29,6 +29,7 @@ import {
 export default function MyPage() {
   const router = useRouter();
   const toast = useToast();
+  const { confirm } = useDialog();
   const projectHistoryRef = useRef(null);
 
   const [profile, setProfile] = useState(null);
@@ -355,9 +356,13 @@ export default function MyPage() {
   };
 
   const handleWithdrawAccount = async () => {
-    const confirmed = window.confirm(
-      "회원 탈퇴 후 계정은 복구할 수 없습니다. 정말 탈퇴하시겠습니까?"
-    );
+    const confirmed = await confirm({
+      title: "회원 탈퇴",
+      message: "회원 탈퇴 후 계정은 복구할 수 없습니다. 정말 탈퇴하시겠습니까?",
+      confirmText: "탈퇴하기",
+      cancelText: "취소",
+      tone: "danger",
+    });
 
     if (!confirmed) return;
 
