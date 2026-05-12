@@ -436,7 +436,7 @@ export default function ProjectManagePage() {
                   onClick={() => router.push(`/memoir?projectId=${projectId}`)}
                   className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
                 >
-                  텃밭일기
+                  개발자의 텃밭일기
                 </button>
               )}
             </div>
