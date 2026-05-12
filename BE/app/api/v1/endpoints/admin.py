@@ -49,8 +49,8 @@ def _ensure_admin(db: Session, user_id: int) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin permission required")
 
 
-def _takedown_body(target_label: str, reason: str | None) -> str:
-    base_message = f"작성하신 {target_label}이 관리자에 의해 내려졌습니다."
+def _takedown_body(target_label: str, target_title: str, reason: str | None) -> str:
+    base_message = f"작성하신 {target_label} '{target_title}'이 관리자에 의해 내려졌습니다."
     if reason:
         return f"{base_message}\n사유: {reason}"
     return base_message
@@ -70,8 +70,8 @@ def _notify_admin_takedown(
         Notification(
             user_id=user_id,
             type="admin_takedown",
-            title=f"{target_label}이 관리자에 의해 내려졌습니다",
-            body=_takedown_body(target_label, reason),
+            title=f"{target_label} '{target_title}'이 내려졌습니다",
+            body=_takedown_body(target_label, target_title, reason),
             data={
                 "target_type": target_type,
                 "target_id": target_id,
