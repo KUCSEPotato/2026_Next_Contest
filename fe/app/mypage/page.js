@@ -28,6 +28,7 @@ export default function MyPage() {
   const projectHistoryRef = useRef(null);
 
   const [profile, setProfile] = useState(null);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [reputation, setReputation] = useState(null);
   const [stats, setStats] = useState(null);
   const [projects, setProjects] = useState([]);
@@ -74,6 +75,7 @@ export default function MyPage() {
       console.log("업로드 결과:", result);
       console.log("avatarUrl:", avatarUrl);
 
+      setAvatarLoadFailed(false);
 
       setProfile((prev) => ({
         ...prev,
@@ -81,6 +83,7 @@ export default function MyPage() {
       }));
 
       setEditAvatarUrl(avatarUrl);
+      await reloadProfile();
 
       alert("프로필 이미지가 업로드되었습니다.");
     } catch (error) {
@@ -100,6 +103,7 @@ export default function MyPage() {
     const profileData = profileResult.data;
 
     setProfile(profileData);
+    setAvatarLoadFailed(false);
     setEditNickname(profileData.nickname || "");
     setEditBio(profileData.bio || "");
     setEditAvatarUrl(profileData.avatar_url || "");
@@ -415,6 +419,11 @@ export default function MyPage() {
     projectStatusFilter,
     projectSortOrder
   );
+  const avatarUrl =
+    profile?.avatar_url && !avatarLoadFailed
+      ? getImageUrl(profile.avatar_url)
+      : "";
+  const avatarFallback = profile?.nickname?.[0] || "D";
 
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
@@ -422,26 +431,21 @@ export default function MyPage() {
         <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
           <div className="flex items-center justify-between gap-6">
             <div className="flex items-center gap-6">
-            <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-red-100 text-3xl font-bold text-red-600">
-              {profile?.avatar_url ? (
-                <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-red-100 text-3xl font-bold text-red-600">
-                  {profile?.avatar_url ? (
-                    <img
-                      src={getImageUrl(profile.avatar_url)}
-                      alt=""
-                      className="h-full w-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  ) : (
-                    profile?.nickname?.[0] || "D"
-                  )}
-                </div>
-              ) : (
-                profile?.nickname?.[0] || "D"
-              )}
-            </div>
+              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-red-100 text-3xl font-bold text-red-600">
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt={`${profile?.nickname || "사용자"} 프로필 이미지`}
+                    className="h-full w-full object-cover"
+                    onError={() => {
+                      console.error("프로필 이미지 로드 실패:", avatarUrl);
+                      setAvatarLoadFailed(true);
+                    }}
+                  />
+                ) : (
+                  avatarFallback
+                )}
+              </div>
 
             <div>
               <h1 className="text-3xl font-bold text-slate-900">
