@@ -418,13 +418,55 @@ def _fallback_memoir_refine(feelings: str, shortcomings: str) -> str:
     return "\n\n".join(parts)
 
 
-async def _call_gemini_for_memoir_refine(feelings: str, shortcomings: str) -> str:
+def _clean_memoir_refine_output(text: str) -> str:
+    forbidden_patterns = [
+        r"아래\s*프로젝트\s*맥락",
+        r"해석을\s*위한\s*배경",
+        r"그대로\s*(인용|옮겨|나열)",
+        r"프로젝트\s*(분야|난이도|기술|키워드|제목|한줄|상세)",
+        r"사용자가\s*고른\s*키워드",
+        r"성장\s*키워드\s*[:：]",
+        r"느낀\s*점\s*[:：]",
+        r"배운\s*점\s*[:：]",
+        r"다음\s*액션\s*[:：]",
+        r"부족했던\s*점\s*[:：]",
+    ]
+    cleaned_lines: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            if cleaned_lines and cleaned_lines[-1] != "":
+                cleaned_lines.append("")
+            continue
+        if any(re.search(pattern, stripped, re.IGNORECASE) for pattern in forbidden_patterns):
+            continue
+        cleaned_lines.append(stripped)
+
+    cleaned = "\n".join(cleaned_lines).strip()
+    return re.sub(r"\n{3,}", "\n\n", cleaned)
+
+
+def _build_project_memoir_context(db: Session, project: Project) -> str:
+    tech_stack = db.query(Skill.name).join(
+        ProjectSkill,
+        ProjectSkill.skill_id == Skill.id,
+    ).filter(ProjectSkill.project_id == project.id).all()
+    tech_stack_list = [skill[0] for skill in tech_stack if skill and skill[0]]
+    context_parts = [
+        f"분야={project.category}" if project.category else "",
+        f"난이도={project.difficulty}" if project.difficulty else "",
+        f"기술={', '.join(tech_stack_list[:5])}" if tech_stack_list else "",
+    ]
+    return " / ".join(part for part in context_parts if part)
+
+
+async def _call_gemini_for_memoir_refine(feelings: str, shortcomings: str, project_context: str = "") -> str:
     if not settings.gemini_api_key:
         return _fallback_memoir_refine(feelings, shortcomings)
-    return await asyncio.to_thread(_sync_call_gemini_for_memoir_refine, feelings, shortcomings)
+    return await asyncio.to_thread(_sync_call_gemini_for_memoir_refine, feelings, shortcomings, project_context)
 
 
-def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str) -> str:
+def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str, project_context: str = "") -> str:
     prompt = (
         "당신은 사용자의 프로젝트 경험을 바탕으로 성장 회고를 작성해주는 AI 코치입니다.\n"
         "목표는 입력 내용을 요약하거나 예쁘게 고쳐 쓰는 것이 아니라, "
@@ -445,7 +487,8 @@ def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str) -> str
         "    이 제안에는 다음에 해볼 만한 프로젝트 유형과, 그 프로젝트가 어떤 역량을 성장시킬 수 있는지 포함하세요.\n"
         "11. 제목, JSON, 마크다운, 따옴표, 불릿 목록은 쓰지 마세요.\n\n"
 
-        "아래 정보는 그대로 옮겨 쓰기 위한 내용이 아니라, 회고를 작성하기 위한 참고 자료입니다.\n\n"
+        "아래 프로젝트 맥락은 내부 참고용입니다. 출력에 이 항목명이나 값을 직접 쓰지 마세요.\n"
+        f"[내부 참고 맥락]\n{project_context or '별도 프로젝트 맥락 없음'}\n\n"
 
         "[사용자의 성장 기록]\n"
         f"{feelings}\n\n"
@@ -474,7 +517,8 @@ def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str) -> str
             candidate = candidates[0]
             text = getattr(candidate, "content", None) or getattr(candidate, "output", None) or ""
 
-    return (text or "").strip()
+    cleaned_text = _clean_memoir_refine_output((text or "").strip())
+    return cleaned_text or _fallback_memoir_refine(feelings, shortcomings)
 
 
 def _split_ai_todo_item(raw_title: str) -> tuple[str, str, str | None]:
@@ -1780,7 +1824,7 @@ async def refine_memoir(
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict:
-    _get_project_or_404(db, project_id)
+    project = _get_project_or_404(db, project_id)
     _ensure_project_member(db, project_id, current_user_id)
 
     feelings = payload.felt_point.strip()
@@ -1788,7 +1832,8 @@ async def refine_memoir(
     if not feelings and not shortcomings:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="felt_point and lacked_point are required")
 
-    refined_text = await _call_gemini_for_memoir_refine(feelings, shortcomings)
+    project_context = _build_project_memoir_context(db, project)
+    refined_text = await _call_gemini_for_memoir_refine(feelings, shortcomings, project_context)
     return success_response(data={"refined_memoir": refined_text})
 
 
