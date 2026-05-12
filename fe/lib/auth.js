@@ -1,17 +1,22 @@
 export function getApiBaseUrl() {
-  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
-    return process.env.NEXT_PUBLIC_API_BASE_URL;
-  }
-
   if (typeof window !== "undefined") {
     const { protocol, hostname } = window.location;
+
     if (hostname === "devory.kr" || hostname === "www.devory.kr") {
       return "https://api.devory.kr";
+    }
+
+    if (hostname === "3.37.87.121") {
+      return "http://3.37.87.121:8000";
     }
 
     if (hostname && hostname !== "localhost" && hostname !== "127.0.0.1") {
       return `${protocol}//${hostname}:8000`;
     }
+  }
+
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    return process.env.NEXT_PUBLIC_API_BASE_URL.replace(/\/$/, "");
   }
 
   return "http://localhost:8000";
