@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   confirmTodosApi,
   createTodoApi,
@@ -25,6 +25,7 @@ const TODO_STAGES = [
 
 export default function ChatRoomPage() {
   const params = useParams();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const roomId = params.roomId;
   const projectId = searchParams.get("projectId");
@@ -565,11 +566,24 @@ export default function ChatRoomPage() {
               </button>
             </div>
             <div className="mt-3 flex items-center justify-between gap-2">
-              <p className="text-xs text-slate-500">
-                {isTodoFinalized
-                  ? "확정된 체크리스트입니다. 수정/추가는 진행 관리 페이지에서 할 수 있습니다."
-                  : "채팅방에서 초안을 만들고 확정하면 진행 관리 페이지로 넘깁니다."}
-              </p>
+              {isTodoFinalized ? (
+                <p className="text-xs text-slate-500">
+                  확정된 체크리스트입니다. 수정/추가는{" "}
+                  <button
+                    type="button"
+                    onClick={() => projectId && router.push(`/projects/${projectId}/manage`)}
+                    disabled={!projectId}
+                    className="font-semibold text-red-600 underline-offset-2 transition hover:text-red-700 hover:underline disabled:cursor-not-allowed disabled:text-slate-400"
+                  >
+                    진행 관리 페이지
+                  </button>
+                  에서 할 수 있습니다.
+                </p>
+              ) : (
+                <p className="text-xs text-slate-500">
+                  채팅방에서 초안을 만들고 확정하면 진행 관리 페이지로 넘깁니다.
+                </p>
+              )}
 
               {!isTodoFinalized && (
                 <button

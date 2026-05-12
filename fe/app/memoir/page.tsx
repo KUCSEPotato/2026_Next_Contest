@@ -337,7 +337,9 @@ function GrowthModal({
       <div style={{ background: "#fff", borderRadius: "24px 24px 0 0", width: "100%", maxWidth: 480, padding: "22px 22px 40px", maxHeight: "85vh", overflowY: "auto" }}>
         <div style={{ width: 38, height: 4, background: "#f0d0d0", borderRadius: 4, margin: "0 auto 18px" }} />
         <p style={{ fontSize: 20, fontWeight: 800, color: "#5c0a0a", marginBottom: 4 }}>🌹 성장 기록하기</p>
-        <p style={{ fontSize: 13, color: "#c08080", marginBottom: 22 }}>이 프로젝트에서 새롭게 도전한 것들을 골라봐요</p>
+        <p style={{ fontSize: 13, color: "#c08080", marginBottom: 22 }}>
+          새롭게 도전한 점과 회고 내용을 수정한 뒤 AI 요약본을 다시 만들 수 있어요.
+        </p>
 
         {[
           { title: "기술 스택", chips: TECH_CHIPS, selected: selectedTech, setSelected: setSelectedTech },
@@ -409,13 +411,20 @@ function GrowthModal({
             marginBottom: 12,
           }}
         >
-          {generating ? "AI가 회고록을 만드는 중..." : "AI에게 회고록 만들기"}
+          {generating
+            ? "AI 요약본 만드는 중..."
+            : aiMemoir.trim()
+              ? "AI 요약본 다시 만들기"
+              : "AI 요약본 만들기"}
         </button>
 
         {aiMemoir.trim() && (
           <div style={{ marginBottom: 14 }}>
             <p style={{ fontSize: 12, color: "#a83030", fontWeight: 700, marginBottom: 9 }}>
               AI 회고록 초안
+            </p>
+            <p style={{ fontSize: 12, color: "#c08080", lineHeight: 1.7, marginBottom: 8 }}>
+              아직 저장되지 않은 초안입니다. 위 내용을 수정한 뒤 AI 요약본을 다시 만들거나, 아래에서 초안을 직접 다듬을 수 있어요.
             </p>
             <textarea
               value={aiMemoir}
@@ -435,7 +444,7 @@ function GrowthModal({
             cursor: saving ? "not-allowed" : "pointer", marginTop: 6,
           }}
         >
-          {saving ? "저장 중..." : "수확 기록 저장하기 🌹"}
+          {saving ? "저장 중..." : "수확일기 저장하기 🌹"}
         </button>
       </div>
     </div>
