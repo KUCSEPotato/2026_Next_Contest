@@ -340,8 +340,15 @@ function GrowthModal({
   async function handleGenerate() {
     const custom = customInput.split(",").map((s) => s.trim()).filter(Boolean);
     const chips = [...selectedTech, ...selectedField, ...custom];
-    if (!good.trim() && !bad.trim()) {
-      alert("느낀 점이나 부족했던 점을 먼저 입력해주세요.");
+    const hasGenerationSource =
+      chips.length > 0 ||
+      good.trim() ||
+      bad.trim() ||
+      lessons.trim() ||
+      nextActions.trim();
+
+    if (!hasGenerationSource) {
+      alert("기술 스택, 분야, 느낀 점, 부족했던 점, 배운 점, 다음 액션 중 하나 이상을 입력해주세요.");
       return;
     }
 
@@ -359,6 +366,15 @@ function GrowthModal({
     padding: "10px 14px", fontSize: 13,
     color: "#3c1010", background: "#fdf8f8", outline: "none", boxSizing: "border-box",
   };
+  const canGenerateMemoir = Boolean(
+    selectedTech.length ||
+    selectedField.length ||
+    customInput.trim() ||
+    good.trim() ||
+    bad.trim() ||
+    lessons.trim() ||
+    nextActions.trim()
+  );
 
   return (
     <div
@@ -427,7 +443,7 @@ function GrowthModal({
 
         <button
           onClick={handleGenerate}
-          disabled={saving || generating || (!good.trim() && !bad.trim())}
+          disabled={saving || generating || !canGenerateMemoir}
           style={{
             width: "100%",
             background: generating ? "#f0a0a0" : "#fff",
@@ -437,7 +453,7 @@ function GrowthModal({
             padding: 14,
             fontSize: 15,
             fontWeight: 700,
-            cursor: saving || generating || (!good.trim() && !bad.trim()) ? "not-allowed" : "pointer",
+            cursor: saving || generating || !canGenerateMemoir ? "not-allowed" : "pointer",
             marginTop: 2,
             marginBottom: 12,
           }}
@@ -511,7 +527,8 @@ function Section({ emoji, label, headline, children }: {
 ──────────────────────────────────────────────────────────── */
 function MemoirContent() {
   const searchParams = useSearchParams();
-  const requestedProjectId = searchParams.get("projectId");
+  const isListView = searchParams.get("view") === "list";
+  const requestedProjectId = isListView ? null : searchParams.get("projectId");
 
   const [modalOpen, setModalOpen]           = useState(false);
   const [project, setProject]               = useState<ProjectData | null>(null);
@@ -717,10 +734,10 @@ function MemoirContent() {
     try {
       setGeneratingMemoir(true);
       const projectContext = [
-        `프로젝트 제목: ${project.title}`,
-        project.summary ? `한줄 소개: ${project.summary}` : "",
-        project.description ? `상세 설명: ${project.description}` : "",
-        project.category ? `분야: ${project.category}` : "",
+        "아래 프로젝트 맥락은 해석을 위한 배경입니다. 결과 문장에 그대로 인용하거나 나열하지 마세요.",
+        project.category ? `프로젝트 분야: ${project.category}` : "",
+        project.difficulty ? `프로젝트 난이도: ${project.difficulty}` : "",
+        techStack.length ? `프로젝트 기술/키워드: ${techStack.join(", ")}` : "",
         data.chips.length ? `사용자가 고른 키워드: ${data.chips.join(", ")}` : "",
       ]
         .filter(Boolean)

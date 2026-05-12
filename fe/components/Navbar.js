@@ -150,7 +150,7 @@ export default function Navbar() {
           )}
 
           <button
-            onClick={() => router.push("/memoir")}
+            onClick={() => router.push("/memoir?view=list")}
             className="text-slate-700 transition hover:text-red-600"
           >
             나의 회고
