@@ -76,6 +76,7 @@ export default function AdminPage() {
   const [noticeForm, setNoticeForm] = useState({
     title: "",
     content: "",
+    category: "announcement",
     isPinned: true,
   });
   const [loading, setLoading] = useState(true);
@@ -96,7 +97,7 @@ export default function AdminPage() {
     try {
       setLoading(true);
       setError("");
-      const [overviewResult, usersResult, projectsResult, reportsResult, paymentsResult] =
+      const [overviewResult, usersResult, projectsResult, reportsResult, paymentsResult, adminPostsResult] =
         await Promise.all([
           getAdminOverviewApi(),
           getAdminUsersApi({
@@ -118,9 +119,7 @@ export default function AdminPage() {
       setProjects(projectsResult.data || []);
       setReports(reportsResult.data || []);
       setPayments(paymentsResult.data || []);
-      setAdminPosts((paymentsResult && paymentsResult.data) || (typeof paymentsResult === 'undefined' ? [] : []));
-      // above is placeholder; set adminPosts from the correct result below
-      setAdminPosts((await getAdminMyPostsApi().then(r=>r.data).catch(()=>[])) || []);
+      setAdminPosts(adminPostsResult.data || []);
     } catch (err) {
       console.error(err);
       setError(
@@ -295,6 +294,46 @@ export default function AdminPage() {
     }
   }
 
+  async function handleRevokeCoins(userId) {
+    const targetUser = users.find((user) => user.id === userId);
+    const amountInput = window.prompt(
+      `${targetUser?.nickname || `User #${userId}`}으로부터 환수할 코인 수를 입력하세요.`,
+      "100"
+    );
+
+    if (amountInput === null) return;
+
+    const amount = Number(amountInput);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert("환수할 코인 수는 1 이상의 숫자여야 합니다.");
+      return;
+    }
+
+    const noteInput = window.prompt("환수 사유를 입력하세요. (선택)", "") || "";
+
+    try {
+      setProcessingKey(`revoke-coin-${userId}`);
+      const result = await revokeAdminUserCoinsApi(userId, {
+        amount,
+        note: noteInput.trim() || undefined,
+      });
+
+      setUsers((prev) =>
+        prev.map((user) =>
+          user.id === userId
+            ? { ...user, coin_balance: result.data?.coin_balance ?? (user.coin_balance - amount) }
+            : user
+        )
+      );
+
+      alert("코인을 환수했습니다.");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "코인 환수에 실패했습니다.");
+    } finally {
+      setProcessingKey("");
+    }
+  }
+
   async function handleCreateNotice() {
     if (!noticeForm.title.trim()) {
       alert("공지 제목을 입력해주세요.");
@@ -311,10 +350,11 @@ export default function AdminPage() {
       await createAdminNoticeApi({
         title: noticeForm.title.trim(),
         content: noticeForm.content.trim(),
+        category: noticeForm.category,
         is_pinned: noticeForm.isPinned,
       });
 
-      setNoticeForm({ title: "", content: "", isPinned: true });
+      setNoticeForm({ title: "", content: "", category: "announcement", isPinned: true });
       alert("공지글을 작성했습니다.");
     } catch (err) {
       alert(err instanceof Error ? err.message : "공지 작성에 실패했습니다.");
@@ -691,6 +731,13 @@ export default function AdminPage() {
                           >
                             코인 지급
                           </button>
+                          <button
+                            onClick={() => handleRevokeCoins(user.id)}
+                            disabled={processingKey === `revoke-coin-${user.id}`}
+                            className="rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                          >
+                            코인 환수
+                          </button>
                         </div>
                       </Td>
                     </tr>
@@ -717,6 +764,27 @@ export default function AdminPage() {
                       placeholder="공지 제목"
                       className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none"
                     />
+                    <div className="flex items-center gap-3">
+                      <select
+                        value={noticeForm.category}
+                        onChange={(e) => setNoticeForm((prev) => ({ ...prev, category: e.target.value }))}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none"
+                      >
+                        <option value="announcement">공지</option>
+                        <option value="event">이벤트</option>
+                      </select>
+                      <label className="flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={noticeForm.isPinned}
+                          onChange={(e) =>
+                            setNoticeForm((prev) => ({ ...prev, isPinned: e.target.checked }))
+                          }
+                        />
+                        상단 고정
+                      </label>
+                    </div>
+
                     <textarea
                       value={noticeForm.content}
                       onChange={(e) =>
@@ -726,16 +794,6 @@ export default function AdminPage() {
                       rows={8}
                       className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none"
                     />
-                    <label className="flex items-center gap-2 text-sm text-slate-700">
-                      <input
-                        type="checkbox"
-                        checked={noticeForm.isPinned}
-                        onChange={(e) =>
-                          setNoticeForm((prev) => ({ ...prev, isPinned: e.target.checked }))
-                        }
-                      />
-                      상단 고정
-                    </label>
 
                     <div className="flex justify-end gap-2">
                       <button
