@@ -146,6 +146,9 @@ export default function ProjectDetailPage() {
 
   const isLeader = project?.leader_id === myProfile?.id;
   const isProjectCompleted = project?.status === "completed";
+  const isTeamFormed = ["in_progress", "started", "completed"].includes(
+    String(project?.status || "").replace("-", "_")
+  );
   const hasApplied = Boolean(myApplication);
   const acceptedMemberCount = project?.members?.length || 1;
 
@@ -172,7 +175,7 @@ export default function ProjectDetailPage() {
       return;
     }
 
-    if (Number(editForm.max_members) < acceptedMemberCount) {
+    if (!isTeamFormed && Number(editForm.max_members) < acceptedMemberCount) {
       alert(`현재 팀원수인 ${acceptedMemberCount}명 이상으로만 변경 가능합니다.`);
       return;
     }
@@ -180,14 +183,13 @@ export default function ProjectDetailPage() {
     try {
       setIsSavingEdit(true);
 
-      const updateResult = await updateProjectApi(projectId, {
+      const payload = {
         title: editForm.title,
         summary: editForm.summary,
         description: editForm.description,
         difficulty: editForm.difficulty,
         category: editForm.category,
         progress_percent: Number(editForm.progress_percent),
-        max_members: Number(editForm.max_members),
         expected_period: editForm.expected_period.trim(),
         preferred_members: editForm.preferred_members.trim(),
         tech_stack: editForm.tech_stack
@@ -199,7 +201,13 @@ export default function ProjectDetailPage() {
           .map((item) => item.trim().replace(/^#/, ""))
           .filter(Boolean),
         is_public: editForm.is_public,
-      });
+      };
+
+      if (!isTeamFormed) {
+        payload.max_members = Number(editForm.max_members);
+      }
+
+      const updateResult = await updateProjectApi(projectId, payload);
 
       const refreshed = await getProjectApi(projectId);
       const nextProject = {
@@ -217,12 +225,20 @@ export default function ProjectDetailPage() {
       setEditForm(buildEditFormFromProject(nextProject));
       setIsEditing(false);
 
-      alert(`프로젝트 정보가 수정되었습니다. 모집 인원은 ${Number(editForm.max_members)}명입니다.`);
+      alert(
+        isTeamFormed
+          ? "프로젝트 정보가 수정되었습니다. 모집 인원은 팀 결성 완료 후 변경되지 않습니다."
+          : `프로젝트 정보가 수정되었습니다. 모집 인원은 ${Number(editForm.max_members)}명입니다.`
+      );
     } catch (error) {
       console.error(error);
       const message = error instanceof Error ? error.message : "";
       if (message.includes("current member count")) {
         alert(`모집 인원은 현재 팀원수인 ${acceptedMemberCount}명 이상이어야 합니다.`);
+        return;
+      }
+      if (message.includes("team formation")) {
+        alert("팀 결성 완료 후에는 모집 인원을 변경할 수 없습니다.");
         return;
       }
       alert(message || "프로젝트 수정에 실패했습니다.");
@@ -409,16 +425,19 @@ export default function ProjectDetailPage() {
                     모집 인원 (리더 포함) (최대 인원: 100명)
                   </label>
                   <input
-                    className={inputClassName}
+                    className={`${inputClassName} disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500`}
                     type="number"
                     min={acceptedMemberCount}
                     max="100"
                     value={editForm.max_members}
+                    disabled={isTeamFormed}
                     onChange={(e) => handleEditChange("max_members", e.target.value)}
                     placeholder="모집 인원 (리더 포함)"
                   />
                   <p className="mt-1 text-xs text-slate-500">
-                    리더 포함 총 인원입니다. {acceptedMemberCount}명(현재 팀원수) 이상으로만 설정할 수 있습니다.
+                    {isTeamFormed
+                      ? "팀 결성 완료 후에는 모집 인원을 변경할 수 없습니다."
+                      : `리더 포함 총 인원입니다. ${acceptedMemberCount}명(현재 팀원수) 이상으로만 설정할 수 있습니다.`}
                   </p>
                 </div>
 

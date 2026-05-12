@@ -277,6 +277,28 @@ async def update_my_profile(
     )
 
 
+@router.delete("/me", summary="회원 탈퇴", description="현재 로그인한 사용자를 탈퇴 처리합니다.")
+async def withdraw_my_account(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    user = db.get(User, current_user_id)
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    now = datetime.now(timezone.utc)
+    anonymized_id = f"deleted_{user.id}_{int(now.timestamp())}"
+    user.email = f"{anonymized_id}@deleted.local"
+    user.nickname = anonymized_id[:50]
+    user.github_id = None
+    user.google_id = None
+    user.is_active = False
+    user.deleted_at = now
+
+    db.commit()
+    return success_response(data={"withdrawn": True})
+
+
 @router.get("/me/onboarding", summary="내 온보딩 상태 조회", description="회원가입/프로필/관심 아이디어 선택 진행 상태를 조회합니다.")
 async def get_my_onboarding_state(
     current_user_id: int = Depends(get_current_user_id),

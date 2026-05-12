@@ -269,6 +269,14 @@ export async function getProjectApi(projectId) {
   return handleResponse(res, "프로젝트 정보를 불러오지 못했습니다.");
 }
 
+export async function getProjectStatusApi(projectId) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/projects/${projectId}/status-check`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "프로젝트 상태를 확인하지 못했습니다.");
+}
+
 export async function getRecommendedProjectsApi(payload = {}, limit = 20) {
   const query = new URLSearchParams();
   query.set("limit", limit);
@@ -775,6 +783,15 @@ export async function updateMyProfileApi(payload) {
   return handleResponse(res, "프로필 수정 실패");
 }
 
+export async function withdrawMyAccountApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/users/me`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "회원 탈퇴에 실패했습니다.");
+}
+
 export async function addMySkillApi(name, proficiency = 3) {
   const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/users/me/skills`, {
     method: "POST",
@@ -856,6 +873,15 @@ export async function readNotificationApi(notificationId) {
   );
 
   return handleResponse(res, "알림 읽음 처리에 실패했습니다.");
+}
+
+export async function readAllNotificationsApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/notifications/read-all`, {
+    method: "PATCH",
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "알림 모두 읽음 처리에 실패했습니다.");
 }
 
 /* =========================

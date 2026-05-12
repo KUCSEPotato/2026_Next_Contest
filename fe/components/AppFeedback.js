@@ -13,7 +13,7 @@ import {
 const FeedbackContext = createContext(null);
 
 const TOAST_STYLES = {
-  success: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  success: "border-red-100 bg-white text-slate-900",
   error: "border-red-200 bg-red-50 text-red-900",
   warning: "border-amber-200 bg-amber-50 text-amber-900",
   info: "border-slate-200 bg-white text-slate-900",
@@ -109,6 +109,25 @@ export function AppFeedbackProvider({ children }) {
     return () => window.removeEventListener(APP_TOAST_EVENT, handleToastEvent);
   }, [showToast]);
 
+  useEffect(() => {
+    const nativeAlert = window.alert;
+
+    window.alert = (message) => {
+      const text = String(message ?? "");
+      const type = /실패|오류|에러|불가|못했습니다|확인해주세요/.test(text)
+        ? "error"
+        : /완료|성공|되었습니다|저장/.test(text)
+          ? "success"
+          : "info";
+
+      showToast({ message: text, type, duration: 3400 });
+    };
+
+    return () => {
+      window.alert = nativeAlert;
+    };
+  }, [showToast]);
+
   const value = useMemo(
     () => ({ toast, confirm, prompt }),
     [confirm, prompt, toast]
@@ -141,7 +160,7 @@ export function useDialog() {
 
 function ToastViewport({ toasts, onDismiss }) {
   return (
-    <div className="fixed right-4 top-4 z-[100] flex w-[calc(100vw-2rem)] max-w-sm flex-col gap-3">
+    <div className="fixed left-1/2 top-5 z-[100] flex w-[calc(100vw-2rem)] max-w-sm -translate-x-1/2 flex-col gap-3">
       {toasts.map((toast) => (
         <div
           key={toast.id}
