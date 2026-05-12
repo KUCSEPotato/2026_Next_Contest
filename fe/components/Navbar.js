@@ -150,10 +150,10 @@ export default function Navbar() {
           )}
 
           <button
-            onClick={() => router.push("/mypage?section=projects")}
+            onClick={() => router.push("/memoir")}
             className="text-slate-700 transition hover:text-red-600"
           >
-            나의 프로젝트
+            나의 회고
           </button>
 
           {user?.role === "admin" && (

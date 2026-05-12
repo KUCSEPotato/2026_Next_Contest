@@ -75,6 +75,12 @@ interface RetrospectiveDetail {
   next_actions?: string | null;
 }
 
+interface MemoirOverviewItem {
+  project: ProjectData;
+  retrospectiveId: number | null;
+  growth: GrowthData | null;
+}
+
 /* ────────────────────────────────────────────────────────────
    리뷰 멘트 시스템 (미리보기와 동일)
 ──────────────────────────────────────────────────────────── */
@@ -125,15 +131,6 @@ function daysBetween(start?: string | null) {
   const d = new Date(start);
   if (isNaN(d.getTime())) return 0;
   return Math.max(1, Math.ceil((Date.now() - d.getTime()) / 86400000));
-}
-
-function pickProjectFromList(projects: ProjectData[]) {
-  return (
-    projects.find((p) => p.status === "completed") ||
-    projects.find((p) => p.status === "in_progress") ||
-    projects[0] ||
-    null
-  );
 }
 
 function parseLessonsLearned(value?: string | null): { chips: string[]; lessons: string } {
@@ -410,6 +407,7 @@ function MemoirContent() {
   const [progress, setProgress]             = useState<ProgressData | null>(null);
   const [reviews, setReviews]               = useState<ProjectReview[]>([]);
   const [growth, setGrowth]                 = useState<GrowthData | null>(null);
+  const [memoirList, setMemoirList]         = useState<MemoirOverviewItem[]>([]);
   const [retrospectiveId, setRetrospectiveId] = useState<number | null>(null);
   const [harvestCount, setHarvestCount]     = useState(1); // 몇 번째 수확
   const [loading, setLoading]               = useState(true);
@@ -426,25 +424,74 @@ function MemoirContent() {
 
         let selectedProject: ProjectData | null = null;
 
-        if (requestedProjectId) {
-          const [detailResult, listResult] = await Promise.allSettled([
-            getProjectApi(requestedProjectId),
-            getProjectsApi({ page: 1, size: 100 }),
-          ]);
-          if (detailResult.status === "fulfilled") selectedProject = detailResult.value.data;
-          if (selectedProject && listResult.status === "fulfilled") {
-            const listed = (listResult.value.data || []).find(
-              (item: ProjectData) => Number(item.id) === Number(selectedProject?.id)
-            );
-            selectedProject = { ...listed, ...selectedProject };
-          }
-        } else {
-          const myProjectsResult = await getMyProjectsApi().catch(() => null);
-          selectedProject = pickProjectFromList(myProjectsResult?.data || []);
-          if (!selectedProject) {
-            const completedResult = await getProjectsApi({ page: 1, size: 20, status: "completed" });
-            selectedProject = pickProjectFromList(completedResult.data || []);
-          }
+        if (!requestedProjectId) {
+          const myProjectsResult = await getMyProjectsApi();
+          const completedProjects = (myProjectsResult.data || []).filter(
+            (p: ProjectData) => p.status === "completed"
+          );
+
+          const overviewItems = await Promise.all(
+            completedProjects.map(async (completedProject: ProjectData) => {
+              try {
+                const retrospectivesResult = await getProjectRetrospectivesApi(
+                  completedProject.id
+                );
+                const first = (retrospectivesResult.data || [])[0] as
+                  | RetrospectiveSummary
+                  | undefined;
+
+                if (!first) {
+                  return {
+                    project: completedProject,
+                    retrospectiveId: null,
+                    growth: null,
+                  };
+                }
+
+                const detail = await getProjectRetrospectiveApi(
+                  completedProject.id,
+                  first.id
+                );
+                const retro = detail.data as RetrospectiveDetail;
+                const ll = parseLessonsLearned(retro.lessons_learned);
+
+                return {
+                  project: completedProject,
+                  retrospectiveId: retro.id,
+                  growth: {
+                    chips: ll.chips,
+                    good: retro.what_went_well || "",
+                    bad: retro.what_went_badly || "",
+                    lessons: ll.lessons,
+                    nextActions: retro.next_actions || "",
+                  },
+                };
+              } catch {
+                return {
+                  project: completedProject,
+                  retrospectiveId: null,
+                  growth: null,
+                };
+              }
+            })
+          );
+
+          if (ignore) return;
+          setMemoirList(overviewItems);
+          setProject(null);
+          return;
+        }
+
+        const [detailResult, listResult] = await Promise.allSettled([
+          getProjectApi(requestedProjectId),
+          getProjectsApi({ page: 1, size: 100 }),
+        ]);
+        if (detailResult.status === "fulfilled") selectedProject = detailResult.value.data;
+        if (selectedProject && listResult.status === "fulfilled") {
+          const listed = (listResult.value.data || []).find(
+            (item: ProjectData) => Number(item.id) === Number(selectedProject?.id)
+          );
+          selectedProject = { ...listed, ...selectedProject };
         }
 
         if (!selectedProject) throw new Error("회고를 보여줄 프로젝트가 없습니다.");
@@ -587,6 +634,80 @@ function MemoirContent() {
     return (
       <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#f8fafc", fontSize: 14, color: "#64748b" }}>
         회고 데이터를 불러오는 중이에요 🌹
+      </div>
+    );
+  }
+
+  if (!requestedProjectId) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f8fafc", color: "#0f172a", fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", padding: "40px 24px" }}>
+        <div style={{ width: "100%", maxWidth: 1152, margin: "0 auto" }}>
+          <section style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 18, padding: "32px 36px", boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)" }}>
+            <p style={{ color: "#e60012", fontSize: 14, fontWeight: 800, margin: 0 }}>
+              나의 회고
+            </p>
+            <h1 style={{ margin: "8px 0 0", fontSize: 34, lineHeight: 1.25, fontWeight: 900 }}>
+              완료한 프로젝트에서 남긴 성장 기록
+            </h1>
+            <p style={{ margin: "12px 0 0", color: "#64748b", fontSize: 15 }}>
+              지금까지 완료한 프로젝트의 텃밭일기를 한눈에 모아봅니다.
+            </p>
+          </section>
+
+          {memoirList.length === 0 ? (
+            <section style={{ marginTop: 20, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: 28, color: "#64748b" }}>
+              아직 완료한 프로젝트 회고가 없습니다.
+            </section>
+          ) : (
+            <div style={{ marginTop: 20, display: "grid", gap: 16 }}>
+              {memoirList.map(({ project: completedProject, growth: itemGrowth }) => {
+                const summaryText =
+                  itemGrowth?.good ||
+                  itemGrowth?.lessons ||
+                  itemGrowth?.nextActions ||
+                  "아직 작성된 회고 내용이 없습니다.";
+
+                return (
+                  <article
+                    key={completedProject.id}
+                    style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: 24, boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)" }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start" }}>
+                      <div>
+                        <span style={{ display: "inline-block", background: "#fee2e2", color: "#e60012", borderRadius: 999, padding: "5px 10px", fontSize: 12, fontWeight: 800 }}>
+                          completed
+                        </span>
+                        <h2 style={{ margin: "12px 0 0", fontSize: 22, fontWeight: 900 }}>
+                          {completedProject.title}
+                        </h2>
+                        <p style={{ margin: "8px 0 0", color: "#64748b", lineHeight: 1.7 }}>
+                          {summaryText}
+                        </p>
+                      </div>
+
+                      <a
+                        href={`/memoir?projectId=${completedProject.id}`}
+                        style={{ flexShrink: 0, borderRadius: 12, background: "#e60012", color: "#fff", padding: "10px 14px", fontSize: 14, fontWeight: 800, textDecoration: "none" }}
+                      >
+                        회고 보기
+                      </a>
+                    </div>
+
+                    {itemGrowth?.chips?.length ? (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16 }}>
+                        {itemGrowth.chips.map((chip) => (
+                          <span key={chip} style={{ background: "#f8fafc", color: "#475569", border: "1px solid #e2e8f0", borderRadius: 999, padding: "5px 10px", fontSize: 12, fontWeight: 700 }}>
+                            {chip}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     );
   }

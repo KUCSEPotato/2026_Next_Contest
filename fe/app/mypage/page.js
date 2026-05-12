@@ -31,6 +31,8 @@ export default function MyPage() {
   const [stats, setStats] = useState(null);
   const [projects, setProjects] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [projectStatusFilter, setProjectStatusFilter] = useState("all");
+  const [projectSortOrder, setProjectSortOrder] = useState("latest");
 
   const [loading, setLoading] = useState(true);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -381,6 +383,12 @@ export default function MyPage() {
     );
   }
 
+  const visibleProjects = getVisibleProjects(
+    projects,
+    projectStatusFilter,
+    projectSortOrder
+  );
+
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
       <div className="mx-auto w-full max-w-5xl">
@@ -670,11 +678,35 @@ export default function MyPage() {
           id="my-projects"
           className="scroll-mt-24 rounded-2xl bg-white p-6 shadow"
         >
-          <h2 className="mb-4 text-xl font-bold">프로젝트 이력</h2>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-xl font-bold">프로젝트 이력</h2>
+
+            <div className="flex flex-wrap gap-2">
+              <select
+                value={projectStatusFilter}
+                onChange={(e) => setProjectStatusFilter(e.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 outline-none transition focus:border-red-500"
+              >
+                <option value="all">전체</option>
+                <option value="planning">planning</option>
+                <option value="in_progress">in_progress</option>
+                <option value="completed">completed</option>
+              </select>
+
+              <select
+                value={projectSortOrder}
+                onChange={(e) => setProjectSortOrder(e.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 outline-none transition focus:border-red-500"
+              >
+                <option value="latest">최신순</option>
+                <option value="progress">진행율순</option>
+              </select>
+            </div>
+          </div>
 
           <div className="space-y-3">
-            {projects.length ? (
-              projects.map((project) => (
+            {visibleProjects.length ? (
+              visibleProjects.map((project) => (
                 <button
                   key={project.id}
                   onClick={() => router.push(`/projects/${project.id}`)}
@@ -687,6 +719,8 @@ export default function MyPage() {
                       </p>
                       <p className="mt-1 text-sm text-slate-500">
                         난이도 {project.difficulty || "미정"}
+                        {" · "}
+                        진행률 {Math.round(project.progress_percent ?? 0)}%
                       </p>
                     </div>
 
@@ -719,21 +753,33 @@ export default function MyPage() {
                         </span>
                       )}
 
-                      <span
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/projects/${project.id}/manage`);
-                        }}
-                        className="rounded-lg bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-700"
-                      >
-                        진행 관리
-                      </span>
+                      {project.status === "completed" ? (
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/memoir?projectId=${project.id}`);
+                          }}
+                          className="rounded-lg bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-700"
+                        >
+                          회고
+                        </span>
+                      ) : (
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/projects/${project.id}/manage`);
+                          }}
+                          className="rounded-lg bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-700"
+                        >
+                          진행 관리
+                        </span>
+                      )}
                     </div>
                   </div>
                 </button>
               ))
             ) : (
-              <p className="text-sm text-slate-500">프로젝트 없음</p>
+              <p className="text-sm text-slate-500">조건에 맞는 프로젝트가 없습니다.</p>
             )}
           </div>
         </section>
@@ -935,6 +981,20 @@ async function loadReceivedReviews(userId, statsData) {
     console.error("공개 리뷰 API 재시도 실패:", error);
     return [];
   }
+}
+
+function getVisibleProjects(projects, statusFilter, sortOrder) {
+  return [...projects]
+    .filter((project) =>
+      statusFilter === "all" ? true : project.status === statusFilter
+    )
+    .sort((a, b) => {
+      if (sortOrder === "progress") {
+        return (b.progress_percent ?? 0) - (a.progress_percent ?? 0);
+      }
+
+      return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+    });
 }
 
 function RatingSummary({ reputation }) {

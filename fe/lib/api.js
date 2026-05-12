@@ -673,6 +673,14 @@ export async function getMyReputationApi() {
   return handleResponse(res, "신뢰도 정보를 불러오지 못했습니다.");
 }
 
+export async function getUserReputationApi(userId) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/users/${userId}/reputation`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "사용자 신뢰도 정보를 불러오지 못했습니다.");
+}
+
 export async function getUserStatsApi(userId) {
   const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/users/${userId}/stats`, {
     headers: authHeaders(),

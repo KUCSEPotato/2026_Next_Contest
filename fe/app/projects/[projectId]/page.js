@@ -392,20 +392,6 @@ export default function ProjectDetailPage() {
 
               <p className="mt-3 text-lg text-slate-600">{project.summary}</p>
 
-              <div className="mt-6">
-                <div className="mb-2 flex justify-between text-sm font-semibold text-slate-700">
-                  <span>진행률</span>
-                  <span>{project.progress_percent}%</span>
-                </div>
-
-                <div className="h-3 overflow-hidden rounded-full bg-slate-200">
-                  <div
-                    className="h-full rounded-full bg-red-600"
-                    style={{ width: `${project.progress_percent}%` }}
-                  />
-                </div>
-              </div>
-
               {isLeader && (
                 <div className="mt-6 grid gap-3 sm:grid-cols-3">
                   <button
