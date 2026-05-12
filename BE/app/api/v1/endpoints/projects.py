@@ -510,6 +510,10 @@ def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str, projec
             },
         )
     except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Gemini API request failed: {str(error)}",
+        )
         return _fallback_memoir_refine(feelings, shortcomings)
 
     text = getattr(response, "text", None) or getattr(response, "content", None)
