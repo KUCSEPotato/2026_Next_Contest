@@ -10,7 +10,7 @@ BEGIN;
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'reaction_type') THEN
-        CREATE TYPE reaction_type AS ENUM ('like', 'interested', 'helpful', 'curious');
+        CREATE TYPE reaction_type AS ENUM ('recommend', 'not_recommend');
     END IF;
 
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'post_category') THEN
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS community_post_reactions (
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     reaction_type reaction_type NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT community_post_reactions_unique UNIQUE (post_id, user_id, reaction_type)
+    CONSTRAINT community_post_reactions_unique UNIQUE (post_id, user_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_post_reactions_post_id ON community_post_reactions(post_id);
@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS community_comment_reactions (
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     reaction_type reaction_type NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT community_comment_reactions_unique UNIQUE (comment_id, user_id, reaction_type)
+    CONSTRAINT community_comment_reactions_unique UNIQUE (comment_id, user_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_comment_reactions_comment_id ON community_comment_reactions(comment_id);
