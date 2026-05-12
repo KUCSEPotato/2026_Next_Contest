@@ -169,34 +169,44 @@ function ordinalKo(n: number) {
 ──────────────────────────────────────────────────────────── */
 function RoseSVG() {
   return (
-    <svg viewBox="0 0 120 140" width={90} height={105} xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <svg viewBox="0 0 160 200" width={110} height={137} xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       {/* 줄기 */}
-      <path d="M60 110 Q55 125 52 135" stroke="#6b4226" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-      <path d="M60 110 Q65 125 68 135" stroke="#6b4226" strokeWidth="2" fill="none" strokeLinecap="round"/>
-      {/* 잎 */}
-      <path d="M55 118 Q40 112 38 100 Q50 104 55 118Z" fill="#c0392b" opacity="0.45"/>
-      <path d="M65 122 Q80 115 82 103 Q70 108 65 122Z" fill="#c0392b" opacity="0.35"/>
+      <path d="M80 138 Q76 158 73 178 Q74 179 75 178 Q78 160 80 140" stroke="#4a7c3f" strokeWidth="3.5" fill="none" strokeLinecap="round"/>
+      <path d="M80 138 Q84 158 87 178 Q88 179 87 178 Q84 160 80 140" stroke="#3d6b33" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+      {/* 잎 왼쪽 */}
+      <path d="M76 155 Q54 148 50 132 Q64 136 76 155Z" fill="#5a9e4a" opacity="0.9"/>
+      <path d="M76 155 Q63 149 62 138" stroke="#4a7c3f" strokeWidth="1" fill="none"/>
+      {/* 잎 오른쪽 */}
+      <path d="M84 162 Q106 154 108 138 Q94 143 84 162Z" fill="#5a9e4a" opacity="0.85"/>
+      <path d="M84 162 Q97 155 97 144" stroke="#4a7c3f" strokeWidth="1" fill="none"/>
       {/* 꽃받침 */}
-      <path d="M48 92 Q60 84 72 92 Q70 100 60 102 Q50 100 48 92Z" fill="#a93226"/>
-      {/* 꽃잎 바깥 */}
-      <ellipse cx="60" cy="70" rx="26" ry="28" fill="#e74c3c"/>
-      <path d="M34 70 Q28 50 40 42 Q48 60 34 70Z" fill="#e74c3c"/>
-      <path d="M86 70 Q92 50 80 42 Q72 60 86 70Z" fill="#e74c3c"/>
-      <path d="M60 42 Q40 30 38 44 Q50 50 60 42Z" fill="#ec7063"/>
-      <path d="M60 42 Q80 30 82 44 Q70 50 60 42Z" fill="#ec7063"/>
-      {/* 꽃잎 중간 */}
-      <ellipse cx="60" cy="66" rx="20" ry="22" fill="#c0392b"/>
-      <path d="M40 66 Q38 50 50 46 Q54 60 40 66Z" fill="#c0392b"/>
-      <path d="M80 66 Q82 50 70 46 Q66 60 80 66Z" fill="#c0392b"/>
-      <path d="M60 44 Q44 36 46 48 Q54 52 60 44Z" fill="#e74c3c"/>
-      <path d="M60 44 Q76 36 74 48 Q66 52 60 44Z" fill="#e74c3c"/>
-      {/* 꽃잎 안쪽 */}
-      <ellipse cx="60" cy="63" rx="13" ry="14" fill="#922b21"/>
-      <path d="M47 63 Q46 53 54 50 Q57 60 47 63Z" fill="#922b21"/>
-      <path d="M73 63 Q74 53 66 50 Q63 60 73 63Z" fill="#922b21"/>
+      <path d="M62 118 Q70 108 80 106 Q90 108 98 118 Q95 128 80 130 Q65 128 62 118Z" fill="#4a7c3f"/>
+      <path d="M62 118 Q58 112 64 106 Q70 112 62 118Z" fill="#5a9e4a"/>
+      <path d="M98 118 Q102 112 96 106 Q90 112 98 118Z" fill="#5a9e4a"/>
+      <path d="M80 106 Q76 96 80 90 Q84 96 80 106Z" fill="#5a9e4a"/>
+      {/* 꽃잎 맨 바깥 레이어 */}
+      <path d="M80 30 Q54 20 48 42 Q50 62 80 68 Q110 62 112 42 Q106 20 80 30Z" fill="#ff6b6b"/>
+      <path d="M42 58 Q24 52 26 76 Q32 96 62 96 Q74 88 68 68 Q54 60 42 58Z" fill="#ff6b6b"/>
+      <path d="M118 58 Q136 52 134 76 Q128 96 98 96 Q86 88 92 68 Q106 60 118 58Z" fill="#ff6b6b"/>
+      <path d="M54 100 Q40 106 46 126 Q56 140 80 136 Q86 122 78 108 Q66 100 54 100Z" fill="#ff6b6b"/>
+      <path d="M106 100 Q120 106 114 126 Q104 140 80 136 Q74 122 82 108 Q94 100 106 100Z" fill="#ff6b6b"/>
+      {/* 꽃잎 중간 레이어 */}
+      <path d="M80 36 Q58 28 54 50 Q56 68 80 74 Q104 68 106 50 Q102 28 80 36Z" fill="#e74c3c"/>
+      <path d="M50 66 Q34 64 36 84 Q42 100 68 98 Q78 90 72 74 Q60 66 50 66Z" fill="#e74c3c"/>
+      <path d="M110 66 Q126 64 124 84 Q118 100 92 98 Q82 90 88 74 Q100 66 110 66Z" fill="#e74c3c"/>
+      <path d="M60 104 Q48 112 54 128 Q62 140 80 136 Q84 124 78 112 Q68 104 60 104Z" fill="#e74c3c"/>
+      <path d="M100 104 Q112 112 106 128 Q98 140 80 136 Q76 124 82 112 Q92 104 100 104Z" fill="#e74c3c"/>
+      {/* 꽃잎 안쪽 레이어 */}
+      <path d="M80 44 Q62 40 60 58 Q62 72 80 78 Q98 72 100 58 Q98 40 80 44Z" fill="#c0392b"/>
+      <path d="M58 74 Q46 76 48 90 Q54 104 74 102 Q82 94 76 80 Q66 72 58 74Z" fill="#c0392b"/>
+      <path d="M102 74 Q114 76 112 90 Q106 104 86 102 Q78 94 84 80 Q94 72 102 74Z" fill="#c0392b"/>
       {/* 중심 */}
-      <ellipse cx="60" cy="60" rx="7" ry="8" fill="#641e16"/>
-      <ellipse cx="60" cy="59" rx="4" ry="4.5" fill="#922b21"/>
+      <ellipse cx="80" cy="72" rx="18" ry="20" fill="#a93226"/>
+      <ellipse cx="80" cy="70" rx="12" ry="14" fill="#922b21"/>
+      <ellipse cx="80" cy="68" rx="7" ry="8" fill="#7b241c"/>
+      {/* 꽃잎 하이라이트 */}
+      <path d="M72 38 Q66 46 68 56" stroke="#ff8a80" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity="0.7"/>
+      <path d="M40 66 Q38 76 42 84" stroke="#ff8a80" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity="0.6"/>
     </svg>
   );
 }
@@ -636,7 +646,7 @@ function MemoirContent() {
         </Section>
 
         {/* 2. 나는 이런 사람이었어요 */}
-        <Section emoji="🌹" label="팀원 리뷰 기반 · 평균 반올림" headline="나는 이런 사람이었어요">
+        <Section emoji="🌹" label="팀원 리뷰 기반" headline="나는 이런 사람이었어요">
           <ReviewSection rating={rating} />
         </Section>
 
@@ -727,9 +737,11 @@ function MemoirContent() {
         </Section>
 
         {/* Footer — 장미 SVG + n번째 수확 */}
-        <div style={{ margin: "24px 16px 40px", textAlign: "center", padding: "28px 20px 24px", background: "#9b1c1c", borderRadius: 18, color: "#fdf0f0" }}>
-          <div style={{ marginBottom: 12 }}>
-            <RoseSVG />
+        <div style={{ margin: "24px 16px 40px", textAlign: "center", padding: "28px 20px 24px", background: "#7b0f0f", borderRadius: 18, color: "#fdf0f0" }}>
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", marginBottom: 16 }}>
+            <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: "50%", padding: 16, display: "inline-flex" }}>
+              <RoseSVG />
+            </div>
           </div>
           <p style={{ fontFamily: "'Nanum Myeongjo', serif", fontSize: 20, fontWeight: 700, marginBottom: 8 }}>
             {ordinalKo(harvestCount)} 수확을 축하해요!
