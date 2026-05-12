@@ -607,6 +607,19 @@ export async function updateProjectRetrospectiveApi(projectId, retrospectiveId, 
   return handleResponse(res, "회고 수정에 실패했습니다.");
 }
 
+export async function refineProjectMemoirApi(projectId, payload) {
+  const res = await authenticatedFetch(
+    `${API_BASE_URL}/api/v1/projects/${projectId}/memoir/ai-refine`,
+    {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    }
+  );
+
+  return handleResponse(res, "AI 회고록 생성에 실패했습니다.");
+}
+
 /* =========================
    Chat
 ========================= */
