@@ -255,10 +255,14 @@
 
 - GET /admin/overview: 운영 요약 지표(사용자/프로젝트/미처리 신고/결제 이벤트/활성 구독)
 - GET /admin/users: 전체 사용자 목록 조회(관리자)
+  - query: `q`(이메일/닉네임 검색), `role`, `is_active`
+- POST /admin/users/{user_id}/coins: 사용자 코인 수동 지급
 - PATCH /admin/users/{user_id}/status: 사용자 상태/역할 변경(관리자)
 - GET /admin/projects: 전체 프로젝트 목록 조회(관리자)
 - GET /admin/reports: 신고 목록 조회(관리자)
+  - query: `scope=all|user|project|post|chat`
 - PATCH /admin/reports/{report_id}: 신고 처리 상태 변경(관리자)
+- POST /admin/notices: 공지글 작성(커뮤니티 `announcement` 게시글 생성)
 - GET /admin/payments: 결제 이벤트 목록 조회(관리자)
 - PATCH /admin/payments/{event_id}: 결제 이벤트 처리/해제(관리자)
 

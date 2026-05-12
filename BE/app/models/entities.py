@@ -458,6 +458,8 @@ class Report(Base):
     reporter_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     target_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     target_project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id", ondelete="SET NULL"))
+    target_post_id: Mapped[int | None] = mapped_column(ForeignKey("community_posts.id", ondelete="SET NULL"))
+    target_chat_room_id: Mapped[int | None] = mapped_column(ForeignKey("chat_rooms.id", ondelete="SET NULL"))
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="open")
     handled_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))

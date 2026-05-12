@@ -823,12 +823,35 @@ export async function getAdminOverviewApi() {
   return handleResponse(res, "운영 요약을 불러오지 못했습니다.");
 }
 
-export async function getAdminUsersApi() {
-  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/users`, {
+export async function getAdminUsersApi(params = {}) {
+  const query = new URLSearchParams();
+
+  if (params.q) query.set("q", params.q);
+  if (params.role) query.set("role", params.role);
+  if (params.is_active !== undefined && params.is_active !== "") {
+    query.set("is_active", String(params.is_active));
+  }
+
+  const queryString = query.toString();
+  const url = queryString
+    ? `${API_BASE_URL}/api/v1/admin/users?${queryString}`
+    : `${API_BASE_URL}/api/v1/admin/users`;
+
+  const res = await authenticatedFetch(url, {
     headers: authHeaders(),
   });
 
   return handleResponse(res, "사용자 목록을 불러오지 못했습니다.");
+}
+
+export async function grantAdminUserCoinsApi(userId, payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/users/${userId}/coins`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "코인 지급에 실패했습니다.");
 }
 
 export async function updateAdminUserStatusApi(userId, payload) {
@@ -849,8 +872,17 @@ export async function getAdminProjectsApi() {
   return handleResponse(res, "프로젝트 목록을 불러오지 못했습니다.");
 }
 
-export async function getAdminReportsApi() {
-  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/reports`, {
+export async function getAdminReportsApi(params = {}) {
+  const query = new URLSearchParams();
+
+  if (params.scope) query.set("scope", params.scope);
+
+  const queryString = query.toString();
+  const url = queryString
+    ? `${API_BASE_URL}/api/v1/admin/reports?${queryString}`
+    : `${API_BASE_URL}/api/v1/admin/reports`;
+
+  const res = await authenticatedFetch(url, {
     headers: authHeaders(),
   });
 
@@ -883,6 +915,16 @@ export async function updateAdminPaymentApi(eventId, payload) {
   });
 
   return handleResponse(res, "결제 이벤트 처리에 실패했습니다.");
+}
+
+export async function createAdminNoticeApi(payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/notices`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "공지 작성에 실패했습니다.");
 }
 
 export async function getMyChatRoomsApi() {
