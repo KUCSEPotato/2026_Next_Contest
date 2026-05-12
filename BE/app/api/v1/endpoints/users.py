@@ -287,11 +287,7 @@ async def withdraw_my_account(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     now = datetime.now(timezone.utc)
-    anonymized_id = f"deleted_{user.id}_{int(now.timestamp())}"
-    user.email = f"{anonymized_id}@deleted.local"
-    user.nickname = anonymized_id[:50]
-    user.github_id = None
-    user.google_id = None
+    user.password_hash = None
     user.is_active = False
     user.deleted_at = now
 
