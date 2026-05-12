@@ -18,6 +18,7 @@ class OAuthGithubLoginRequest(BaseModel):
     code: str = Field(min_length=1, description="OAuth authorization code")
     redirect_uri: str | None = None
     nickname: str | None = Field(default=None, min_length=2, max_length=50)
+    mode: str | None = Field(default="login", pattern="^(login|signup)$")
 
 
 class OAuthGoogleLoginRequest(BaseModel):

@@ -59,6 +59,7 @@ export default function LoginPage() {
       client_id: clientId,
       redirect_uri: redirectUri,
       scope: "read:user user:email",
+      state: "login",
     });
 
     window.location.href = `https://github.com/login/oauth/authorize?${params.toString()}`;

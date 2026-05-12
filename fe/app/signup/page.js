@@ -189,7 +189,7 @@ export default function SignupPage() {
     }
 
     const scope = encodeURIComponent("read:user user:email");
-    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}`;
+    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&state=signup`;
   };
 
   // ── Step 1 제출 ───────────────────────────────────────────────────────────

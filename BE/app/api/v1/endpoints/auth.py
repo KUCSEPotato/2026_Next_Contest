@@ -100,8 +100,22 @@ def _reject_withdrawn_user(user: User | None) -> None:
     if user is not None and (user.deleted_at is not None or not user.is_active):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="탈퇴한 계정입니다. 같은 계정으로 다시 로그인하거나 가입할 수 없습니다.",
+            detail="탈퇴한 계정입니다. 다시 가입하려면 회원가입에서 시작해주세요.",
         )
+
+
+def _release_withdrawn_user_identity(user: User | None) -> bool:
+    if user is None or user.deleted_at is None:
+        return False
+
+    suffix = f"deleted_{user.id}_{int(datetime.now(timezone.utc).timestamp())}"
+    user.email = f"{suffix}@deleted.local"
+    user.nickname = suffix[:50]
+    user.github_id = None
+    user.google_id = None
+    user.password_hash = None
+    user.is_active = False
+    return True
 
 
 def _get_avatar_url(user: User) -> str | None:
@@ -172,10 +186,13 @@ async def signup(payload: SignupRequest, db: Session = Depends(get_db)) -> dict:
     phone_number = payload.phone_number
     password = payload.password
 
+    released_identity = False
     deleted_email_user = db.query(User).filter(User.email == email, User.deleted_at.is_not(None)).first()
-    _reject_withdrawn_user(deleted_email_user)
+    released_identity = _release_withdrawn_user_identity(deleted_email_user) or released_identity
     deleted_login_user = db.query(User).filter(User.nickname == login_id, User.deleted_at.is_not(None)).first()
-    _reject_withdrawn_user(deleted_login_user)
+    released_identity = _release_withdrawn_user_identity(deleted_login_user) or released_identity
+    if released_identity:
+        db.flush()
 
     if db.query(User).filter(User.email == email, User.deleted_at.is_(None)).first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists")
@@ -255,13 +272,18 @@ async def github_oauth_login(payload: OAuthGithubLoginRequest, db: Session = Dep
     github_id = profile.get("provider_id")
     email = profile["email"]
     nickname = payload.nickname
+    mode = payload.mode or "login"
     github_login = profile.get("login")
     avatar_url = profile.get("avatar_url")
 
     user = None
+    released_identity = False
     if github_id:
         withdrawn_github_user = db.query(User).filter(User.github_id == github_id, User.deleted_at.is_not(None)).first()
-        _reject_withdrawn_user(withdrawn_github_user)
+        if mode == "signup":
+            released_identity = _release_withdrawn_user_identity(withdrawn_github_user) or released_identity
+        else:
+            _reject_withdrawn_user(withdrawn_github_user)
         user = db.query(User).filter(User.github_id == github_id, User.deleted_at.is_(None)).first()
     if user is not None:
         _reject_withdrawn_user(user)
@@ -272,7 +294,13 @@ async def github_oauth_login(payload: OAuthGithubLoginRequest, db: Session = Dep
         return success_response(data=_create_auth_tokens(user.id))
 
     withdrawn_email_user = db.query(User).filter(User.email == email, User.deleted_at.is_not(None)).first()
-    _reject_withdrawn_user(withdrawn_email_user)
+    if mode == "signup":
+        released_identity = _release_withdrawn_user_identity(withdrawn_email_user) or released_identity
+    else:
+        _reject_withdrawn_user(withdrawn_email_user)
+
+    if released_identity:
+        db.flush()
 
     existing_email_user = db.query(User).filter(User.email == email, User.deleted_at.is_(None)).first()
     if existing_email_user is not None:
@@ -375,14 +403,19 @@ async def github_oauth_callback(
         email = profile["email"]
         github_login = profile.get("login")
         avatar_url = profile.get("avatar_url")
+        mode = "signup" if state == "signup" else "login"
         
         frontend_url = settings.frontend_url or "http://localhost:3000"
 
         # 기존 유저 찾기
         user = None
+        released_identity = False
         if github_id:
             withdrawn_github_user = db.query(User).filter(User.github_id == github_id, User.deleted_at.is_not(None)).first()
-            _reject_withdrawn_user(withdrawn_github_user)
+            if mode == "signup":
+                released_identity = _release_withdrawn_user_identity(withdrawn_github_user) or released_identity
+            else:
+                _reject_withdrawn_user(withdrawn_github_user)
             user = db.query(User).filter(User.github_id == github_id, User.deleted_at.is_(None)).first()
         if user is not None:
             _reject_withdrawn_user(user)
@@ -397,7 +430,13 @@ async def github_oauth_callback(
             return RedirectResponse(url=redirect_url, status_code=302)
 
         withdrawn_email_user = db.query(User).filter(User.email == email, User.deleted_at.is_not(None)).first()
-        _reject_withdrawn_user(withdrawn_email_user)
+        if mode == "signup":
+            released_identity = _release_withdrawn_user_identity(withdrawn_email_user) or released_identity
+        else:
+            _reject_withdrawn_user(withdrawn_email_user)
+
+        if released_identity:
+            db.flush()
 
         existing_email_user = db.query(User).filter(User.email == email, User.deleted_at.is_(None)).first()
         if existing_email_user is not None:
