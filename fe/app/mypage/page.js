@@ -419,9 +419,10 @@ export default function MyPage() {
     projectStatusFilter,
     projectSortOrder
   );
+  const rawAvatarUrl = profile?.avatar_url || profile?.avatarUrl || "";
   const avatarUrl =
-    profile?.avatar_url && !avatarLoadFailed
-      ? getImageUrl(profile.avatar_url)
+    rawAvatarUrl && !avatarLoadFailed
+      ? getImageUrl(rawAvatarUrl)
       : "";
   const avatarFallback = profile?.nickname?.[0] || "D";
 

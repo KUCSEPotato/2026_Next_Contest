@@ -176,3 +176,22 @@ def generate_presigned_get_url(s3_key: str | None, expires_in: int = 3600) -> st
     if not s3_key:
         return None
     return get_s3_service().generate_presigned_get_url(s3_key, expires_in=expires_in)
+
+
+def resolve_avatar_url(
+    avatar_s3_key: str | None,
+    avatar_url: str | None,
+    expires_in: int = 3600,
+) -> str | None:
+    """Return the API-facing avatar URL.
+
+    Private S3 avatars are always returned as temporary presigned GET URLs.
+    Raw S3 object URLs are treated as fallback input only and converted to a
+    presigned URL when their object key can be extracted.
+    Non-S3 external URLs, such as OAuth provider avatars, are returned as-is.
+    """
+    s3_key = avatar_s3_key or extract_s3_key_from_url(avatar_url)
+    if s3_key:
+        return generate_presigned_get_url(s3_key, expires_in=expires_in)
+
+    return avatar_url

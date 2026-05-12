@@ -21,8 +21,8 @@ from app.models import Interest
 from app.schemas.users import OnboardingIdeaSelectionRequest
 from app.schemas.users import UserProfileUpdateRequest
 from app.services.s3_upload import extract_s3_key_from_url
-from app.services.s3_upload import generate_presigned_get_url
 from app.services.s3_upload import get_s3_service
+from app.services.s3_upload import resolve_avatar_url
 
 router = APIRouter()
 
@@ -31,11 +31,19 @@ def _get_avatar_url(user: User | None) -> str | None:
     if user is None:
         return None
 
-    s3_key = user.avatar_s3_key or extract_s3_key_from_url(user.avatar_url)
-    if s3_key:
-        return generate_presigned_get_url(s3_key)
+    return resolve_avatar_url(user.avatar_s3_key, user.avatar_url)
 
-    return user.avatar_url
+
+def _backfill_avatar_s3_key_from_url(user: User) -> bool:
+    if user.avatar_s3_key or not user.avatar_url:
+        return False
+
+    s3_key = extract_s3_key_from_url(user.avatar_url)
+    if not s3_key:
+        return False
+
+    user.avatar_s3_key = s3_key
+    return True
 
 
 def _serialize_review(db: Session, review: Review) -> dict:
@@ -75,6 +83,9 @@ async def get_my_profile(
     user = db.get(User, current_user_id)
     if user is None or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if _backfill_avatar_s3_key_from_url(user):
+        db.commit()
+        db.refresh(user)
 
     skills = (
         db.query(Skill.name)
@@ -161,6 +172,9 @@ async def upload_my_avatar(
     user = db.get(User, current_user_id)
     if user is None or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if _backfill_avatar_s3_key_from_url(user):
+        db.commit()
+        db.refresh(user)
 
     content_type = file.content_type or ""
     if not content_type.startswith("image/"):
@@ -229,6 +243,9 @@ async def update_my_profile(
     user = db.get(User, current_user_id)
     if user is None or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if _backfill_avatar_s3_key_from_url(user):
+        db.commit()
+        db.refresh(user)
 
     if payload.nickname is not None and payload.nickname != user.nickname:
         duplicate = db.query(User).filter(User.nickname == payload.nickname, User.id != user.id, User.deleted_at.is_(None)).first()
