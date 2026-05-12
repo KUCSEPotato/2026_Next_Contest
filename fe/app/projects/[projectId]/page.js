@@ -82,6 +82,26 @@ export default function ProjectDetailPage() {
   const inputClassName =
     "w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100";
 
+  const buildEditFormFromProject = (projectData) => ({
+    title: projectData.title || "",
+    summary: projectData.summary || "",
+    description: projectData.description || "",
+    difficulty: projectData.difficulty || "",
+    category: projectData.category || projectData.domain || "",
+    progress_percent: projectData.progress_percent ?? 0,
+    max_members:
+      projectData.max_members ??
+      projectData.maxMembers ??
+      projectData.recruitment_count ??
+      projectData.member_limit ??
+      "",
+    expected_period: projectData.expected_period || "",
+    preferred_members: projectData.preferred_members || "",
+    tech_stack: (projectData.tech_stack || projectData.techStack || []).join(", "),
+    hashtags: (projectData.hashtags || []).join(", "),
+    is_public: projectData.is_public ?? true,
+  });
+
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [projectId]);
@@ -114,25 +134,7 @@ export default function ProjectDetailPage() {
             : null
         );
 
-        setEditForm({
-          title: projectData.title || "",
-          summary: projectData.summary || "",
-          description: projectData.description || "",
-          difficulty: projectData.difficulty || "",
-          category: projectData.category || projectData.domain || "",
-          progress_percent: projectData.progress_percent ?? 0,
-          max_members:
-            projectData.max_members ??
-            projectData.maxMembers ??
-            projectData.recruitment_count ??
-            projectData.member_limit ??
-            "",
-          expected_period: projectData.expected_period || "",
-          preferred_members: projectData.preferred_members || "",
-          tech_stack: (projectData.tech_stack || projectData.techStack || []).join(", "),
-          hashtags: (projectData.hashtags || []).join(", "),
-          is_public: projectData.is_public ?? true,
-        });
+        setEditForm(buildEditFormFromProject(projectData));
       } catch (error) {
         console.error(error);
         alert("프로젝트 정보를 불러오지 못했습니다.");
@@ -178,7 +180,7 @@ export default function ProjectDetailPage() {
     try {
       setIsSavingEdit(true);
 
-      await updateProjectApi(projectId, {
+      const updateResult = await updateProjectApi(projectId, {
         title: editForm.title,
         summary: editForm.summary,
         description: editForm.description,
@@ -200,13 +202,30 @@ export default function ProjectDetailPage() {
       });
 
       const refreshed = await getProjectApi(projectId);
-      setProject(refreshed.data);
+      const nextProject = {
+        ...refreshed.data,
+        max_members:
+          refreshed.data?.max_members ??
+          updateResult.data?.max_members ??
+          Number(editForm.max_members),
+        maxMembers:
+          refreshed.data?.maxMembers ??
+          updateResult.data?.maxMembers ??
+          Number(editForm.max_members),
+      };
+      setProject(nextProject);
+      setEditForm(buildEditFormFromProject(nextProject));
       setIsEditing(false);
 
-      alert("프로젝트 정보가 수정되었습니다.");
+      alert(`프로젝트 정보가 수정되었습니다. 모집 인원은 ${Number(editForm.max_members)}명입니다.`);
     } catch (error) {
       console.error(error);
-      alert("프로젝트 수정에 실패했습니다.");
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("current member count")) {
+        alert(`모집 인원은 현재 팀원수인 ${acceptedMemberCount}명 이상이어야 합니다.`);
+        return;
+      }
+      alert(message || "프로젝트 수정에 실패했습니다.");
     } finally {
       setIsSavingEdit(false);
     }

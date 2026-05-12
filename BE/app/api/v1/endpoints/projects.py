@@ -990,6 +990,21 @@ async def update_project(
     expected_period = payload_data.pop("expected_period", None)
     preferred_members = payload_data.pop("preferred_members", None)
 
+    if "max_members" in payload_data:
+        active_member_count = (
+            db.query(ProjectMember)
+            .filter(
+                ProjectMember.project_id == project_id,
+                ProjectMember.left_at.is_(None),
+            )
+            .count()
+        )
+        if payload_data["max_members"] < active_member_count:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"max_members must be at least current member count ({active_member_count})",
+            )
+
     for field, value in payload_data.items():
         setattr(project, field, value)
 
@@ -1023,7 +1038,24 @@ async def update_project(
 
     db.commit()
     db.refresh(project)
-    return success_response(data={"id": project.id, "updated": True})
+    current_member_count = (
+        db.query(ProjectMember)
+        .filter(
+            ProjectMember.project_id == project_id,
+            ProjectMember.left_at.is_(None),
+        )
+        .count()
+    )
+    return success_response(
+        data={
+            "id": project.id,
+            "updated": True,
+            "max_members": project.max_members,
+            "maxMembers": project.max_members,
+            "current_members": current_member_count,
+            "currentMembers": current_member_count,
+        }
+    )
 
 
 @router.delete("/{project_id}", summary="프로젝트 삭제", description="프로젝트를 soft delete 처리합니다.")
