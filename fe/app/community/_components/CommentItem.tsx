@@ -13,13 +13,13 @@ const REACTION_ROW: {
 }[] = [
   {
     type: "recommend",
-    label: "추천",
+    label: "⬆️",
     activeClass: "text-red-500",
     inactiveClass: "text-gray-400 hover:text-red-400",
   },
   {
     type: "not_recommend",
-    label: "비추천",
+    label: "⬇️",
     activeClass: "text-slate-700",
     inactiveClass: "text-gray-400 hover:text-slate-600",
   },

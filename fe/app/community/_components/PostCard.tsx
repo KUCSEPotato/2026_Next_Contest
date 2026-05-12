@@ -22,13 +22,13 @@ const REACTIONS: {
 }[] = [
   {
     type: "recommend",
-    label: "추천",
+    label: "⬆️",
     inactiveClass: "border-gray-200 text-gray-500 hover:border-red-200 hover:text-red-500",
     activeClass: "border-red-300 bg-red-50 text-red-600",
   },
   {
     type: "not_recommend",
-    label: "비추천",
+    label: "⬇️",
     inactiveClass: "border-gray-200 text-gray-500 hover:border-slate-300 hover:text-slate-600",
     activeClass: "border-slate-400 bg-slate-100 text-slate-700",
   },

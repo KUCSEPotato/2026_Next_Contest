@@ -43,7 +43,7 @@ type HotSection = {
 
 const HOT_SECTIONS: HotSection[] = [
   { key: "popular", label: "인기게시물", emoji: "🔥" },
-  { key: "most_recommended", label: "추천 TOP", emoji: "👍" },
+  { key: "most_recommended", label: "⬆️ TOP", emoji: "⬆️" },
   { key: "most_commented", label: "댓글 TOP", emoji: "💬" },
   { key: "most_viewed", label: "조회수 TOP", emoji: "👀" },
   { key: "latest", label: "최신글", emoji: "🆕" },
