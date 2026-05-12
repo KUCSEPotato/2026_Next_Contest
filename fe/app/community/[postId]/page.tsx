@@ -354,7 +354,7 @@ export default function PostDetailPage() {
           onClick={() => router.push("/community")}
           className="mb-5 flex items-center gap-1.5 text-sm text-gray-500 transition hover:text-gray-800"
         >
-          ← 자유게시판
+          ← 모닥불
         </button>
 
         {/* Post */}

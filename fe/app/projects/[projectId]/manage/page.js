@@ -488,7 +488,7 @@ export default function ProjectManagePage() {
       setRecruitmentCount(1);
       setRecruitmentSummary("");
       setRecruitmentDescription("");
-      alert("재모집이 등록되었습니다. 프로젝트 탐색에 모집중으로 표시됩니다.");
+      alert("재모집이 등록되었습니다. 개발의 땅에 모집중으로 표시됩니다.");
     } catch (error) {
       console.error(error);
       alert("재모집 등록에 실패했습니다.");
