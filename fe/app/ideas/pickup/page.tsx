@@ -62,7 +62,7 @@ const SERVICE_BLOCKS = [
     description: "진행 중인 프로젝트가 자라는 땅에서\n 함께할 팀을 찾아보세요.",
     path: "/mainpage",
     icon: "sprout",
-    isActive: true,
+    isActive: false,
   },
   {
     title: "생각의 뜰",
@@ -70,7 +70,7 @@ const SERVICE_BLOCKS = [
     description: "잠시 멈춘 아이디어 씨앗을 살펴보고\n 다시 싹틔워보세요.",
     path: "/ideas/pickup",
     icon: "seed",
-    isActive: false,
+    isActive: true,
   },
   {
     title: "모닥불",

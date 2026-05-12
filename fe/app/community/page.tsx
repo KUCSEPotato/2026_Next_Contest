@@ -25,7 +25,7 @@ const SERVICE_BLOCKS = [
     description: "진행 중인 프로젝트가 자라는 땅에서\n 함께할 팀을 찾아보세요.",
     path: "/mainpage",
     icon: "sprout",
-    isActive: true,
+    isActive: false,
   },
   {
     title: "생각의 뜰",
@@ -41,7 +41,7 @@ const SERVICE_BLOCKS = [
     description: "팀원 모집, 질문, 회고를 불빛 곁에서 \n편하게 나눠보세요.",
     path: "/community",
     icon: "flame",
-    isActive: false,
+    isActive: true,
   },
 ];
 
