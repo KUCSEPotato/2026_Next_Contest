@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 
-const HIDDEN_PATHS = new Set(["/", "/mainpage"]);
+const HIDDEN_PATHS = new Set(["/", "/mainpage", "/login"]);
 const NAVBAR_HIDDEN_PATHS = new Set(["/login", "/signup"]);
 
 export default function BackButton() {
