@@ -27,7 +27,7 @@ export default function LoginPage() {
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: redirectUri,
-      scope: "user:email",
+      scope: "read:user user:email",
     });
 
     window.location.href = `https://github.com/login/oauth/authorize?${params.toString()}`;

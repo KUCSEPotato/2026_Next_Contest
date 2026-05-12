@@ -75,9 +75,10 @@ async def fetch_github_user_profile(access_token: str) -> dict[str, Any]:
             if selected:
                 email = selected.get("email")
         else:
-            logger.warning(
-                "Unable to fetch GitHub user emails: status=%s body=%s",
+            logger.info(
+                "Unable to fetch GitHub user emails; falling back to noreply email when possible: status=%s accepted_scope=%s body=%s",
                 emails_response.status_code,
+                emails_response.headers.get("x-oauth-scopes"),
                 emails_response.text[:500],
             )
 

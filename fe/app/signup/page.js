@@ -168,7 +168,8 @@ export default function SignupPage() {
       return;
     }
 
-    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=user:email`;
+    const scope = encodeURIComponent("read:user user:email");
+    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}`;
   };
 
   // ── Step 1 제출 ───────────────────────────────────────────────────────────
