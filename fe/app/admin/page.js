@@ -196,6 +196,48 @@ export default function AdminPage() {
     }
   }
 
+  async function handleTakedownReport(report) {
+    if (!report) return;
+
+    const targetPostId = report.target_post_id;
+    const targetProjectId = report.target_project_id;
+    // Idea id not present in reports model by default, but support if present
+    const targetIdeaId = report.target_idea_id || null;
+
+    if (!targetPostId && !targetProjectId && !targetIdeaId) {
+      alert("이 신고에 대해 강제 내릴 수 있는 대상이 없습니다.");
+      return;
+    }
+
+    if (!window.confirm("정말로 해당 대상을 강제 삭제(soft delete) 하시겠습니까?")) return;
+
+    try {
+      setProcessingKey(`report-takedown-${report.id}`);
+
+      if (targetPostId) {
+        await adminTakedownPostApi(targetPostId);
+      } else if (targetProjectId) {
+        await adminTakedownProjectApi(targetProjectId);
+      } else if (targetIdeaId) {
+        await adminTakedownIdeaApi(targetIdeaId);
+      }
+
+      // mark report resolved locally
+      setReports((prev) => prev.map((r) => (r.id === report.id ? { ...r, status: "resolved" } : r)));
+      setOverview((prev) =>
+        prev
+          ? { ...prev, reports_open: Math.max(0, (prev.reports_open || 0) - 1) }
+          : prev
+      );
+
+      alert("대상이 강제 내리기(soft delete) 처리되었습니다.");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "강제 내리기에 실패했습니다.");
+    } finally {
+      setProcessingKey("");
+    }
+  }
+
   async function handlePaymentProcessed(eventId, processed) {
     try {
       setProcessingKey(`payment-${eventId}`);
@@ -592,6 +634,15 @@ export default function AdminPage() {
                             <option key={status} value={status}>{status}</option>
                           ))}
                         </select>
+                        {(report.target_post_id || report.target_project_id || report.target_idea_id) && (
+                          <button
+                            onClick={() => handleTakedownReport(report)}
+                            disabled={processingKey === `report-takedown-${report.id}`}
+                            className="ml-2 rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                          >
+                            강제내리기
+                          </button>
+                        )}
                       </Td>
                     </tr>
                   ))}
