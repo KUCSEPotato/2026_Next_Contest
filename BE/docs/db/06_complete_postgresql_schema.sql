@@ -34,3 +34,6 @@
 \ir 21_add_memoir_fields_to_retrospectives.sql
 \ir 22_add_user_avatar_s3_key.sql
 \ir 23_add_application_timestamps.sql
+\ir 24_community_reaction_recommend.sql
+\ir 25_backfill_user_avatar_s3_key.sql
+\ir 26_add_report_target_fields.sql

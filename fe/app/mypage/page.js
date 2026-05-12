@@ -271,7 +271,7 @@ export default function MyPage() {
       setProjects((prev) => prev.filter((p) => p.id !== project.id));
       await reloadMyProjects();
       setDiscardConfirm(null);
-      alert(`"${project.title}" 프로젝트가 영감의 샘으로 이동되었습니다.`);
+      alert(`"${project.title}" 프로젝트가 생각의 뜰으로 이동되었습니다.`);
     } catch (error) {
       console.error(error);
       alert("프로젝트 버리기에 실패했습니다.");
@@ -308,7 +308,7 @@ export default function MyPage() {
 
       await reloadProfile();
 
-      alert("팀원 평가가 저장되었고, 프로젝트가 영감의 샘으로 이동되었습니다.");
+      alert("팀원 평가가 저장되었고, 프로젝트가 생각의 뜰으로 이동되었습니다.");
     } catch (error) {
       console.error(error);
       alert("평가 저장 또는 프로젝트 버리기에 실패했습니다.");
@@ -337,6 +337,14 @@ export default function MyPage() {
       setIsEditingProfile(false);
     } catch (error) {
       console.error(error);
+      const message = error?.message || "";
+      if (
+        message.includes("이미 존재하는 닉네임입니다") ||
+        message.includes("Nickname already exists")
+      ) {
+        alert("이미 존재하는 닉네임입니다.");
+        return;
+      }
       alert("프로필 수정에 실패했습니다.");
     }
   };
@@ -836,7 +844,7 @@ export default function MyPage() {
 
           <div className="relative w-full max-w-sm rounded-2xl bg-white p-7 shadow-2xl">
             <h2 className="mb-2 text-center text-base font-bold text-slate-800">
-              프로젝트를 영감의 샘으로 이동할까요?
+              프로젝트를 생각의 뜰으로 이동할까요?
             </h2>
 
             <p className="mb-1 text-center text-sm font-semibold text-slate-700 line-clamp-1">
@@ -846,7 +854,7 @@ export default function MyPage() {
             <p className="mb-6 text-center text-sm text-slate-400 leading-relaxed">
               이 프로젝트는 프로젝트 목록에서 사라지고,
               <br />
-              영감의 샘에 아이디어로 표시됩니다.
+              생각의 뜰에 아이디어로 표시됩니다.
               <br />
               이 작업은 되돌릴 수 없습니다.
             </p>

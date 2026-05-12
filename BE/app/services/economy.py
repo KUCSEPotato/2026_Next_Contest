@@ -164,7 +164,7 @@ def send_stale_project_notifications(db: Session, *, stale_days: int = 30) -> in
             user_id=project.leader_id,
             notification_type="project.stale_reminder",
             title="30일 이상 진행되지 않은 프로젝트입니다.",
-            body="영감의 샘으로 흘려보내겠습니까? 프로젝트를 버리면 코인을 받을 수 있습니다.",
+            body="생각의 뜰으로 흘려보내겠습니까? 프로젝트를 버리면 코인을 받을 수 있습니다.",
             data={"project_id": project.id, "project_title": project.title, "stale_days": stale_days},
         )
         created_count += 1

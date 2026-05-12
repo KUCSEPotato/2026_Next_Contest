@@ -41,6 +41,10 @@ class ProjectUpdateRequest(CommonProjectUpdateRequest):
     progress_percent: float | None = Field(default=None, ge=0, le=100)
     max_members: int | None = Field(default=None, ge=1, le=100)
     min_members: int | None = Field(default=None, ge=1, le=100)
+    tech_stack: list[str] | None = None
+    hashtags: list[str] | None = None
+    expected_period: str | None = None
+    preferred_members: str | None = None
     is_public: bool | None = None
 
 

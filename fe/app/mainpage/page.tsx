@@ -100,27 +100,33 @@ const RECRUITMENT_STATUS_OPTIONS = [
 
 const SORT_OPTIONS = [
   { value: "latest", label: "최신순" },
-  { value: "recommended", label: "AI 기반 추천순" },
+  { value: "recommended", label: "추천순" },
   { value: "competition", label: "경쟁률순" },
 ];
 
 const SERVICE_BLOCKS = [
   {
-    title: "프로젝트 탐색",
-    description: "진행 중인 아이디어와 프로젝트를 둘러보고 함께할 팀을 찾아보세요.",
+    title: "개발의 땅",
+    subtitle: "Devory",
+    description: "진행 중인 프로젝트가 자라는 땅에서\n 함께할 팀을 찾아보세요.",
     path: "/mainpage",
+    icon: "sprout",
     isActive: true,
   },
   {
-    title: "영감의 샘",
-    description: "아이디어를 흘려보내고,\n새로운 영감을 건져가세요.",
+    title: "생각의 뜰",
+    subtitle: "IdeaYard",
+    description: "잠시 멈춘 아이디어 씨앗을 살펴보고\n 다시 싹틔워보세요.",
     path: "/ideas/pickup",
+    icon: "seed",
     isActive: false,
   },
   {
-    title: "자유항해",
-    description: "질문, 회고, 팀원 모집까지\n넓은 바다처럼 자유롭게.",
+    title: "모닥불",
+    subtitle: "Campfire",
+    description: "팀원 모집, 질문, 회고를 불빛 곁에서 \n편하게 나눠보세요.",
     path: "/community",
+    icon: "flame",
     isActive: false,
   },
 ];
@@ -362,7 +368,7 @@ export default function MainPage() {
     sortBy !== "latest";
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 text-gray-900" style={{ colorScheme: "light" }}>
       <header className="mx-auto flex max-w-6xl items-center justify-end gap-3 px-4 py-4">
         <button
           onClick={() => router.push("/notifications")}
@@ -380,14 +386,19 @@ export default function MainPage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 pb-16">
-        <section className="py-10 text-center sm:py-14">
-          <h1 className="mb-3 text-2xl font-bold leading-tight text-gray-900 sm:text-4xl">
-            아이디어를 팀으로,
-            <br className="sm:hidden" /> 팀을 프로젝트로
+        <section className="pb-10 pt-6 text-center">
+          <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center">
+            <SproutHeroIcon />
+          </div>
+
+          <h1 className="mb-3 text-3xl font-bold leading-tight tracking-tight text-gray-900 sm:text-4xl">
+            개발의 땅
           </h1>
 
-          <p className="mb-8 text-sm text-gray-500 sm:text-base">
-            관심 있는 기능을 선택하고 Devory에서 함께할 팀을 찾아보세요
+          <p className="mx-auto mb-8 max-w-md text-sm leading-7 text-gray-500 sm:text-base">
+            아이디어가 팀이 되고, 팀이 프로젝트로 자라는 곳.
+            <br />
+            Devory에서 함께할 팀을 찾아보세요.
           </p>
 
           <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 text-left sm:grid-cols-3">
@@ -402,13 +413,21 @@ export default function MainPage() {
                 }`}
               >
                 <div className="mb-3 flex items-center justify-between">
-                  <p
-                    className={`text-base font-bold ${
-                      block.isActive ? "text-red-600" : "text-gray-900"
-                    }`}
-                  >
-                    {block.title}
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <ServiceIcon type={block.icon} active={block.isActive} />
+                    <div>
+                      <p
+                        className={`text-base font-bold ${
+                          block.isActive ? "text-red-600" : "text-gray-900"
+                        }`}
+                      >
+                        {block.title}
+                      </p>
+                      <p className="text-[11px] font-semibold text-gray-400">
+                        {block.subtitle}
+                      </p>
+                    </div>
+                  </div>
 
                   {block.isActive && (
                     <span className="rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-semibold text-white">
@@ -428,7 +447,7 @@ export default function MainPage() {
         <section className="mb-8 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-lg font-bold text-gray-900">프로젝트 탐색</p>
+              <p className="text-lg font-bold text-gray-900">개발의 땅</p>
               <p className="mt-1 text-sm text-gray-500">
                 등록된 프로젝트를 살펴보고 함께할 팀을 찾아보세요.
               </p>
@@ -449,7 +468,7 @@ export default function MainPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="프로젝트 제목이나 기술 스택을 검색해보세요"
-            className="mb-4 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-400"
+            className="mb-4 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-red-400"
           />
 
           <div className="flex flex-wrap gap-2">
@@ -560,7 +579,7 @@ export default function MainPage() {
                 value={memberMin}
                 onChange={(e) => setMemberMin(e.target.value)}
                 placeholder="최소 인원"
-                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-400"
+                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-red-400"
               />
 
               <span className="hidden text-center text-sm text-gray-400 sm:block">
@@ -574,7 +593,7 @@ export default function MainPage() {
                 value={memberMax}
                 onChange={(e) => setMemberMax(e.target.value)}
                 placeholder="최대 인원"
-                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-400"
+                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-red-400"
               />
             </div>
           </div>
@@ -656,6 +675,117 @@ export default function MainPage() {
         />
       )}
     </div>
+  );
+}
+
+function SproutHeroIcon() {
+  return (
+    <svg
+      viewBox="0 0 96 96"
+      className="h-24 w-24"
+      aria-hidden
+      style={{ animation: "floatSprout 3s ease-in-out infinite" }}
+    >
+      <defs>
+        <linearGradient id="sproutStem" x1="44" y1="78" x2="44" y2="34">
+          <stop offset="0%" stopColor="#92400e" />
+          <stop offset="100%" stopColor="#16a34a" />
+        </linearGradient>
+      </defs>
+      <g transform="translate(-7 -5) scale(1.15)">
+        <path d="M48 82V38" stroke="url(#sproutStem)" strokeWidth="8" strokeLinecap="round" />
+        <path
+          d="M45 41C23 39 15 24 15 11c19 0 33 9 36 29"
+          fill="#22c55e"
+        />
+        <path
+          d="M51 45c23-2 34-16 34-33-20 0-35 10-38 32"
+          fill="#16a34a"
+        />
+        <ellipse cx="48" cy="84" rx="27" ry="7" fill="#92400e" opacity="0.22" />
+      </g>
+      <style jsx>{`
+        @keyframes floatSprout {
+          0%,
+          100% {
+            transform: translateY(0) scale(1);
+          }
+          50% {
+            transform: translateY(-8px) scale(1.03);
+          }
+        }
+      `}</style>
+    </svg>
+  );
+}
+
+function ServiceIcon({ type, active }: { type: string; active?: boolean }) {
+  const color = active ? "#dc2626" : "#64748b";
+
+  if (type === "seed") {
+    return (
+      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50">
+        <svg viewBox="0 0 48 48" className="h-7 w-7" aria-hidden>
+          <path
+            d="M25 39c8-4 14-11 14-20 0-5-3-9-8-9-8 0-16 9-16 18 0 6 4 10 10 11Z"
+            fill="#d97706"
+            opacity="0.9"
+          />
+          <path
+            d="M16 36c5-8 11-14 19-20"
+            stroke="#78350f"
+            strokeWidth="3"
+            strokeLinecap="round"
+            fill="none"
+            opacity="0.45"
+          />
+        </svg>
+      </span>
+    );
+  }
+
+  if (type === "flame") {
+    return (
+      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50">
+        <svg viewBox="0 0 48 48" className="h-7 w-7" aria-hidden>
+          <path
+            d="M25 43c9-3 14-9 14-17 0-8-5-13-9-18-1 6-5 9-8 12-2-4-2-7-1-11-7 5-12 12-12 20 0 8 7 14 16 14Z"
+            fill="#f97316"
+          />
+          <path
+            d="M24 39c4-2 7-5 7-9 0-4-2-7-5-10-1 4-4 6-6 8-1 5 0 9 4 11Z"
+            fill="#facc15"
+          />
+        </svg>
+      </span>
+    );
+  }
+
+  return (
+    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50">
+      <svg viewBox="0 0 48 48" className="h-7 w-7" aria-hidden>
+        <path
+          d="M24 40V20"
+          stroke={color}
+          strokeWidth="4"
+          strokeLinecap="round"
+        />
+        <path
+          d="M23 23C13 22 9 15 9 8c8 0 15 4 16 14"
+          fill="#22c55e"
+        />
+        <path
+          d="M25 25c10-1 15-7 15-14-8 0-15 4-16 13"
+          fill="#16a34a"
+        />
+        <path
+          d="M15 41h18"
+          stroke="#92400e"
+          strokeWidth="4"
+          strokeLinecap="round"
+        />
+      </svg>
+    </span>
   );
 }
 

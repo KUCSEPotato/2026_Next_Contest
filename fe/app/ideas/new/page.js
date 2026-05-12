@@ -36,7 +36,7 @@ export default function NewIdeaPage() {
 
     const handleSubmit = async () => {
       if (!title.trim()) {
-        alert("프로젝트 주제를 입력해주세요.");
+        alert("프로젝트 제목을 입력해주세요.");
         return;
       }
     
@@ -53,23 +53,15 @@ export default function NewIdeaPage() {
       try {
         setIsSubmitting(true);
     
-        const fullDescription = [
-          description.trim(),
-          expectedPeriod.trim()
-            ? `\n\n<b>[ 예상 진행 기간 ]</b>\n${expectedPeriod.trim()}`
-            : "",
-          preferredMembers.trim()
-            ? `\n\n<b>[ 이런 분과 함께하고 싶어요 ]</b>\n${preferredMembers.trim()}`
-            : "",
-        ].join("");
-    
         const payload = {
           title: title.trim(),
           summary: summary.trim(),
-          description: fullDescription,
+          description: description.trim(),
           domain,
           difficulty,
           required_members: Number(requiredMembers),
+          expected_period: expectedPeriod.trim(),
+          preferred_members: preferredMembers.trim(),
           tech_stack: techStackText
             .split(",")
             .map((item) => item.trim())
@@ -111,7 +103,7 @@ export default function NewIdeaPage() {
         <div className="space-y-6">
           <div>
             <label className="mb-2 block text-sm font-semibold text-slate-700">
-              프로젝트 주제
+              프로젝트 제목
             </label>
             <input
               value={title}

@@ -1,4 +1,5 @@
 import secrets
+import logging
 from datetime import datetime, timedelta, timezone
 import re
 from urllib.parse import urlencode
@@ -48,6 +49,7 @@ from app.services.oauth import fetch_google_user_profile
 from app.services.s3_upload import resolve_avatar_url
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _normalize_nickname_seed(raw_value: str | None) -> str:
@@ -163,7 +165,7 @@ async def signup(payload: SignupRequest, db: Session = Depends(get_db)) -> dict:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists")
 
     if db.query(User).filter(User.nickname == login_id, User.deleted_at.is_(None)).first():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Login id already exists")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 존재하는 닉네임입니다.")
 
     user = User(
         email=email,
@@ -404,6 +406,7 @@ async def github_oauth_callback(
         return RedirectResponse(url=redirect_url, status_code=302)
     
     except Exception as e:
+        logger.exception("GitHub OAuth callback failed: state=%s error=%s", state, e)
         frontend_url = settings.frontend_url or "http://localhost:3000"
         error_url = f"{frontend_url}/signup?error=oauth_failed&message={str(e)}"
         return RedirectResponse(url=error_url, status_code=302)

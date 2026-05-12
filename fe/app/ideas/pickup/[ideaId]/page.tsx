@@ -106,14 +106,14 @@ export default function PickupIdeaDetailPage() {
       <div className="mx-auto w-full max-w-5xl">
         <button
           onClick={handleReturnToWell}
-          className="mb-5 text-sm font-semibold text-slate-500 transition hover:text-blue-600"
+          className="mb-5 text-sm font-semibold text-slate-500 transition hover:text-emerald-700"
         >
-          영감의 샘으로 돌아가기
+          생각의 뜰으로 돌아가기
         </button>
 
         <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700">
+            <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">
               {difficultyLabel}
             </span>
 
@@ -147,20 +147,20 @@ export default function PickupIdeaDetailPage() {
           />
         </section>
 
-        <section className="mt-6 rounded-2xl border border-blue-100 bg-white p-6 shadow-sm">
+        <section className="mt-6 rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
               onClick={handleReturnToWell}
               disabled={isPickingUp}
               className="flex-1 rounded-xl border border-slate-200 px-5 py-3 font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              다시 샘으로 보내기
+              다시 뜰로 보내기
             </button>
 
             <button
               onClick={handlePickup}
               disabled={isPickingUp}
-              className="flex-1 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="flex-1 rounded-xl bg-emerald-600 px-5 py-3 font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
               {isPickingUp ? "프로젝트로 만드는 중..." : "내 프로젝트로 만들기"}
             </button>

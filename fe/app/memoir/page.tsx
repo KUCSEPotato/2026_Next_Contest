@@ -121,6 +121,37 @@ function average(values: number[]) {
   return Number((values.reduce((s, v) => s + v, 0) / values.length).toFixed(1));
 }
 
+function getCurrentUserId() {
+  if (typeof window === "undefined") return null;
+
+  const storedUserId = localStorage.getItem("user_id");
+  if (storedUserId) {
+    const parsed = Number(storedUserId);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+
+  try {
+    const storedUser = localStorage.getItem("user");
+    const user = storedUser ? JSON.parse(storedUser) : null;
+    const parsed = Number(user?.id ?? user?.user_id);
+    return Number.isFinite(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function findMyRetrospective(
+  retrospectives: RetrospectiveSummary[],
+  currentUserId: number | null
+) {
+  if (!currentUserId) return null;
+  return (
+    retrospectives.find(
+      (retrospective) => Number(retrospective.author_id) === currentUserId
+    ) || null
+  );
+}
+
 function toDateLabel(value?: string | null) {
   if (!value) return "기록 없음";
   const d = new Date(value);
@@ -309,8 +340,15 @@ function GrowthModal({
   async function handleGenerate() {
     const custom = customInput.split(",").map((s) => s.trim()).filter(Boolean);
     const chips = [...selectedTech, ...selectedField, ...custom];
-    if (!good.trim() && !bad.trim()) {
-      alert("느낀 점이나 부족했던 점을 먼저 입력해주세요.");
+    const hasGenerationSource =
+      chips.length > 0 ||
+      good.trim() ||
+      bad.trim() ||
+      lessons.trim() ||
+      nextActions.trim();
+
+    if (!hasGenerationSource) {
+      alert("기술 스택, 분야, 느낀 점, 부족했던 점, 배운 점, 다음 액션 중 하나 이상을 입력해주세요.");
       return;
     }
 
@@ -328,6 +366,15 @@ function GrowthModal({
     padding: "10px 14px", fontSize: 13,
     color: "#3c1010", background: "#fdf8f8", outline: "none", boxSizing: "border-box",
   };
+  const canGenerateMemoir = Boolean(
+    selectedTech.length ||
+    selectedField.length ||
+    customInput.trim() ||
+    good.trim() ||
+    bad.trim() ||
+    lessons.trim() ||
+    nextActions.trim()
+  );
 
   return (
     <div
@@ -337,7 +384,9 @@ function GrowthModal({
       <div style={{ background: "#fff", borderRadius: "24px 24px 0 0", width: "100%", maxWidth: 480, padding: "22px 22px 40px", maxHeight: "85vh", overflowY: "auto" }}>
         <div style={{ width: 38, height: 4, background: "#f0d0d0", borderRadius: 4, margin: "0 auto 18px" }} />
         <p style={{ fontSize: 20, fontWeight: 800, color: "#5c0a0a", marginBottom: 4 }}>🌹 성장 기록하기</p>
-        <p style={{ fontSize: 13, color: "#c08080", marginBottom: 22 }}>이 프로젝트에서 새롭게 도전한 것들을 골라봐요</p>
+        <p style={{ fontSize: 13, color: "#c08080", marginBottom: 22 }}>
+          새롭게 도전한 점과 회고 내용을 수정한 뒤 AI 요약본을 다시 만들 수 있어요.
+        </p>
 
         {[
           { title: "기술 스택", chips: TECH_CHIPS, selected: selectedTech, setSelected: setSelectedTech },
@@ -394,7 +443,7 @@ function GrowthModal({
 
         <button
           onClick={handleGenerate}
-          disabled={saving || generating || (!good.trim() && !bad.trim())}
+          disabled={saving || generating || !canGenerateMemoir}
           style={{
             width: "100%",
             background: generating ? "#f0a0a0" : "#fff",
@@ -404,18 +453,25 @@ function GrowthModal({
             padding: 14,
             fontSize: 15,
             fontWeight: 700,
-            cursor: saving || generating || (!good.trim() && !bad.trim()) ? "not-allowed" : "pointer",
+            cursor: saving || generating || !canGenerateMemoir ? "not-allowed" : "pointer",
             marginTop: 2,
             marginBottom: 12,
           }}
         >
-          {generating ? "AI가 회고록을 만드는 중..." : "AI에게 회고록 만들기"}
+          {generating
+            ? "AI 요약본 만드는 중..."
+            : aiMemoir.trim()
+              ? "AI 요약본 다시 만들기"
+              : "AI 요약본 만들기"}
         </button>
 
         {aiMemoir.trim() && (
           <div style={{ marginBottom: 14 }}>
             <p style={{ fontSize: 12, color: "#a83030", fontWeight: 700, marginBottom: 9 }}>
               AI 회고록 초안
+            </p>
+            <p style={{ fontSize: 12, color: "#c08080", lineHeight: 1.7, marginBottom: 8 }}>
+              아직 저장되지 않은 초안입니다. 위 내용을 수정한 뒤 AI 요약본을 다시 만들거나, 아래에서 초안을 직접 다듬을 수 있어요.
             </p>
             <textarea
               value={aiMemoir}
@@ -435,7 +491,7 @@ function GrowthModal({
             cursor: saving ? "not-allowed" : "pointer", marginTop: 6,
           }}
         >
-          {saving ? "저장 중..." : "수확 기록 저장하기 🌹"}
+          {saving ? "저장 중..." : "수확일기 저장하기 🌹"}
         </button>
       </div>
     </div>
@@ -471,7 +527,8 @@ function Section({ emoji, label, headline, children }: {
 ──────────────────────────────────────────────────────────── */
 function MemoirContent() {
   const searchParams = useSearchParams();
-  const requestedProjectId = searchParams.get("projectId");
+  const isListView = searchParams.get("view") === "list";
+  const requestedProjectId = isListView ? null : searchParams.get("projectId");
 
   const [modalOpen, setModalOpen]           = useState(false);
   const [project, setProject]               = useState<ProjectData | null>(null);
@@ -495,6 +552,7 @@ function MemoirContent() {
         setError("");
 
         let selectedProject: ProjectData | null = null;
+        const currentUserId = getCurrentUserId();
 
         if (!requestedProjectId) {
           const myProjectsResult = await getMyProjectsApi();
@@ -508,11 +566,12 @@ function MemoirContent() {
                 const retrospectivesResult = await getProjectRetrospectivesApi(
                   completedProject.id
                 );
-                const first = (retrospectivesResult.data || [])[0] as
-                  | RetrospectiveSummary
-                  | undefined;
+                const myRetrospective = findMyRetrospective(
+                  (retrospectivesResult.data || []) as RetrospectiveSummary[],
+                  currentUserId
+                );
 
-                if (!first) {
+                if (!myRetrospective) {
                   return {
                     project: completedProject,
                     retrospectiveId: null,
@@ -522,7 +581,7 @@ function MemoirContent() {
 
                 const detail = await getProjectRetrospectiveApi(
                   completedProject.id,
-                  first.id
+                  myRetrospective.id
                 );
                 const retro = detail.data as RetrospectiveDetail;
                 const ll = parseLessonsLearned(retro.lessons_learned);
@@ -591,9 +650,12 @@ function MemoirContent() {
         let loadedRetrospectiveId: number | null = null;
 
         if (retrospectivesResult.status === "fulfilled") {
-          const first = (retrospectivesResult.value.data || [])[0] as RetrospectiveSummary | undefined;
-          if (first) {
-            const detail = await getProjectRetrospectiveApi(projectId, first.id);
+          const myRetrospective = findMyRetrospective(
+            (retrospectivesResult.value.data || []) as RetrospectiveSummary[],
+            currentUserId
+          );
+          if (myRetrospective) {
+            const detail = await getProjectRetrospectiveApi(projectId, myRetrospective.id);
             const retro  = detail.data as RetrospectiveDetail;
             const ll     = parseLessonsLearned(retro.lessons_learned);
             loadedRetrospectiveId = retro.id;
@@ -671,11 +733,19 @@ function MemoirContent() {
 
     try {
       setGeneratingMemoir(true);
+      const userReflection = [
+        data.chips.length
+          ? `이번 회고에서 중요하게 표시한 성장 키워드는 ${data.chips.join(", ")}입니다.`
+          : "",
+        data.good ? `좋았던 경험과 느낀 점은 ${data.good}` : "",
+        data.lessons ? `새롭게 배운 점은 ${data.lessons}` : "",
+        data.nextActions ? `앞으로 해보고 싶은 다음 행동은 ${data.nextActions}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+
       const result = await refineProjectMemoirApi(project.id, {
-        felt_point: [data.good, data.lessons, data.nextActions]
-          .filter((value) => value?.trim())
-          .join("\n\n")
-          .trim(),
+        felt_point: userReflection.trim(),
         lacked_point: data.bad.trim(),
       });
       const refined = result.data?.refined_memoir?.trim();

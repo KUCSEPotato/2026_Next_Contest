@@ -427,6 +427,23 @@ export async function getTodosApi(projectId) {
   return handleResponse(res, "Todo 목록을 불러오지 못했습니다.");
 }
 
+export async function getTodoStateApi(projectId) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/projects/${projectId}/todos/state`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "Todo 확정 상태를 불러오지 못했습니다.");
+}
+
+export async function confirmTodosApi(projectId) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/projects/${projectId}/todos/confirm`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "Todo 확정에 실패했습니다.");
+}
+
 export async function updateTodoApi(projectId, todoId, payload) {
   const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/projects/${projectId}/todos/${todoId}`,
@@ -925,6 +942,91 @@ export async function createAdminNoticeApi(payload) {
   });
 
   return handleResponse(res, "공지 작성에 실패했습니다.");
+}
+
+export async function revokeAdminUserCoinsApi(userId, payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/users/${userId}/coins/revoke`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "코인 환수에 실패했습니다.");
+}
+
+export async function getAdminMyPostsApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/posts/mine`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "내 공지/이벤트 목록을 불러오지 못했습니다.");
+}
+
+export async function getAdminPostsApi(params = {}) {
+  const query = new URLSearchParams();
+
+  if (params.q) query.set("q", params.q);
+  if (params.category) query.set("category", params.category);
+  if (params.include_deleted !== undefined) {
+    query.set("include_deleted", String(params.include_deleted));
+  }
+
+  const queryString = query.toString();
+  const url = queryString
+    ? `${API_BASE_URL}/api/v1/admin/posts?${queryString}`
+    : `${API_BASE_URL}/api/v1/admin/posts`;
+
+  const res = await authenticatedFetch(url, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "게시글 목록을 불러오지 못했습니다.");
+}
+
+export async function adminUpdatePostApi(postId, payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/posts/${postId}`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "게시물 수정에 실패했습니다.");
+}
+
+export async function adminDeletePostApi(postId) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/posts/${postId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "게시물 삭제에 실패했습니다.");
+}
+
+export async function adminTakedownPostApi(postId) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/posts/${postId}/takedown`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "게시물 강제 내리기에 실패했습니다.");
+}
+
+export async function adminTakedownIdeaApi(ideaId) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/ideas/${ideaId}/takedown`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "아이디어 강제 내리기에 실패했습니다.");
+}
+
+export async function adminTakedownProjectApi(projectId) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/projects/${projectId}/takedown`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "프로젝트 강제 내리기에 실패했습니다.");
 }
 
 export async function getMyChatRoomsApi() {
