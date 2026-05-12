@@ -1,4 +1,5 @@
 import secrets
+import logging
 from datetime import datetime, timedelta, timezone
 import re
 from urllib.parse import urlencode
@@ -48,6 +49,7 @@ from app.services.oauth import fetch_google_user_profile
 from app.services.s3_upload import resolve_avatar_url
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _normalize_nickname_seed(raw_value: str | None) -> str:
@@ -404,6 +406,7 @@ async def github_oauth_callback(
         return RedirectResponse(url=redirect_url, status_code=302)
     
     except Exception as e:
+        logger.exception("GitHub OAuth callback failed: state=%s error=%s", state, e)
         frontend_url = settings.frontend_url or "http://localhost:3000"
         error_url = f"{frontend_url}/signup?error=oauth_failed&message={str(e)}"
         return RedirectResponse(url=error_url, status_code=302)
