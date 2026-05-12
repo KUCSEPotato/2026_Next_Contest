@@ -523,6 +523,12 @@ def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str, projec
             candidate = candidates[0]
             text = getattr(candidate, "content", None) or getattr(candidate, "output", None) or ""
 
+    if not text:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"No Text in Gemini Response: {str(error)}",
+        )
+    
     #cleaned_text = _clean_memoir_refine_output((text or "").strip())
     return text or _fallback_memoir_refine(feelings, shortcomings)
 
