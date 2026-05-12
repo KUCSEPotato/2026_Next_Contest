@@ -137,6 +137,13 @@ export default function Navbar() {
             마이페이지
           </button>
 
+          <button
+            onClick={() => router.push("/mypage?section=projects")}
+            className="text-slate-700 transition hover:text-red-600"
+          >
+            나의 프로젝트
+          </button>
+
           {user?.role === "admin" && (
             <button
               onClick={() => router.push("/admin")}

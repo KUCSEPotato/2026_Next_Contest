@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateStoredUser } from "../../lib/auth";
 import {
@@ -24,6 +24,7 @@ import {
 
 export default function MyPage() {
   const router = useRouter();
+  const projectHistoryRef = useRef(null);
 
   const [profile, setProfile] = useState(null);
   const [reputation, setReputation] = useState(null);
@@ -161,6 +162,21 @@ export default function MyPage() {
 
     loadMyPage();
   }, [router]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("section") !== "projects") return;
+
+    requestAnimationFrame(() => {
+      projectHistoryRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }, [loading]);
 
   const isTeamFormedProject = (project) => {
     return ["in_progress", "started", "completed", "paused"].includes(
@@ -649,7 +665,11 @@ export default function MyPage() {
           </section>
         </div>
 
-        <section className="rounded-2xl bg-white p-6 shadow">
+        <section
+          ref={projectHistoryRef}
+          id="my-projects"
+          className="scroll-mt-24 rounded-2xl bg-white p-6 shadow"
+        >
           <h2 className="mb-4 text-xl font-bold">프로젝트 이력</h2>
 
           <div className="space-y-3">
