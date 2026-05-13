@@ -804,15 +804,16 @@ function SproutHeroIcon() {
       <g transform="translate(-7 -5) scale(1.15)">
         <ellipse cx="48" cy="84" rx="27" ry="7" fill="#92400e" opacity="0.22" />
         <path
+          d="M45 41C23 39 15 24 15 11c19 0 33 9 36 29"
+          fill="#22c55e"
+          transform="translate(-4 0)"
+        />
+        <path
           d="M48 78V40"
           stroke="#7c2d12"
           strokeWidth="8"
           strokeLinecap="round"
           fill="none"
-        />
-        <path
-          d="M45 41C23 39 15 24 15 11c19 0 33 9 36 29"
-          fill="#22c55e"
         />
         <path
           d="M51 45c23-2 34-16 34-33-20 0-35 10-38 32"
