@@ -141,14 +141,15 @@ export default function ProjectManagePage() {
   const canAcceptMore = !maxMembers || displayCurrentMemberCount < maxMembers;
   const projectStatus = normalizeStatus(project?.status);
   const isProjectInProgress = ["in_progress", "started"].includes(projectStatus);
+  const isProjectCompleted = ["completed", "complete", "done"].includes(projectStatus);
   const doneTodoCount = todos.filter(isDoneTodo).length;
   const todoCompletionRate = todos.length
     ? Math.round((doneTodoCount / todos.length) * 100)
     : 0;
   const canCompleteProject =
     isProjectInProgress && todos.length > 0 && todoCompletionRate >= 70;
-  const isProjectCompleted = projectStatus === "completed";
   const canCompleteTeam = !isProjectInProgress && !isProjectCompleted;
+  const canRecruitAgain = isLeader && isProjectInProgress && !isProjectCompleted;
   const completionHelpText =
     !isProjectInProgress
       ? ""
@@ -698,36 +699,33 @@ export default function ProjectManagePage() {
             {maxMembers ? `${maxMembers}명 (리더 포함)` : "제한 없음"}
           </div>
 
-          {isLeader && !isProjectCompleted && (
-            <div className={`mt-4 grid gap-3 ${isProjectInProgress ? "sm:grid-cols-2" : ""}`}>
+          {isLeader && canCompleteTeam && (
+            <button
+              onClick={handleCompleteTeam}
+              disabled={isCompletingTeam}
+              className="mt-4 w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+            >
+              {isCompletingTeam ? "팀 결성 중..." : "팀 결성하기"}
+            </button>
+          )}
+
+          {canRecruitAgain && (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <button
-                onClick={
-                  isProjectInProgress
-                    ? () => setShowRecruitmentForm((prev) => !prev)
-                    : handleCompleteTeam
-                }
-                disabled={
-                  isCompletingTeam ||
-                  (!isProjectInProgress && !canCompleteTeam)
-                }
+                onClick={() => setShowRecruitmentForm((prev) => !prev)}
+                disabled={isCompletingTeam}
                 className="w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
               >
-                {isProjectInProgress
-                  ? "재모집하기"
-                  : isCompletingTeam
-                  ? "팀 결성 중..."
-                  : "팀 결성하기"}
+                재모집하기
               </button>
 
-              {isProjectInProgress && (
-                <button
-                  onClick={openTeamChat}
-                  disabled={isOpeningChat}
-                  className="w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-                >
-                  {isOpeningChat ? "이동 중..." : "팀 채팅방으로 가기"}
-                </button>
-              )}
+              <button
+                onClick={openTeamChat}
+                disabled={isOpeningChat}
+                className="w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+              >
+                {isOpeningChat ? "이동 중..." : "팀 채팅방으로 가기"}
+              </button>
             </div>
           )}
 
@@ -741,7 +739,7 @@ export default function ProjectManagePage() {
             </button>
           )}
 
-          {isLeader && isProjectInProgress && showRecruitmentForm && (
+          {canRecruitAgain && showRecruitmentForm && (
             <div className="mt-4 rounded-xl border border-red-100 bg-red-50/40 p-4">
               <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_160px]">
                 <div>
