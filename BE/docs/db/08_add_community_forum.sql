@@ -95,12 +95,14 @@ CREATE INDEX IF NOT EXISTS idx_comment_reactions_user_id ON community_comment_re
 -- ======================================
 -- 6) Triggers for Timestamps
 -- ======================================
-CREATE TRIGGER IF NOT EXISTS set_community_posts_updated_at
+DROP TRIGGER IF EXISTS set_community_posts_updated_at ON community_posts;
+CREATE TRIGGER set_community_posts_updated_at
     BEFORE UPDATE ON community_posts
     FOR EACH ROW
     EXECUTE FUNCTION set_updated_at();
 
-CREATE TRIGGER IF NOT EXISTS set_post_comments_updated_at
+DROP TRIGGER IF EXISTS set_post_comments_updated_at ON community_post_comments;
+CREATE TRIGGER set_post_comments_updated_at
     BEFORE UPDATE ON community_post_comments
     FOR EACH ROW
     EXECUTE FUNCTION set_updated_at();

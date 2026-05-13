@@ -5,6 +5,24 @@ import { useParams, useRouter } from "next/navigation";
 import { PostDetail } from "../../community/_types";
 import { getPost } from "../../community/_lib/api";
 import { timeAgo } from "../../community/_lib/utils";
+import { NOTICE_READ_IDS_STORAGE_KEY } from "../../../components/TopActionButtons";
+
+function markNoticeAsRead(noticeId: number) {
+  if (typeof window === "undefined") return;
+
+  try {
+    const parsed = JSON.parse(localStorage.getItem(NOTICE_READ_IDS_STORAGE_KEY) || "[]");
+    const readIds = new Set(
+      Array.isArray(parsed)
+        ? parsed.map((id) => Number(id)).filter((id) => Number.isFinite(id))
+        : []
+    );
+    readIds.add(noticeId);
+    localStorage.setItem(NOTICE_READ_IDS_STORAGE_KEY, JSON.stringify([...readIds]));
+  } catch {
+    localStorage.setItem(NOTICE_READ_IDS_STORAGE_KEY, JSON.stringify([noticeId]));
+  }
+}
 
 export default function NoticeDetailPage() {
   const router = useRouter();
@@ -31,6 +49,7 @@ export default function NoticeDetailPage() {
         return;
       }
       setNotice(data);
+      markNoticeAsRead(data.id);
     } catch (err) {
       console.error(err);
       setError("공지 정보를 불러오지 못했습니다.");
