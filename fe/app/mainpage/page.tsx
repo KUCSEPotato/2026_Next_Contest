@@ -811,13 +811,6 @@ function SproutHeroIcon() {
           fill="none"
         />
         <path
-          d="M48 56C40 49 31 44 19 39M49 55C58 47 67 38 78 24"
-          stroke="#7c2d12"
-          strokeWidth="5"
-          strokeLinecap="round"
-          fill="none"
-        />
-        <path
           d="M45 41C23 39 15 24 15 11c19 0 33 9 36 29"
           fill="#22c55e"
         />
