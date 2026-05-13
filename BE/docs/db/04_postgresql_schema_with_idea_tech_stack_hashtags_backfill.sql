@@ -134,24 +134,6 @@ CREATE TABLE IF NOT EXISTS user_interests (
     CONSTRAINT user_interests_level_check CHECK (interest_level IS NULL OR interest_level BETWEEN 1 AND 5)
 );
 
-CREATE TABLE IF NOT EXISTS project_skills (
-    id BIGSERIAL PRIMARY KEY,
-    project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    skill_id BIGINT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
-    required_level SMALLINT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT project_skills_unique UNIQUE (project_id, skill_id),
-    CONSTRAINT project_skills_level_check CHECK (required_level IS NULL OR required_level BETWEEN 1 AND 5)
-);
-
-CREATE TABLE IF NOT EXISTS project_interests (
-    id BIGSERIAL PRIMARY KEY,
-    project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    interest_id BIGINT NOT NULL REFERENCES interests(id) ON DELETE CASCADE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT project_interests_unique UNIQUE (project_id, interest_id)
-);
-
 -- =========================
 -- 5) Idea Domain
 -- =========================
@@ -214,6 +196,24 @@ CREATE TABLE IF NOT EXISTS projects (
     CONSTRAINT projects_progress_check CHECK (progress_percent >= 0 AND progress_percent <= 100),
     CONSTRAINT projects_min_members_check CHECK (min_members BETWEEN 1 AND 100),
     CONSTRAINT projects_max_members_check CHECK (max_members BETWEEN 1 AND 100)
+);
+
+CREATE TABLE IF NOT EXISTS project_skills (
+    id BIGSERIAL PRIMARY KEY,
+    project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    skill_id BIGINT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+    required_level SMALLINT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT project_skills_unique UNIQUE (project_id, skill_id),
+    CONSTRAINT project_skills_level_check CHECK (required_level IS NULL OR (required_level BETWEEN 1 AND 5))
+);
+
+CREATE TABLE IF NOT EXISTS project_interests (
+    id BIGSERIAL PRIMARY KEY,
+    project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    interest_id BIGINT NOT NULL REFERENCES interests(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT project_interests_unique UNIQUE (project_id, interest_id)
 );
 
 CREATE TABLE IF NOT EXISTS project_members (
