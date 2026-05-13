@@ -38,6 +38,16 @@ export default function Navbar() {
   const [theme, setTheme] = useState(getCurrentTheme);
 
   useEffect(() => {
+    const frameId = window.requestAnimationFrame(() => {
+      setTheme(getCurrentTheme());
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
 
     const syncAuthState = async () => {
@@ -139,7 +149,8 @@ export default function Navbar() {
   };
 
   const handleThemeToggle = () => {
-    const nextTheme = theme === "dark" ? "light" : "dark";
+    const currentTheme = getCurrentTheme();
+    const nextTheme = currentTheme === "dark" ? "light" : "dark";
     applyTheme(nextTheme);
     setTheme(nextTheme);
   };
