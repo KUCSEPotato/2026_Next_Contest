@@ -63,6 +63,10 @@ OPENAPI_TAGS = [
         "description": "코인 잔액, 수동 구매 요청 생성 및 구매 요청 조회 API입니다.",
     },
     {
+        "name": "payments",
+        "description": "토스페이먼츠 결제 주문 생성, 결제 승인 및 실패 기록 API입니다.",
+    },
+    {
         "name": "notifications",
         "description": "사용자 알림 목록 조회 및 읽음 처리 API입니다.",
     },

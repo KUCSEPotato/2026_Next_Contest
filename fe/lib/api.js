@@ -941,6 +941,36 @@ export async function getMyCoinPurchaseRequestsApi() {
   return handleResponse(res, "코인 구매 요청 목록을 불러오지 못했습니다.");
 }
 
+export async function preparePaymentApi(payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/payments/prepare`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "결제 준비에 실패했습니다.");
+}
+
+export async function confirmPaymentApi(payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/payments/confirm`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "결제 승인에 실패했습니다.");
+}
+
+export async function recordPaymentFailureApi(payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/payments/fail`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "결제 실패 기록에 실패했습니다.");
+}
+
 /* =========================
    Admin
 ========================= */

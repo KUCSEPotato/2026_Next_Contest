@@ -10,6 +10,7 @@ import {
 } from "../../lib/api";
 import { getToken } from "../../lib/auth";
 import { useDialog, useToast } from "../../components/AppFeedback";
+import TossPaymentButton from "../../components/payment/TossPaymentButton";
 
 const STATUS_LABELS = {
   pending: "확인 대기",
@@ -118,7 +119,7 @@ export default function CoinsPage() {
             <div>
               <h1 className="text-3xl font-black text-slate-950">코인 구매</h1>
               <p className="mt-2 text-sm text-slate-600">
-                PG 연동 전까지는 구매 요청을 남기면 관리자가 결제 확인 후 코인을 지급합니다.
+                카드 결제는 승인 완료 후 자동으로 충전됩니다. 문제가 있으면 수동 구매 요청도 남길 수 있습니다.
               </p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-right">
@@ -155,13 +156,21 @@ export default function CoinsPage() {
                   <p className="mt-1 text-lg font-bold text-red-600">
                     {formatKrw(packageItem.price_krw)}
                   </p>
+                  <TossPaymentButton
+                    productId={packageItem.id}
+                    label="카드 결제"
+                    onError={(err) =>
+                      toast.error(err instanceof Error ? err.message : "결제를 시작하지 못했습니다.")
+                    }
+                    className="mt-5 w-full rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  />
                   <button
                     type="button"
                     onClick={() => handleRequestPurchase(packageItem)}
                     disabled={processingPackage === packageItem.id}
-                    className="mt-5 w-full rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    className="mt-3 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                   >
-                    {processingPackage === packageItem.id ? "요청 중" : "구매 요청"}
+                    {processingPackage === packageItem.id ? "요청 중" : "수동 구매 요청"}
                   </button>
                 </article>
               ))}

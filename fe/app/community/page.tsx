@@ -7,6 +7,7 @@ import { getPosts, deletePost, reactToPost, getHotPosts } from "./_lib/api";
 import PostCard from "./_components/PostCard";
 import LoginModal from "./_components/LoginModal";
 import { ThumbUpIcon } from "./_components/ReactionThumbIcons";
+import TopActionButtons from "../../components/TopActionButtons";
 
 const CATEGORIES = [
   { label: "전체", value: undefined },
@@ -14,8 +15,6 @@ const CATEGORIES = [
   { label: "질문", value: "question" },
   { label: "아이디어", value: "idea" },
   { label: "작업 공유", value: "showcase" },
-  { label: "이벤트", value: "event" },
-  { label: "공지", value: "announcement" },
 ];
 
 const SERVICE_BLOCKS = [
@@ -58,6 +57,12 @@ const HOT_SECTIONS: HotSection[] = [
   { key: "most_viewed", label: "조회수 TOP", emoji: "👀" },
   { key: "latest", label: "최신글", emoji: "🆕" },
 ];
+
+const ADMIN_ONLY_CATEGORIES = new Set(["announcement", "event"]);
+
+function isCampfirePost(post: PostSummary | null) {
+  return Boolean(post && !ADMIN_ONLY_CATEGORIES.has(post.category || ""));
+}
 
 type Tab = "board" | "hot";
 type HotPostsState = {
@@ -138,7 +143,7 @@ export default function CommunityPage() {
     setLoadError("");
     try {
       const res = await getPosts({ category: selectedCategory, page, page_size: 20 });
-      setPosts(res.posts);
+      setPosts((res.posts || []).filter(isCampfirePost));
       setTotalPages(res.total_pages);
     } catch (e) {
       console.error(e);
@@ -160,7 +165,13 @@ export default function CommunityPage() {
     setLoadingHot(true);
     try {
       const res = await getHotPosts();
-      setHotPosts(res);
+      setHotPosts({
+        popular: isCampfirePost(res.popular) ? res.popular : null,
+        most_recommended: isCampfirePost(res.most_recommended) ? res.most_recommended : null,
+        most_commented: isCampfirePost(res.most_commented) ? res.most_commented : null,
+        most_viewed: isCampfirePost(res.most_viewed) ? res.most_viewed : null,
+        latest: isCampfirePost(res.latest) ? res.latest : null,
+      });
     } catch (e) {
       console.error(e);
     } finally {
@@ -224,20 +235,7 @@ export default function CommunityPage() {
 
   return (
     <div className="min-h-screen bg-orange-50/30 text-gray-900">
-      <header className="mx-auto flex max-w-6xl items-center justify-end gap-3 px-4 py-4">
-        <button
-          onClick={() => router.push("/notifications")}
-          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-red-300 hover:text-red-600"
-        >
-          알림
-        </button>
-        <button
-          onClick={() => router.push("/chat")}
-          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-red-300 hover:text-red-600"
-        >
-          채팅
-        </button>
-      </header>
+      <TopActionButtons />
 
       <main className="mx-auto max-w-6xl px-4 pb-16">
         <section className="pb-10 pt-6 text-center">

@@ -902,8 +902,16 @@ function getProfileOptionId(option) {
   return option.id ?? option.skill_id ?? option.interest_id ?? null;
 }
 
+function normalizeProfileOptionName(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
 function findProfileOption(options, name) {
-  return (options || []).find((option) => getProfileOptionName(option) === name);
+  const normalizedName = normalizeProfileOptionName(name);
+
+  return (options || []).find(
+    (option) => normalizeProfileOptionName(getProfileOptionName(option)) === normalizedName
+  );
 }
 
 function hasProfileOption(options, name) {

@@ -13,7 +13,7 @@
 -- 7. 11_emergency_sync_ideas_table.sql
 -- 8. 12_add_user_onboarding_fields.sql
 -- 9. 13_add_coin_wallet_and_project_reminders.sql
--- 10. Additional numbered backfills through 23_add_application_timestamps.sql
+-- 10. Additional numbered backfills through 30_create_toss_payments.sql
 --
 -- Use `psql` so relative includes resolve from this file's directory.
 
@@ -40,3 +40,4 @@
 \ir 27_add_coin_purchase_requests.sql
 \ir 28_add_user_suspension_fields.sql
 \ir 29_add_report_comment_target.sql
+\ir 30_create_toss_payments.sql

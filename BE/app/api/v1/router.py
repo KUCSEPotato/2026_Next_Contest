@@ -10,6 +10,7 @@ from app.api.v1.endpoints import ideas
 from app.api.v1.endpoints import llm
 from app.api.v1.endpoints import matching
 from app.api.v1.endpoints import notifications
+from app.api.v1.endpoints import payments
 from app.api.v1.endpoints import projects
 from app.api.v1.endpoints import recommendations
 from app.api.v1.endpoints import reports
@@ -33,6 +34,7 @@ api_router.include_router(recommendations.router, prefix="/recommendations", tag
 api_router.include_router(llm.router, prefix="/llm", tags=["llm"])
 api_router.include_router(chats.router, prefix="/chats", tags=["chats"])
 api_router.include_router(coins.router, prefix="/coins", tags=["coins"])
+api_router.include_router(payments.router, prefix="/payments", tags=["payments"])
 api_router.include_router(community.router, prefix="/community", tags=["community"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
 api_router.include_router(reports.router, prefix="/reports", tags=["reports"])
