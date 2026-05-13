@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
+import { useDialog } from "../../../components/AppFeedback";
 import { confirmPaymentApi } from "../../../lib/api";
 
 type ConfirmState =
@@ -13,6 +14,7 @@ type ConfirmState =
 function PaymentSuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { confirm } = useDialog();
   const calledRef = useRef(false);
   const [state, setState] = useState<ConfirmState>({
     status: "loading",
@@ -45,11 +47,13 @@ function PaymentSuccessContent() {
           coinBalance: result.data?.coin_balance,
         });
 
-        // 결제 완료 후 메인 페이지로 이동 (운영 기준으로 /mainpage)
-        // 사용자 경험을 위해 짧게 대기 후 리디렉션합니다.
-        setTimeout(() => {
-          router.push("/mainpage");
-        }, 1200);
+        // 결제 완료 다이얼로그를 띄우고 사용자가 확인하면 메인으로 이동
+        await confirm({
+          title: "결제가 완료되었습니다",
+          message: "결제가 성공적으로 완료되었습니다.",
+          confirmText: "확인",
+        });
+        router.push("/mainpage");
       } catch (error) {
         setState({
           status: "error",
