@@ -53,6 +53,7 @@ export default function CommentItem({
   const isOwn =
     comment.is_mine === true ||
     (comment.author_id != null && comment.author_id === currentUserId);
+  const isAdminComment = comment.author?.role === "admin";
 
   const submitReply = () => {
     if (!replyText.trim()) return;
@@ -160,7 +161,7 @@ export default function CommentItem({
                 </button>
               </>
             )}
-            {!isOwn && (
+            {!isOwn && !isAdminComment && (
               <button
                 onClick={() => onReport(comment.id)}
                 className="text-[10px] text-gray-400 hover:text-red-500"

@@ -10,6 +10,7 @@ from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
 from app.models import CommunityPost
 from app.models import CommunityPostComment
+from app.models import ChatRoom
 from app.models import CoinPurchaseRequest
 from app.models import Notification
 from app.models import PaymentEvent
@@ -54,6 +55,108 @@ def _ensure_admin(db: Session, user_id: int) -> None:
     user = db.get(User, user_id)
     if user is None or user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin permission required")
+
+
+def _excerpt(value: str | None, limit: int = 160) -> str | None:
+    if not value:
+        return None
+    compact = " ".join(value.split())
+    if len(compact) <= limit:
+        return compact
+    return f"{compact[:limit].rstrip()}..."
+
+
+def _report_target_meta(db: Session, report: Report) -> dict:
+    if report.target_comment_id is not None:
+        comment = db.get(CommunityPostComment, report.target_comment_id)
+        post = db.get(CommunityPost, comment.post_id) if comment else None
+        title = f"댓글: {_excerpt(comment.content, 40) or f'#{report.target_comment_id}'}" if comment else f"댓글 #{report.target_comment_id}"
+        return {
+            "target_title": title,
+            "target_excerpt": _excerpt(comment.content if comment else None),
+            "target_url": f"/community/{comment.post_id}" if comment else None,
+            "target_parent_title": post.title if post else None,
+        }
+
+    if report.target_post_id is not None:
+        post = db.get(CommunityPost, report.target_post_id)
+        return {
+            "target_title": post.title if post else f"게시글 #{report.target_post_id}",
+            "target_excerpt": _excerpt(post.content if post else None),
+            "target_url": f"/community/{post.id}" if post else None,
+            "target_parent_title": None,
+        }
+
+    if report.target_project_id is not None:
+        project = db.get(Project, report.target_project_id)
+        project_excerpt = (project.summary or project.description) if project else None
+        return {
+            "target_title": project.title if project else f"프로젝트 #{report.target_project_id}",
+            "target_excerpt": _excerpt(project_excerpt),
+            "target_url": f"/projects/{project.id}" if project else None,
+            "target_parent_title": None,
+        }
+
+    if report.target_chat_room_id is not None:
+        room = db.get(ChatRoom, report.target_chat_room_id)
+        project = db.get(Project, room.project_id) if room else None
+        room_name = room.name if room and room.name else "채팅방"
+        project_title = project.title if project else None
+        return {
+            "target_title": f"{project_title} / {room_name}" if project_title else f"채팅방 #{report.target_chat_room_id}",
+            "target_excerpt": "채팅방 신고",
+            "target_url": f"/projects/{room.project_id}/chat" if room else None,
+            "target_parent_title": project_title,
+        }
+
+    if report.target_user_id is not None:
+        user = db.get(User, report.target_user_id)
+        user_title = (user.nickname or user.email) if user else f"사용자 #{report.target_user_id}"
+        return {
+            "target_title": user_title,
+            "target_excerpt": user.email if user else None,
+            "target_url": f"/users/{user.id}" if user else None,
+            "target_parent_title": None,
+        }
+
+    return {
+        "target_title": "알 수 없는 대상",
+        "target_excerpt": None,
+        "target_url": None,
+        "target_parent_title": None,
+    }
+
+
+def _notify_report_result(
+    db: Session,
+    *,
+    report: Report,
+    status_value: str,
+    resolution_type: str | None,
+    message: str | None,
+) -> None:
+    if status_value not in {"resolved", "rejected"}:
+        return
+    status_label = "처리 완료" if status_value == "resolved" else "반려"
+    resolution = resolution_type or ("조치 완료" if status_value == "resolved" else "조치 없음")
+    body = f"접수하신 신고가 {status_label}되었습니다.\n처분: {resolution}"
+    if message:
+        body = f"{body}\n메시지: {message}"
+
+    db.add(
+        Notification(
+            user_id=report.reporter_id,
+            type="report_result",
+            title="신고 처리 결과 안내",
+            body=body,
+            data={
+                "report_id": report.id,
+                "status": status_value,
+                "resolution_type": resolution,
+                "message": message,
+            },
+        )
+    )
 
 
 def _takedown_body(target_label: str, target_title: str, reason: str | None) -> str:
@@ -420,8 +523,10 @@ async def list_reports_for_admin(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid scope")
 
     reports = query.order_by(Report.id.desc()).all()
-    return success_response(
-        data=[
+    data = []
+    for r in reports:
+        target_meta = _report_target_meta(db, r)
+        data.append(
             {
                 "id": r.id,
                 "reporter_id": r.reporter_id,
@@ -447,10 +552,10 @@ async def list_reports_for_admin(
                 "reason": r.reason,
                 "handled_by": r.handled_by,
                 "handled_at": r.handled_at,
+                **target_meta,
             }
-            for r in reports
-        ]
-    )
+        )
+    return success_response(data=data)
 
 
 @router.post("/notices", summary="관리자 공지 작성", description="공지 게시물을 작성합니다.")
@@ -659,10 +764,26 @@ async def process_report(
     report = db.get(Report, report_id)
     if report is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+    previous_status = report.status
     if payload.get("status"):
-        report.status = payload["status"]
+        next_status = payload["status"]
+        if next_status not in {"open", "reviewing", "resolved", "rejected"}:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid report status")
+        report.status = next_status
     report.handled_by = current_user_id
     report.handled_at = datetime.now(timezone.utc)
+    resolution_type = payload.get("resolution_type")
+    resolution_type = resolution_type.strip() if isinstance(resolution_type, str) and resolution_type.strip() else None
+    message = payload.get("message")
+    message = message.strip() if isinstance(message, str) and message.strip() else None
+    if report.status != previous_status:
+        _notify_report_result(
+            db,
+            report=report,
+            status_value=report.status,
+            resolution_type=resolution_type,
+            message=message,
+        )
     db.commit()
     return success_response(data={"id": report.id, "status": report.status})
 

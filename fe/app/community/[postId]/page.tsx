@@ -393,6 +393,7 @@ export default function PostDetailPage() {
   }
 
   const isOwn = currentUser?.id === post.author_id;
+  const isAdminPost = post.author?.role === "admin";
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
@@ -571,7 +572,7 @@ export default function PostDetailPage() {
                   </button>
                 );
               })}
-              {!isOwn && (
+              {!isOwn && !isAdminPost && (
                 <button
                   onClick={() => handleReport("post", post.id, "게시글")}
                   className="ml-auto rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-500 transition hover:border-red-200 hover:text-red-600"
