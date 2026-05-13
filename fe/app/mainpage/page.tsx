@@ -804,26 +804,26 @@ function SproutHeroIcon() {
       <g transform="translate(-7 -5) scale(1.15)">
         <ellipse cx="48" cy="84" rx="27" ry="7" fill="#92400e" opacity="0.22" />
         <path
-          d="M45 41C23 39 15 24 15 11c19 0 33 9 36 29"
-          fill="#22c55e"
-        />
-        <path
-          d="M51 45c23-2 34-16 34-33-20 0-35 10-38 32"
-          fill="#16a34a"
-        />
-        <path
-          d="M48 83C48 70 48 56 48 39"
+          d="M48 78V40"
           stroke="#7c2d12"
           strokeWidth="8"
           strokeLinecap="round"
           fill="none"
         />
         <path
-          d="M48 58C40 51 31 45 18 40M49 56C59 48 70 36 83 20"
+          d="M48 56C40 49 31 44 19 39M49 55C58 47 67 38 78 24"
           stroke="#7c2d12"
           strokeWidth="5"
           strokeLinecap="round"
           fill="none"
+        />
+        <path
+          d="M45 41C23 39 15 24 15 11c19 0 33 9 36 29"
+          fill="#22c55e"
+        />
+        <path
+          d="M51 45c23-2 34-16 34-33-20 0-35 10-38 32"
+          fill="#16a34a"
         />
       </g>
       <style jsx>{`
@@ -891,13 +891,6 @@ function ServiceIcon({ type, active: _active }: { type: string; active?: boolean
           stroke="#92400e"
           strokeWidth="4"
           strokeLinecap="round"
-        />
-        <path
-          d="M24 29c-4-4-8-7-13-9M24 27c5-4 9-8 14-14"
-          stroke="#92400e"
-          strokeWidth="3"
-          strokeLinecap="round"
-          fill="none"
         />
         <path
           d="M23 23C13 22 9 15 9 8c8 0 15 4 16 14"
