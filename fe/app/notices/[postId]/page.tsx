@@ -25,7 +25,7 @@ export default function NoticeDetailPage() {
       setLoading(true);
       setError("");
       const data = await getPost(noticeId);
-      if (data.category !== "announcement") {
+      if (!["announcement", "event"].includes(data.category || "")) {
         setError("공지 정보를 찾을 수 없습니다.");
         setNotice(null);
         return;
@@ -70,6 +70,10 @@ export default function NoticeDetailPage() {
     );
   }
 
+  const title = notice.category === "event"
+    ? `<이벤트> ${notice.title || "제목 없는 공지"}`
+    : notice.title || "제목 없는 공지";
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <main className="mx-auto max-w-3xl px-4 pb-16 pt-8">
@@ -91,7 +95,7 @@ export default function NoticeDetailPage() {
               </div>
               <div className="min-w-0">
                 <h1 className="text-xl font-bold leading-7 text-gray-900">
-                  {notice.title || "제목 없는 공지"}
+                  {title}
                 </h1>
                 <p className="mt-1 text-xs font-semibold text-red-600">관리자</p>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-400">
