@@ -203,6 +203,7 @@ CREATE TABLE IF NOT EXISTS projects (
     difficulty difficulty_level NOT NULL,
     status project_status NOT NULL DEFAULT 'planning',
     progress_percent NUMERIC(5,2) NOT NULL DEFAULT 0,
+    min_members SMALLINT NOT NULL DEFAULT 1,
     max_members SMALLINT NOT NULL DEFAULT 10,
     is_public BOOLEAN NOT NULL DEFAULT TRUE,
     started_at TIMESTAMPTZ,
@@ -211,6 +212,7 @@ CREATE TABLE IF NOT EXISTS projects (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     deleted_at TIMESTAMPTZ,
     CONSTRAINT projects_progress_check CHECK (progress_percent >= 0 AND progress_percent <= 100),
+    CONSTRAINT projects_min_members_check CHECK (min_members BETWEEN 1 AND 100),
     CONSTRAINT projects_max_members_check CHECK (max_members BETWEEN 1 AND 100)
 );
 
