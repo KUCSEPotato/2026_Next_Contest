@@ -59,6 +59,7 @@ const CATEGORIES = [
 ];
 
 const IDEA_VIEW_COIN_COST = 1;
+const IDEAS_PER_PAGE = 12;
 
 const SERVICE_BLOCKS = [
   {
@@ -101,6 +102,7 @@ export default function InspirationWellPage() {
     idea: null,
   });
   const [pickingUp, setPickingUp] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const [seedBursts, setSeedBursts] = useState<{ id: number; x: number; y: number }[]>([]);
   const seedBurstRef = useRef(0);
 
@@ -179,6 +181,12 @@ export default function InspirationWellPage() {
 
   const likedCount = ideas.filter((idea) => idea.is_liked).length;
   const bookmarkedCount = ideas.filter((idea) => idea.is_bookmarked).length;
+  const totalIdeaPages = Math.max(1, Math.ceil(filtered.length / IDEAS_PER_PAGE));
+  const safeCurrentPage = Math.min(currentPage, totalIdeaPages);
+  const paginatedIdeas = filtered.slice(
+    (safeCurrentPage - 1) * IDEAS_PER_PAGE,
+    safeCurrentPage * IDEAS_PER_PAGE
+  );
 
   const handleServiceClick = (path: string) => {
     router.push(path);
@@ -368,7 +376,10 @@ export default function InspirationWellPage() {
 
           <input
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
             placeholder="아이디어 제목, 태그로 검색해보세요"
             className="mb-4 w-full rounded-xl border border-emerald-100 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-emerald-500"
           />
@@ -377,7 +388,10 @@ export default function InspirationWellPage() {
             {CATEGORIES.map((cat) => (
               <button
                 key={cat.label}
-                onClick={() => setSelectedCategory(cat.label)}
+                onClick={() => {
+                  setSelectedCategory(cat.label);
+                  setCurrentPage(1);
+                }}
                 className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
                   selectedCategory === cat.label
                     ? "border-emerald-600 bg-emerald-600 text-white shadow-sm shadow-emerald-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:shadow-none"
@@ -410,6 +424,7 @@ export default function InspirationWellPage() {
               <button
                 onClick={() => {
                   setSearchQuery("");
+                  setCurrentPage(1);
                   setSelectedCategory("전체");
                 }}
                 className="text-xs text-slate-400 transition hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
@@ -427,7 +442,10 @@ export default function InspirationWellPage() {
             ].map((filter) => (
               <button
                 key={filter.value}
-                onClick={() => setCollectionFilter(filter.value as "all" | "liked" | "bookmarked")}
+                onClick={() => {
+                  setCollectionFilter(filter.value as "all" | "liked" | "bookmarked");
+                  setCurrentPage(1);
+                }}
                 className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                   collectionFilter === filter.value
                     ? "border-emerald-600 bg-emerald-600 text-white shadow-sm shadow-emerald-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:shadow-none"
@@ -445,11 +463,11 @@ export default function InspirationWellPage() {
             <EmptyState />
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {filtered.map((idea, i) => (
+              {paginatedIdeas.map((idea, i) => (
                 <IdeaCard
                   key={idea.id}
                   idea={idea}
-                  index={i}
+                  index={(safeCurrentPage - 1) * IDEAS_PER_PAGE + i}
                   onClick={(e) => {
                     triggerSeedBurst(e);
                     handleIdeaClick(idea);
@@ -458,6 +476,28 @@ export default function InspirationWellPage() {
                   onToggleBookmark={handleToggleBookmark}
                 />
               ))}
+            </div>
+          )}
+
+          {filtered.length > IDEAS_PER_PAGE && (
+            <div className="mt-6 flex items-center justify-center gap-2">
+              <button
+                onClick={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))}
+                disabled={safeCurrentPage === 1}
+                className="rounded-lg border border-emerald-100 bg-white/80 px-3 py-1.5 text-xs text-slate-500 transition hover:bg-emerald-50 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                이전
+              </button>
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                {safeCurrentPage} / {totalIdeaPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(Math.min(totalIdeaPages, safeCurrentPage + 1))}
+                disabled={safeCurrentPage === totalIdeaPages}
+                className="rounded-lg border border-emerald-100 bg-white/80 px-3 py-1.5 text-xs text-slate-500 transition hover:bg-emerald-50 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                다음
+              </button>
             </div>
           )}
         </section>
