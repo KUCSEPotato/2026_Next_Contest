@@ -30,9 +30,30 @@ const STATUS_COLORS = {
 // 백엔드 package id → 일러스트 타입
 const PACKAGE_ILLUS_TYPE = {
   drop:   "drop",
+  waterdrop: "drop",
   cup:    "glass",
+  glass:  "glass",
   bottle: "bottle",
 };
+
+const DEFAULT_COIN_PACKAGES = [
+  { id: "drop", coin_amount: 1, price_krw: 300, label: "\uD55C \uBC29\uC6B8" },
+  { id: "cup", coin_amount: 10, price_krw: 2000, label: "\uD55C \uC794" },
+  { id: "bottle", coin_amount: 100, price_krw: 15000, label: "\uD55C \uBCD1" },
+];
+
+function normalizeCoinPackages(packages = []) {
+  const packageMap = new Map(
+    packages
+      .filter((pkg) => pkg?.id)
+      .map((pkg) => [pkg.id, pkg])
+  );
+
+  return DEFAULT_COIN_PACKAGES.map((defaultPackage) => ({
+    ...packageMap.get(defaultPackage.id),
+    ...defaultPackage,
+  }));
+}
 
 // ── 포맷 헬퍼 ─────────────────────────────────────────────────────────────────
 
@@ -267,7 +288,7 @@ export default function CoinsPage() {
         getMyCoinPurchaseRequestsApi(),
       ]);
       setBalance(balanceResult.data?.waterdrop_balance ?? balanceResult.data?.coin_balance ?? 0);
-      setPackages(packagesResult.data || []);
+      setPackages(normalizeCoinPackages(packagesResult.data || []));
       setRequests(requestsResult.data || []);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "물방울 정보를 불러오지 못했습니다.");
@@ -416,7 +437,7 @@ export default function CoinsPage() {
                     type="button"
                     onClick={() => handleRequestPurchase(pkg)}
                     disabled={processingPackage === pkg.id}
-                    className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-bold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 whitespace-nowrap"
+                    className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-bold leading-tight text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 whitespace-normal break-keep"
                   >
                     {processingPackage === pkg.id ? "요청 중…" : "수동 구매 요청"}
                   </button>
