@@ -45,17 +45,15 @@ const SERVICE_BLOCKS = [
 ];
 
 type HotSection = {
-  key: "popular" | "most_recommended" | "most_commented" | "most_viewed" | "latest";
+  key: "popular" | "most_recommended" | "most_viewed";
   label: string;
   emoji: string;
 };
 
 const HOT_SECTIONS: HotSection[] = [
   { key: "popular", label: "인기게시물", emoji: "🔥" },
-  { key: "most_recommended", label: "TOP", emoji: "" },
-  { key: "most_commented", label: "댓글 TOP", emoji: "💬" },
+  { key: "most_recommended", label: "추천 TOP", emoji: "" },
   { key: "most_viewed", label: "조회수 TOP", emoji: "👀" },
-  { key: "latest", label: "최신글", emoji: "🆕" },
 ];
 
 const ADMIN_ONLY_CATEGORIES = new Set(["announcement", "event"]);
@@ -68,9 +66,7 @@ type Tab = "board" | "hot";
 type HotPostsState = {
   popular: PostSummary | null;
   most_recommended: PostSummary | null;
-  most_commented: PostSummary | null;
   most_viewed: PostSummary | null;
-  latest: PostSummary | null;
 };
 
 function applyPostReaction(
@@ -168,9 +164,7 @@ export default function CommunityPage() {
       setHotPosts({
         popular: isCampfirePost(res.popular) ? res.popular : null,
         most_recommended: isCampfirePost(res.most_recommended) ? res.most_recommended : null,
-        most_commented: isCampfirePost(res.most_commented) ? res.most_commented : null,
         most_viewed: isCampfirePost(res.most_viewed) ? res.most_viewed : null,
-        latest: isCampfirePost(res.latest) ? res.latest : null,
       });
     } catch (e) {
       console.error(e);

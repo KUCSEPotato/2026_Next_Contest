@@ -115,9 +115,7 @@ export async function reactToPost(
 export async function getHotPosts(): Promise<{
   popular: PostSummary | null;
   most_recommended: PostSummary | null;
-  most_commented: PostSummary | null;
   most_viewed: PostSummary | null;
-  latest: PostSummary | null;
 }> {
   const fetchTop1 = async (sort_by: string): Promise<PostSummary | null> => {
     const res = await authenticatedFetch(`${BASE}?sort_by=${sort_by}&page=1&page_size=1`, {
@@ -127,34 +125,21 @@ export async function getHotPosts(): Promise<{
     return data.posts[0] ?? null;
   };
 
-  const [popular, most_recommended, most_commented, most_viewed, latest] = await Promise.all([
+  const [popular, most_recommended, most_viewed] = await Promise.all([
     fetchTop1("hot"),
     fetchTop1("recommend"),
-    fetchTop1("comments"),
     fetchTop1("views"),
-    fetchTop1("newest"),
   ]);
 
-  // 겹치는 게시물은 인기게시물(popular)에만 표시
+  // Duplicates are merged by priority: hot first, then views over recommend.
   const usedIds = new Set<number>();
   if (popular) usedIds.add(popular.id);
+  if (most_viewed && !usedIds.has(most_viewed.id)) usedIds.add(most_viewed.id);
 
   return {
     popular,
-    most_recommended:
-      most_recommended && !usedIds.has(most_recommended.id)
-        ? (usedIds.add(most_recommended.id), most_recommended)
-        : null,
-    most_commented:
-      most_commented && !usedIds.has(most_commented.id)
-        ? (usedIds.add(most_commented.id), most_commented)
-        : null,
-    most_viewed:
-      most_viewed && !usedIds.has(most_viewed.id)
-        ? (usedIds.add(most_viewed.id), most_viewed)
-        : null,
-    latest:
-      latest && !usedIds.has(latest.id) ? (usedIds.add(latest.id), latest) : null,
+    most_viewed: most_viewed && most_viewed.id !== popular?.id ? most_viewed : null,
+    most_recommended: most_recommended && !usedIds.has(most_recommended.id) ? most_recommended : null,
   };
 }
 
