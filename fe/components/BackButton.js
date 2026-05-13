@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 
 const HIDDEN_PATHS = new Set(["/", "/mainpage", "/login"]);
+const HIDDEN_PATH_PREFIXES = ["/ideas/pickup", "/community"];
 const NAVBAR_HIDDEN_PATHS = new Set(["/login", "/signup"]);
 
 export default function BackButton() {
@@ -10,7 +11,12 @@ export default function BackButton() {
   const pathname = usePathname() || "/";
   const normalizedPath = pathname.replace(/\/$/, "") || "/";
 
-  if (HIDDEN_PATHS.has(normalizedPath)) {
+  if (
+    HIDDEN_PATHS.has(normalizedPath) ||
+    HIDDEN_PATH_PREFIXES.some(
+      (path) => normalizedPath === path || normalizedPath.startsWith(`${path}/`)
+    )
+  ) {
     return null;
   }
 

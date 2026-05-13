@@ -16,6 +16,7 @@ export interface AuthorInfo {
   id: number | null;
   nickname: string;
   avatar_url: string | null;
+  role?: string | null;
 }
 
 /** GET /community 목록 아이템 */

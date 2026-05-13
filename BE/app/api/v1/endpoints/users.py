@@ -14,6 +14,7 @@ from app.models import IdeaBookmark
 from app.models import Application
 from app.models import Project
 from app.models import ProjectMember
+from app.models import ProjectRecruitment
 from app.models import Review
 from app.models import Skill
 from app.models import Todo
@@ -147,13 +148,13 @@ async def get_my_profile(
         db.refresh(user)
 
     skills = (
-        db.query(Skill.name)
+        db.query(Skill.id, Skill.name)
         .join(UserSkill, UserSkill.skill_id == Skill.id)
         .filter(UserSkill.user_id == current_user_id)
         .all()
     )
     interests = (
-        db.query(Interest.name)
+        db.query(Interest.id, Interest.name)
         .join(UserInterest, UserInterest.interest_id == Interest.id)
         .filter(UserInterest.user_id == current_user_id)
         .all()
@@ -196,8 +197,8 @@ async def get_my_profile(
             "bio": user.bio,
             "avatar_url": _get_avatar_url(user),
             "avatar_s3_key": user.avatar_s3_key,
-            "skills": [name for (name,) in skills],
-            "interests": [name for (name,) in interests],
+            "skills": [{"id": skill_id, "name": name} for (skill_id, name) in skills],
+            "interests": [{"id": interest_id, "name": name} for (interest_id, name) in interests],
             "selected_idea_ids": [idea_id for (idea_id,) in selected_idea_ids],
             "participating_projects": participating_project_list,
             "onboarding_step": user.onboarding_step,
@@ -410,14 +411,20 @@ async def get_my_projects(
         .order_by(Project.created_at.desc())
         .all()
     )
-
-    if not projects:
-        projects = (
-            db.query(Project)
-            .filter(Project.leader_id == current_user_id, Project.deleted_at.is_(None))
-            .order_by(Project.created_at.desc())
-            .all()
-        )
+    leader_projects = (
+        db.query(Project)
+        .filter(Project.leader_id == current_user_id, Project.deleted_at.is_(None))
+        .order_by(Project.created_at.desc())
+        .all()
+    )
+    projects_by_id = {project.id: project for project in projects}
+    for project in leader_projects:
+        projects_by_id[project.id] = project
+    projects = sorted(
+        projects_by_id.values(),
+        key=lambda project: project.created_at or datetime.min,
+        reverse=True,
+    )
 
     project_ids = [project.id for project in projects]
     active_chat_project_ids = set()
@@ -522,6 +529,33 @@ async def get_user_stats(user_id: int, db: Session = Depends(get_db)) -> dict:
     """
     joined_count = db.query(func.count(Project.id)).filter(Project.leader_id == user_id, Project.deleted_at.is_(None)).scalar() or 0
     completed_count = db.query(func.count(Project.id)).filter(Project.leader_id == user_id, Project.status == "completed", Project.deleted_at.is_(None)).scalar() or 0
+    member_in_progress_ids = {
+        project_id
+        for (project_id,) in (
+            db.query(Project.id)
+            .join(ProjectMember, ProjectMember.project_id == Project.id)
+            .filter(
+                ProjectMember.user_id == user_id,
+                ProjectMember.left_at.is_(None),
+                Project.status.in_(["in_progress", "started", "paused"]),
+                Project.deleted_at.is_(None),
+            )
+            .all()
+        )
+    }
+    leader_in_progress_ids = {
+        project_id
+        for (project_id,) in (
+            db.query(Project.id)
+            .filter(
+                Project.leader_id == user_id,
+                Project.status.in_(["in_progress", "started", "paused"]),
+                Project.deleted_at.is_(None),
+            )
+            .all()
+        )
+    }
+    in_progress_count = len(member_in_progress_ids | leader_in_progress_ids)
     review_count = db.query(func.count(Review.id)).filter(Review.reviewee_id == user_id).scalar() or 0
 
     return success_response(
@@ -529,12 +563,13 @@ async def get_user_stats(user_id: int, db: Session = Depends(get_db)) -> dict:
             "user_id": user_id,
             "lead_projects": joined_count,
             "completed_projects": completed_count,
+            "in_progress_projects": in_progress_count,
             "review_received": review_count,
         },
     )
 
 
-@router.get("/{user_id}/projects", summary="사용자 프로젝트 이력", description="사용자가 리더로 참여한 프로젝트 이력을 반환합니다.")
+@router.get("/{user_id}/projects", summary="사용자 프로젝트 이력", description="사용자가 리더 또는 팀원으로 참여한 프로젝트 이력을 반환합니다.")
 async def get_user_projects(user_id: int, db: Session = Depends(get_db)) -> dict:
     """사용자 프로젝트 이력 조회 API.
 
@@ -542,9 +577,19 @@ async def get_user_projects(user_id: int, db: Session = Depends(get_db)) -> dict
     - path의 `user_id`를 전달합니다.
 
     응답:
-    - 사용자가 리더인 프로젝트 목록을 생성일 역순으로 반환합니다.
+    - 사용자가 리더이거나 팀원으로 참여한 프로젝트 목록을 생성일 역순으로 반환합니다.
     """
-    projects = db.query(Project).filter(Project.leader_id == user_id, Project.deleted_at.is_(None)).order_by(Project.created_at.desc()).all()
+    projects = (
+        db.query(Project)
+        .join(ProjectMember, ProjectMember.project_id == Project.id)
+        .filter(
+            ProjectMember.user_id == user_id,
+            ProjectMember.left_at.is_(None),
+            Project.deleted_at.is_(None),
+        )
+        .order_by(Project.created_at.desc())
+        .all()
+    )
     return success_response(
         data=[
             {
@@ -554,6 +599,8 @@ async def get_user_projects(user_id: int, db: Session = Depends(get_db)) -> dict
                 "difficulty": project.difficulty,
                 "progress_percent": float(project.progress_percent),
                 "created_at": project.created_at,
+                "leader_id": project.leader_id,
+                "is_leader": project.leader_id == user_id,
             }
             for project in projects
         ],
@@ -863,6 +910,14 @@ async def get_my_applications(
 
         # competition_rate: 경쟁률 (지원자/최대멤버)
         competition_rate = round((applicant_count / max_members * 100) if max_members > 0 else 0, 2)
+        open_recruitment = (
+            db.query(ProjectRecruitment)
+            .filter(
+                ProjectRecruitment.project_id == project.id,
+                ProjectRecruitment.status == "open",
+            )
+            .first()
+        )
 
         result.append(
             {
@@ -879,6 +934,7 @@ async def get_my_applications(
                 "current_members": current_members,
                 "max_members": max_members,
                 "competition_rate": competition_rate,
+                "open_recruitment_count": 1 if open_recruitment else 0,
                 "created_at": app.created_at,
             }
         )

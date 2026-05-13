@@ -2,11 +2,12 @@
 
 type ProgressBloomProps = {
   progress?: number | null;
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
   showLabel?: boolean;
 };
 
 const SIZE_CLASS = {
+  xs: "h-12 w-12",
   sm: "h-16 w-16",
   md: "h-24 w-24",
   lg: "h-32 w-32",

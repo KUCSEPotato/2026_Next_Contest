@@ -9,11 +9,15 @@ import {
   getUserProjectsApi,
   getUserReceivedReviewsApi,
   getImageUrl,
+  createReportApi,
 } from "../../../lib/api";
+import { useDialog, useToast } from "../../../components/AppFeedback";
 
 export default function UserProfilePage() {
   const params = useParams();
   const router = useRouter();
+  const toast = useToast();
+  const { prompt } = useDialog();
   const userId = params.userId;
 
   const [profile, setProfile] = useState(null);
@@ -23,6 +27,7 @@ export default function UserProfilePage() {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showReviews, setShowReviews] = useState(false);
+  const [projectRoleFilter, setProjectRoleFilter] = useState("all");
 
   useEffect(() => {
     async function loadUserProfile() {
@@ -56,6 +61,7 @@ export default function UserProfilePage() {
             : {
                 lead_projects: 0,
                 completed_projects: 0,
+                in_progress_projects: 0,
                 review_received: 0,
               }
         );
@@ -85,6 +91,40 @@ export default function UserProfilePage() {
     }
   }, [userId, router]);
 
+  const handleReportUser = async () => {
+    const myUserId = typeof window !== "undefined" ? localStorage.getItem("user_id") : null;
+    if (!myUserId) {
+      router.push("/login");
+      return;
+    }
+    if (String(myUserId) === String(userId)) {
+      toast.warning("본인 계정은 신고할 수 없습니다.");
+      return;
+    }
+
+    const reasonInput = await prompt({
+      title: "사용자 신고",
+      message: "관리자가 확인할 수 있도록 신고 사유를 입력해주세요.",
+      placeholder: "문제가 되는 이유를 입력하세요.",
+      confirmText: "신고하기",
+      required: true,
+      multiline: true,
+      tone: "danger",
+    });
+    if (reasonInput === null) return;
+
+    try {
+      await createReportApi({
+        target_type: "user",
+        target_id: Number(userId),
+        reason: reasonInput.trim(),
+      });
+      toast.success("신고가 접수되었습니다.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "신고 접수에 실패했습니다.");
+    }
+  };
+
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-50 px-6 py-10">
@@ -92,6 +132,12 @@ export default function UserProfilePage() {
       </main>
     );
   }
+
+  const visibleProjects = getVisibleProjects(
+    projects,
+    projectRoleFilter,
+    profile?.id ?? userId
+  );
 
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
@@ -120,7 +166,7 @@ export default function UserProfilePage() {
               )}
             </div>
 
-            <div>
+            <div className="min-w-0 flex-1">
               <h1 className="text-3xl font-bold text-slate-900">
                 {profile?.nickname || "이름 없는 사용자"}
               </h1>
@@ -129,6 +175,12 @@ export default function UserProfilePage() {
                 {profile?.bio || "아직 자기소개가 없습니다."}
               </p>
             </div>
+            <button
+              onClick={handleReportUser}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-red-300 hover:text-red-600"
+            >
+              사용자 신고
+            </button>
           </div>
         </section>
 
@@ -250,35 +302,63 @@ export default function UserProfilePage() {
         </div>
 
         <section className="rounded-2xl bg-white p-6 shadow">
-          <h2 className="mb-4 text-xl font-bold">프로젝트 이력</h2>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-xl font-bold">프로젝트 이력</h2>
+
+            <select
+              value={projectRoleFilter}
+              onChange={(e) => setProjectRoleFilter(e.target.value)}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 outline-none transition focus:border-red-500"
+            >
+              <option value="all">전체 역할</option>
+              <option value="leader">리더 프로젝트</option>
+              <option value="member">팀원으로 참여</option>
+            </select>
+          </div>
 
           <div className="space-y-3">
-            {projects.length ? (
-              projects.map((project) => (
-                <button
-                  key={project.id}
-                  onClick={() => router.push(`/projects/${project.id}`)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-left transition hover:border-red-300 hover:bg-red-50"
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="font-semibold text-slate-900">
-                        {project.title}
-                      </p>
+            {visibleProjects.length ? (
+              visibleProjects.map((project) => {
+                const isLeader = isProjectLeader(project, profile?.id ?? userId);
 
-                      <p className="mt-1 text-sm text-slate-500">
-                        난이도 {project.difficulty || "미정"}
-                      </p>
+                return (
+                  <button
+                    key={project.id}
+                    onClick={() => router.push(`/projects/${project.id}`)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-left transition hover:border-red-300 hover:bg-red-50"
+                  >
+                    <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-center">
+                      <div>
+                        <p className="font-semibold text-slate-900">
+                          {project.title}
+                        </p>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                          난이도 {project.difficulty || "미정"}
+                        </p>
+                      </div>
+
+                      <div className="flex min-w-48 items-center justify-end gap-2">
+                        <span className={`rounded-full px-3 py-1 text-sm font-semibold ${getProjectStatusClassName(project.status)}`}>
+                          {formatProjectStatus(project.status)}
+                        </span>
+
+                        <span
+                          className={`min-w-14 rounded-full px-3 py-1 text-center text-sm font-semibold ${
+                            isLeader
+                              ? "bg-red-600 text-white"
+                              : "bg-slate-200 text-slate-600"
+                          }`}
+                        >
+                          {isLeader ? "리더" : "팀원"}
+                        </span>
+                      </div>
                     </div>
-
-                    <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-600">
-                      {project.status || "상태 없음"}
-                    </span>
-                  </div>
-                </button>
-              ))
+                  </button>
+                );
+              })
             ) : (
-              <p className="text-sm text-slate-500">프로젝트 없음</p>
+              <p className="text-sm text-slate-500">조건에 맞는 프로젝트가 없습니다.</p>
             )}
           </div>
         </section>
@@ -354,6 +434,65 @@ function normalizeRating(value) {
 
 function formatRating(value) {
   return normalizeRating(value).toFixed(1);
+}
+
+function getProjectLeaderId(project) {
+  return (
+    project?.leader_id ??
+    project?.leaderId ??
+    project?.leader?.id ??
+    project?.owner_id ??
+    project?.owner?.id ??
+    project?.created_by ??
+    project?.creator_id
+  );
+}
+
+function isProjectLeader(project, userId) {
+  const leaderId = Number(getProjectLeaderId(project));
+  const currentUserId = Number(userId);
+
+  if (Number.isFinite(leaderId) && Number.isFinite(currentUserId)) {
+    return leaderId === currentUserId;
+  }
+
+  return (
+    project?.is_leader === true ||
+    project?.isLeader === true ||
+    project?.role_in_project === "leader"
+  );
+}
+
+function formatProjectStatus(status) {
+  const labels = {
+    planning: "모집중",
+    in_progress: "진행중",
+    started: "진행중",
+    paused: "일시중지",
+    completed: "완료",
+  };
+
+  return labels[status] || status || "상태 없음";
+}
+
+function getProjectStatusClassName(status) {
+  const classNames = {
+    planning: "bg-blue-50 text-blue-700",
+    in_progress: "bg-emerald-50 text-emerald-700",
+    started: "bg-emerald-50 text-emerald-700",
+    paused: "bg-amber-50 text-amber-700",
+    completed: "bg-slate-200 text-slate-700",
+  };
+
+  return classNames[status] || "bg-slate-100 text-slate-600";
+}
+
+function getVisibleProjects(projects, roleFilter, userId) {
+  return projects.filter((project) => {
+    if (roleFilter === "leader") return isProjectLeader(project, userId);
+    if (roleFilter === "member") return !isProjectLeader(project, userId);
+    return true;
+  });
 }
 
 function getReviewMessage(review) {

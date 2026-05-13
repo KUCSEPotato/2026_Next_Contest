@@ -21,6 +21,7 @@ import {
   adminUpdatePostApi,
   adminDeletePostApi,
   adminTakedownPostApi,
+  adminTakedownCommentApi,
   adminTakedownIdeaApi,
   adminTakedownProjectApi,
 } from "../../lib/api";
@@ -48,6 +49,7 @@ const REPORT_SCOPES = [
   { value: "user", label: "사용자" },
   { value: "project", label: "프로젝트" },
   { value: "post", label: "게시글" },
+  { value: "comment", label: "댓글" },
   { value: "chat", label: "채팅" },
 ];
 
@@ -212,23 +214,64 @@ export default function AdminPage() {
     await loadAdminData();
   }
 
-  async function handleReportStatus(reportId, status) {
+  async function buildReportResolutionPayload(report, status) {
+    const payload = { status };
+    if (!["resolved", "rejected"].includes(status)) {
+      return payload;
+    }
+
+    const resolutionType = await prompt({
+      title: "신고 처리 종류",
+      message: `${report.target_title || `신고 #${report.id}`}에 대한 처분 종류를 입력하세요.`,
+      defaultValue: status === "resolved" ? "조치 완료" : "신고 반려",
+      placeholder: "예: 강제 내리기, 경고, 신고 반려",
+      confirmText: "다음",
+      required: true,
+    });
+    if (resolutionType === null) return null;
+
+    const message = await prompt({
+      title: "신고자 안내 메시지",
+      message: "신고자에게 알림으로 전달할 간단한 메시지를 입력하세요.",
+      defaultValue:
+        status === "resolved"
+          ? "신고 내용을 확인했고 필요한 조치를 완료했습니다."
+          : "신고 내용을 검토했지만 추가 조치 대상은 아니라고 판단했습니다.",
+      placeholder: "처리 결과 안내 메시지",
+      confirmText: "처리",
+      required: true,
+      multiline: true,
+      tone: status === "rejected" ? "danger" : "default",
+    });
+    if (message === null) return null;
+
+    return {
+      ...payload,
+      resolution_type: resolutionType.trim(),
+      message: message.trim(),
+    };
+  }
+
+  async function handleReportStatus(report, status) {
+    const payload = await buildReportResolutionPayload(report, status);
+    if (!payload) return;
+
     try {
-      setProcessingKey(`report-${reportId}`);
-      await updateAdminReportApi(reportId, { status });
+      setProcessingKey(`report-${report.id}`);
+      await updateAdminReportApi(report.id, payload);
       setReports((prev) =>
-        prev.map((report) =>
-          report.id === reportId ? { ...report, status } : report
-        )
+        prev.map((item) => (item.id === report.id ? { ...item, status } : item))
       );
       setOverview((prev) =>
         prev
           ? {
               ...prev,
               reports_open:
-                status === "open"
-                  ? prev.reports_open
-                  : Math.max(0, prev.reports_open - 1),
+                report.status === "open" && status !== "open"
+                  ? Math.max(0, prev.reports_open - 1)
+                  : report.status !== "open" && status === "open"
+                  ? (prev.reports_open || 0) + 1
+                  : prev.reports_open,
             }
           : prev
       );
@@ -243,11 +286,12 @@ export default function AdminPage() {
     if (!report) return;
 
     const targetPostId = report.target_post_id;
+    const targetCommentId = report.target_comment_id;
     const targetProjectId = report.target_project_id;
     // Idea id not present in reports model by default, but support if present
     const targetIdeaId = report.target_idea_id || null;
 
-    if (!targetPostId && !targetProjectId && !targetIdeaId) {
+    if (!targetPostId && !targetCommentId && !targetProjectId && !targetIdeaId) {
       toast.warning("이 신고에 대해 강제 내릴 수 있는 대상이 없습니다.");
       return;
     }
@@ -276,11 +320,18 @@ export default function AdminPage() {
 
       if (targetPostId) {
         await adminTakedownPostApi(targetPostId, payload);
+      } else if (targetCommentId) {
+        await adminTakedownCommentApi(targetCommentId, payload);
       } else if (targetProjectId) {
         await adminTakedownProjectApi(targetProjectId, payload);
       } else if (targetIdeaId) {
         await adminTakedownIdeaApi(targetIdeaId, payload);
       }
+      await updateAdminReportApi(report.id, {
+        status: "resolved",
+        resolution_type: "강제 내리기",
+        message: reasonInput.trim() || "신고 내용을 확인했고 대상 콘텐츠를 강제로 내렸습니다.",
+      });
 
       // mark report resolved locally
       setReports((prev) => prev.map((r) => (r.id === report.id ? { ...r, status: "resolved" } : r)));
@@ -383,6 +434,10 @@ export default function AdminPage() {
   }
 
   async function handleSuspendUser(user) {
+    if (user.deleted_at) {
+      toast.warning("탈퇴한 사용자는 정지 상태로 변경할 수 없습니다.");
+      return;
+    }
     const daysInput = await prompt({
       title: "사용자 정지 기간",
       message: `${user.nickname || user.email || `User #${user.id}`} 사용자를 며칠 동안 정지할까요?\n비워두면 무기한 정지됩니다.`,
@@ -447,6 +502,10 @@ export default function AdminPage() {
   }
 
   async function handleRestoreUser(user) {
+    if (user.deleted_at) {
+      toast.warning("탈퇴한 사용자는 어드민 정지 복구 대상이 아닙니다.");
+      return;
+    }
     const ok = await confirm({
       title: "사용자 복구",
       message: `${user.nickname || user.email || `User #${user.id}`} 사용자의 정지를 해제할까요?`,
@@ -831,14 +890,14 @@ export default function AdminPage() {
                 <div key={report.id} className="flex items-start justify-between gap-3 py-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900">
-                      신고 #{report.id} · {report.target_scope || "user"}
+                      {report.target_title || `신고 #${report.id}`} · {report.target_scope || "user"}
                     </p>
                     <p className="mt-1 line-clamp-2 text-xs text-slate-500">
                       {report.reason}
                     </p>
                   </div>
                   <button
-                    onClick={() => handleReportStatus(report.id, "resolved")}
+                    onClick={() => handleReportStatus(report, "resolved")}
                     disabled={processingKey === `report-${report.id}`}
                     className="shrink-0 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
                   >
@@ -938,13 +997,28 @@ export default function AdminPage() {
                           <p className="text-xs font-semibold uppercase text-slate-500">
                             {report.target_scope || "user"}
                           </p>
-                          <p>
-                            {report.target_user_id ? `User #${report.target_user_id}` : ""}
-                            {report.target_project_id ? `Project #${report.target_project_id}` : ""}
-                            {report.target_post_id ? `Post #${report.target_post_id}` : ""}
-                            {report.target_chat_room_id ? `Chat Room #${report.target_chat_room_id}` : ""}
-                            {!report.target_user_id && !report.target_project_id && !report.target_post_id && !report.target_chat_room_id ? "-" : ""}
-                          </p>
+                          {report.target_url ? (
+                            <a
+                              href={report.target_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-semibold text-slate-900 underline-offset-2 hover:text-red-600 hover:underline"
+                            >
+                              {report.target_title || "대상 확인"}
+                            </a>
+                          ) : (
+                            <p className="font-semibold text-slate-900">
+                              {report.target_title || "-"}
+                            </p>
+                          )}
+                          {report.target_parent_title ? (
+                            <p className="text-xs text-slate-400">상위: {report.target_parent_title}</p>
+                          ) : null}
+                          {report.target_excerpt ? (
+                            <p className="mt-1 line-clamp-2 max-w-sm text-xs text-slate-500">
+                              {report.target_excerpt}
+                            </p>
+                          ) : null}
                         </div>
                       </Td>
                       <Td className="max-w-md">
@@ -954,14 +1028,14 @@ export default function AdminPage() {
                       <Td>
                         <select
                           value={report.status}
-                          onChange={(e) => handleReportStatus(report.id, e.target.value)}
+                          onChange={(e) => handleReportStatus(report, e.target.value)}
                           className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
                         >
                           {REPORT_STATUSES.map((status) => (
                             <option key={status} value={status}>{status}</option>
                           ))}
                         </select>
-                        {(report.target_post_id || report.target_project_id || report.target_idea_id) && (
+                        {(report.target_post_id || report.target_comment_id || report.target_project_id || report.target_idea_id) && (
                           <button
                             onClick={() => handleTakedownReport(report)}
                             disabled={processingKey === `report-takedown-${report.id}`}
@@ -1175,8 +1249,13 @@ export default function AdminPage() {
                       <Td>{user.role}</Td>
                       <Td>{user.coin_balance}</Td>
                       <Td>
-                        <StatusBadge value={user.is_active ? "active" : "suspended"} />
-                        {!user.is_active ? (
+                        <StatusBadge value={user.deleted_at ? "withdrawn" : user.is_active ? "active" : "suspended"} />
+                        {user.deleted_at ? (
+                          <div className="mt-1 max-w-56 text-xs leading-5 text-slate-500">
+                            <p>탈퇴: {formatDate(user.deleted_at)}</p>
+                            <p>탈퇴 계정은 복구할 수 없습니다.</p>
+                          </div>
+                        ) : !user.is_active ? (
                           <div className="mt-1 max-w-56 text-xs leading-5 text-slate-500">
                             <p>종료: {user.suspended_until ? formatDate(user.suspended_until) : "무기한"}</p>
                             {user.suspension_reason ? (
@@ -1187,12 +1266,12 @@ export default function AdminPage() {
                       </Td>
                       <Td>
                         <div className="flex flex-wrap gap-2">
-                          <select
-                            value={user.role}
-                            onChange={(e) => handleUserRole(user.id, e.target.value)}
-                            disabled={processingKey === `user-role-${user.id}`}
-                            className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-50"
-                          >
+	                          <select
+	                            value={user.role}
+	                            onChange={(e) => handleUserRole(user.id, e.target.value)}
+	                            disabled={Boolean(user.deleted_at) || processingKey === `user-role-${user.id}`}
+	                            className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-50"
+	                          >
                             {USER_ROLES.map((role) => (
                               <option key={role} value={role}>
                                 {role}
@@ -1201,23 +1280,23 @@ export default function AdminPage() {
                           </select>
 	                          <button
 	                            onClick={() => user.is_active ? handleSuspendUser(user) : handleRestoreUser(user)}
-	                            disabled={processingKey === `user-${user.id}`}
+	                            disabled={Boolean(user.deleted_at) || processingKey === `user-${user.id}`}
 	                            className="rounded-md border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
 	                          >
-	                            {user.is_active ? "정지" : "복구"}
-                          </button>
-                          <button
-                            onClick={() => handleGrantCoins(user.id)}
-                            disabled={processingKey === `coin-${user.id}`}
-                            className="rounded-md bg-amber-500 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
-                          >
+	                            {user.deleted_at ? "탈퇴됨" : user.is_active ? "정지" : "복구"}
+	                          </button>
+	                          <button
+	                            onClick={() => handleGrantCoins(user.id)}
+	                            disabled={Boolean(user.deleted_at) || processingKey === `coin-${user.id}`}
+	                            className="rounded-md bg-amber-500 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
+	                          >
                             코인 지급
                           </button>
-                          <button
-                            onClick={() => handleRevokeCoins(user.id)}
-                            disabled={processingKey === `revoke-coin-${user.id}`}
-                            className="rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
-                          >
+	                          <button
+	                            onClick={() => handleRevokeCoins(user.id)}
+	                            disabled={Boolean(user.deleted_at) || processingKey === `revoke-coin-${user.id}`}
+	                            className="rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+	                          >
                             코인 환수
                           </button>
                         </div>
@@ -1511,7 +1590,7 @@ function Td({ children, className = "", ...props }) {
 function StatusBadge({ value }) {
   const normalized = String(value || "-");
   const tone =
-    ["open", "inactive", "deleted", "suspended"].includes(normalized)
+    ["open", "inactive", "deleted", "suspended", "withdrawn"].includes(normalized)
       ? "bg-red-50 text-red-700"
       : ["pending", "reviewing", "planning"].includes(normalized)
       ? "bg-amber-50 text-amber-700"

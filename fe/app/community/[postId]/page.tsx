@@ -32,6 +32,8 @@ import Avatar from "../_components/Avatar";
 import CommentItem from "../_components/CommentItem";
 import LoginModal from "../_components/LoginModal";
 import { ThumbDownIcon, ThumbUpIcon } from "../_components/ReactionThumbIcons";
+import { createReportApi } from "../../../lib/api";
+import { useDialog, useToast } from "../../../components/AppFeedback";
 
 const CATEGORIES = [
   { label: "일반", value: "general" },
@@ -69,6 +71,8 @@ const getErrorMessage = (error: unknown, fallback: string) =>
 
 export default function PostDetailPage() {
   const router = useRouter();
+  const toast = useToast();
+  const { prompt } = useDialog();
   const { postId } = useParams<{ postId: string }>();
   const pid = Number(postId);
 
@@ -212,6 +216,35 @@ export default function PostDetailPage() {
       router.push("/community");
     } catch (e: unknown) {
       alert(getErrorMessage(e, "삭제에 실패했어요."));
+    }
+  };
+
+  const handleReport = async (targetType: "post" | "comment", targetId: number, label: string) => {
+    if (!currentUser) {
+      setShowLoginModal(true);
+      return;
+    }
+
+    const reasonInput = await prompt({
+      title: `${label} 신고`,
+      message: "관리자가 확인할 수 있도록 신고 사유를 입력해주세요.",
+      placeholder: "문제가 되는 이유를 입력하세요.",
+      confirmText: "신고하기",
+      required: true,
+      multiline: true,
+      tone: "danger",
+    });
+    if (reasonInput === null) return;
+
+    try {
+      await createReportApi({
+        target_type: targetType,
+        target_id: targetId,
+        reason: reasonInput.trim(),
+      });
+      toast.success("신고가 접수되었습니다.");
+    } catch (e: unknown) {
+      toast.error(getErrorMessage(e, "신고 접수에 실패했어요."));
     }
   };
 
@@ -360,6 +393,7 @@ export default function PostDetailPage() {
   }
 
   const isOwn = currentUser?.id === post.author_id;
+  const isAdminPost = post.author?.role === "admin";
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
@@ -538,6 +572,14 @@ export default function PostDetailPage() {
                   </button>
                 );
               })}
+              {!isOwn && !isAdminPost && (
+                <button
+                  onClick={() => handleReport("post", post.id, "게시글")}
+                  className="ml-auto rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-500 transition hover:border-red-200 hover:text-red-600"
+                >
+                  신고
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -568,6 +610,7 @@ export default function PostDetailPage() {
                   }}
                   onEdit={handleEditComment}
                   onDelete={handleDeleteComment}
+                  onReport={(commentId) => handleReport("comment", commentId, "댓글")}
                   currentUserId={currentUser?.id ?? -1}
                 />
               ))}

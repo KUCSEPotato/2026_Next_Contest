@@ -215,6 +215,15 @@ function stringifyLessonsLearned(data: GrowthData) {
   });
 }
 
+function toMemoirPreview(value?: string | null) {
+  const text = (value || "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  const firstSentence = text.match(/^.*?[.!?。！？](?=\s|$)/)?.[0] || text;
+  return firstSentence.length > 120
+    ? `${firstSentence.slice(0, 120).trim()}...`
+    : firstSentence;
+}
+
 /* ── 서수 (1번째, 2번째…) ── */
 function getProjectRecentTime(project: ProjectData): number {
   const value = project.completed_at || project.updated_at || project.created_at;
@@ -654,6 +663,7 @@ function MemoirContent() {
                     bad: retro.what_went_badly || "",
                     lessons: ll.lessons,
                     nextActions: retro.next_actions || "",
+                    aiMemoir: ll.aiMemoir,
                   },
                 };
               } catch {
@@ -667,7 +677,11 @@ function MemoirContent() {
           );
 
           if (ignore) return;
-          setMemoirList(overviewItems);
+          setMemoirList(
+            [...overviewItems].sort(
+              (a, b) => getProjectRecentTime(b.project) - getProjectRecentTime(a.project)
+            )
+          );
           setProject(null);
           return;
         }
@@ -890,17 +904,35 @@ function MemoirContent() {
   if (!requestedProjectId) {
     return (
       <div style={{ minHeight: "100vh", background: "var(--memoir-page-bg)", color: "var(--memoir-text)", fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", padding: "40px 24px" }}>
-        <div style={{ width: "100%", maxWidth: 1152, margin: "0 auto" }}>
+        <div style={{ width: "100%", maxWidth: 1024, margin: "0 auto" }}>
           <section style={{ background: "var(--memoir-card-bg)", border: "1px solid var(--memoir-border)", borderRadius: 18, padding: "32px 36px", boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)" }}>
-            <p style={{ color: "var(--memoir-rose-text)", fontSize: 14, fontWeight: 800, margin: 0 }}>
+            <p style={{ color: "var(--memoir-rose-text)", fontSize: 18, fontWeight: 900, margin: 0 }}>
               나의 회고
             </p>
-            <h1 style={{ margin: "8px 0 0", fontSize: 34, lineHeight: 1.25, fontWeight: 900 }}>
-              완료한 프로젝트에서 남긴 성장 기록
-            </h1>
             <p style={{ margin: "12px 0 0", color: "var(--memoir-muted)", fontSize: 15 }}>
               지금까지 완료한 프로젝트의 정원을 한눈에 모아봅니다.
             </p>
+            {memoirList.length > 0 ? (
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 6,
+                  marginTop: 18,
+                  maxWidth: "100%",
+                }}
+                aria-label={`완료한 프로젝트 ${memoirList.length}개`}
+              >
+                {memoirList.map(({ project: completedProject }) => (
+                  <ProgressBloom
+                    key={`garden-rose-${completedProject.id}`}
+                    progress={100}
+                    size="xs"
+                    showLabel={false}
+                  />
+                ))}
+              </div>
+            ) : null}
           </section>
 
           {memoirList.length === 0 ? (
@@ -911,9 +943,10 @@ function MemoirContent() {
             <div style={{ marginTop: 20, display: "grid", gap: 16 }}>
               {memoirList.map(({ project: completedProject, growth: itemGrowth }) => {
                 const summaryText =
-                  itemGrowth?.good ||
-                  itemGrowth?.lessons ||
-                  itemGrowth?.nextActions ||
+                  toMemoirPreview(itemGrowth?.aiMemoir) ||
+                  toMemoirPreview(itemGrowth?.good) ||
+                  toMemoirPreview(itemGrowth?.lessons) ||
+                  toMemoirPreview(itemGrowth?.nextActions) ||
                   "아직 작성된 회고 내용이 없습니다.";
 
                 return (
@@ -926,7 +959,7 @@ function MemoirContent() {
                         <span style={{ display: "inline-block", background: "var(--memoir-rose-bg)", color: "var(--memoir-rose-text)", borderRadius: 999, padding: "5px 10px", fontSize: 12, fontWeight: 800 }}>
                           completed
                         </span>
-                        <h2 style={{ margin: "12px 0 0", fontSize: 22, fontWeight: 900 }}>
+                        <h2 style={{ margin: "12px 0 0", fontSize: 20, fontWeight: 900 }}>
                           {completedProject.title}
                         </h2>
                         <p style={{ margin: "8px 0 0", color: "var(--memoir-muted)", lineHeight: 1.7 }}>
@@ -979,7 +1012,7 @@ function MemoirContent() {
   return (
     <>
       <div style={{ minHeight: "100vh", background: "var(--memoir-page-bg)", color: "var(--memoir-text)", fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", padding: "40px 24px" }}>
-        <div style={{ width: "100%", maxWidth: 1152, margin: "0 auto" }}>
+        <div style={{ width: "100%", maxWidth: 1024, margin: "0 auto" }}>
 
         {/* ── Hero ── */}
         <section style={{ position: "relative", overflow: "hidden", background: "var(--memoir-card-bg)", padding: "34px 36px", border: "1px solid var(--memoir-border)", borderRadius: 18, boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)" }}>

@@ -260,21 +260,33 @@
 - 프로젝트 리뷰 작성: 리뷰 대상자에게 `review_received` 알림 생성, `/projects/{project_id}`로 이동
 - 커뮤니티 댓글 작성: 게시글 작성자에게 `system` 알림 생성, `/community/{post_id}`로 이동
 
-## 15) Admin
+## 15) Reports
+
+- POST /reports: 사용자/프로젝트/게시글/댓글/채팅방 신고 접수
+  - body: `{ "target_type": "user|project|post|comment|chat", "target_id": 1, "reason": "신고 사유" }`
+  - 채팅방 신고는 해당 채팅방 멤버만 접수할 수 있습니다.
+  - admin이 작성한 커뮤니티 게시글/댓글은 신고할 수 없습니다.
+
+## 16) Admin
 
 - GET /admin/overview: 운영 요약 지표(사용자/프로젝트/미처리 신고/결제 이벤트/코인 구매 요청/활성 구독)
 - GET /admin/users: 전체 사용자 목록 조회(관리자)
   - query: `q`(이메일/닉네임 검색), `role`, `is_active`
+  - 탈퇴 사용자는 `deleted_at`이 있으며, 정지 복구 대상과 구분됩니다.
 - POST /admin/users/{user_id}/coins: 사용자 코인 수동 지급
 - POST /admin/users/{user_id}/coins/revoke: 사용자 코인 수동 환수
 - PATCH /admin/users/{user_id}/status: 사용자 상태/역할 변경(관리자)
   - 정지: `{ "is_active": false, "suspended_until": "ISO8601 또는 null", "suspension_reason": "사유" }`
   - 복구: `{ "is_active": true }`
   - 정지 중인 사용자는 공통 인증 dependency에서 API 접근이 차단되며, 기간 만료 후 자동 복구됩니다.
+  - 탈퇴(`deleted_at`) 사용자는 복구할 수 없습니다.
 - GET /admin/projects: 전체 프로젝트 목록 조회(관리자)
 - GET /admin/reports: 신고 목록 조회(관리자)
-  - query: `scope=all|user|project|post|chat`
+  - query: `scope=all|user|project|post|comment|chat`
+  - 응답에 `target_title`, `target_excerpt`, `target_url`이 포함되어 대상 내용을 바로 확인할 수 있습니다.
 - PATCH /admin/reports/{report_id}: 신고 처리 상태 변경(관리자)
+  - body: `{ "status": "resolved|rejected|reviewing|open", "resolution_type": "처분 종류", "message": "신고자 안내 메시지" }`
+  - `resolved`/`rejected` 처리 시 신고자에게 알림이 발송됩니다.
 - POST /admin/notices: 공지글 작성(커뮤니티 `announcement` 게시글 생성)
 - GET /admin/payments: 결제 이벤트 목록 조회(관리자)
 - PATCH /admin/payments/{event_id}: 결제 이벤트 처리/해제(관리자)

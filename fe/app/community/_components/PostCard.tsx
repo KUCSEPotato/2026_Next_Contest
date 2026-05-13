@@ -138,7 +138,7 @@ export default function PostCard({
       )}
 
       {/* Actions */}
-      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-50 pt-3">
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-50 pt-3 dark:border-slate-800/70">
         {REACTIONS.map(({ type, Icon, inactiveClass, activeClass }) => {
           const isActive = post.user_reaction === type;
           const count = post.reaction_stats[type];

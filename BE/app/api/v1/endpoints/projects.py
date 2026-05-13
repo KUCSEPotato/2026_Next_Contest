@@ -681,6 +681,7 @@ async def list_projects(
             ProjectSkill, ProjectSkill.skill_id == Skill.id
         ).filter(ProjectSkill.project_id == p.id).all()
         tech_stack_list = [s[0] for s in tech_stack]
+        source_idea = db.get(Idea, p.idea_id) if p.idea_id else None
 
         applicant_count = db.query(func.count(Application.id)).filter(
             Application.project_id == p.id,
@@ -719,6 +720,7 @@ async def list_projects(
             "currentMembers": current_members,
             "maxMembers": p.max_members,
             "techStack": tech_stack_list,
+            "hashtags": source_idea.hashtags if source_idea else [],
             "applicantCount": applicant_count,
             "remainingSeats": remaining_seats,
             "competitionRatio": competition_ratio,
