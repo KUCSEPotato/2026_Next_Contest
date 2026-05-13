@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   bookmarkIdeaApi,
   getIdeasApi,
+  getMyCoinBalanceApi,
   likeIdeaApi,
   unbookmarkIdeaApi,
   unlikeIdeaApi,
@@ -55,6 +56,8 @@ const CATEGORIES = [
   { label: "헬스케어", emoji: "❤️" },
 ];
 
+const IDEA_VIEW_COIN_COST = 1;
+
 const SERVICE_BLOCKS = [
   {
     title: "개발의 땅",
@@ -90,6 +93,7 @@ export default function InspirationWellPage() {
   const [selectedCategory, setSelectedCategory] = useState("전체");
   const [collectionFilter, setCollectionFilter] = useState<"all" | "liked" | "bookmarked">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [coinBalance, setCoinBalance] = useState<number | null>(null);
   const [coinModal, setCoinModal] = useState<{ open: boolean; idea: Idea | null }>({
     open: false,
     idea: null,
@@ -116,9 +120,15 @@ export default function InspirationWellPage() {
       try {
         setLoading(true);
 
-        const result = await getIdeasApi({ page: 1, size: 50, discarded: true });
+        const [result, coinResult] = await Promise.all([
+          getIdeasApi({ page: 1, size: 50, discarded: true }),
+          getToken()
+            ? getMyCoinBalanceApi().catch(() => null)
+            : Promise.resolve(null),
+        ]);
         const raw: IdeaListItem[] = result.data || [];
 
+        setCoinBalance(coinResult?.data?.coin_balance ?? null);
         setIdeas(
           raw.map((item) => ({
             id: item.id,
@@ -465,6 +475,8 @@ export default function InspirationWellPage() {
       {coinModal.open && coinModal.idea && (
         <CoinModal
           idea={coinModal.idea}
+          coinBalance={coinBalance}
+          coinCost={IDEA_VIEW_COIN_COST}
           onConfirm={handleConfirmView}
           onCancel={() => setCoinModal({ open: false, idea: null })}
           isLoading={pickingUp}
@@ -795,15 +807,22 @@ function ServiceIcon({ type, active }: { type: string; active?: boolean }) {
 
 function CoinModal({
   idea,
+  coinBalance,
+  coinCost,
   onConfirm,
   onCancel,
   isLoading,
 }: {
   idea: Idea;
+  coinBalance: number | null;
+  coinCost: number;
   onConfirm: () => void;
   onCancel: () => void;
   isLoading: boolean;
 }) {
+  const remainingBalance = coinBalance === null ? null : coinBalance - coinCost;
+  const isInsufficient = coinBalance !== null && coinBalance < coinCost;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
@@ -826,16 +845,42 @@ function CoinModal({
 
         <p className="mb-5 text-center text-xs text-slate-400">
           이 아이디어를 열람하면{" "}
-          <span className="font-semibold text-amber-600">코인 1개</span>가
+          <span className="font-semibold text-amber-600">코인 {coinCost}개</span>가
           차감됩니다.
         </p>
 
-        <div className="mb-5 flex items-center justify-center gap-2 rounded-2xl border border-amber-100 bg-amber-50 py-3">
-          <span className="text-xl">🪙</span>
-          <span className="text-sm font-semibold text-amber-700">
-            −1 코인 차감
-          </span>
+        <div className="mb-5 grid grid-cols-3 overflow-hidden rounded-2xl border border-amber-100 bg-amber-50 text-center">
+          <div className="px-3 py-3">
+            <p className="text-[11px] font-semibold text-amber-700/70">
+              현재 잔액
+            </p>
+            <p className="mt-1 text-base font-black text-amber-800">
+              {coinBalance === null ? "-" : coinBalance.toLocaleString("ko-KR")}
+            </p>
+          </div>
+          <div className="border-x border-amber-100 bg-white/70 px-3 py-3">
+            <p className="text-[11px] font-semibold text-amber-700/70">
+              사용량
+            </p>
+            <p className="mt-1 text-base font-black text-red-600">
+              -{coinCost.toLocaleString("ko-KR")}
+            </p>
+          </div>
+          <div className="px-3 py-3">
+            <p className="text-[11px] font-semibold text-amber-700/70">
+              사용 후
+            </p>
+            <p className={`mt-1 text-base font-black ${isInsufficient ? "text-red-600" : "text-amber-800"}`}>
+              {remainingBalance === null ? "-" : remainingBalance.toLocaleString("ko-KR")}
+            </p>
+          </div>
         </div>
+
+        {isInsufficient ? (
+          <p className="mb-4 rounded-2xl border border-red-100 bg-red-50 px-3 py-2 text-center text-xs font-semibold text-red-700">
+            코인이 부족합니다. 코인을 충전한 뒤 다시 열람해주세요.
+          </p>
+        ) : null}
 
         <div className="flex gap-2">
           <button
@@ -848,10 +893,10 @@ function CoinModal({
 
           <button
             onClick={onConfirm}
-            disabled={isLoading}
+            disabled={isLoading || isInsufficient}
             className="flex-1 rounded-2xl bg-emerald-600 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-200 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
           >
-            {isLoading ? "여는 중..." : "열람하기"}
+            {isLoading ? "여는 중..." : isInsufficient ? "코인 부족" : "열람하기"}
           </button>
         </div>
       </div>

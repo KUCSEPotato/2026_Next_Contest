@@ -268,6 +268,9 @@
 - POST /admin/users/{user_id}/coins: 사용자 코인 수동 지급
 - POST /admin/users/{user_id}/coins/revoke: 사용자 코인 수동 환수
 - PATCH /admin/users/{user_id}/status: 사용자 상태/역할 변경(관리자)
+  - 정지: `{ "is_active": false, "suspended_until": "ISO8601 또는 null", "suspension_reason": "사유" }`
+  - 복구: `{ "is_active": true }`
+  - 정지 중인 사용자는 공통 인증 dependency에서 API 접근이 차단되며, 기간 만료 후 자동 복구됩니다.
 - GET /admin/projects: 전체 프로젝트 목록 조회(관리자)
 - GET /admin/reports: 신고 목록 조회(관리자)
   - query: `scope=all|user|project|post|chat`

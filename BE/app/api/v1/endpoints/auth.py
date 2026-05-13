@@ -91,9 +91,36 @@ def _load_active_user(db: Session, user_id: int) -> User:
     user = db.get(User, user_id)
     if user is None or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    _restore_expired_suspension(db, user)
     if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_inactive_user_detail(user))
     return user
+
+
+def _restore_expired_suspension(db: Session, user: User) -> None:
+    suspended_until = _as_utc(user.suspended_until) if user.suspended_until is not None else None
+    if suspended_until is not None and suspended_until <= datetime.now(timezone.utc):
+        user.is_active = True
+        user.suspended_until = None
+        user.suspension_reason = None
+        db.commit()
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _inactive_user_detail(user: User) -> str | dict:
+    if user.suspended_until is not None:
+        suspended_until = _as_utc(user.suspended_until)
+        return {
+            "message": "Suspended user",
+            "suspended_until": suspended_until.isoformat(),
+            "reason": user.suspension_reason,
+        }
+    return "Inactive user"
 
 
 def _reject_withdrawn_user(user: User | None) -> None:
@@ -242,8 +269,9 @@ async def login(payload: LoginRequest, db: Session = Depends(get_db)) -> dict:
     )
     if user is None or not verify_password(password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    _restore_expired_suspension(db, user)
     if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_inactive_user_detail(user))
 
     return success_response(data=_create_auth_tokens(user.id))
 
@@ -791,8 +819,9 @@ async def reset_password(payload: ResetPasswordRequest, db: Session = Depends(ge
     user = db.get(User, token_data["user_id"])
     if user is None or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    _restore_expired_suspension(db, user)
     if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_inactive_user_detail(user))
 
     user.password_hash = hash_password(new_password)
     db.commit()
@@ -817,8 +846,9 @@ async def get_my_auth_info(
     user = db.get(User, current_user_id)
     if user is None or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    _restore_expired_suspension(db, user)
     if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_inactive_user_detail(user))
 
     return success_response(
         data={
@@ -830,6 +860,8 @@ async def get_my_auth_info(
             "coin_balance": user.coin_balance,
             "role": user.role,
             "is_verified": user.is_verified,
+            "suspended_until": user.suspended_until,
+            "suspension_reason": user.suspension_reason,
             "name": getattr(user, "name", None),
             "phone_number": getattr(user, "phone_number", None),
             "onboarding_step": getattr(user, "onboarding_step", None),
