@@ -221,8 +221,39 @@ async def signup(payload: SignupRequest, db: Session = Depends(get_db)) -> dict:
     if released_identity:
         db.flush()
 
-    if db.query(User).filter(User.email == email, User.deleted_at.is_(None)).first():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists")
+    existing_email_user = db.query(User).filter(User.email == email, User.deleted_at.is_(None)).first()
+    if existing_email_user is not None:
+        _reject_withdrawn_user(existing_email_user)
+        if existing_email_user.password_hash:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists")
+
+        nickname_owner = (
+            db.query(User)
+            .filter(
+                User.nickname == login_id,
+                User.id != existing_email_user.id,
+                User.deleted_at.is_(None),
+            )
+            .first()
+        )
+        if nickname_owner is not None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="중복된 아이디입니다.")
+
+        existing_email_user.nickname = login_id
+        existing_email_user.name = name
+        existing_email_user.phone_number = phone_number
+        existing_email_user.password_hash = hash_password(password)
+        db.commit()
+        db.refresh(existing_email_user)
+
+        linked_provider = "github" if existing_email_user.github_id else "google" if existing_email_user.google_id else None
+        return success_response(
+            data={
+                **_create_auth_tokens(existing_email_user.id),
+                "user": _serialize_user_onboarding(existing_email_user),
+                "linked_provider": linked_provider,
+            },
+        )
 
     if db.query(User).filter(User.nickname == login_id, User.deleted_at.is_(None)).first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="중복된 아이디입니다.")
