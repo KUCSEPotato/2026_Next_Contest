@@ -802,14 +802,7 @@ function SproutHeroIcon() {
       style={{ animation: "floatSprout 3s ease-in-out infinite" }}
     >
       <g transform="translate(-7 -5) scale(1.15)">
-        <path d="M48 82V38" stroke="#92400e" strokeWidth="8" strokeLinecap="round" />
-        <path
-          d="M48 60c-9-9-18-15-31-21M49 57c11-9 21-20 34-37"
-          stroke="#92400e"
-          strokeWidth="5"
-          strokeLinecap="round"
-          fill="none"
-        />
+        <ellipse cx="48" cy="84" rx="27" ry="7" fill="#92400e" opacity="0.22" />
         <path
           d="M45 41C23 39 15 24 15 11c19 0 33 9 36 29"
           fill="#22c55e"
@@ -818,7 +811,20 @@ function SproutHeroIcon() {
           d="M51 45c23-2 34-16 34-33-20 0-35 10-38 32"
           fill="#16a34a"
         />
-        <ellipse cx="48" cy="84" rx="27" ry="7" fill="#92400e" opacity="0.22" />
+        <path
+          d="M48 83C48 70 48 56 48 39"
+          stroke="#7c2d12"
+          strokeWidth="8"
+          strokeLinecap="round"
+          fill="none"
+        />
+        <path
+          d="M48 58C40 51 31 45 18 40M49 56C59 48 70 36 83 20"
+          stroke="#7c2d12"
+          strokeWidth="5"
+          strokeLinecap="round"
+          fill="none"
+        />
       </g>
       <style jsx>{`
         @keyframes floatSprout {
