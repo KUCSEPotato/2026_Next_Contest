@@ -14,6 +14,11 @@ function getFirstLine(content: string) {
   return line || "공지 본문이 없습니다.";
 }
 
+function withEventPrefix(post: PostSummary) {
+  const title = post.title || "제목 없는 공지";
+  return post.category === "event" ? `<이벤트> ${title}` : title;
+}
+
 export default function NoticesPage() {
   const router = useRouter();
   const [notices, setNotices] = useState<PostSummary[]>([]);
@@ -24,13 +29,25 @@ export default function NoticesPage() {
     try {
       setLoading(true);
       setError("");
-      const result = await getPosts({
-        category: "announcement",
-        page: 1,
-        page_size: 50,
-        sort_by: "latest",
-      });
-      setNotices(result.posts || []);
+      const [announcementResult, eventResult] = await Promise.all([
+        getPosts({
+          category: "announcement",
+          page: 1,
+          page_size: 50,
+          sort_by: "latest",
+        }),
+        getPosts({
+          category: "event",
+          page: 1,
+          page_size: 50,
+          sort_by: "latest",
+        }),
+      ]);
+      setNotices(
+        [...(announcementResult.posts || []), ...(eventResult.posts || [])].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )
+      );
     } catch (err) {
       console.error(err);
       setError("공지 목록을 불러오지 못했습니다.");
@@ -80,7 +97,7 @@ export default function NoticesPage() {
                       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                         <div className="min-w-0">
                           <h2 className="line-clamp-1 text-base font-bold text-gray-900">
-                            {notice.title || "제목 없는 공지"}
+                            {withEventPrefix(notice)}
                           </h2>
                           <p className="mt-1 text-xs font-medium text-red-700">관리자</p>
                         </div>
