@@ -284,6 +284,13 @@ export default function InspirationWellPage() {
 
       <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-end gap-3 px-4 py-4">
         <button
+          onClick={() => router.push("/notices")}
+          className="rounded-xl border border-emerald-100 bg-white/75 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-emerald-700 dark:border-emerald-800/50 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-emerald-300"
+        >
+          공지
+        </button>
+
+        <button
           onClick={() => router.push("/notifications")}
           className="rounded-xl border border-emerald-100 bg-white/75 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-emerald-700 dark:border-emerald-800/50 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-emerald-300"
         >

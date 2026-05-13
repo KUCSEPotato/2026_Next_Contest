@@ -225,6 +225,13 @@ export default function CommunityPage() {
     <div className="min-h-screen bg-orange-50/30 text-gray-900">
       <header className="mx-auto flex max-w-6xl items-center justify-end gap-3 px-4 py-4">
         <button
+          onClick={() => router.push("/notices")}
+          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-red-300 hover:text-red-600"
+        >
+          공지
+        </button>
+
+        <button
           onClick={() => router.push("/notifications")}
           className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-red-300 hover:text-red-600"
         >
