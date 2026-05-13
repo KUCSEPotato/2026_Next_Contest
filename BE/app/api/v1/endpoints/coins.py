@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -6,6 +6,7 @@ from app.api.v1.response import success_response
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
 from app.models import CoinPurchaseRequest
+from app.models import CoinTransaction
 from app.models import User
 
 router = APIRouter()
@@ -44,6 +45,60 @@ async def get_my_coin_balance(
 @router.get("/packages", summary="물방울 패키지 목록", description="수동 결제 요청에 사용할 물방울 패키지를 조회합니다.")
 async def list_coin_packages() -> dict:
     return success_response(data=COIN_PACKAGES)
+
+
+@router.get(
+    "/transactions/me",
+    summary="내 물방울 거래 내역 조회",
+    description="현재 로그인한 사용자의 물방울 충전/지급 및 사용 기록을 최신순으로 조회합니다.",
+)
+async def list_my_coin_transactions(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    direction: str | None = Query(default=None, pattern="^(earned|spent)$"),
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    user = db.get(User, current_user_id)
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    query = db.query(CoinTransaction).filter(CoinTransaction.user_id == current_user_id)
+    if direction == "earned":
+        query = query.filter(CoinTransaction.amount > 0)
+    elif direction == "spent":
+        query = query.filter(CoinTransaction.amount < 0)
+
+    total = query.count()
+    transactions = (
+        query.order_by(CoinTransaction.created_at.desc(), CoinTransaction.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    return success_response(
+        data={
+            "transactions": [
+                {
+                    "id": transaction.id,
+                    "amount": transaction.amount,
+                    "direction": "earned" if transaction.amount > 0 else "spent",
+                    "balance_after": transaction.balance_after,
+                    "event_type": transaction.event_type,
+                    "source_type": transaction.source_type,
+                    "source_id": transaction.source_id,
+                    "note": transaction.note,
+                    "created_at": transaction.created_at,
+                }
+                for transaction in transactions
+            ],
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": (total + page_size - 1) // page_size,
+        }
+    )
 
 
 @router.post("/purchase-requests", summary="물방울 구매 요청 생성", description="PG 연동 전 수동 확인용 물방울 구매 요청을 생성합니다.")
