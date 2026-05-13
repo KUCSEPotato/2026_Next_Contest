@@ -20,7 +20,8 @@ from app.models import UserSkill
 
 router = APIRouter()
 
-PROJECT_RECOMMENDATION_CANDIDATE_LIMIT = 30
+PROJECT_RECOMMENDATION_MAX_LIMIT = 100
+PROJECT_RECOMMENDATION_CANDIDATE_LIMIT = PROJECT_RECOMMENDATION_MAX_LIMIT
 PROJECT_RECOMMENDATION_RESULT_LIMIT = 6
 
 
@@ -31,7 +32,7 @@ def _normalize_match_name(name: str) -> str:
 @router.post("/projects", summary="프로젝트 추천", description="로그인 사용자 기술 스택/관심분야 기반 규칙 추천입니다.")
 async def recommend_projects_llm(
     payload: dict = Body(default={}),
-    limit: int = Query(default=PROJECT_RECOMMENDATION_RESULT_LIMIT, ge=1, le=20),
+    limit: int = Query(default=PROJECT_RECOMMENDATION_RESULT_LIMIT, ge=1, le=PROJECT_RECOMMENDATION_MAX_LIMIT),
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict:
