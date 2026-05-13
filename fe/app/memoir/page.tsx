@@ -654,6 +654,7 @@ function MemoirContent() {
                     bad: retro.what_went_badly || "",
                     lessons: ll.lessons,
                     nextActions: retro.next_actions || "",
+                    aiMemoir: ll.aiMemoir,
                   },
                 };
               } catch {
@@ -667,7 +668,11 @@ function MemoirContent() {
           );
 
           if (ignore) return;
-          setMemoirList(overviewItems);
+          setMemoirList(
+            [...overviewItems].sort(
+              (a, b) => getProjectRecentTime(b.project) - getProjectRecentTime(a.project)
+            )
+          );
           setProject(null);
           return;
         }
@@ -901,6 +906,27 @@ function MemoirContent() {
             <p style={{ margin: "12px 0 0", color: "var(--memoir-muted)", fontSize: 15 }}>
               지금까지 완료한 프로젝트의 정원을 한눈에 모아봅니다.
             </p>
+            {memoirList.length > 0 ? (
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 6,
+                  marginTop: 18,
+                  maxWidth: "100%",
+                }}
+                aria-label={`완료한 프로젝트 ${memoirList.length}개`}
+              >
+                {memoirList.map(({ project: completedProject }) => (
+                  <ProgressBloom
+                    key={`garden-rose-${completedProject.id}`}
+                    progress={100}
+                    size="xs"
+                    showLabel={false}
+                  />
+                ))}
+              </div>
+            ) : null}
           </section>
 
           {memoirList.length === 0 ? (
@@ -911,6 +937,7 @@ function MemoirContent() {
             <div style={{ marginTop: 20, display: "grid", gap: 16 }}>
               {memoirList.map(({ project: completedProject, growth: itemGrowth }) => {
                 const summaryText =
+                  itemGrowth?.aiMemoir ||
                   itemGrowth?.good ||
                   itemGrowth?.lessons ||
                   itemGrowth?.nextActions ||
