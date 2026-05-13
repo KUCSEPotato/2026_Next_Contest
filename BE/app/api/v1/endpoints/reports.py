@@ -31,6 +31,12 @@ def _clean_reason(reason: str) -> str:
     return cleaned
 
 
+def _ensure_not_admin_content(db: Session, author_id: int) -> None:
+    author = db.get(User, author_id)
+    if author is not None and author.role == "admin":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Admin-authored content cannot be reported")
+
+
 @router.post("", summary="신고 접수", description="사용자가 사용자/프로젝트/게시글/댓글/채팅방을 신고합니다.")
 async def create_report(
     payload: ReportCreateRequest,
@@ -62,12 +68,14 @@ async def create_report(
         post = db.get(CommunityPost, payload.target_id)
         if post is None or post.deleted_at is not None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+        _ensure_not_admin_content(db, post.author_id)
         report_data["target_post_id"] = post.id
 
     elif payload.target_type == "comment":
         comment = db.get(CommunityPostComment, payload.target_id)
         if comment is None or comment.deleted_at is not None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
+        _ensure_not_admin_content(db, comment.author_id)
         report_data["target_comment_id"] = comment.id
 
     elif payload.target_type == "chat":

@@ -803,6 +803,15 @@ export async function addMySkillApi(name, proficiency = 3) {
   return handleResponse(res, "기술 스택 추가 실패");
 }
 
+export async function removeMySkillApi(skillId) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/users/me/skills/${skillId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "기술 스택 삭제 실패");
+}
+
 export async function addMyInterestApi(name, interestLevel = 3) {
   const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/users/me/interests`, {
     method: "POST",
@@ -814,6 +823,15 @@ export async function addMyInterestApi(name, interestLevel = 3) {
   });
 
   return handleResponse(res, "관심 분야 추가 실패");
+}
+
+export async function removeMyInterestApi(interestId) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/users/me/interests/${interestId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "관심 분야 삭제 실패");
 }
 
 export async function uploadMyAvatarApi(file) {
@@ -921,6 +939,36 @@ export async function getMyCoinPurchaseRequestsApi() {
   });
 
   return handleResponse(res, "코인 구매 요청 목록을 불러오지 못했습니다.");
+}
+
+export async function preparePaymentApi(payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/payments/prepare`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "결제 준비에 실패했습니다.");
+}
+
+export async function confirmPaymentApi(payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/payments/confirm`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "결제 승인에 실패했습니다.");
+}
+
+export async function recordPaymentFailureApi(payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/payments/fail`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "결제 실패 기록에 실패했습니다.");
 }
 
 /* =========================

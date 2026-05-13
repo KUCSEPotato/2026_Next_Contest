@@ -396,6 +396,32 @@ class PaymentEvent(Base):
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class Payment(Base):
+    __tablename__ = "payments"
+
+    id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    order_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    payment_key: Mapped[str | None] = mapped_column(String(200), unique=True)
+    order_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    coin_amount: Mapped[int | None] = mapped_column(Integer)
+    currency: Mapped[str] = mapped_column(String(10), default="KRW", nullable=False)
+    status: Mapped[str] = mapped_column(String(30), default="READY", nullable=False)
+    method: Mapped[str | None] = mapped_column(String(50))
+    provider: Mapped[str] = mapped_column(String(30), default="TOSS", nullable=False)
+    toss_raw_response: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    canceled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    failure_code: Mapped[str | None] = mapped_column(String(100))
+    failure_message: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class CoinPurchaseRequest(Base):
     __tablename__ = "coin_purchase_requests"
 

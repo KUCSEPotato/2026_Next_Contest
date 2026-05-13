@@ -56,6 +56,22 @@ export default function NotificationsPage() {
       return null;
     }
 
+    const type = notification.type || notification.notification_type;
+    const action = notification.action || notification.data?.action;
+    const projectId =
+      notification.project_id ||
+      notification.target_project_id ||
+      notification.target_id ||
+      notification.data?.project_id ||
+      notification.data?.target_project_id;
+
+    if (
+      type === "project_completed_review_requested" ||
+      action === "review_teammates"
+    ) {
+      return projectId ? `/projects/${projectId}/manage` : null;
+    }
+
     if (notification.url) return notification.url;
     if (notification.data?.url) return notification.data.url;
     if (notification.link_url) return notification.link_url;
@@ -63,8 +79,6 @@ export default function NotificationsPage() {
     if (notification.data?.project_id) return `/projects/${notification.data.project_id}`;
     if (notification.post_id) return `/community/${notification.post_id}`;
     if (notification.data?.post_id) return `/community/${notification.data.post_id}`;
-
-    const type = notification.type || notification.notification_type;
 
     if (
       type === "project_formed" ||

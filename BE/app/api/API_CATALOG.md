@@ -246,6 +246,17 @@
   - PG 연동 전 수동 확인용이며, 관리자가 승인하면 코인이 지급됩니다.
 - GET /coins/purchase-requests/me: 내가 만든 코인 구매 요청 목록 조회
 
+### Toss Payments
+- POST /payments/prepare: 코인 상품 결제 주문 생성
+  - body: `{ "product_id": "starter|builder|maker" }`
+  - 서버가 `order_id`, `order_name`, `amount`, `coin_amount`를 확정합니다.
+- POST /payments/confirm: 토스 결제 승인
+  - body: `{ "paymentKey": "...", "orderId": "...", "amount": 1000 }`
+  - DB 주문 금액과 요청 금액을 검증한 뒤 백엔드에서 Toss confirm API를 호출합니다.
+  - 이미 `DONE`인 주문은 중복 승인 요청에도 기존 성공 응답을 반환합니다.
+- POST /payments/fail: 토스 결제 실패 기록
+  - body: `{ "orderId": "...", "code": "...", "message": "..." }`
+
 ## 14) Notifications
 
 - GET /notifications: 현재 사용자의 알림 목록
@@ -265,6 +276,7 @@
 - POST /reports: 사용자/프로젝트/게시글/댓글/채팅방 신고 접수
   - body: `{ "target_type": "user|project|post|comment|chat", "target_id": 1, "reason": "신고 사유" }`
   - 채팅방 신고는 해당 채팅방 멤버만 접수할 수 있습니다.
+  - admin이 작성한 커뮤니티 게시글/댓글은 신고할 수 없습니다.
 
 ## 16) Admin
 
@@ -282,7 +294,10 @@
 - GET /admin/projects: 전체 프로젝트 목록 조회(관리자)
 - GET /admin/reports: 신고 목록 조회(관리자)
   - query: `scope=all|user|project|post|comment|chat`
+  - 응답에 `target_title`, `target_excerpt`, `target_url`이 포함되어 대상 내용을 바로 확인할 수 있습니다.
 - PATCH /admin/reports/{report_id}: 신고 처리 상태 변경(관리자)
+  - body: `{ "status": "resolved|rejected|reviewing|open", "resolution_type": "처분 종류", "message": "신고자 안내 메시지" }`
+  - `resolved`/`rejected` 처리 시 신고자에게 알림이 발송됩니다.
 - POST /admin/notices: 공지글 작성(커뮤니티 `announcement` 게시글 생성)
 - GET /admin/payments: 결제 이벤트 목록 조회(관리자)
 - PATCH /admin/payments/{event_id}: 결제 이벤트 처리/해제(관리자)

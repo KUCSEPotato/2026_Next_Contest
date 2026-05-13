@@ -597,49 +597,51 @@ export default function ProjectDetailPage() {
 
               <p className="mt-3 text-lg text-slate-600">{project.summary}</p>
 
-              {isLeader && (
-                <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
-                  >
-                    수정하기
-                  </button>
+              {(isLeader || isProjectMember) && (
+                <div className="mt-6 flex flex-wrap items-center gap-2">
+                  {isLeader && (
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+                    >
+                      수정하기
+                    </button>
+                  )}
 
-                  {!isProjectCompleted && (
+                  {isLeader && !isProjectCompleted && (
                     <button
                       onClick={() => setShowDiscardOptions(true)}
                       disabled={isDeleting}
-                      className="rounded-xl border border-red-200 bg-white px-5 py-3 font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                      className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                     >
                       {isDeleting ? "처리 중..." : "버리기"}
+                    </button>
+                  )}
+
+                  {isProjectMember && isTeamFormed && (
+                    <button
+                      onClick={() => router.push(`/projects/${projectId}/manage`)}
+                      className="rounded-lg bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 ring-1 ring-inset ring-red-200 transition hover:bg-red-100"
+                    >
+                      진행 관리
+                    </button>
+                  )}
+
+                  {isProjectMember && (
+                    <button
+                      onClick={() => router.push(`/projects/${projectId}/chat`)}
+                      className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                    >
+                      팀 채팅방
                     </button>
                   )}
                 </div>
               )}
 
-              {isProjectMember && isTeamFormed && (
-                <button
-                  onClick={() => router.push(`/projects/${projectId}/manage`)}
-                  className="mt-6 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
-                >
-                  진행 관리 페이지로 가기
-                </button>
-              )}
-
-              {isProjectMember && (
-                <button
-                  onClick={() => router.push(`/projects/${projectId}/chat`)}
-                  className={`${isTeamFormed ? "mt-3" : "mt-6"} w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800`}
-                >
-                  팀 채팅방 들어가기
-                </button>
-              )}
-
               {!isLeader && (
                 <button
                   onClick={handleReportProject}
-                  className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-600 transition hover:border-red-200 hover:text-red-600"
+                  className="mt-3 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-red-200 hover:text-red-600"
                 >
                   프로젝트 신고
                 </button>

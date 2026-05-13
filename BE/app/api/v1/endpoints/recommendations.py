@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from fastapi import APIRouter, Body, Depends, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -5,21 +7,27 @@ from sqlalchemy.orm import Session
 from app.api.v1.response import success_response
 from app.dependencies.auth import get_current_user_id
 from app.db.session import get_db
+from app.models import Interest
 from app.models import Project
+from app.models import ProjectInterest
 from app.models import ProjectMember
 from app.models import ProjectRecruitment
 from app.models import ProjectSkill
 from app.models import Skill
 from app.models import User
+from app.models import UserInterest
 from app.models import UserSkill
 
 router = APIRouter()
 
+PROJECT_RECOMMENDATION_CANDIDATE_LIMIT = 30
+PROJECT_RECOMMENDATION_RESULT_LIMIT = 6
 
-@router.post("/projects", summary="프로젝트 추천", description="로그인 사용자 스킬 기반 프로젝트를 추천합니다.")
+
+@router.post("/projects", summary="프로젝트 추천", description="로그인 사용자 기술 스택/관심분야 기반 규칙 추천입니다.")
 async def recommend_projects_llm(
     payload: dict = Body(default={}),
-    limit: int = Query(default=5, ge=1, le=20),
+    limit: int = Query(default=PROJECT_RECOMMENDATION_RESULT_LIMIT, ge=1, le=20),
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -28,85 +36,157 @@ async def recommend_projects_llm(
     Swagger 테스트 방법:
     - Authorization 헤더에 Bearer 액세스 토큰을 설정합니다.
     - body에 `difficulty`(선택)와 `role`(선택)을 전달할 수 있습니다.
-    - query `limit`(1~20)로 추천 개수를 조절합니다.
+    - query `limit`(기본 6, 1~20)로 추천 개수를 조절합니다.
 
     동작:
-    - 공개 프로젝트 중에서 사용자의 등록 기술과 매칭되는 프로젝트를 우선 추천합니다.
+    - 기술 스택과 관심분야가 각각 1개 이상 매칭되는 공개/미삭제 프로젝트만 추천합니다.
+    - 모집중이고 현재 참여 인원이 최대 참여 인원 미만인 프로젝트만 추천합니다.
     - `role`이 주어지면 해당 포지션을 채용 중인 프로젝트로 필터링합니다.
     """
     requested_role = payload.get("role")
     preferred_difficulty = payload.get("difficulty")
 
-    user_skill_names = [
-        name for (name,) in db.query(Skill.name)
+    user_skill_rows = (
+        db.query(Skill.id, Skill.name)
         .join(UserSkill, UserSkill.skill_id == Skill.id)
         .filter(UserSkill.user_id == current_user_id)
         .all()
-    ]
+    )
+    user_interest_rows = (
+        db.query(Interest.id, Interest.name)
+        .join(UserInterest, UserInterest.interest_id == Interest.id)
+        .filter(UserInterest.user_id == current_user_id)
+        .all()
+    )
+    user_skill_ids = [skill_id for (skill_id, _name) in user_skill_rows]
+    user_interest_ids = [interest_id for (interest_id, _name) in user_interest_rows]
+    user_skill_names = [name for (_skill_id, name) in user_skill_rows]
+    user_interest_names = [name for (_interest_id, name) in user_interest_rows]
 
-    query = db.query(Project).filter(
-        Project.is_public.is_(True),
-        Project.deleted_at.is_(None),
+    if not user_skill_ids or not user_interest_ids:
+        return success_response(data=[])
+
+    current_member_count_subquery = (
+        db.query(
+            ProjectMember.project_id.label("project_id"),
+            func.count(ProjectMember.id).label("current_members"),
+        )
+        .filter(ProjectMember.left_at.is_(None))
+        .group_by(ProjectMember.project_id)
+        .subquery()
+    )
+
+    query = (
+        db.query(Project)
+        .join(ProjectSkill, ProjectSkill.project_id == Project.id)
+        .join(ProjectInterest, ProjectInterest.project_id == Project.id)
+        .join(ProjectRecruitment, ProjectRecruitment.project_id == Project.id)
+        .outerjoin(current_member_count_subquery, current_member_count_subquery.c.project_id == Project.id)
+        .filter(
+            Project.is_public.is_(True),
+            Project.deleted_at.is_(None),
+            ProjectSkill.skill_id.in_(user_skill_ids),
+            ProjectInterest.interest_id.in_(user_interest_ids),
+            ProjectRecruitment.status == "open",
+            func.coalesce(current_member_count_subquery.c.current_members, 0) < Project.max_members,
+        )
+        .distinct()
     )
     if preferred_difficulty:
         query = query.filter(Project.difficulty == preferred_difficulty)
 
     if requested_role:
-        query = query.join(ProjectRecruitment, ProjectRecruitment.project_id == Project.id).filter(
-            ProjectRecruitment.position_name.ilike(f"%{requested_role}%"),
-            ProjectRecruitment.status == "open",
-        ).distinct()
+        query = query.filter(ProjectRecruitment.position_name.ilike(f"%{requested_role}%"))
 
-    projects = query.all()
+    projects = (
+        query
+        .order_by(Project.created_at.desc())
+        .limit(PROJECT_RECOMMENDATION_CANDIDATE_LIMIT)
+        .all()
+    )
 
-    scored_projects = []
+    if not projects:
+        return success_response(data=[])
+
+    project_ids = [project.id for project in projects]
+
     user_skill_set = {skill.lower() for skill in user_skill_names}
-    for p in projects:
-        project_skill_names = [
-            name for (name,) in db.query(Skill.name)
-            .join(ProjectSkill, ProjectSkill.skill_id == Skill.id)
-            .filter(ProjectSkill.project_id == p.id)
-            .all()
-        ]
-        project_skill_set = {skill.lower() for skill in project_skill_names}
-        matched_skills = sorted(user_skill_set & project_skill_set)
-        skill_match_count = len(matched_skills)
+    user_interest_set = {interest.lower() for interest in user_interest_names}
 
-        current_members = db.query(func.count(ProjectMember.id)).filter(
-            ProjectMember.project_id == p.id,
-            ProjectMember.left_at.is_(None)
-        ).scalar() or 0
+    project_skills: dict[int, list[str]] = defaultdict(list)
+    for project_id, skill_name in (
+        db.query(ProjectSkill.project_id, Skill.name)
+        .join(Skill, Skill.id == ProjectSkill.skill_id)
+        .filter(ProjectSkill.project_id.in_(project_ids))
+        .all()
+    ):
+        project_skills[project_id].append(skill_name)
 
-        if skill_match_count > 0:
-            reason = f"보유 기술 {skill_match_count}개가 프로젝트 요구 기술과 일치합니다."
-        elif requested_role:
-            reason = f"요청 포지션 '{requested_role}' 채용 프로젝트입니다."
-        else:
-            reason = f"{p.difficulty} 난이도와 최근 공개 프로젝트 기준 추천입니다."
+    project_interests: dict[int, list[str]] = defaultdict(list)
+    for project_id, interest_name in (
+        db.query(ProjectInterest.project_id, Interest.name)
+        .join(Interest, Interest.id == ProjectInterest.interest_id)
+        .filter(ProjectInterest.project_id.in_(project_ids))
+        .all()
+    ):
+        project_interests[project_id].append(interest_name)
 
-        scored_projects.append({
-            "project": p,
+    current_member_counts = dict(
+        db.query(ProjectMember.project_id, func.count(ProjectMember.id))
+        .filter(
+            ProjectMember.project_id.in_(project_ids),
+            ProjectMember.left_at.is_(None),
+        )
+        .group_by(ProjectMember.project_id)
+        .all()
+    )
+
+    project_items = []
+    for project in projects:
+        skill_names = project_skills[project.id]
+        interest_names = project_interests[project.id]
+        matched_skills = sorted(user_skill_set & {skill.lower() for skill in skill_names})
+        matched_interests = sorted(user_interest_set & {interest.lower() for interest in interest_names})
+        current_members = int(current_member_counts.get(project.id, 0))
+        if current_members >= project.max_members:
+            continue
+
+        reason = f"기술 {len(matched_skills)}개와 관심분야 {len(matched_interests)}개가 매칭되고 모집 정원이 남아 있습니다."
+
+        project_items.append({
+            "project": project,
             "current_members": current_members,
             "matched_skills": matched_skills,
-            "skill_match_count": skill_match_count,
+            "matched_interests": matched_interests,
+            "skill_match_count": len(matched_skills),
+            "interest_match_count": len(matched_interests),
             "reason": reason,
         })
 
-    scored_projects.sort(key=lambda item: (item["skill_match_count"], item["project"].created_at), reverse=True)
-    scored_projects = scored_projects[:limit]
+    project_items.sort(
+        key=lambda item: (
+            item["skill_match_count"] + item["interest_match_count"],
+            item["skill_match_count"],
+            item["project"].created_at,
+        ),
+        reverse=True,
+    )
 
-    data = [
-        {
-            "project_id": item["project"].id,
-            "title": item["project"].title,
-            "difficulty": item["project"].difficulty,
-            "currentMembers": item["current_members"],
-            "maxMembers": item["project"].max_members,
-            "matchedSkills": item["matched_skills"],
-            "reason": item["reason"],
-        }
-        for item in scored_projects
-    ]
+    data = []
+    for item in project_items[:limit]:
+        project = item["project"]
+        data.append(
+            {
+                "project_id": project.id,
+                "title": project.title,
+                "difficulty": project.difficulty,
+                "currentMembers": item["current_members"],
+                "maxMembers": project.max_members,
+                "matchedSkills": item["matched_skills"],
+                "matchedInterests": item["matched_interests"],
+                "reason": item["reason"],
+            }
+        )
 
     return success_response(data=data)
 

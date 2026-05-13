@@ -103,11 +103,12 @@ def _serialize_comment(db: Session, comment: CommunityPostComment, current_user_
         "is_mine": bool(current_user_id and comment.author_id == current_user_id),
         "created_at": comment.created_at,
         "updated_at": comment.updated_at,
-        "author": {
-            "id": author.id if not anon else None,
-            "nickname": "?듬챸" if anon else author.nickname,
-            "avatar_url": None if anon else author.avatar_url,
-        },
+            "author": {
+                "id": author.id if not anon else None,
+                "nickname": "?듬챸" if anon else author.nickname,
+                "avatar_url": None if anon else author.avatar_url,
+                "role": None if anon else author.role,
+            },
         "reaction_stats": snapshot["reaction_stats"],
         "user_reaction": snapshot["user_reaction"],
         "reply_count": reply_count,
@@ -154,6 +155,7 @@ async def create_post(
                 "id": author.id,
                 "nickname": author.nickname,
                 "avatar_url": author.avatar_url,
+                "role": author.role,
             },
             "created_at": post.created_at,
             "updated_at": post.updated_at,
@@ -261,6 +263,7 @@ async def list_posts(
                     "id": author.id,
                     "nickname": author.nickname,
                     "avatar_url": author.avatar_url,
+                    "role": author.role,
                 },
                 "comment_count": comment_count,
                 "reaction_stats": reaction_stats,
@@ -370,6 +373,7 @@ async def get_post(
                 "id": author.id,
                 "nickname": author.nickname,
                 "avatar_url": author.avatar_url,
+                "role": author.role,
             },
             "comment_count": comment_count,
             "reaction_stats": reaction_stats,
@@ -419,6 +423,7 @@ async def update_post(
                 "id": author.id,
                 "nickname": author.nickname,
                 "avatar_url": author.avatar_url,
+                "role": author.role,
             },
         },
     )
@@ -502,6 +507,7 @@ async def create_comment(
         "id": author.id if not payload.is_anonymous else None,
         "nickname": "익명" if payload.is_anonymous else author.nickname,
         "avatar_url": None if payload.is_anonymous else author.avatar_url,
+        "role": None if payload.is_anonymous else author.role,
     }
     
     return success_response(
@@ -615,6 +621,7 @@ async def list_comments(
                     "id": author.id if not comment.is_anonymous else None,
                     "nickname": "익명" if comment.is_anonymous else author.nickname,
                     "avatar_url": None if comment.is_anonymous else author.avatar_url,
+                    "role": None if comment.is_anonymous else author.role,
                 },
                 "reaction_stats": reaction_stats,
                 "reply_count": reply_count,
@@ -668,6 +675,7 @@ async def update_comment(
                 "id": author.id if not anon else None,
                 "nickname": "익명" if anon else author.nickname,
                 "avatar_url": None if anon else author.avatar_url,
+                "role": None if anon else author.role,
             },
         },
     )
