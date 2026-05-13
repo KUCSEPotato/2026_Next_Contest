@@ -32,9 +32,30 @@ const STATUS_COLORS = {
 // 백엔드 package id → 일러스트 타입
 const PACKAGE_ILLUS_TYPE = {
   drop:   "drop",
+  waterdrop: "drop",
   cup:    "glass",
+  glass:  "glass",
   bottle: "bottle",
 };
+
+const DEFAULT_COIN_PACKAGES = [
+  { id: "drop", coin_amount: 1, price_krw: 300, label: "\uD55C \uBC29\uC6B8" },
+  { id: "cup", coin_amount: 10, price_krw: 2000, label: "\uD55C \uC794" },
+  { id: "bottle", coin_amount: 100, price_krw: 15000, label: "\uD55C \uBCD1" },
+];
+
+function normalizeCoinPackages(packages = []) {
+  const packageMap = new Map(
+    packages
+      .filter((pkg) => pkg?.id)
+      .map((pkg) => [pkg.id, pkg])
+  );
+
+  return DEFAULT_COIN_PACKAGES.map((defaultPackage) => ({
+    ...packageMap.get(defaultPackage.id),
+    ...defaultPackage,
+  }));
+}
 
 // ── 포맷 헬퍼 ─────────────────────────────────────────────────────────────────
 
@@ -459,7 +480,7 @@ export default function CoinsPage() {
         getMyEntitlementApi(),
       ]);
       setBalance(balanceResult.data?.waterdrop_balance ?? balanceResult.data?.coin_balance ?? 0);
-      setPackages(packagesResult.data || []);
+      setPackages(normalizeCoinPackages(packagesResult.data || []));
       setRequests(requestsResult.data || []);
       setPaymentProducts(productsResult.data || []);
       setEntitlement(entitlementResult.data || null);
@@ -642,97 +663,24 @@ export default function CoinsPage() {
                       <PackageIllustration type={PACKAGE_ILLUS_TYPE[pkg.id] ?? "drop"} />
                     </div>
 
-                    <TossPaymentButton
-                      productId={pkg.id}
-                      label="카드 결제"
-                      onError={(err) =>
-                        toast.error(err instanceof Error ? err.message : "결제를 시작하지 못했습니다.")
-                      }
-                      className="mt-4 w-full rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleRequestPurchase(pkg)}
-                      disabled={processingPackage === pkg.id}
-                      className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-bold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                    >
-                      {processingPackage === pkg.id ? "요청 중…" : "수동 구매 요청"}
-                    </button>
-                  </article>
-                ))}
-              </div>
-            </section>
-            
-            <section className="mb-8">
-              <div className="mb-4">
-                <h2 className="text-xl font-black text-slate-950">무료 요금제</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  결제 없이 기본으로 제공되는 사용 범위입니다.
-                </p>
-              </div>
-              <div className="grid gap-4 md:grid-cols-3">
-                <PlanCard
-                  eyebrow="기본 제공"
-                  product={freeProduct}
-                  isCurrent={currentPlanCode === "FREE"}
-                  onError={handlePaymentError}
-                  onManualPurchase={handleRequestProductPurchase}
-                  manualLoading={false}
-                >
-                  물방울을 별도 사용하면서 가볍게 둘러볼 수 있습니다.
-                </PlanCard>
-              </div>
-            </section>
-
-            <section className="mb-8">
-              <div className="mb-4">
-                <h2 className="text-xl font-black text-slate-950">월정액 요금제</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  현재는 자동 결제 전 단계로, 결제 즉시 30일 동안 활성화됩니다.
-                  {entitlement?.product_type === "SUBSCRIPTION" && entitlement.next_renewal_at
-                    ? ` 다음 갱신 기준일은 ${formatShortDate(entitlement.next_renewal_at)}입니다.`
-                    : ""}
-                </p>
-              </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                {subscriptionProducts.map((product) => (
-                  <PlanCard
-                    key={product.product_code}
-                    eyebrow="월정액 30일권"
-                    product={product}
-                    isCurrent={currentPlanCode === product.product_code}
-                    onError={handlePaymentError}
-                    onManualPurchase={handleRequestProductPurchase}
-                    manualLoading={processingPackage === product.product_code}
+                  <TossPaymentButton
+                    productId={pkg.id}
+                    label="카드 결제"
+                    onError={(err) =>
+                      toast.error(err instanceof Error ? err.message : "결제를 시작하지 못했습니다.")
+                    }
+                    className="mt-4 w-full rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleRequestPurchase(pkg)}
+                    disabled={processingPackage === pkg.id}
+                    className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-bold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 whitespace-nowrap"
                   >
-                    {product.duration_days}일 동안 월정액 권한이 유지됩니다.
-                  </PlanCard>
-                ))}
-              </div>
-            </section>
-
-            <section className="mb-8">
-              <div className="mb-4">
-                <h2 className="text-xl font-black text-slate-950">정액제 기간권</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  짧은 기간 동안 프로젝트 생성/지원 권한을 쓰는 패스입니다. 기간권은 자동 갱신되지 않습니다.
-                </p>
-              </div>
-              <div className="grid gap-4 md:grid-cols-3">
-                {passProducts.map((product) => (
-                  <PlanCard
-                    key={product.product_code}
-                    eyebrow={`${product.duration_days}일 기간권`}
-                    product={product}
-                    isCurrent={currentPlanCode === product.product_code}
-                    onError={handlePaymentError}
-                    onManualPurchase={handleRequestProductPurchase}
-                    manualLoading={processingPackage === product.product_code}
-                  >
-                    결제일부터 {product.duration_days}일 동안 활성화됩니다.
-                  </PlanCard>
-                ))}
-              </div>
+                    {processingPackage === pkg.id ? "요청 중…" : "수동 구매 요청"}
+                  </button>
+                </article>
+              ))}
             </section>
 
             {/* 구매 요청 내역 */}

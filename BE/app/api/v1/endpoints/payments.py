@@ -32,6 +32,7 @@ PAYMENT_STATUS_FAILED = "FAILED"
 COIN_PACKAGES = {
     "drop": {"coin_amount": 1, "price_krw": 300, "label": "한 방울"},
     "cup": {"coin_amount": 10, "price_krw": 2000, "label": "한 잔"},
+    "bottle": {"coin_amount": 100, "price_krw": 15000, "label": "\uD55C \uBCD1"},
 }
 
 
