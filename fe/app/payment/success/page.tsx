@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { confirmPaymentApi } from "../../../lib/api";
 
@@ -43,6 +43,12 @@ function PaymentSuccessContent() {
           message: `${result.data?.coin_amount?.toLocaleString("ko-KR") || 0}코인이 충전되었습니다.`,
           coinBalance: result.data?.coin_balance,
         });
+
+        // 결제 완료 후 메인 페이지로 이동 (운영 기준으로 /mainpage)
+        // 사용자 경험을 위해 짧게 대기 후 리디렉션합니다.
+        setTimeout(() => {
+          router.push("/mainpage");
+        }, 1200);
       } catch (error) {
         setState({
           status: "error",
