@@ -269,11 +269,11 @@ export default function InspirationWellPage() {
 
   return (
     <div
-      className="relative min-h-screen overflow-hidden bg-[#f7fbf3] text-slate-900"
+      className="relative min-h-screen overflow-hidden bg-[#f7fbf3] text-slate-900 dark:bg-slate-950 dark:text-slate-100"
     >
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 z-0"
+        className="idea-yard-bg pointer-events-none absolute inset-0 z-0"
         style={{
           background:
             "radial-gradient(ellipse 80% 60% at 50% 110%, #d9f99d 0%, #ecfccb 38%, #f7fbf3 100%)",
@@ -285,14 +285,14 @@ export default function InspirationWellPage() {
       <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-end gap-3 px-4 py-4">
         <button
           onClick={() => router.push("/notifications")}
-          className="rounded-xl border border-emerald-100 bg-white/75 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-emerald-700"
+          className="rounded-xl border border-emerald-100 bg-white/75 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-emerald-700 dark:border-emerald-800/50 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-emerald-300"
         >
           알림
         </button>
 
         <button
           onClick={() => router.push("/chat")}
-          className="rounded-xl border border-emerald-100 bg-white/75 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-emerald-700"
+          className="rounded-xl border border-emerald-100 bg-white/75 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-emerald-700 dark:border-emerald-800/50 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-emerald-300"
         >
           채팅
         </button>
@@ -304,11 +304,11 @@ export default function InspirationWellPage() {
             <SeedIcon />
           </div>
 
-          <h1 className="mb-3 text-3xl font-bold leading-tight tracking-tight text-slate-800 sm:text-4xl">
+          <h1 className="mb-3 text-3xl font-bold leading-tight tracking-tight text-slate-800 dark:text-slate-50 sm:text-4xl">
             생각의 뜰
           </h1>
 
-          <p className="mx-auto mb-8 max-w-md text-sm leading-7 text-slate-500 sm:text-base">
+          <p className="mx-auto mb-8 max-w-md text-sm leading-7 text-slate-500 dark:text-slate-300 sm:text-base">
             버려진 아이디어들이 잠들어 있는 곳.
             <br />
             당신의 손길로 다시 꽃피울 씨앗을 살펴보세요.
@@ -321,8 +321,8 @@ export default function InspirationWellPage() {
                 onClick={() => handleServiceClick(block.path)}
                 className={`rounded-2xl border p-5 shadow-sm transition hover:border-emerald-300 hover:shadow-md ${
                   block.isActive
-                    ? "border-emerald-200 bg-emerald-50/80"
-                    : "border-emerald-100 bg-white/75"
+                    ? "border-emerald-200 bg-emerald-50/80 dark:border-emerald-500/70 dark:bg-emerald-950/55"
+                    : "border-emerald-100 bg-white/75 dark:border-slate-700 dark:bg-slate-900/80"
                 }`}
               >
                 <div className="mb-3 flex items-center justify-between">
@@ -331,12 +331,12 @@ export default function InspirationWellPage() {
                     <div>
                       <p
                         className={`text-base font-bold ${
-                          block.isActive ? "text-emerald-700" : "text-slate-900"
+                          block.isActive ? "text-emerald-700 dark:text-emerald-300" : "text-slate-900 dark:text-slate-100"
                         }`}
                       >
                         {block.title}
                       </p>
-                      <p className="text-[11px] font-semibold text-slate-400">
+                      <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">
                         {block.subtitle}
                       </p>
                     </div>
@@ -349,7 +349,7 @@ export default function InspirationWellPage() {
                   )}
                 </div>
 
-                <p className="whitespace-pre-line text-sm leading-relaxed text-gray-500">
+                <p className="whitespace-pre-line text-sm leading-relaxed text-gray-500 dark:text-slate-300">
                   {block.description}
                 </p>
               </button>
@@ -357,11 +357,11 @@ export default function InspirationWellPage() {
           </div>
         </section>
 
-        <section className="mb-8 rounded-2xl border border-emerald-100 bg-white/75 p-5 shadow-sm backdrop-blur-sm">
+        <section className="mb-8 rounded-2xl border border-emerald-100 bg-white/75 p-5 shadow-sm backdrop-blur-sm dark:border-emerald-800/50 dark:bg-slate-900/85">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-lg font-bold text-slate-800">생각의 뜰</p>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="text-lg font-bold text-slate-800 dark:text-slate-50">생각의 뜰</p>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
                 잠들어 있는 아이디어를 열람한 뒤 프로젝트로 이어받아보세요.
               </p>
             </div>
@@ -378,7 +378,7 @@ export default function InspirationWellPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="아이디어 제목, 태그로 검색해보세요"
-            className="mb-4 w-full rounded-xl border border-emerald-100 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-emerald-400"
+            className="mb-4 w-full rounded-xl border border-emerald-100 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-emerald-500"
           />
 
           <div className="flex flex-wrap gap-2">
@@ -389,7 +389,7 @@ export default function InspirationWellPage() {
                 className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
                   selectedCategory === cat.label
                     ? "border-emerald-600 bg-emerald-600 text-white shadow-sm shadow-emerald-200"
-                    : "border-emerald-100 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-700"
+                    : "border-emerald-100 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-emerald-500 dark:hover:text-emerald-300"
                 }`}
               >
                 <span>{cat.emoji}</span>
@@ -402,13 +402,13 @@ export default function InspirationWellPage() {
         <section>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-semibold text-slate-600">
+              <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">
                 {searchQuery || selectedCategory !== "전체"
                   ? `검색 결과 (${filtered.length})`
                   : `${filtered.length}개의 아이디어가 잠들어 있어요`}
               </p>
 
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50/80 px-3 py-1 text-xs font-medium text-amber-700">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50/80 px-3 py-1 text-xs font-medium text-amber-700 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200">
                 <span>🪙</span>
                 <span>아이디어 열람 시 코인 1개가 차감됩니다</span>
               </span>
@@ -420,7 +420,7 @@ export default function InspirationWellPage() {
                   setSearchQuery("");
                   setSelectedCategory("전체");
                 }}
-                className="text-xs text-slate-400 transition hover:text-slate-600"
+                className="text-xs text-slate-400 transition hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
               >
                 필터 초기화
               </button>
@@ -439,7 +439,7 @@ export default function InspirationWellPage() {
                 className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                   collectionFilter === filter.value
                     ? "border-emerald-600 bg-emerald-600 text-white shadow-sm shadow-emerald-100"
-                    : "border-emerald-100 bg-white/80 text-slate-500 hover:border-emerald-300 hover:text-emerald-700"
+                    : "border-emerald-100 bg-white/80 text-slate-500 hover:border-emerald-300 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:border-emerald-500 dark:hover:text-emerald-300"
                 }`}
               >
                 {filter.label} {filter.count}
@@ -538,6 +538,15 @@ export default function InspirationWellPage() {
         .card-fadeup {
           animation: fadeUp 0.4s ease both;
         }
+
+        .dark .idea-yard-bg {
+          background: radial-gradient(
+            ellipse 80% 60% at 50% 110%,
+            rgba(16, 185, 129, 0.2) 0%,
+            rgba(15, 23, 42, 0.78) 44%,
+            #020617 100%
+          ) !important;
+        }
       `}</style>
     </div>
   );
@@ -547,7 +556,7 @@ function GardenGround() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute bottom-0 left-0 right-0 z-0 overflow-hidden"
+      className="pointer-events-none absolute bottom-0 left-0 right-0 z-0 overflow-hidden dark:opacity-30"
       style={{ height: "260px" }}
     >
       <svg
@@ -626,7 +635,7 @@ function LoadingGarden() {
         ))}
       </div>
 
-      <p className="text-sm text-slate-400">뜰에서 아이디어 씨앗을 살펴보는 중...</p>
+      <p className="text-sm text-slate-400 dark:text-slate-500">뜰에서 아이디어 씨앗을 살펴보는 중...</p>
     </div>
   );
 }
@@ -635,8 +644,8 @@ function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
       <div className="mb-4 text-5xl opacity-60">🌱</div>
-      <p className="text-sm font-medium text-slate-500">뜰이 비어있어요</p>
-      <p className="mt-1 text-xs text-slate-400">
+      <p className="text-sm font-medium text-slate-500 dark:text-slate-300">뜰이 비어있어요</p>
+      <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
         아직 버려진 아이디어가 없습니다.
       </p>
     </div>
@@ -659,7 +668,7 @@ function IdeaCard({
   return (
     <article
       onClick={onClick}
-      className="card-fadeup group relative flex w-full cursor-pointer flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white/80 p-5 text-left shadow-sm backdrop-blur-sm transition-all hover:-translate-y-1 hover:border-emerald-300 hover:shadow-lg hover:shadow-emerald-100/60"
+      className="card-fadeup group relative flex w-full cursor-pointer flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white/80 p-5 text-left shadow-sm backdrop-blur-sm transition-all hover:-translate-y-1 hover:border-emerald-300 hover:shadow-lg hover:shadow-emerald-100/60 dark:border-slate-700 dark:bg-slate-900/90 dark:hover:border-emerald-500 dark:hover:shadow-emerald-950/40"
       style={{ animationDelay: `${index * 0.05}s` }}
     >
       <div
@@ -671,18 +680,18 @@ function IdeaCard({
       />
 
       <div className="mb-3 flex items-center justify-between">
-        <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700">
+        <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/50 dark:text-emerald-200">
           {idea.domain || "기타"}
         </span>
 
         <SeedMark />
       </div>
 
-      <h3 className="mb-2 line-clamp-2 text-sm font-bold leading-snug text-slate-800">
+      <h3 className="mb-2 line-clamp-2 text-sm font-bold leading-snug text-slate-800 dark:text-slate-50">
         {idea.title}
       </h3>
 
-      <p className="mb-3 line-clamp-2 text-xs leading-relaxed text-slate-500">
+      <p className="mb-3 line-clamp-2 text-xs leading-relaxed text-slate-500 dark:text-slate-300">
         {idea.summary}
       </p>
 
@@ -691,7 +700,7 @@ function IdeaCard({
           {idea.hashtags.slice(0, 4).map((tag) => (
             <span
               key={tag}
-              className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500"
+              className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-300"
             >
               #{tag}
             </span>
@@ -699,7 +708,7 @@ function IdeaCard({
         </div>
       )}
 
-      <div className="mt-auto flex items-center justify-between gap-3 border-t border-emerald-50 pt-3">
+      <div className="mt-auto flex items-center justify-between gap-3 border-t border-emerald-50 pt-3 dark:border-slate-700">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -709,8 +718,8 @@ function IdeaCard({
             }}
             className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
               idea.is_liked
-                ? "border-rose-200 bg-rose-50 text-rose-600"
-                : "border-slate-100 bg-white text-slate-400 hover:border-rose-200 hover:text-rose-500"
+                ? "border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-700/70 dark:bg-rose-950/50 dark:text-rose-200"
+                : "border-slate-100 bg-white text-slate-400 hover:border-rose-200 hover:text-rose-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400 dark:hover:border-rose-700 dark:hover:text-rose-300"
             }`}
             aria-label={idea.is_liked ? "좋아요 취소" : "좋아요"}
           >
@@ -724,8 +733,8 @@ function IdeaCard({
             }}
             className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
               idea.is_bookmarked
-                ? "border-amber-200 bg-amber-50 text-amber-600"
-                : "border-slate-100 bg-white text-slate-400 hover:border-amber-200 hover:text-amber-500"
+                ? "border-amber-200 bg-amber-50 text-amber-600 dark:border-amber-700/70 dark:bg-amber-950/50 dark:text-amber-200"
+                : "border-slate-100 bg-white text-slate-400 hover:border-amber-200 hover:text-amber-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400 dark:hover:border-amber-700 dark:hover:text-amber-300"
             }`}
             aria-label={idea.is_bookmarked ? "북마크 해제" : "북마크"}
           >
@@ -829,54 +838,54 @@ function CoinModal({
         onClick={onCancel}
       />
 
-      <div className="relative w-full max-w-sm rounded-3xl border border-emerald-100 bg-white p-7 shadow-2xl shadow-emerald-200/40">
+      <div className="relative w-full max-w-sm rounded-3xl border border-emerald-100 bg-white p-7 shadow-2xl shadow-emerald-200/40 dark:border-emerald-800/60 dark:bg-slate-900 dark:shadow-slate-950/60">
         <div className="mx-auto mb-4 h-14 w-14">
           <SeedIcon />
         </div>
 
-        <h2 className="mb-1 text-center text-base font-bold text-slate-800">
+        <h2 className="mb-1 text-center text-base font-bold text-slate-800 dark:text-slate-50">
           아이디어를 열람할까요?
         </h2>
 
-        <p className="mb-1 line-clamp-1 text-center text-sm font-semibold text-slate-700">
+        <p className="mb-1 line-clamp-1 text-center text-sm font-semibold text-slate-700 dark:text-slate-200">
           &ldquo;{idea.title}&rdquo;
         </p>
 
-        <p className="mb-5 text-center text-xs text-slate-400">
+        <p className="mb-5 text-center text-xs text-slate-400 dark:text-slate-400">
           이 아이디어를 열람하면{" "}
           <span className="font-semibold text-amber-600">코인 {coinCost}개</span>가
           차감됩니다.
         </p>
 
-        <div className="mb-5 grid grid-cols-3 overflow-hidden rounded-2xl border border-amber-100 bg-amber-50 text-center">
+        <div className="mb-5 grid grid-cols-3 overflow-hidden rounded-2xl border border-amber-100 bg-amber-50 text-center dark:border-amber-800/70 dark:bg-amber-950/40">
           <div className="px-3 py-3">
-            <p className="text-[11px] font-semibold text-amber-700/70">
+            <p className="text-[11px] font-semibold text-amber-700/70 dark:text-amber-200/70">
               현재 잔액
             </p>
-            <p className="mt-1 text-base font-black text-amber-800">
+            <p className="mt-1 text-base font-black text-amber-800 dark:text-amber-100">
               {coinBalance === null ? "-" : coinBalance.toLocaleString("ko-KR")}
             </p>
           </div>
-          <div className="border-x border-amber-100 bg-white/70 px-3 py-3">
-            <p className="text-[11px] font-semibold text-amber-700/70">
+          <div className="border-x border-amber-100 bg-white/70 px-3 py-3 dark:border-amber-800/70 dark:bg-slate-900/55">
+            <p className="text-[11px] font-semibold text-amber-700/70 dark:text-amber-200/70">
               사용량
             </p>
-            <p className="mt-1 text-base font-black text-red-600">
+            <p className="mt-1 text-base font-black text-red-600 dark:text-red-300">
               -{coinCost.toLocaleString("ko-KR")}
             </p>
           </div>
           <div className="px-3 py-3">
-            <p className="text-[11px] font-semibold text-amber-700/70">
+            <p className="text-[11px] font-semibold text-amber-700/70 dark:text-amber-200/70">
               사용 후
             </p>
-            <p className={`mt-1 text-base font-black ${isInsufficient ? "text-red-600" : "text-amber-800"}`}>
+            <p className={`mt-1 text-base font-black ${isInsufficient ? "text-red-600 dark:text-red-300" : "text-amber-800 dark:text-amber-100"}`}>
               {remainingBalance === null ? "-" : remainingBalance.toLocaleString("ko-KR")}
             </p>
           </div>
         </div>
 
         {isInsufficient ? (
-          <p className="mb-4 rounded-2xl border border-red-100 bg-red-50 px-3 py-2 text-center text-xs font-semibold text-red-700">
+          <p className="mb-4 rounded-2xl border border-red-100 bg-red-50 px-3 py-2 text-center text-xs font-semibold text-red-700 dark:border-red-800/70 dark:bg-red-950/50 dark:text-red-200">
             코인이 부족합니다. 코인을 충전한 뒤 다시 열람해주세요.
           </p>
         ) : null}
@@ -885,7 +894,7 @@ function CoinModal({
           <button
             onClick={onCancel}
             disabled={isLoading}
-            className="flex-1 rounded-2xl border border-slate-200 py-3 text-sm font-medium text-slate-500 transition hover:bg-slate-50"
+            className="flex-1 rounded-2xl border border-slate-200 py-3 text-sm font-medium text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             취소
           </button>
