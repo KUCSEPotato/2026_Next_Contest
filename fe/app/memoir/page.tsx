@@ -1002,11 +1002,11 @@ function MemoirContent() {
         {/* 1. 할 일 달성 */}
         <Section emoji="✅" label="할 일 달성" headline={<>우리팀은 {todoDone}개를 달성했고<br />나는 그중 {myTodoDone}개를 해냈어요</>}>
           <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 14 }}>
-            <div style={{ border: "1px solid #f0cccc", borderRadius: 14, background: "#fdf4f4", padding: 16, minHeight: 286 }}>
+            <div style={{ border: "1px solid #f0cccc", borderRadius: 14, background: "#fdf4f4", padding: 14, minHeight: 250 }}>
               <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 800, color: "#a83030" }}>
                 우리팀이 달성한 일
               </p>
-              <div style={{ display: "flex", alignItems: "center", gap: 14, minHeight: 170 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14, minHeight: 140 }}>
                 <ProgressBloom progress={todoPercent} size="sm" />
                 <p style={{ fontSize: 38, fontWeight: 900, color: "#9b1c1c", lineHeight: 1, margin: 0 }}>
                   {todoDone}
@@ -1023,11 +1023,11 @@ function MemoirContent() {
             </div>
 
             <div style={{ display: "grid", gap: 14 }}>
-              <div style={{ border: "1px solid #e2e8f0", borderRadius: 14, background: "#fff", padding: 16 }}>
+              <div style={{ border: "1px solid #e2e8f0", borderRadius: 14, background: "#fff", padding: 14 }}>
                 <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 800, color: "#475569" }}>
                   내가 달성한 일
                 </p>
-                <p style={{ fontSize: 32, fontWeight: 900, color: "#0f172a", lineHeight: 1, margin: 0 }}>
+                <p style={{ fontSize: 30, fontWeight: 900, color: "#0f172a", lineHeight: 1, margin: 0 }}>
                   {myTodoDone}
                   <span style={{ fontSize: 14, color: "#64748b", marginLeft: 4 }}>개 체크</span>
                 </p>
@@ -1040,11 +1040,11 @@ function MemoirContent() {
                 </div>
               </div>
 
-              <div style={{ border: "1px solid #dbeafe", borderRadius: 14, background: "#f8fbff", padding: 16 }}>
+              <div style={{ border: "1px solid #dbeafe", borderRadius: 14, background: "#f8fbff", padding: 14 }}>
                 <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 800, color: "#1e40af" }}>
                   나의 기여도
                 </p>
-                <p style={{ fontSize: 32, fontWeight: 900, color: "#1e3a8a", lineHeight: 1, margin: 0 }}>
+                <p style={{ fontSize: 30, fontWeight: 900, color: "#1e3a8a", lineHeight: 1, margin: 0 }}>
                   {myContributionPercent}
                   <span style={{ fontSize: 14, color: "#64748b", marginLeft: 4 }}>%</span>
                 </p>
