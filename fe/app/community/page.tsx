@@ -223,7 +223,7 @@ export default function CommunityPage() {
   };
 
   return (
-    <div className="min-h-screen bg-orange-50/30 text-gray-900" style={{ colorScheme: "light" }}>
+    <div className="min-h-screen bg-orange-50/30 text-gray-900">
       <header className="mx-auto flex max-w-6xl items-center justify-end gap-3 px-4 py-4">
         <button
           onClick={() => router.push("/notifications")}
