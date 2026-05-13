@@ -111,6 +111,16 @@ function getIdeaViewText(product) {
   return "물방울 별도 사용";
 }
 
+function getProjectBoostText(product) {
+  if (product?.benefits?.project_boost_total_limit) {
+    return `기간 내 ${product.benefits.project_boost_total_limit}회`;
+  }
+  if (product?.product_code === "PLUS_MONTHLY") {
+    return "없음";
+  }
+  return null;
+}
+
 function PlanCard({ eyebrow, product, isCurrent, onError, onManualPurchase, manualLoading, children }) {
   return (
     <article
@@ -143,9 +153,7 @@ function PlanCard({ eyebrow, product, isCurrent, onError, onManualPurchase, manu
         {product.benefits?.project_apply_priority && (
           <li>지원자 노출: 지원자 목록 상단 노출</li>
         )}
-        {product.benefits?.project_boost_total_limit ? (
-          <li>프로젝트 상단 노출: 기간 내 {product.benefits.project_boost_total_limit}회</li>
-        ) : null}
+        {getProjectBoostText(product) ? <li>프로젝트 상단 노출: {getProjectBoostText(product)}</li> : null}
         <li>
           자유게시판:{" "}
           {product.benefits?.community_write_unlimited
