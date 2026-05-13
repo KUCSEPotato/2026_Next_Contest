@@ -15,6 +15,7 @@ interface Project {
   summary?: string;
   category: string;
   techStack: string[];
+  interests: string[];
   hashtags: string[];
   currentMembers: number;
   maxMembers: number;
@@ -38,6 +39,7 @@ interface ApiProject {
   category?: string;
   tech_stack?: string[];
   techStack?: string[];
+  interests?: string[];
   hashtags?: string[];
   hashTags?: string[];
   hash_tags?: string[];
@@ -168,6 +170,7 @@ function normalizeProject(project: ApiProject): Project {
     summary: project.summary,
     category: project.category || "IT/소프트웨어",
     techStack: project.techStack || project.tech_stack || [],
+    interests: project.interests || [],
     hashtags: project.hashtags || project.hashTags || project.hash_tags || project.tags || [],
     currentMembers: project.currentMembers ?? project.current_members ?? 0,
     maxMembers: project.maxMembers ?? project.max_members ?? 0,
@@ -955,7 +958,7 @@ function ProjectCard({
 
       <div className="mb-3 flex flex-wrap gap-1">
         {project.techStack.length ? (
-          project.techStack.map((t) => (
+          project.techStack.slice(0, 4).map((t) => (
             <span
               key={t}
               className="rounded-md bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500 dark:bg-slate-800 dark:text-slate-300"
@@ -969,6 +972,19 @@ function ProjectCard({
           </span>
         )}
       </div>
+
+      {project.interests.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-1">
+          {project.interests.slice(0, 4).map((interest) => (
+            <span
+              key={interest}
+              className="rounded-md bg-rose-50 px-2 py-0.5 text-[10px] font-medium text-rose-600 dark:bg-rose-500/10 dark:text-rose-200"
+            >
+              {interest}
+            </span>
+          ))}
+        </div>
+      )}
 
       {project.hashtags.length > 0 && (
         <div className="mb-3 flex flex-wrap gap-1">
