@@ -23,6 +23,7 @@ export default function UserProfilePage() {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showReviews, setShowReviews] = useState(false);
+  const [projectRoleFilter, setProjectRoleFilter] = useState("all");
 
   useEffect(() => {
     async function loadUserProfile() {
@@ -92,6 +93,12 @@ export default function UserProfilePage() {
       </main>
     );
   }
+
+  const visibleProjects = getVisibleProjects(
+    projects,
+    projectRoleFilter,
+    profile?.id ?? userId
+  );
 
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
@@ -250,11 +257,23 @@ export default function UserProfilePage() {
         </div>
 
         <section className="rounded-2xl bg-white p-6 shadow">
-          <h2 className="mb-4 text-xl font-bold">프로젝트 이력</h2>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-xl font-bold">프로젝트 이력</h2>
+
+            <select
+              value={projectRoleFilter}
+              onChange={(e) => setProjectRoleFilter(e.target.value)}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 outline-none transition focus:border-red-500"
+            >
+              <option value="all">전체 역할</option>
+              <option value="leader">리더 프로젝트</option>
+              <option value="member">팀원으로 참여</option>
+            </select>
+          </div>
 
           <div className="space-y-3">
-            {projects.length ? (
-              projects.map((project) => (
+            {visibleProjects.length ? (
+              visibleProjects.map((project) => (
                 <button
                   key={project.id}
                   onClick={() => router.push(`/projects/${project.id}`)}
@@ -274,11 +293,17 @@ export default function UserProfilePage() {
                     <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-600">
                       {project.status || "상태 없음"}
                     </span>
+
+                    {isProjectLeader(project, profile?.id ?? userId) && (
+                      <span className="rounded-full bg-red-600 px-3 py-1 text-sm font-semibold text-white">
+                        리더
+                      </span>
+                    )}
                   </div>
                 </button>
               ))
             ) : (
-              <p className="text-sm text-slate-500">프로젝트 없음</p>
+              <p className="text-sm text-slate-500">조건에 맞는 프로젝트가 없습니다.</p>
             )}
           </div>
         </section>
@@ -354,6 +379,41 @@ function normalizeRating(value) {
 
 function formatRating(value) {
   return normalizeRating(value).toFixed(1);
+}
+
+function getProjectLeaderId(project) {
+  return (
+    project?.leader_id ??
+    project?.leaderId ??
+    project?.leader?.id ??
+    project?.owner_id ??
+    project?.owner?.id ??
+    project?.created_by ??
+    project?.creator_id
+  );
+}
+
+function isProjectLeader(project, userId) {
+  const leaderId = Number(getProjectLeaderId(project));
+  const currentUserId = Number(userId);
+
+  if (Number.isFinite(leaderId) && Number.isFinite(currentUserId)) {
+    return leaderId === currentUserId;
+  }
+
+  return (
+    project?.is_leader === true ||
+    project?.isLeader === true ||
+    project?.role_in_project === "leader"
+  );
+}
+
+function getVisibleProjects(projects, roleFilter, userId) {
+  return projects.filter((project) => {
+    if (roleFilter === "leader") return isProjectLeader(project, userId);
+    if (roleFilter === "member") return !isProjectLeader(project, userId);
+    return true;
+  });
 }
 
 function getReviewMessage(review) {
