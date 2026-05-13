@@ -199,6 +199,19 @@ def _link_github_profile_to_user(user: User, profile: dict) -> None:
     user.is_verified = True
 
 
+def _can_release_duplicate_github_account(user: User) -> bool:
+    return bool(user.github_id and not user.google_id and not user.password_hash and user.role != "admin")
+
+
+def _release_duplicate_github_account(user: User) -> None:
+    suffix = f"merged_github_{user.id}_{int(datetime.now(timezone.utc).timestamp())}"
+    user.email = f"{suffix}@deleted.local"
+    user.nickname = suffix[:50]
+    user.github_id = None
+    user.is_active = False
+    user.deleted_at = datetime.now(timezone.utc)
+
+
 @router.post("/signup", summary="회원가입", description="이메일/아이디/이름/전화번호/비밀번호로 계정을 생성합니다.")
 async def signup(payload: SignupRequest, db: Session = Depends(get_db)) -> dict:
     """회원가입 API.
@@ -415,8 +428,10 @@ async def confirm_existing_github_link(
 
     existing = db.query(User).filter(User.github_id == github_id, User.id != user.id, User.deleted_at.is_(None)).first()
     if existing:
-        delete_oauth_link_token(payload.link_token)
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="GitHub account already linked to another user")
+        if not _can_release_duplicate_github_account(existing):
+            delete_oauth_link_token(payload.link_token)
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="GitHub account already linked to another user")
+        _release_duplicate_github_account(existing)
 
     if user.github_id and user.github_id != github_id:
         delete_oauth_link_token(payload.link_token)
@@ -498,16 +513,17 @@ async def github_oauth_callback(
                 user.avatar_url = avatar_url
             user.is_verified = True
             db.commit()
+            db.refresh(user)
 
             tokens = _create_auth_tokens(user.id)
-            access_token_value = tokens["access_token"]
             query = urlencode({
-                "step": "profile",
+                "access_token": tokens["access_token"],
+                "refresh_token": tokens["refresh_token"],
                 "via": "github",
-                "access_token": access_token_value,
                 "user_id": user.id,
+                "is_new_user": "0",
             })
-            redirect_url = f"{frontend_url}/signup?{query}"
+            redirect_url = f"{frontend_url}/auth/github/callback?{query}"
             return RedirectResponse(url=redirect_url, status_code=302)
 
         withdrawn_email_user = db.query(User).filter(User.email == email, User.deleted_at.is_not(None)).first()
@@ -551,16 +567,16 @@ async def github_oauth_callback(
         
         # 토큰 발급
         tokens = _create_auth_tokens(user.id)
-        access_token_value = tokens["access_token"]
         
         # 프론트엔드로 리다이렉트 (URL encoding 적용)
         query = urlencode({
-            "step": "2",
+            "access_token": tokens["access_token"],
+            "refresh_token": tokens["refresh_token"],
             "via": "github",
-            "access_token": access_token_value,
             "user_id": user.id,
+            "is_new_user": "1",
         })
-        redirect_url = f"{frontend_url}/signup?{query}"
+        redirect_url = f"{frontend_url}/auth/github/callback?{query}"
         
         return RedirectResponse(url=redirect_url, status_code=302)
     
@@ -671,8 +687,6 @@ async def link_github_oauth(
     github_id = profile.get("provider_id")
     email = profile["email"]
 
-    if email.lower() != user.email.lower():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OAuth account email must match your account email")
     if not github_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid GitHub account id")
 
@@ -681,7 +695,9 @@ async def link_github_oauth(
 
     existing = db.query(User).filter(User.github_id == github_id, User.id != user.id, User.deleted_at.is_(None)).first()
     if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="GitHub account already linked to another user")
+        if not _can_release_duplicate_github_account(existing):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="GitHub account already linked to another user")
+        _release_duplicate_github_account(existing)
 
     user.github_id = github_id
     if not user.avatar_url and profile.get("avatar_url"):
