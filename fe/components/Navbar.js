@@ -8,6 +8,7 @@ import {
   getStoredUser,
   getToken,
   loadCurrentUser,
+  logoutSession,
   refreshAccessToken,
   removeToken,
   updateStoredUser,
@@ -140,8 +141,8 @@ export default function Navbar() {
     return null;
   }
 
-  const handleLogout = () => {
-    removeToken();
+  const handleLogout = async () => {
+    await logoutSession({ reason: "logout" });
     setToken(null);
     setUser(null);
     setAuthStatus("anonymous");
