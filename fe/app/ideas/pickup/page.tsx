@@ -409,9 +409,11 @@ export default function InspirationWellPage() {
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">
-                {searchQuery || selectedCategory !== "전체"
+                {searchQuery
                   ? `검색 결과 (${filtered.length})`
-                  : `${filtered.length}개의 아이디어가 잠들어 있어요`}
+                  : selectedCategory === "전체"
+                    ? `${filtered.length}개의 아이디어가 잠들어 있어요`
+                    : `${selectedCategory} 분야에는 ${filtered.length}개의 아이디어가 잠들어 있어요`}
               </p>
 
               <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50/80 px-3 py-1 text-xs font-medium text-amber-700 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200">

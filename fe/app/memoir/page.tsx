@@ -1196,7 +1196,7 @@ function MemoirContent() {
             {ordinalKo(harvestCount)} 수확을 축하해요!
           </p>
           <p style={{ fontSize: 13, opacity: 0.85, lineHeight: 1.8, margin: 0 }}>
-            씨앗을 심고 꾸준히 가꾼 당신,<br />이 텃밭일지는 영원히 남아있을 거예요.
+            씨앗을 심고 꾸준히 가꾼 당신,<br />이 개발일지는 영원히 남아있을 거예요.
           </p>
         </div>
 
