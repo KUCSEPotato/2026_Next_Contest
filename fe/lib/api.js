@@ -355,6 +355,18 @@ export async function applyProjectApi(projectId, message) {
   return handleResponse(res, "프로젝트 지원에 실패했습니다.");
 }
 
+export async function boostProjectApi(projectId) {
+  const res = await authenticatedFetch(
+    `${API_BASE_URL}/api/v1/projects/${projectId}/boost`,
+    {
+      method: "POST",
+      headers: authHeaders(),
+    }
+  );
+
+  return handleResponse(res, "프로젝트 상단 노출에 실패했습니다.");
+}
+
 export async function getProjectApplicationsApi(projectId) {
   const res = await authenticatedFetch(
     `${API_BASE_URL}/api/v1/projects/${projectId}/applications`,
@@ -969,6 +981,22 @@ export async function getMyCoinPurchaseRequestsApi() {
   });
 
   return handleResponse(res, "물방울 구매 요청 목록을 불러오지 못했습니다.");
+}
+
+export async function getPaymentProductsApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/payments/products`, {
+    cache: "no-store",
+  });
+
+  return handleResponse(res, "결제 상품 목록을 불러오지 못했습니다.");
+}
+
+export async function getMyEntitlementApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/payments/me/entitlement`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "이용권 정보를 불러오지 못했습니다.");
 }
 
 export async function preparePaymentApi(payload) {

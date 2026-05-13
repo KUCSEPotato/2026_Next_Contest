@@ -7,6 +7,7 @@ import {
   getCoinPackagesApi,
   getMyCoinBalanceApi,
   getMyCoinPurchaseRequestsApi,
+  getPaymentProductsApi,
 } from "../../lib/api";
 import { getToken } from "../../lib/auth";
 import { useDialog, useToast } from "../../components/AppFeedback";
@@ -109,6 +110,7 @@ export default function CoinsPage() {
   const { confirm, prompt } = useDialog();
   const [balance, setBalance] = useState(0);
   const [packages, setPackages] = useState([]);
+  const [paymentProducts, setPaymentProducts] = useState([]);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingPackage, setProcessingPackage] = useState("");
@@ -120,14 +122,16 @@ export default function CoinsPage() {
   const loadCoins = useCallback(async () => {
     try {
       setLoading(true);
-      const [balanceResult, packagesResult, requestsResult] = await Promise.all([
+      const [balanceResult, packagesResult, requestsResult, paymentProductsResult] = await Promise.all([
         getMyCoinBalanceApi(),
         getCoinPackagesApi(),
         getMyCoinPurchaseRequestsApi(),
+        getPaymentProductsApi(),
       ]);
       setBalance(balanceResult.data?.waterdrop_balance ?? balanceResult.data?.coin_balance ?? 0);
       setPackages(packagesResult.data || []);
       setRequests(requestsResult.data || []);
+      setPaymentProducts(paymentProductsResult.data || []);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "물방울 정보를 불러오지 못했습니다.");
     } finally {
@@ -187,7 +191,7 @@ export default function CoinsPage() {
             <div>
               <h1 className="text-3xl font-black text-slate-950">물방울 구매</h1>
               <p className="mt-2 text-sm text-slate-600">
-                PG 연동 전까지는 구매 요청을 남기면 관리자가 결제 확인 후 물방울을 지급합니다.
+                이용권은 카드 결제로 바로 활성화되고, 물방울은 수동 구매 요청으로 충전할 수 있습니다.
               </p>
             </div>
             <div className="flex items-center gap-5">
@@ -214,6 +218,70 @@ export default function CoinsPage() {
               </div>
             ) : null}
 
+            <section className="mb-8">
+              <div className="mb-4">
+                <h2 className="text-xl font-black text-slate-950">이용권</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  구독제는 30일 이용권으로 먼저 제공되며, 기간권은 자동 갱신되지 않습니다.
+                </p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                {paymentProducts.map((product) => (
+                  <article
+                    key={product.product_code}
+                    className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-red-200 hover:shadow-md"
+                  >
+                    <p className="text-sm font-bold text-red-600">
+                      {product.product_type === "SUBSCRIPTION" ? "월 구독" : "기간권"}
+                    </p>
+                    <h3 className="mt-2 text-2xl font-black text-slate-950">{product.name}</h3>
+                    <p className="mt-1 text-lg font-bold text-slate-800">
+                      {formatKrw(product.price_krw)}
+                    </p>
+                    <p className="mt-2 text-sm text-slate-500">
+                      {product.duration_days}일 동안 활성화
+                    </p>
+                    <ul className="mt-4 space-y-1 text-sm text-slate-600">
+                      <li>
+                        프로젝트 생성:{" "}
+                        {product.benefits?.project_create_daily_limit
+                          ? `일 ${product.benefits.project_create_daily_limit}회`
+                          : product.benefits?.project_create_total_limit
+                          ? `총 ${product.benefits.project_create_total_limit}회`
+                          : "불가"}
+                      </li>
+                      <li>
+                        프로젝트 지원:{" "}
+                        {product.benefits?.project_apply_unlimited
+                          ? "무제한"
+                          : product.benefits?.project_apply_total_limit
+                          ? `총 ${product.benefits.project_apply_total_limit}회`
+                          : "제한"}
+                      </li>
+                      <li>
+                        자유게시판: {product.benefits?.community_write_unlimited ? "무제한" : "일 제한"}
+                      </li>
+                    </ul>
+                    <TossPaymentButton
+                      productId={product.product_code}
+                      productCode={product.product_code}
+                      label="카드 결제"
+                      onError={(err) =>
+                        toast.error(err instanceof Error ? err.message : "결제를 시작하지 못했습니다.")
+                      }
+                      className="mt-5 w-full rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    />
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <div className="mb-4">
+              <h2 className="text-xl font-black text-slate-950">물방울 수동 충전</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                FREE/PASS 사용자의 아이디어 열람 등에 사용할 물방울입니다.
+              </p>
+            </div>
             <section className="grid gap-4 md:grid-cols-3">
               {packages.map((packageItem) => (
                 <article
@@ -232,19 +300,11 @@ export default function CoinsPage() {
                   <p className="mt-1 text-lg font-bold text-red-600">
                     {formatKrw(packageItem.price_krw)}
                   </p>
-                  <TossPaymentButton
-                    productId={packageItem.id}
-                    label="카드 결제"
-                    onError={(err) =>
-                      toast.error(err instanceof Error ? err.message : "결제를 시작하지 못했습니다.")
-                    }
-                    className="mt-5 w-full rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                  />
                   <button
                     type="button"
                     onClick={() => handleRequestPurchase(packageItem)}
                     disabled={processingPackage === packageItem.id}
-                    className="mt-3 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                    className="mt-5 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                   >
                     {processingPackage === packageItem.id ? "요청 중" : "수동 구매 요청"}
                   </button>

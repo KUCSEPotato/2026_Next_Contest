@@ -57,6 +57,7 @@ const HOT_SECTIONS: HotSection[] = [
 ];
 
 const ADMIN_ONLY_CATEGORIES = new Set(["announcement", "event"]);
+const POSTS_PER_PAGE = 5;
 
 function isCampfirePost(post: PostSummary | null) {
   return Boolean(post && !ADMIN_ONLY_CATEGORIES.has(post.category || ""));
@@ -138,7 +139,12 @@ export default function CommunityPage() {
     setLoading(true);
     setLoadError("");
     try {
-      const res = await getPosts({ category: selectedCategory, page, page_size: 20 });
+      const res = await getPosts({
+        category: selectedCategory,
+        page,
+        page_size: POSTS_PER_PAGE,
+        exclude_admin_categories: !selectedCategory,
+      });
       setPosts((res.posts || []).filter(isCampfirePost));
       setTotalPages(res.total_pages);
     } catch (e) {
@@ -228,10 +234,14 @@ export default function CommunityPage() {
   };
 
   return (
-    <div className="min-h-screen bg-orange-50/30 text-gray-900">
-      <TopActionButtons />
+    <div className="relative min-h-screen overflow-hidden bg-[#fff7ed] text-gray-900 dark:bg-slate-950 dark:text-slate-100">
+      <CampfireGround />
 
-      <main className="mx-auto max-w-6xl px-4 pb-16">
+      <div className="relative z-10">
+        <TopActionButtons />
+      </div>
+
+      <main className="relative z-10 mx-auto max-w-6xl px-4 pb-16">
         <section className="pb-10 pt-6 text-center">
           <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center">
             <CampfireHeroIcon />
@@ -452,6 +462,67 @@ export default function CommunityPage() {
           onLogin={() => router.push("/login")}
         />
       )}
+    </div>
+  );
+}
+
+function CampfireGround() {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute bottom-0 left-0 right-0 z-0 overflow-hidden dark:opacity-35"
+      style={{ height: "260px" }}
+    >
+      <div
+        className="absolute inset-x-0 bottom-0 h-full campfire-ground-glow"
+        style={{
+          background:
+            "radial-gradient(ellipse 78% 58% at 50% 112%, rgba(239, 68, 68, 0.24) 0%, rgba(251, 146, 60, 0.18) 42%, rgba(255, 247, 237, 0) 74%)",
+        }}
+      />
+      <svg
+        viewBox="0 0 1440 120"
+        className="absolute bottom-12 w-[200%]"
+        style={{ animation: "campfireGroundDrift 16s linear infinite" }}
+        preserveAspectRatio="none"
+      >
+        <path
+          d="M0,72 C240,42 480,96 720,66 C960,36 1200,92 1440,58 L1440,120 L0,120 Z"
+          fill="rgba(248,113,113,0.24)"
+        />
+      </svg>
+
+      <svg
+        viewBox="0 0 1440 120"
+        className="absolute bottom-0 w-[200%]"
+        style={{ animation: "campfireGroundDrift 11s linear infinite reverse" }}
+        preserveAspectRatio="none"
+      >
+        <path
+          d="M0,52 C300,88 620,24 960,58 C1180,82 1320,40 1440,52 L1440,120 L0,120 Z"
+          fill="rgba(220,38,38,0.32)"
+        />
+      </svg>
+
+      <style jsx>{`
+        @keyframes campfireGroundDrift {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(-50%);
+          }
+        }
+
+        :global(.dark) .campfire-ground-glow {
+          background: radial-gradient(
+            ellipse 78% 58% at 50% 112%,
+            rgba(239, 68, 68, 0.24) 0%,
+            rgba(154, 52, 18, 0.14) 42%,
+            rgba(2, 6, 23, 0) 74%
+          ) !important;
+        }
+      `}</style>
     </div>
   );
 }

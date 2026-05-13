@@ -110,6 +110,8 @@ const SORT_OPTIONS = [
   { value: "competition", label: "경쟁률순" },
 ];
 
+const PROJECTS_PER_PAGE = 12;
+
 const SERVICE_BLOCKS = [
   {
     title: "개발의 땅",
@@ -211,6 +213,7 @@ export default function MainPage() {
   const [sortBy, setSortBy] = useState("latest");
   const [recommendedProjectIds, setRecommendedProjectIds] = useState<number[]>([]);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     async function loadProjects() {
@@ -377,11 +380,25 @@ export default function MainPage() {
     memberMax ||
     sortBy !== "latest";
 
-  return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-slate-950 dark:text-slate-100">
-      <TopActionButtons />
+  const totalProjectPages = Math.max(
+    1,
+    Math.ceil(filteredProjects.length / PROJECTS_PER_PAGE)
+  );
+  const safeCurrentPage = Math.min(currentPage, totalProjectPages);
+  const paginatedProjects = filteredProjects.slice(
+    (safeCurrentPage - 1) * PROJECTS_PER_PAGE,
+    safeCurrentPage * PROJECTS_PER_PAGE
+  );
 
-      <main className="mx-auto max-w-6xl px-4 pb-16">
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-[#fbf7f1] text-gray-900 dark:bg-slate-950 dark:text-slate-100">
+      <DevelopmentGround />
+
+      <div className="relative z-10">
+        <TopActionButtons />
+      </div>
+
+      <main className="relative z-10 mx-auto max-w-6xl px-4 pb-16">
         <section className="pb-10 pt-6 text-center">
           <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center">
             <SproutHeroIcon />
@@ -462,7 +479,10 @@ export default function MainPage() {
 
           <input
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
             placeholder="프로젝트 제목, 기술 스택, 해시태그를 검색해보세요"
             className="mb-4 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-red-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-red-400/60"
           />
@@ -471,11 +491,12 @@ export default function MainPage() {
             {CATEGORIES.map((cat) => (
               <button
                 key={cat.label}
-                onClick={() =>
+                onClick={() => {
                   setSelectedCategory(
                     selectedCategory === cat.label ? null : cat.label
-                  )
-                }
+                  );
+                  setCurrentPage(1);
+                }}
                 className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
                   selectedCategory === cat.label
                     ? "border-red-600 bg-red-600 text-white dark:border-red-400/50 dark:bg-red-500/15 dark:text-red-200"
@@ -498,11 +519,12 @@ export default function MainPage() {
                 {DIFFICULTY_OPTIONS.map((option) => (
                   <button
                     key={option.value}
-                    onClick={() =>
+                    onClick={() => {
                       setSelectedDifficulty(
                         selectedDifficulty === option.value ? null : option.value
-                      )
-                    }
+                      );
+                      setCurrentPage(1);
+                    }}
                     className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
                       selectedDifficulty === option.value
                         ? "border-red-600 bg-red-600 text-white dark:border-red-400/50 dark:bg-red-500/15 dark:text-red-200"
@@ -524,13 +546,14 @@ export default function MainPage() {
                 {RECRUITMENT_STATUS_OPTIONS.map((option) => (
                   <button
                     key={option.value}
-                    onClick={() =>
+                    onClick={() => {
                       setSelectedRecruitmentStatus(
                         selectedRecruitmentStatus === option.value
                           ? null
                           : option.value
-                      )
-                    }
+                      );
+                      setCurrentPage(1);
+                    }}
                     className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
                       selectedRecruitmentStatus === option.value
                         ? "border-red-600 bg-red-600 text-white dark:border-red-400/50 dark:bg-red-500/15 dark:text-red-200"
@@ -550,7 +573,10 @@ export default function MainPage() {
 
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
+                onChange={(e) => {
+                  setSortBy(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-red-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-red-400/60"
               >
                 {SORT_OPTIONS.map((option) => (
@@ -573,7 +599,10 @@ export default function MainPage() {
                 min="1"
                 max="100"
                 value={memberMin}
-                onChange={(e) => setMemberMin(e.target.value)}
+                onChange={(e) => {
+                  setMemberMin(e.target.value);
+                  setCurrentPage(1);
+                }}
                 placeholder="최소 인원"
                 className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-red-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-red-400/60"
               />
@@ -587,7 +616,10 @@ export default function MainPage() {
                 min="1"
                 max="100"
                 value={memberMax}
-                onChange={(e) => setMemberMax(e.target.value)}
+                onChange={(e) => {
+                  setMemberMax(e.target.value);
+                  setCurrentPage(1);
+                }}
                 placeholder="최대 인원"
                 className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-red-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-red-400/60"
               />
@@ -624,6 +656,7 @@ export default function MainPage() {
                   setMemberMin("");
                   setMemberMax("");
                   setSortBy("latest");
+                  setCurrentPage(1);
                 }}
                 className="text-xs text-gray-400 transition hover:text-gray-600 dark:text-slate-500 dark:hover:text-slate-300"
               >
@@ -652,13 +685,35 @@ export default function MainPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredProjects.map((project) => (
+              {paginatedProjects.map((project) => (
                 <ProjectCard
                   key={project.id}
                   project={project}
                   onClick={() => handleProjectClick(project)}
                 />
               ))}
+            </div>
+          )}
+
+          {filteredProjects.length > PROJECTS_PER_PAGE && (
+            <div className="mt-6 flex items-center justify-center gap-2">
+              <button
+                onClick={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))}
+                disabled={safeCurrentPage === 1}
+                className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-500 transition hover:bg-gray-50 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                이전
+              </button>
+              <span className="text-xs text-gray-500 dark:text-slate-400">
+                {safeCurrentPage} / {totalProjectPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(Math.min(totalProjectPages, safeCurrentPage + 1))}
+                disabled={safeCurrentPage === totalProjectPages}
+                className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-500 transition hover:bg-gray-50 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                다음
+              </button>
             </div>
           )}
         </section>
@@ -670,6 +725,67 @@ export default function MainPage() {
           onLogin={() => router.push("/login")}
         />
       )}
+    </div>
+  );
+}
+
+function DevelopmentGround() {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute bottom-0 left-0 right-0 z-0 overflow-hidden dark:opacity-35"
+      style={{ height: "260px" }}
+    >
+      <div
+        className="absolute inset-x-0 bottom-0 h-full development-ground-glow"
+        style={{
+          background:
+            "radial-gradient(ellipse 80% 58% at 50% 112%, rgba(180, 83, 9, 0.22) 0%, rgba(253, 230, 138, 0.2) 42%, rgba(251, 247, 241, 0) 74%)",
+        }}
+      />
+      <svg
+        viewBox="0 0 1440 120"
+        className="absolute bottom-12 w-[200%]"
+        style={{ animation: "developmentGroundDrift 18s linear infinite" }}
+        preserveAspectRatio="none"
+      >
+        <path
+          d="M0,72 C240,42 480,96 720,66 C960,36 1200,92 1440,58 L1440,120 L0,120 Z"
+          fill="rgba(180,83,9,0.22)"
+        />
+      </svg>
+
+      <svg
+        viewBox="0 0 1440 120"
+        className="absolute bottom-0 w-[200%]"
+        style={{ animation: "developmentGroundDrift 13s linear infinite reverse" }}
+        preserveAspectRatio="none"
+      >
+        <path
+          d="M0,52 C300,88 620,24 960,58 C1180,82 1320,40 1440,52 L1440,120 L0,120 Z"
+          fill="rgba(146,64,14,0.34)"
+        />
+      </svg>
+
+      <style jsx>{`
+        @keyframes developmentGroundDrift {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(-50%);
+          }
+        }
+
+        :global(.dark) .development-ground-glow {
+          background: radial-gradient(
+            ellipse 80% 58% at 50% 112%,
+            rgba(180, 83, 9, 0.2) 0%,
+            rgba(120, 53, 15, 0.14) 42%,
+            rgba(2, 6, 23, 0) 74%
+          ) !important;
+        }
+      `}</style>
     </div>
   );
 }

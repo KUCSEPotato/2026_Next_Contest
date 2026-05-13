@@ -25,7 +25,9 @@ from app.schemas import (
     ReactionRequest,
 )
 from app.services.s3_upload import get_s3_service
-from app.services.economy import spend_coins
+from app.services.entitlement_service import USAGE_COMMUNITY_WRITE
+from app.services.entitlement_service import check_usage_allowed
+from app.services.entitlement_service import record_usage
 
 router = APIRouter()
 
@@ -132,6 +134,8 @@ async def create_post(
         user = db.get(User, current_user_id)
         if user is None or user.role != "admin":
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admin can create announcement or event posts")
+    else:
+        check_usage_allowed(db, current_user_id, USAGE_COMMUNITY_WRITE)
     post = CommunityPost(
         author_id=current_user_id,
         title=payload.title,
@@ -140,15 +144,8 @@ async def create_post(
     )
     db.add(post)
     db.flush()
-    spend_coins(
-        db,
-        user_id=current_user_id,
-        amount=1,
-        event_type="waterdrop.community.post",
-        source_type="community_post",
-        source_id=post.id,
-        note=f"Community post waterdrop for {post.title}",
-    )
+    if payload.category not in ("announcement", "event"):
+        record_usage(db, current_user_id, USAGE_COMMUNITY_WRITE, target_type="community_post", target_id=post.id)
     db.commit()
     db.refresh(post)
 
@@ -180,6 +177,7 @@ async def list_posts(
     page: int = 1,
     page_size: int = 20,
     sort_by: str = "newest",
+    exclude_admin_categories: bool = False,
     db: Session = Depends(get_db),
     authorization: str | None = Header(default=None),
 ) -> dict:
@@ -196,6 +194,8 @@ async def list_posts(
 
     if category:
         query = query.filter(CommunityPost.category == category)
+    elif exclude_admin_categories:
+        query = query.filter(CommunityPost.category.notin_(("announcement", "event")))
 
     # sort_by에 따른 초기 정렬 설정 (핀 된 글은 항상 먼저)
     if sort_by == "views":

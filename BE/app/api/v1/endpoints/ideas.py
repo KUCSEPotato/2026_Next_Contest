@@ -11,6 +11,7 @@ from app.dependencies.auth import get_current_user_id
 from app.dependencies.auth import get_current_user_id_from_token
 from app.models import Idea
 from app.models import IdeaBookmark
+from app.models import CoinTransaction
 from app.models import IdeaFile
 from app.models import IdeaLike
 from app.models import Notification
@@ -18,10 +19,13 @@ from app.models import Project
 from app.models import ProjectMember
 from app.models import ProjectSkill
 from app.models import Skill
+from app.models import UserUsageLog
 from app.schemas import IdeaCreateRequest
 from app.schemas import IdeaUpdateRequest
 from app.schemas import ProjectCreateRequest
 from app.services.economy import spend_coins
+from app.services.entitlement_service import USAGE_IDEA_VIEW
+from app.services.entitlement_service import record_usage
 from app.services.s3_upload import get_s3_service
 
 router = APIRouter()
@@ -301,6 +305,36 @@ async def spend_for_idea_view(
     idea = db.get(Idea, idea_id)
     if idea is None or idea.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Idea not found")
+
+    already_used_entitlement = (
+        db.query(UserUsageLog)
+        .filter(
+            UserUsageLog.user_id == current_user_id,
+            UserUsageLog.usage_type == USAGE_IDEA_VIEW,
+            UserUsageLog.target_type == "idea",
+            UserUsageLog.target_id == idea.id,
+        )
+        .first()
+    )
+    already_spent_coin = (
+        db.query(CoinTransaction)
+        .filter(
+            CoinTransaction.user_id == current_user_id,
+            CoinTransaction.event_type == "waterdrop.idea.view",
+            CoinTransaction.source_type == "idea",
+            CoinTransaction.source_id == idea.id,
+        )
+        .first()
+    )
+    if already_used_entitlement is not None or already_spent_coin is not None:
+        return success_response(data={"idea_id": idea.id, "already_viewed": True})
+
+    try:
+        record_usage(db, current_user_id, USAGE_IDEA_VIEW, target_type="idea", target_id=idea.id)
+        db.commit()
+        return success_response(data={"idea_id": idea.id, "view_method": "entitlement"})
+    except HTTPException:
+        db.rollback()
 
     balance = spend_coins(
         db,

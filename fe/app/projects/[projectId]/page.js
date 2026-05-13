@@ -11,10 +11,10 @@ import {
   revertProjectToIdeaApi,
   getMyApplicationsApi,
   createReportApi,
+  boostProjectApi,
 } from "../../../lib/api";
 import { SKILLS_LIST } from "../../../lib/profileOptions";
 import { useDialog, useToast } from "../../../components/AppFeedback";
-import { confirmWaterdropSpend } from "../../../lib/waterdrops";
 
 const DIFFICULTY_OPTIONS = [
   { value: "beginner", label: "입문" },
@@ -52,7 +52,7 @@ export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
   const toast = useToast();
-  const { prompt, confirmCoinSpend } = useDialog();
+  const { prompt } = useDialog();
   const projectId = params.projectId;
 
   const [project, setProject] = useState(null);
@@ -65,6 +65,7 @@ export default function ProjectDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isBoosting, setIsBoosting] = useState(false);
   const [showDiscardOptions, setShowDiscardOptions] = useState(false);
 
   const [editForm, setEditForm] = useState({
@@ -164,6 +165,8 @@ export default function ProjectDetailPage() {
       ));
   const hasApplied = Boolean(myApplication);
   const acceptedMemberCount = project?.members?.length || 1;
+  const isBoosted =
+    project?.boosted_until && new Date(project.boosted_until).getTime() > Date.now();
 
   const handleEditChange = (field, value) => {
     setEditForm((prev) => ({
@@ -358,13 +361,6 @@ export default function ProjectDetailPage() {
 
     try {
       setIsApplying(true);
-      const canSpend = await confirmWaterdropSpend({
-        confirmCoinSpend,
-        toast,
-        actionLabel: "프로젝트 지원",
-      });
-      if (!canSpend) return;
-
       const result = await applyProjectApi(projectId, message);
       setMyApplication(result.data || { project_id: Number(projectId), status: "pending" });
       alert("프로젝트 지원이 완료되었습니다.");
@@ -380,6 +376,23 @@ export default function ProjectDetailPage() {
       alert("프로젝트 지원에 실패했습니다.");
     } finally {
       setIsApplying(false);
+    }
+  };
+
+  const handleBoostProject = async () => {
+    try {
+      setIsBoosting(true);
+      const result = await boostProjectApi(projectId);
+      setProject((prev) => ({
+        ...prev,
+        boosted_until: result.data?.boosted_until || prev?.boosted_until,
+        boost_score: result.data?.boost_score ?? prev?.boost_score,
+      }));
+      toast.success("프로젝트 상단 노출이 적용되었습니다.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "프로젝트 상단 노출에 실패했습니다.");
+    } finally {
+      setIsBoosting(false);
     }
   };
 
@@ -626,6 +639,16 @@ export default function ProjectDetailPage() {
                     </button>
                   )}
 
+                  {isLeader && !isProjectCompleted && (
+                    <button
+                      onClick={handleBoostProject}
+                      disabled={isBoosting}
+                      className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isBoosting ? "노출 적용 중..." : "상단 노출"}
+                    </button>
+                  )}
+
                   {isProjectMember && isTeamFormed && (
                     <button
                       onClick={() => router.push(`/projects/${projectId}/manage`)}
@@ -653,6 +676,12 @@ export default function ProjectDetailPage() {
                 >
                   프로젝트 신고
                 </button>
+              )}
+
+              {isBoosted && (
+                <p className="mt-3 text-sm font-semibold text-amber-700">
+                  상단 노출 중 · {new Date(project.boosted_until).toLocaleDateString("ko-KR")}까지
+                </p>
               )}
             </>
           )}
