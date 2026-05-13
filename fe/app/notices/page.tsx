@@ -42,6 +42,13 @@ function saveReadNoticeId(noticeId: number) {
   return readIds;
 }
 
+function saveReadNoticeIds(noticeIds: number[]) {
+  const readIds = getReadNoticeIds();
+  noticeIds.forEach((noticeId) => readIds.add(noticeId));
+  localStorage.setItem(NOTICE_READ_IDS_STORAGE_KEY, JSON.stringify([...readIds]));
+  return readIds;
+}
+
 export default function NoticesPage() {
   const router = useRouter();
   const [notices, setNotices] = useState<PostSummary[]>([]);
@@ -105,6 +112,12 @@ export default function NoticesPage() {
     router.push(`/notices/${noticeId}`);
   };
 
+  const unreadCount = notices.filter((notice) => !readNoticeIds.has(notice.id)).length;
+
+  const markAllAsRead = () => {
+    setReadNoticeIds(saveReadNoticeIds(notices.map((notice) => notice.id)));
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <main className="mx-auto max-w-3xl px-4 pb-16 pt-8">
@@ -125,6 +138,19 @@ export default function NoticesPage() {
             <p className="px-5 py-12 text-center text-sm text-gray-400">등록된 공지가 없습니다.</p>
           ) : (
             <div className="space-y-3">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-gray-500">
+                  안 읽은 공지 {unreadCount}개
+                </p>
+                <button
+                  type="button"
+                  onClick={markAllAsRead}
+                  disabled={unreadCount === 0}
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-bold text-gray-600 transition hover:border-red-200 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  일괄 읽음
+                </button>
+              </div>
               {notices.map((notice) => {
                 const isRead = readNoticeIds.has(notice.id);
                 return (
