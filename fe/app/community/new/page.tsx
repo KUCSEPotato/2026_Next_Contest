@@ -133,7 +133,7 @@ export default function NewPostPage() {
   if (!currentUser) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900" style={{ colorScheme: "light" }}>
+    <div className="min-h-screen bg-gray-50 text-gray-900">
       <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
 
         {/* Header */}

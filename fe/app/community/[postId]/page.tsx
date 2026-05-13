@@ -362,7 +362,7 @@ export default function PostDetailPage() {
   const isOwn = currentUser?.id === post.author_id;
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900" style={{ colorScheme: "light" }}>
+    <div className="min-h-screen bg-gray-50 text-gray-900">
       <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
 
         <button

@@ -13,10 +13,10 @@ import {
 const FeedbackContext = createContext(null);
 
 const TOAST_STYLES = {
-  success: "border-red-100 bg-white text-slate-900",
-  error: "border-red-200 bg-red-50 text-red-900",
-  warning: "border-amber-200 bg-amber-50 text-amber-900",
-  info: "border-slate-200 bg-white text-slate-900",
+  success: "border-red-100 bg-white text-slate-900 dark:border-red-900/60 dark:bg-slate-900 dark:text-slate-100",
+  error: "border-red-200 bg-red-50 text-red-900 dark:border-red-900/70 dark:bg-red-950/50 dark:text-red-100",
+  warning: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800/70 dark:bg-amber-950/50 dark:text-amber-100",
+  info: "border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100",
 };
 
 export const APP_TOAST_EVENT = "app:toast";
@@ -230,10 +230,10 @@ function Dialog({ dialog, onClose }) {
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/40 px-4 py-6">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
-        <h2 className="text-lg font-bold text-slate-950">{dialog.title}</h2>
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+        <h2 className="text-lg font-bold text-slate-950 dark:text-slate-50">{dialog.title}</h2>
         {dialog.message ? (
-          <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">
+          <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600 dark:text-slate-300">
             {dialog.message}
           </p>
         ) : null}
@@ -269,7 +269,7 @@ function Dialog({ dialog, onClose }) {
               onChange={(event) => setValue(event.target.value)}
               placeholder={dialog.placeholder}
               rows={5}
-              className="mt-4 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-red-500 focus:ring-4 focus:ring-red-100"
+              className="mt-4 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-red-500 focus:ring-4 focus:ring-red-100 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-red-950/50"
             />
           ) : (
             <input
@@ -281,7 +281,7 @@ function Dialog({ dialog, onClose }) {
                 if (event.key === "Enter") submit();
               }}
               placeholder={dialog.placeholder}
-              className="mt-4 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-red-500 focus:ring-4 focus:ring-red-100"
+              className="mt-4 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-red-500 focus:ring-4 focus:ring-red-100 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-red-950/50"
             />
           )
         ) : null}
@@ -290,7 +290,7 @@ function Dialog({ dialog, onClose }) {
           <button
             type="button"
             onClick={() => onClose(isPrompt ? null : false)}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             {dialog.cancelText}
           </button>

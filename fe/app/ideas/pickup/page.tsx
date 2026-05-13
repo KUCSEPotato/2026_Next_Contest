@@ -270,7 +270,6 @@ export default function InspirationWellPage() {
   return (
     <div
       className="relative min-h-screen overflow-hidden bg-[#f7fbf3] text-slate-900"
-      style={{ colorScheme: "light" }}
     >
       <div
         aria-hidden
