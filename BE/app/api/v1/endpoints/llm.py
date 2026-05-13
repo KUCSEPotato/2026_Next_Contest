@@ -54,7 +54,7 @@ def _sync_call_gemini_for_todo_list(conversation_text: str) -> str:
             contents=prompt,
             config={
                     "temperature": 0.0,
-                    "max_output_tokens": 512,
+                    "max_output_tokens": 1024,
                     "response_mime_type": "application/json",
                 },
         )
@@ -138,15 +138,34 @@ def _extract_json_payload(text: str) -> dict[str, Any]:
         return json.loads(text)
     except json.JSONDecodeError:
         match = re.search(r"\{(?:.|\n)*\}", text)
-        if not match:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Failed to parse Gemini output as JSON. Raw response: {text[:300]}",
-            )
-        try:
-            return json.loads(match.group(0))
-        except json.JSONDecodeError:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Failed to parse extracted JSON from Gemini output. Raw response: {text[:300]}",
-            )
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except json.JSONDecodeError:
+                pass
+
+        repaired = _repair_incomplete_json(text)
+        if repaired is not None:
+            return repaired
+
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to parse Gemini output as JSON. Raw response: {text[:300]}",
+        )
+
+
+def _repair_incomplete_json(text: str) -> dict[str, Any] | None:
+    stripped = text.strip()
+    if not stripped.startswith("{"):
+        return None
+
+    open_braces = stripped.count("{") - stripped.count("}")
+    open_brackets = stripped.count("[") - stripped.count("]")
+    if open_braces <= 0 and open_brackets <= 0:
+        return None
+
+    repaired = stripped + ("}" * max(0, open_braces)) + ("]" * max(0, open_brackets))
+    try:
+        return json.loads(repaired)
+    except json.JSONDecodeError:
+        return None

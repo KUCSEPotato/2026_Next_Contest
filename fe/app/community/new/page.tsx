@@ -133,17 +133,12 @@ export default function NewPostPage() {
   if (!currentUser) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900" style={{ colorScheme: "light" }}>
+    <div className="min-h-screen bg-gray-50 text-gray-900">
       <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
 
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-1.5 text-sm text-gray-500 transition hover:text-gray-800"
-          >
-            ← 뒤로
-          </button>
+          <div className="w-[68px]" aria-hidden="true" />
           <h1 className="text-base font-bold text-gray-900">새 게시물</h1>
           <button
             onClick={handleSubmit}

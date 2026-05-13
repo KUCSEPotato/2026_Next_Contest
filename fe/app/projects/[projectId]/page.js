@@ -10,7 +10,10 @@ import {
   deleteProjectApi,
   revertProjectToIdeaApi,
   getMyApplicationsApi,
+  createReportApi,
 } from "../../../lib/api";
+import { SKILLS_LIST } from "../../../lib/profileOptions";
+import { useDialog, useToast } from "../../../components/AppFeedback";
 
 const DIFFICULTY_OPTIONS = [
   { value: "beginner", label: "입문" },
@@ -47,6 +50,8 @@ const getProjectMemberDisplayName = (member) => {
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const toast = useToast();
+  const { prompt } = useDialog();
   const projectId = params.projectId;
 
   const [project, setProject] = useState(null);
@@ -71,7 +76,7 @@ export default function ProjectDetailPage() {
     max_members: 10,
     expected_period: "",
     preferred_members: "",
-    tech_stack: "",
+    tech_stack: [],
     hashtags: "",
     is_public: true,
   });
@@ -97,8 +102,8 @@ export default function ProjectDetailPage() {
       "",
     expected_period: projectData.expected_period || "",
     preferred_members: projectData.preferred_members || "",
-    tech_stack: (projectData.tech_stack || projectData.techStack || []).join(", "),
-    hashtags: (projectData.hashtags || []).join(", "),
+    tech_stack: projectData.tech_stack || projectData.techStack || [],
+    hashtags: (projectData.hashtags || projectData.hash_tags || []).join(", "),
     is_public: projectData.is_public ?? true,
   });
 
@@ -166,6 +171,19 @@ export default function ProjectDetailPage() {
     }));
   };
 
+  const toggleEditTechStack = (skill) => {
+    setEditForm((prev) => {
+      const current = Array.isArray(prev.tech_stack) ? prev.tech_stack : [];
+
+      return {
+        ...prev,
+        tech_stack: current.includes(skill)
+          ? current.filter((item) => item !== skill)
+          : [...current, skill],
+      };
+    });
+  };
+
   const handleSaveEdit = async () => {
     if (!editForm.title.trim()) {
       alert("프로젝트 제목을 입력해주세요.");
@@ -199,10 +217,7 @@ export default function ProjectDetailPage() {
         progress_percent: Number(editForm.progress_percent),
         expected_period: editForm.expected_period.trim(),
         preferred_members: editForm.preferred_members.trim(),
-        tech_stack: editForm.tech_stack
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
+        tech_stack: Array.isArray(editForm.tech_stack) ? editForm.tech_stack : [],
         hashtags: editForm.hashtags
           .split(",")
           .map((item) => item.trim().replace(/^#/, ""))
@@ -297,6 +312,35 @@ export default function ProjectDetailPage() {
       alert("프로젝트 삭제에 실패했습니다.");
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleReportProject = async () => {
+    if (!myProfile) {
+      router.push("/login");
+      return;
+    }
+
+    const reasonInput = await prompt({
+      title: "프로젝트 신고",
+      message: "관리자가 확인할 수 있도록 신고 사유를 입력해주세요.",
+      placeholder: "문제가 되는 이유를 입력하세요.",
+      confirmText: "신고하기",
+      required: true,
+      multiline: true,
+      tone: "danger",
+    });
+    if (reasonInput === null) return;
+
+    try {
+      await createReportApi({
+        target_type: "project",
+        target_id: Number(projectId),
+        reason: reasonInput.trim(),
+      });
+      toast.success("신고가 접수되었습니다.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "신고 접수에 실패했습니다.");
     }
   };
 
@@ -475,17 +519,33 @@ export default function ProjectDetailPage() {
 
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  기술 스택
+                  기술 스택{" "}
+                  <span className="font-normal text-slate-400">
+                    ({Array.isArray(editForm.tech_stack) ? editForm.tech_stack.length : 0}개 선택)
+                  </span>
                 </label>
-                <input
-                  className={inputClassName}
-                  value={editForm.tech_stack}
-                  onChange={(e) => handleEditChange("tech_stack", e.target.value)}
-                  placeholder="예: React, FastAPI, PostgreSQL"
-                />
-                <p className="mt-1 text-xs text-slate-500">
-                  쉼표로 구분해서 입력해주세요.
-                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {SKILLS_LIST.map((skill) => {
+                    const selected = Array.isArray(editForm.tech_stack)
+                      ? editForm.tech_stack.includes(skill)
+                      : false;
+
+                    return (
+                      <button
+                        key={skill}
+                        type="button"
+                        onClick={() => toggleEditTechStack(skill)}
+                        className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                          selected
+                            ? "border-red-600 bg-red-600 text-white shadow-sm"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:text-red-600"
+                        }`}
+                      >
+                        {skill}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div>
@@ -573,6 +633,15 @@ export default function ProjectDetailPage() {
                   className={`${isTeamFormed ? "mt-3" : "mt-6"} w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800`}
                 >
                   팀 채팅방 들어가기
+                </button>
+              )}
+
+              {!isLeader && (
+                <button
+                  onClick={handleReportProject}
+                  className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-600 transition hover:border-red-200 hover:text-red-600"
+                >
+                  프로젝트 신고
                 </button>
               )}
             </>

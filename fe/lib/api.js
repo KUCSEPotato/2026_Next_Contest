@@ -1011,6 +1011,16 @@ export async function updateAdminReportApi(reportId, payload) {
   return handleResponse(res, "신고 처리에 실패했습니다.");
 }
 
+export async function createReportApi(payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/reports`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "신고 접수에 실패했습니다.");
+}
+
 export async function getAdminPaymentsApi() {
   const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/payments`, {
     headers: authHeaders(),
@@ -1123,6 +1133,16 @@ export async function adminTakedownPostApi(postId, payload = {}) {
   });
 
   return handleResponse(res, "게시물 강제 내리기에 실패했습니다.");
+}
+
+export async function adminTakedownCommentApi(commentId, payload = {}) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/comments/${commentId}/takedown`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "댓글 강제 내리기에 실패했습니다.");
 }
 
 export async function adminTakedownIdeaApi(ideaId, payload = {}) {

@@ -21,6 +21,7 @@ import {
   adminUpdatePostApi,
   adminDeletePostApi,
   adminTakedownPostApi,
+  adminTakedownCommentApi,
   adminTakedownIdeaApi,
   adminTakedownProjectApi,
 } from "../../lib/api";
@@ -48,6 +49,7 @@ const REPORT_SCOPES = [
   { value: "user", label: "사용자" },
   { value: "project", label: "프로젝트" },
   { value: "post", label: "게시글" },
+  { value: "comment", label: "댓글" },
   { value: "chat", label: "채팅" },
 ];
 
@@ -243,11 +245,12 @@ export default function AdminPage() {
     if (!report) return;
 
     const targetPostId = report.target_post_id;
+    const targetCommentId = report.target_comment_id;
     const targetProjectId = report.target_project_id;
     // Idea id not present in reports model by default, but support if present
     const targetIdeaId = report.target_idea_id || null;
 
-    if (!targetPostId && !targetProjectId && !targetIdeaId) {
+    if (!targetPostId && !targetCommentId && !targetProjectId && !targetIdeaId) {
       toast.warning("이 신고에 대해 강제 내릴 수 있는 대상이 없습니다.");
       return;
     }
@@ -276,6 +279,8 @@ export default function AdminPage() {
 
       if (targetPostId) {
         await adminTakedownPostApi(targetPostId, payload);
+      } else if (targetCommentId) {
+        await adminTakedownCommentApi(targetCommentId, payload);
       } else if (targetProjectId) {
         await adminTakedownProjectApi(targetProjectId, payload);
       } else if (targetIdeaId) {
@@ -383,6 +388,10 @@ export default function AdminPage() {
   }
 
   async function handleSuspendUser(user) {
+    if (user.deleted_at) {
+      toast.warning("탈퇴한 사용자는 정지 상태로 변경할 수 없습니다.");
+      return;
+    }
     const daysInput = await prompt({
       title: "사용자 정지 기간",
       message: `${user.nickname || user.email || `User #${user.id}`} 사용자를 며칠 동안 정지할까요?\n비워두면 무기한 정지됩니다.`,
@@ -447,6 +456,10 @@ export default function AdminPage() {
   }
 
   async function handleRestoreUser(user) {
+    if (user.deleted_at) {
+      toast.warning("탈퇴한 사용자는 어드민 정지 복구 대상이 아닙니다.");
+      return;
+    }
     const ok = await confirm({
       title: "사용자 복구",
       message: `${user.nickname || user.email || `User #${user.id}`} 사용자의 정지를 해제할까요?`,
@@ -942,8 +955,9 @@ export default function AdminPage() {
                             {report.target_user_id ? `User #${report.target_user_id}` : ""}
                             {report.target_project_id ? `Project #${report.target_project_id}` : ""}
                             {report.target_post_id ? `Post #${report.target_post_id}` : ""}
+                            {report.target_comment_id ? `Comment #${report.target_comment_id}` : ""}
                             {report.target_chat_room_id ? `Chat Room #${report.target_chat_room_id}` : ""}
-                            {!report.target_user_id && !report.target_project_id && !report.target_post_id && !report.target_chat_room_id ? "-" : ""}
+                            {!report.target_user_id && !report.target_project_id && !report.target_post_id && !report.target_comment_id && !report.target_chat_room_id ? "-" : ""}
                           </p>
                         </div>
                       </Td>
@@ -961,7 +975,7 @@ export default function AdminPage() {
                             <option key={status} value={status}>{status}</option>
                           ))}
                         </select>
-                        {(report.target_post_id || report.target_project_id || report.target_idea_id) && (
+                        {(report.target_post_id || report.target_comment_id || report.target_project_id || report.target_idea_id) && (
                           <button
                             onClick={() => handleTakedownReport(report)}
                             disabled={processingKey === `report-takedown-${report.id}`}
@@ -1175,8 +1189,13 @@ export default function AdminPage() {
                       <Td>{user.role}</Td>
                       <Td>{user.coin_balance}</Td>
                       <Td>
-                        <StatusBadge value={user.is_active ? "active" : "suspended"} />
-                        {!user.is_active ? (
+                        <StatusBadge value={user.deleted_at ? "withdrawn" : user.is_active ? "active" : "suspended"} />
+                        {user.deleted_at ? (
+                          <div className="mt-1 max-w-56 text-xs leading-5 text-slate-500">
+                            <p>탈퇴: {formatDate(user.deleted_at)}</p>
+                            <p>탈퇴 계정은 복구할 수 없습니다.</p>
+                          </div>
+                        ) : !user.is_active ? (
                           <div className="mt-1 max-w-56 text-xs leading-5 text-slate-500">
                             <p>종료: {user.suspended_until ? formatDate(user.suspended_until) : "무기한"}</p>
                             {user.suspension_reason ? (
@@ -1187,12 +1206,12 @@ export default function AdminPage() {
                       </Td>
                       <Td>
                         <div className="flex flex-wrap gap-2">
-                          <select
-                            value={user.role}
-                            onChange={(e) => handleUserRole(user.id, e.target.value)}
-                            disabled={processingKey === `user-role-${user.id}`}
-                            className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-50"
-                          >
+	                          <select
+	                            value={user.role}
+	                            onChange={(e) => handleUserRole(user.id, e.target.value)}
+	                            disabled={Boolean(user.deleted_at) || processingKey === `user-role-${user.id}`}
+	                            className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-50"
+	                          >
                             {USER_ROLES.map((role) => (
                               <option key={role} value={role}>
                                 {role}
@@ -1201,23 +1220,23 @@ export default function AdminPage() {
                           </select>
 	                          <button
 	                            onClick={() => user.is_active ? handleSuspendUser(user) : handleRestoreUser(user)}
-	                            disabled={processingKey === `user-${user.id}`}
+	                            disabled={Boolean(user.deleted_at) || processingKey === `user-${user.id}`}
 	                            className="rounded-md border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
 	                          >
-	                            {user.is_active ? "정지" : "복구"}
-                          </button>
-                          <button
-                            onClick={() => handleGrantCoins(user.id)}
-                            disabled={processingKey === `coin-${user.id}`}
-                            className="rounded-md bg-amber-500 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
-                          >
+	                            {user.deleted_at ? "탈퇴됨" : user.is_active ? "정지" : "복구"}
+	                          </button>
+	                          <button
+	                            onClick={() => handleGrantCoins(user.id)}
+	                            disabled={Boolean(user.deleted_at) || processingKey === `coin-${user.id}`}
+	                            className="rounded-md bg-amber-500 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
+	                          >
                             코인 지급
                           </button>
-                          <button
-                            onClick={() => handleRevokeCoins(user.id)}
-                            disabled={processingKey === `revoke-coin-${user.id}`}
-                            className="rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
-                          >
+	                          <button
+	                            onClick={() => handleRevokeCoins(user.id)}
+	                            disabled={Boolean(user.deleted_at) || processingKey === `revoke-coin-${user.id}`}
+	                            className="rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+	                          >
                             코인 환수
                           </button>
                         </div>
@@ -1511,7 +1530,7 @@ function Td({ children, className = "", ...props }) {
 function StatusBadge({ value }) {
   const normalized = String(value || "-");
   const tone =
-    ["open", "inactive", "deleted", "suspended"].includes(normalized)
+    ["open", "inactive", "deleted", "suspended", "withdrawn"].includes(normalized)
       ? "bg-red-50 text-red-700"
       : ["pending", "reviewing", "planning"].includes(normalized)
       ? "bg-amber-50 text-amber-700"

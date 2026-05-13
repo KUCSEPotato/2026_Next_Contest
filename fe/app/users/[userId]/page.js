@@ -9,11 +9,15 @@ import {
   getUserProjectsApi,
   getUserReceivedReviewsApi,
   getImageUrl,
+  createReportApi,
 } from "../../../lib/api";
+import { useDialog, useToast } from "../../../components/AppFeedback";
 
 export default function UserProfilePage() {
   const params = useParams();
   const router = useRouter();
+  const toast = useToast();
+  const { prompt } = useDialog();
   const userId = params.userId;
 
   const [profile, setProfile] = useState(null);
@@ -23,6 +27,7 @@ export default function UserProfilePage() {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showReviews, setShowReviews] = useState(false);
+  const [projectRoleFilter, setProjectRoleFilter] = useState("all");
 
   useEffect(() => {
     async function loadUserProfile() {
@@ -85,6 +90,40 @@ export default function UserProfilePage() {
     }
   }, [userId, router]);
 
+  const handleReportUser = async () => {
+    const myUserId = typeof window !== "undefined" ? localStorage.getItem("user_id") : null;
+    if (!myUserId) {
+      router.push("/login");
+      return;
+    }
+    if (String(myUserId) === String(userId)) {
+      toast.warning("본인 계정은 신고할 수 없습니다.");
+      return;
+    }
+
+    const reasonInput = await prompt({
+      title: "사용자 신고",
+      message: "관리자가 확인할 수 있도록 신고 사유를 입력해주세요.",
+      placeholder: "문제가 되는 이유를 입력하세요.",
+      confirmText: "신고하기",
+      required: true,
+      multiline: true,
+      tone: "danger",
+    });
+    if (reasonInput === null) return;
+
+    try {
+      await createReportApi({
+        target_type: "user",
+        target_id: Number(userId),
+        reason: reasonInput.trim(),
+      });
+      toast.success("신고가 접수되었습니다.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "신고 접수에 실패했습니다.");
+    }
+  };
+
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-50 px-6 py-10">
@@ -92,6 +131,12 @@ export default function UserProfilePage() {
       </main>
     );
   }
+
+  const visibleProjects = getVisibleProjects(
+    projects,
+    projectRoleFilter,
+    profile?.id ?? userId
+  );
 
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
@@ -120,7 +165,7 @@ export default function UserProfilePage() {
               )}
             </div>
 
-            <div>
+            <div className="min-w-0 flex-1">
               <h1 className="text-3xl font-bold text-slate-900">
                 {profile?.nickname || "이름 없는 사용자"}
               </h1>
@@ -129,6 +174,12 @@ export default function UserProfilePage() {
                 {profile?.bio || "아직 자기소개가 없습니다."}
               </p>
             </div>
+            <button
+              onClick={handleReportUser}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-red-300 hover:text-red-600"
+            >
+              사용자 신고
+            </button>
           </div>
         </section>
 
@@ -250,11 +301,23 @@ export default function UserProfilePage() {
         </div>
 
         <section className="rounded-2xl bg-white p-6 shadow">
-          <h2 className="mb-4 text-xl font-bold">프로젝트 이력</h2>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-xl font-bold">프로젝트 이력</h2>
+
+            <select
+              value={projectRoleFilter}
+              onChange={(e) => setProjectRoleFilter(e.target.value)}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 outline-none transition focus:border-red-500"
+            >
+              <option value="all">전체 역할</option>
+              <option value="leader">리더 프로젝트</option>
+              <option value="member">팀원으로 참여</option>
+            </select>
+          </div>
 
           <div className="space-y-3">
-            {projects.length ? (
-              projects.map((project) => (
+            {visibleProjects.length ? (
+              visibleProjects.map((project) => (
                 <button
                   key={project.id}
                   onClick={() => router.push(`/projects/${project.id}`)}
@@ -274,11 +337,17 @@ export default function UserProfilePage() {
                     <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-600">
                       {project.status || "상태 없음"}
                     </span>
+
+                    {isProjectLeader(project, profile?.id ?? userId) && (
+                      <span className="rounded-full bg-red-600 px-3 py-1 text-sm font-semibold text-white">
+                        리더
+                      </span>
+                    )}
                   </div>
                 </button>
               ))
             ) : (
-              <p className="text-sm text-slate-500">프로젝트 없음</p>
+              <p className="text-sm text-slate-500">조건에 맞는 프로젝트가 없습니다.</p>
             )}
           </div>
         </section>
@@ -354,6 +423,41 @@ function normalizeRating(value) {
 
 function formatRating(value) {
   return normalizeRating(value).toFixed(1);
+}
+
+function getProjectLeaderId(project) {
+  return (
+    project?.leader_id ??
+    project?.leaderId ??
+    project?.leader?.id ??
+    project?.owner_id ??
+    project?.owner?.id ??
+    project?.created_by ??
+    project?.creator_id
+  );
+}
+
+function isProjectLeader(project, userId) {
+  const leaderId = Number(getProjectLeaderId(project));
+  const currentUserId = Number(userId);
+
+  if (Number.isFinite(leaderId) && Number.isFinite(currentUserId)) {
+    return leaderId === currentUserId;
+  }
+
+  return (
+    project?.is_leader === true ||
+    project?.isLeader === true ||
+    project?.role_in_project === "leader"
+  );
+}
+
+function getVisibleProjects(projects, roleFilter, userId) {
+  return projects.filter((project) => {
+    if (roleFilter === "leader") return isProjectLeader(project, userId);
+    if (roleFilter === "member") return !isProjectLeader(project, userId);
+    return true;
+  });
 }
 
 function getReviewMessage(review) {

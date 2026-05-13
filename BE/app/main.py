@@ -67,6 +67,10 @@ OPENAPI_TAGS = [
         "description": "사용자 알림 목록 조회 및 읽음 처리 API입니다.",
     },
     {
+        "name": "reports",
+        "description": "사용자가 문제 콘텐츠를 신고하는 API입니다.",
+    },
+    {
         "name": "admin",
         "description": "관리자 전용 사용자/프로젝트/신고 모더레이션 API입니다.",
     },

@@ -11,9 +11,11 @@ import {
   getProjectApi,
   getTodoStateApi,
   getTodosApi,
+  createReportApi,
   sendMessageApi,
   updateTodoApi,
 } from "../../../lib/api";
+import { useDialog, useToast } from "../../../components/AppFeedback";
 import { useRef } from "react";
 
 const TODO_STAGES = [
@@ -59,6 +61,8 @@ export default function ChatRoomPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const toast = useToast();
+  const { prompt } = useDialog();
   const roomId = params.roomId;
   const projectId = searchParams.get("projectId");
   const bottomRef = useRef(null);
@@ -458,6 +462,30 @@ export default function ChatRoomPage() {
     );
   };
 
+  const handleReportChatRoom = async () => {
+    const reasonInput = await prompt({
+      title: "채팅방 신고",
+      message: "관리자가 확인할 수 있도록 신고 사유를 입력해주세요.",
+      placeholder: "문제가 되는 대화나 상황을 입력하세요.",
+      confirmText: "신고하기",
+      required: true,
+      multiline: true,
+      tone: "danger",
+    });
+    if (reasonInput === null) return;
+
+    try {
+      await createReportApi({
+        target_type: "chat",
+        target_id: Number(roomId),
+        reason: reasonInput.trim(),
+      });
+      toast.success("신고가 접수되었습니다.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "신고 접수에 실패했습니다.");
+    }
+  };
+
   const todoGroups = groupTodosByStage(todos);
 
   return (
@@ -478,19 +506,27 @@ export default function ChatRoomPage() {
                 </p>
               </div>
 
-              <button
-                onClick={() => {
-                  setIsSelectingMessages((prev) => !prev);
-                  setSelectedMessageIds([]);
-                }}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                  isSelectingMessages
-                    ? "bg-red-600 text-white hover:bg-red-700"
-                    : "border border-slate-200 text-slate-600 hover:border-red-300 hover:text-red-600"
-                }`}
-              >
-                {isSelectingMessages ? "범위 선택 종료" : "AI 반영 범위 선택"}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={handleReportChatRoom}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-red-300 hover:text-red-600"
+                >
+                  채팅방 신고
+                </button>
+                <button
+                  onClick={() => {
+                    setIsSelectingMessages((prev) => !prev);
+                    setSelectedMessageIds([]);
+                  }}
+                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                    isSelectingMessages
+                      ? "bg-red-600 text-white hover:bg-red-700"
+                      : "border border-slate-200 text-slate-600 hover:border-red-300 hover:text-red-600"
+                  }`}
+                >
+                  {isSelectingMessages ? "범위 선택 종료" : "AI 반영 범위 선택"}
+                </button>
+              </div>
             </div>
 
             {isSelectingMessages && (

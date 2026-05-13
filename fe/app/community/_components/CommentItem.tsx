@@ -33,6 +33,7 @@ export default function CommentItem({
   onReply,
   onEdit,
   onDelete,
+  onReport,
   currentUserId,
 }: {
   comment: CommentItemType;
@@ -41,6 +42,7 @@ export default function CommentItem({
   onReply: (parentId: number, content: string, isAnonymous: boolean) => void;
   onEdit: (commentId: number, content: string) => void;
   onDelete: (commentId: number) => void;
+  onReport: (commentId: number) => void;
   currentUserId: number;
 }) {
   const [replying, setReplying] = useState(false);
@@ -69,7 +71,7 @@ export default function CommentItem({
   const myReaction = comment.user_reaction ?? null;
 
   return (
-    <div className={depth > 0 ? "ml-8 border-l-2 border-gray-100 pl-3" : ""}>
+    <div className={depth > 0 ? "ml-8 border-l-2 border-gray-100 pl-3 dark:border-slate-800/70" : ""}>
       <div className="flex gap-2 py-2">
         <Avatar user={comment.author} size={28} />
         <div className="flex-1">
@@ -158,6 +160,14 @@ export default function CommentItem({
                 </button>
               </>
             )}
+            {!isOwn && (
+              <button
+                onClick={() => onReport(comment.id)}
+                className="text-[10px] text-gray-400 hover:text-red-500"
+              >
+                신고
+              </button>
+            )}
           </div>
 
           {replying && (
@@ -198,6 +208,7 @@ export default function CommentItem({
           onReply={onReply}
           onEdit={onEdit}
           onDelete={onDelete}
+          onReport={onReport}
           currentUserId={currentUserId}
         />
       ))}

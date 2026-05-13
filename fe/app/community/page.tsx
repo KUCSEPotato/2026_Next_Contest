@@ -223,7 +223,7 @@ export default function CommunityPage() {
   };
 
   return (
-    <div className="min-h-screen bg-orange-50/30 text-gray-900" style={{ colorScheme: "light" }}>
+    <div className="min-h-screen bg-orange-50/30 text-gray-900">
       <header className="mx-auto flex max-w-6xl items-center justify-end gap-3 px-4 py-4">
         <button
           onClick={() => router.push("/notifications")}
@@ -277,7 +277,7 @@ export default function CommunityPage() {
                       </div>
                     </div>
                     {isActive && (
-                      <span className="rounded-full bg-orange-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                      <span className="rounded-full bg-orange-600 px-2 py-0.5 text-[10px] font-semibold text-white dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-600">
                         현재
                       </span>
                     )}
@@ -295,7 +295,7 @@ export default function CommunityPage() {
             onClick={() => setTab("board")}
             className={`rounded-xl px-5 py-2 text-sm font-semibold transition ${
               tab === "board"
-                ? "bg-orange-600 text-white shadow-sm"
+                ? "bg-orange-600 text-white shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-600 dark:shadow-none"
                 : "border border-gray-200 bg-white text-gray-600 hover:border-orange-300 hover:text-orange-700"
             }`}
           >
@@ -305,7 +305,7 @@ export default function CommunityPage() {
             onClick={() => setTab("hot")}
             className={`rounded-xl px-5 py-2 text-sm font-semibold transition ${
               tab === "hot"
-                ? "bg-orange-600 text-white shadow-sm"
+                ? "bg-orange-600 text-white shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-600 dark:shadow-none"
                 : "border border-gray-200 bg-white text-gray-600 hover:border-orange-300 hover:text-orange-700"
             }`}
           >
@@ -326,7 +326,7 @@ export default function CommunityPage() {
                 </div>
                 <button
                   onClick={handleWriteClick}
-                  className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-700"
+                  className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-700 dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-600 dark:hover:bg-slate-700"
                 >
                   글쓰기
                 </button>
@@ -338,7 +338,7 @@ export default function CommunityPage() {
                     onClick={() => { setSelectedCategory(cat.value); setPage(1); }}
                     className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                       selectedCategory === cat.value
-                        ? "border-orange-600 bg-orange-600 text-white"
+                        ? "border-orange-600 bg-orange-600 text-white dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                         : "border-gray-200 bg-white text-gray-600 hover:border-orange-300 hover:text-orange-700"
                     }`}
                   >
@@ -360,7 +360,7 @@ export default function CommunityPage() {
                 {isLoggedIn && (
                   <button
                     onClick={() => router.push("/community/new")}
-                    className="mt-4 rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-700"
+                    className="mt-4 rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-700 dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-600 dark:hover:bg-slate-700"
                   >
                     첫 글 쓰기
                   </button>

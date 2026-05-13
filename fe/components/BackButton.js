@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 
 const HIDDEN_PATHS = new Set(["/", "/mainpage", "/login"]);
+const HIDDEN_PATH_PREFIXES = ["/ideas/pickup", "/community"];
 const NAVBAR_HIDDEN_PATHS = new Set(["/login", "/signup"]);
 
 export default function BackButton() {
@@ -10,7 +11,12 @@ export default function BackButton() {
   const pathname = usePathname() || "/";
   const normalizedPath = pathname.replace(/\/$/, "") || "/";
 
-  if (HIDDEN_PATHS.has(normalizedPath)) {
+  if (
+    HIDDEN_PATHS.has(normalizedPath) ||
+    HIDDEN_PATH_PREFIXES.some(
+      (path) => normalizedPath === path || normalizedPath.startsWith(`${path}/`)
+    )
+  ) {
     return null;
   }
 
@@ -29,7 +35,7 @@ export default function BackButton() {
     <button
       type="button"
       onClick={handleBack}
-      className={`fixed left-5 z-40 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/95 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm backdrop-blur transition hover:border-red-200 hover:text-red-600 ${
+      className={`fixed left-5 z-40 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/95 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm backdrop-blur transition hover:border-red-200 hover:text-red-600 dark:border-slate-700 dark:bg-slate-950/95 dark:text-slate-200 dark:hover:border-red-500 dark:hover:text-red-300 ${
         hasNavbar ? "top-20" : "top-5"
       }`}
       aria-label="뒤로 가기"
