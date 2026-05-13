@@ -7,8 +7,6 @@ import {
   getCoinPackagesApi,
   getMyCoinBalanceApi,
   getMyCoinPurchaseRequestsApi,
-  getMyEntitlementApi,
-  getPaymentProductsApi,
 } from "../../lib/api";
 import { getToken } from "../../lib/auth";
 import { useDialog, useToast } from "../../components/AppFeedback";
@@ -50,17 +48,6 @@ function formatDate(value) {
 
 function formatKrw(value) {
   return `${Number(value || 0).toLocaleString("ko-KR")}원`;
-}
-
-function formatShortDate(value) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
 }
 
 function formatWaterdrops(value) {
@@ -427,18 +414,14 @@ export default function CoinsPage() {
   const loadCoins = useCallback(async () => {
     try {
       setLoading(true);
-      const [balanceResult, packagesResult, requestsResult, paymentProductsResult, entitlementResult] = await Promise.all([
+      const [balanceResult, packagesResult, requestsResult] = await Promise.all([
         getMyCoinBalanceApi(),
         getCoinPackagesApi(),
         getMyCoinPurchaseRequestsApi(),
-        getPaymentProductsApi(),
-        getMyEntitlementApi(),
       ]);
       setBalance(balanceResult.data?.waterdrop_balance ?? balanceResult.data?.coin_balance ?? 0);
       setPackages(packagesResult.data || []);
       setRequests(requestsResult.data || []);
-      setPaymentProducts(paymentProductsResult.data || []);
-      setEntitlement(entitlementResult.data || null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "물방울 정보를 불러오지 못했습니다.");
     } finally {
@@ -487,63 +470,6 @@ export default function CoinsPage() {
       setProcessingPackage("");
     }
   }
-
-  async function handleRequestProductPurchase(product) {
-    const ok = await confirm({
-      title: "이용권 수동 구매 요청",
-      message: `${product.name} 수동 구매 요청을 만들까요?\n금액: ${formatKrw(product.price_krw)}\n\n관리자가 결제 확인 후 이용권을 활성화합니다.`,
-      confirmText: "요청하기",
-      cancelText: "돌아가기",
-    });
-    if (!ok) return;
-
-    const noteInput = await prompt({
-      title: "구매 요청 메모",
-      message: "입금자명이나 확인에 필요한 메모가 있으면 남겨주세요.",
-      placeholder: "예: 입금자명 감자",
-      confirmText: "제출",
-      cancelText: "건너뛰기",
-      multiline: true,
-    });
-    if (noteInput === null) return;
-
-    try {
-      setProcessingPackage(product.product_code);
-      const result = await createCoinPurchaseRequestApi({
-        product_code: product.product_code,
-        note: noteInput.trim() || undefined,
-      });
-      setRequests((prev) => [result.data, ...prev]);
-      toast.success("이용권 수동 구매 요청을 보냈습니다. 관리자가 확인 후 활성화합니다.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "이용권 수동 구매 요청에 실패했습니다.");
-    } finally {
-      setProcessingPackage("");
-    }
-  }
-
-  const currentPlanCode = entitlement?.plan || "FREE";
-  const subscriptionProducts = paymentProducts.filter((product) => product.product_type === "SUBSCRIPTION");
-  const passProducts = paymentProducts.filter((product) => product.product_type === "PASS");
-  const freeProduct = {
-    product_code: "FREE",
-    product_type: "FREE",
-    name: "무료 요금제",
-    price_krw: 0,
-    benefits: {
-      idea_view_daily_limit: null,
-      project_create_daily_limit: 0,
-      project_create_total_limit: 0,
-      project_discard_unlimited: false,
-      project_apply_daily_limit: 1,
-      project_apply_total_limit: null,
-      project_apply_unlimited: false,
-      community_write_daily_limit: 1,
-      community_write_unlimited: false,
-    },
-  };
-  const handlePaymentError = (err) =>
-    toast.error(err instanceof Error ? err.message : "결제를 시작하지 못했습니다.");
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-slate-950 dark:text-slate-100">
@@ -753,7 +679,7 @@ export default function CoinsPage() {
                     <thead className="bg-gray-50 text-xs font-semibold uppercase text-gray-500 dark:bg-slate-800 dark:text-slate-400">
                       <tr>
                         <th className="px-4 py-3">ID</th>
-                        <th className="px-4 py-3">상품</th>
+                        <th className="px-4 py-3">물방울</th>
                         <th className="px-4 py-3">금액</th>
                         <th className="px-4 py-3">상태</th>
                         <th className="px-4 py-3">요청일</th>
