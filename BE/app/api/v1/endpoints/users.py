@@ -529,6 +529,33 @@ async def get_user_stats(user_id: int, db: Session = Depends(get_db)) -> dict:
     """
     joined_count = db.query(func.count(Project.id)).filter(Project.leader_id == user_id, Project.deleted_at.is_(None)).scalar() or 0
     completed_count = db.query(func.count(Project.id)).filter(Project.leader_id == user_id, Project.status == "completed", Project.deleted_at.is_(None)).scalar() or 0
+    member_in_progress_ids = {
+        project_id
+        for (project_id,) in (
+            db.query(Project.id)
+            .join(ProjectMember, ProjectMember.project_id == Project.id)
+            .filter(
+                ProjectMember.user_id == user_id,
+                ProjectMember.left_at.is_(None),
+                Project.status.in_(["in_progress", "started", "paused"]),
+                Project.deleted_at.is_(None),
+            )
+            .all()
+        )
+    }
+    leader_in_progress_ids = {
+        project_id
+        for (project_id,) in (
+            db.query(Project.id)
+            .filter(
+                Project.leader_id == user_id,
+                Project.status.in_(["in_progress", "started", "paused"]),
+                Project.deleted_at.is_(None),
+            )
+            .all()
+        )
+    }
+    in_progress_count = len(member_in_progress_ids | leader_in_progress_ids)
     review_count = db.query(func.count(Review.id)).filter(Review.reviewee_id == user_id).scalar() or 0
 
     return success_response(
@@ -536,6 +563,7 @@ async def get_user_stats(user_id: int, db: Session = Depends(get_db)) -> dict:
             "user_id": user_id,
             "lead_projects": joined_count,
             "completed_projects": completed_count,
+            "in_progress_projects": in_progress_count,
             "review_received": review_count,
         },
     )
