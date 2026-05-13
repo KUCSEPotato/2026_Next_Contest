@@ -206,15 +206,7 @@ export default function Navbar() {
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={handleThemeToggle}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-slate-700 transition hover:border-red-200 hover:text-red-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-red-500 dark:hover:text-red-300"
-            aria-label={isDarkTheme ? "라이트 모드로 전환" : "다크 모드로 전환"}
-            title={isDarkTheme ? "라이트 모드" : "다크 모드"}
-          >
-            {isDarkTheme ? "라이트" : "다크"}
-          </button>
+
 
           {authStatus === "checking" ? (
             <span className="rounded-lg border border-slate-200 px-4 py-2 text-slate-500 dark:border-slate-700 dark:text-slate-400">
@@ -225,6 +217,17 @@ export default function Navbar() {
               <span className="hidden max-w-[180px] truncate text-slate-500 dark:text-slate-400 sm:inline">
                 {user?.nickname || user?.email || "로그인됨"}
               </span>
+              
+          <button
+            type="button"
+            onClick={handleThemeToggle}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-slate-700 transition hover:border-red-200 hover:text-red-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-red-500 dark:hover:text-red-300"
+            aria-label={isDarkTheme ? "라이트 모드로 전환" : "다크 모드로 전환"}
+            title={isDarkTheme ? "라이트 모드" : "다크 모드"}
+          >
+            {isDarkTheme ? "라이트" : "다크"}
+          </button>
+              
               <button
                 onClick={handleLogout}
                 className="rounded-lg bg-red-600 px-4 py-2 text-white transition hover:bg-red-700"
@@ -240,6 +243,9 @@ export default function Navbar() {
               로그인
             </button>
           )}
+
+
+
         </div>
       </div>
     </nav>
