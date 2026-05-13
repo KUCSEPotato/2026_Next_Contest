@@ -2,6 +2,7 @@ from collections import defaultdict
 
 from fastapi import APIRouter, Body, Depends, Query
 from sqlalchemy import func
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.api.v1.response import success_response
@@ -85,14 +86,14 @@ async def recommend_projects_llm(
         db.query(Project)
         .join(ProjectSkill, ProjectSkill.project_id == Project.id)
         .join(ProjectInterest, ProjectInterest.project_id == Project.id)
-        .join(ProjectRecruitment, ProjectRecruitment.project_id == Project.id)
+        .outerjoin(ProjectRecruitment, ProjectRecruitment.project_id == Project.id)
         .outerjoin(current_member_count_subquery, current_member_count_subquery.c.project_id == Project.id)
         .filter(
             Project.is_public.is_(True),
             Project.deleted_at.is_(None),
             ProjectSkill.skill_id.in_(user_skill_ids),
             ProjectInterest.interest_id.in_(user_interest_ids),
-            ProjectRecruitment.status == "open",
+            or_(ProjectRecruitment.id.is_(None), ProjectRecruitment.status == "open"),
             func.coalesce(current_member_count_subquery.c.current_members, 0) < Project.max_members,
         )
         .distinct()

@@ -13,7 +13,7 @@ import {
   createReportApi,
   boostProjectApi,
 } from "../../../lib/api";
-import { SKILLS_LIST } from "../../../lib/profileOptions";
+import { INTERESTS_LIST, SKILLS_LIST } from "../../../lib/profileOptions";
 import { useDialog, useToast } from "../../../components/AppFeedback";
 
 const DIFFICULTY_OPTIONS = [
@@ -79,6 +79,7 @@ export default function ProjectDetailPage() {
     expected_period: "",
     preferred_members: "",
     tech_stack: [],
+    interests: [],
     hashtags: "",
     is_public: true,
   });
@@ -105,6 +106,7 @@ export default function ProjectDetailPage() {
     expected_period: projectData.expected_period || "",
     preferred_members: projectData.preferred_members || "",
     tech_stack: projectData.tech_stack || projectData.techStack || [],
+    interests: projectData.interests || [],
     hashtags: (projectData.hashtags || projectData.hash_tags || []).join(", "),
     is_public: projectData.is_public ?? true,
   });
@@ -188,6 +190,19 @@ export default function ProjectDetailPage() {
     });
   };
 
+  const toggleEditInterest = (interest) => {
+    setEditForm((prev) => {
+      const current = Array.isArray(prev.interests) ? prev.interests : [];
+
+      return {
+        ...prev,
+        interests: current.includes(interest)
+          ? current.filter((item) => item !== interest)
+          : [...current, interest],
+      };
+    });
+  };
+
   const handleSaveEdit = async () => {
     if (!editForm.title.trim()) {
       alert("프로젝트 제목을 입력해주세요.");
@@ -222,6 +237,7 @@ export default function ProjectDetailPage() {
         expected_period: editForm.expected_period.trim(),
         preferred_members: editForm.preferred_members.trim(),
         tech_stack: Array.isArray(editForm.tech_stack) ? editForm.tech_stack : [],
+        interests: Array.isArray(editForm.interests) ? editForm.interests : [],
         hashtags: editForm.hashtags
           .split(",")
           .map((item) => item.trim().replace(/^#/, ""))
@@ -584,6 +600,37 @@ export default function ProjectDetailPage() {
                 </p>
               </div>
 
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  추천 관심분야{" "}
+                  <span className="font-normal text-slate-400">
+                    ({Array.isArray(editForm.interests) ? editForm.interests.length : 0}개 선택)
+                  </span>
+                </label>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {INTERESTS_LIST.map((interest) => {
+                    const selected = Array.isArray(editForm.interests)
+                      ? editForm.interests.includes(interest)
+                      : false;
+
+                    return (
+                      <button
+                        key={interest}
+                        type="button"
+                        onClick={() => toggleEditInterest(interest)}
+                        className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                          selected
+                            ? "border-red-600 bg-red-600 text-white shadow-sm"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:text-red-600"
+                        }`}
+                      >
+                        {interest}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="flex gap-3">
                 <button
                   onClick={handleSaveEdit}
@@ -724,6 +771,7 @@ export default function ProjectDetailPage() {
             )}
 
             {((project.tech_stack || project.techStack || []).length > 0 ||
+              (project.interests || []).length > 0 ||
               (project.hashtags || []).length > 0) && (
               <div className="mt-6 space-y-3">
                 {(project.tech_stack || project.techStack || []).length > 0 && (
@@ -738,6 +786,24 @@ export default function ProjectDetailPage() {
                           className="rounded-full bg-red-50 px-3 py-1 text-sm font-semibold text-red-700"
                         >
                           {tech}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(project.interests || []).length > 0 && (
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      추천 관심분야
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {(project.interests || []).map((interest) => (
+                        <span
+                          key={interest}
+                          className="rounded-full bg-rose-50 px-3 py-1 text-sm font-semibold text-rose-700"
+                        >
+                          {interest}
                         </span>
                       ))}
                     </div>
