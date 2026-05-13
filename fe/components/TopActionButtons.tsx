@@ -7,6 +7,7 @@ import { getToken } from "../lib/auth";
 import { getPosts } from "../app/community/_lib/api";
 
 export const NOTICE_LAST_SEEN_STORAGE_KEY = "devory_notice_last_seen_at";
+export const NOTICE_READ_IDS_STORAGE_KEY = "devory_notice_read_ids";
 
 const CHAT_READ_COUNTS_STORAGE_KEY = "devory_chat_read_counts";
 
@@ -24,9 +25,19 @@ function getStoredChatReadCounts() {
   }
 }
 
-function getTime(value?: string | null) {
-  const time = value ? new Date(value).getTime() : NaN;
-  return Number.isNaN(time) ? 0 : time;
+function getStoredNoticeReadIds() {
+  if (typeof window === "undefined") return new Set<number>();
+
+  try {
+    const parsed = JSON.parse(localStorage.getItem(NOTICE_READ_IDS_STORAGE_KEY) || "[]");
+    return new Set(
+      Array.isArray(parsed)
+        ? parsed.map((id) => Number(id)).filter((id) => Number.isFinite(id))
+        : []
+    );
+  } catch {
+    return new Set<number>();
+  }
 }
 
 function RedDot() {
@@ -55,18 +66,13 @@ export default function TopActionButtons({ tone = "default" }: TopActionButtonsP
     async function loadBadges() {
       try {
         const [announcementResult, eventResult] = await Promise.all([
-          getPosts({ category: "announcement", page: 1, page_size: 1, sort_by: "latest" }),
-          getPosts({ category: "event", page: 1, page_size: 1, sort_by: "latest" }),
+          getPosts({ category: "announcement", page: 1, page_size: 50, sort_by: "latest" }),
+          getPosts({ category: "event", page: 1, page_size: 50, sort_by: "latest" }),
         ]);
         if (!ignore) {
-          const latestNoticeTime = Math.max(
-            ...[...(announcementResult.posts || []), ...(eventResult.posts || [])].map((post) =>
-              getTime(post.created_at)
-            ),
-            0
-          );
-          const lastSeen = Number(localStorage.getItem(NOTICE_LAST_SEEN_STORAGE_KEY) || 0);
-          setHasNewNotice(latestNoticeTime > lastSeen);
+          const notices = [...(announcementResult.posts || []), ...(eventResult.posts || [])];
+          const readIds = getStoredNoticeReadIds();
+          setHasNewNotice(notices.some((post) => !readIds.has(post.id)));
         }
       } catch {
         if (!ignore) setHasNewNotice(false);

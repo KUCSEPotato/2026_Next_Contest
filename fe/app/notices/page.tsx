@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { PostSummary } from "../community/_types";
 import { getPosts } from "../community/_lib/api";
 import { timeAgo } from "../community/_lib/utils";
-import { NOTICE_LAST_SEEN_STORAGE_KEY } from "../../components/TopActionButtons";
+import { NOTICE_READ_IDS_STORAGE_KEY } from "../../components/TopActionButtons";
 
 function getFirstLine(content: string) {
   const line = content
@@ -20,9 +20,32 @@ function withEventPrefix(post: PostSummary) {
   return post.category === "event" ? `<이벤트> ${title}` : title;
 }
 
+function getReadNoticeIds() {
+  if (typeof window === "undefined") return new Set<number>();
+
+  try {
+    const parsed = JSON.parse(localStorage.getItem(NOTICE_READ_IDS_STORAGE_KEY) || "[]");
+    return new Set(
+      Array.isArray(parsed)
+        ? parsed.map((id) => Number(id)).filter((id) => Number.isFinite(id))
+        : []
+    );
+  } catch {
+    return new Set<number>();
+  }
+}
+
+function saveReadNoticeId(noticeId: number) {
+  const readIds = getReadNoticeIds();
+  readIds.add(noticeId);
+  localStorage.setItem(NOTICE_READ_IDS_STORAGE_KEY, JSON.stringify([...readIds]));
+  return readIds;
+}
+
 export default function NoticesPage() {
   const router = useRouter();
   const [notices, setNotices] = useState<PostSummary[]>([]);
+  const [readNoticeIds, setReadNoticeIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -59,6 +82,7 @@ export default function NoticesPage() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
+      setReadNoticeIds(getReadNoticeIds());
       loadNotices();
     }, 0);
 
@@ -66,16 +90,20 @@ export default function NoticesPage() {
   }, [loadNotices]);
 
   useEffect(() => {
-    if (!notices.length) return;
+    const syncReadIds = () => setReadNoticeIds(getReadNoticeIds());
 
-    const latestNoticeTime = Math.max(
-      ...notices.map((notice) => new Date(notice.created_at).getTime()).filter(Number.isFinite),
-      0
-    );
-    if (latestNoticeTime > 0) {
-      localStorage.setItem(NOTICE_LAST_SEEN_STORAGE_KEY, String(latestNoticeTime));
-    }
-  }, [notices]);
+    window.addEventListener("focus", syncReadIds);
+    window.addEventListener("storage", syncReadIds);
+    return () => {
+      window.removeEventListener("focus", syncReadIds);
+      window.removeEventListener("storage", syncReadIds);
+    };
+  }, []);
+
+  const openNotice = (noticeId: number) => {
+    setReadNoticeIds(saveReadNoticeId(noticeId));
+    router.push(`/notices/${noticeId}`);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
@@ -97,12 +125,18 @@ export default function NoticesPage() {
             <p className="px-5 py-12 text-center text-sm text-gray-400">등록된 공지가 없습니다.</p>
           ) : (
             <div className="space-y-3">
-              {notices.map((notice) => (
+              {notices.map((notice) => {
+                const isRead = readNoticeIds.has(notice.id);
+                return (
                 <button
                   key={notice.id}
                   type="button"
-                  onClick={() => router.push(`/notices/${notice.id}`)}
-                  className="block w-full rounded-xl border border-red-100 bg-red-50/40 px-5 py-4 text-left transition hover:border-red-200 hover:bg-red-50"
+                  onClick={() => openNotice(notice.id)}
+                  className={`block w-full rounded-xl border px-5 py-4 text-left transition ${
+                    isRead
+                      ? "border-gray-100 bg-white hover:border-gray-200 hover:bg-gray-50"
+                      : "border-red-100 bg-red-50/40 hover:border-red-200 hover:bg-red-50"
+                  }`}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
@@ -125,7 +159,8 @@ export default function NoticesPage() {
                     </div>
                   </div>
                 </button>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
