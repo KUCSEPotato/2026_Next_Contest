@@ -890,7 +890,7 @@ function MemoirContent() {
   if (!requestedProjectId) {
     return (
       <div style={{ minHeight: "100vh", background: "var(--memoir-page-bg)", color: "var(--memoir-text)", fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", padding: "40px 24px" }}>
-        <div style={{ width: "100%", maxWidth: 1152, margin: "0 auto" }}>
+        <div style={{ width: "100%", maxWidth: 1024, margin: "0 auto" }}>
           <section style={{ background: "var(--memoir-card-bg)", border: "1px solid var(--memoir-border)", borderRadius: 18, padding: "32px 36px", boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)" }}>
             <p style={{ color: "var(--memoir-rose-text)", fontSize: 14, fontWeight: 800, margin: 0 }}>
               나의 회고
@@ -979,7 +979,7 @@ function MemoirContent() {
   return (
     <>
       <div style={{ minHeight: "100vh", background: "var(--memoir-page-bg)", color: "var(--memoir-text)", fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", padding: "40px 24px" }}>
-        <div style={{ width: "100%", maxWidth: 1152, margin: "0 auto" }}>
+        <div style={{ width: "100%", maxWidth: 1024, margin: "0 auto" }}>
 
         {/* ── Hero ── */}
         <section style={{ position: "relative", overflow: "hidden", background: "var(--memoir-card-bg)", padding: "34px 36px", border: "1px solid var(--memoir-border)", borderRadius: 18, boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)" }}>
