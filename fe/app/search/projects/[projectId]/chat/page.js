@@ -7,7 +7,7 @@ import {
   createChatRoomApi,
   getProjectApi,
   getMyProfileApi,
-} from "../../../../lib/api";
+} from "../../../../../lib/api";
 
 export default function ProjectChatRoomsPage() {
   const params = useParams();
