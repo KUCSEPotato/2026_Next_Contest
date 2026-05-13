@@ -215,6 +215,15 @@ function stringifyLessonsLearned(data: GrowthData) {
   });
 }
 
+function toMemoirPreview(value?: string | null) {
+  const text = (value || "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  const firstSentence = text.match(/^.*?[.!?。！？](?=\s|$)/)?.[0] || text;
+  return firstSentence.length > 120
+    ? `${firstSentence.slice(0, 120).trim()}...`
+    : firstSentence;
+}
+
 /* ── 서수 (1번째, 2번째…) ── */
 function getProjectRecentTime(project: ProjectData): number {
   const value = project.completed_at || project.updated_at || project.created_at;
@@ -900,9 +909,6 @@ function MemoirContent() {
             <p style={{ color: "var(--memoir-rose-text)", fontSize: 14, fontWeight: 800, margin: 0 }}>
               나의 회고
             </p>
-            <h1 style={{ margin: "8px 0 0", fontSize: 34, lineHeight: 1.25, fontWeight: 900 }}>
-              완료한 프로젝트에서 남긴 성장 기록
-            </h1>
             <p style={{ margin: "12px 0 0", color: "var(--memoir-muted)", fontSize: 15 }}>
               지금까지 완료한 프로젝트의 정원을 한눈에 모아봅니다.
             </p>
@@ -937,10 +943,10 @@ function MemoirContent() {
             <div style={{ marginTop: 20, display: "grid", gap: 16 }}>
               {memoirList.map(({ project: completedProject, growth: itemGrowth }) => {
                 const summaryText =
-                  itemGrowth?.aiMemoir ||
-                  itemGrowth?.good ||
-                  itemGrowth?.lessons ||
-                  itemGrowth?.nextActions ||
+                  toMemoirPreview(itemGrowth?.aiMemoir) ||
+                  toMemoirPreview(itemGrowth?.good) ||
+                  toMemoirPreview(itemGrowth?.lessons) ||
+                  toMemoirPreview(itemGrowth?.nextActions) ||
                   "아직 작성된 회고 내용이 없습니다.";
 
                 return (
