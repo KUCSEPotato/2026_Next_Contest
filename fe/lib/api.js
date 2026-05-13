@@ -109,6 +109,27 @@ export async function resetPasswordApi(token, newPassword) {
   return handleResponse(res, "비밀번호 재설정에 실패했습니다.");
 }
 
+export async function getOAuthLinksApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/auth/oauth/links`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "OAuth 연결 상태를 불러오지 못했습니다.");
+}
+
+export async function linkGithubOAuthApi(code, redirectUri) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/auth/oauth/link/github`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({
+      code,
+      redirect_uri: redirectUri,
+    }),
+  });
+
+  return handleResponse(res, "GitHub 계정 연동에 실패했습니다.");
+}
+
 /* =========================
    Ideas
 ========================= */
