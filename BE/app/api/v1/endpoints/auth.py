@@ -448,6 +448,17 @@ async def github_oauth_callback(
     try:
         if not settings.github_oauth_client_id or not settings.github_oauth_client_secret:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="GitHub OAuth is not configured")
+
+        frontend_url = settings.frontend_url or "http://localhost:3000"
+        if state == "link_github":
+            query = urlencode(
+                {
+                    "code": code,
+                    "state": "link_github",
+                    "oauth_redirect_uri": settings.github_oauth_redirect_uri or "",
+                }
+            )
+            return RedirectResponse(url=f"{frontend_url}/auth/github/callback?{query}", status_code=302)
         
         redirect_uri = settings.github_oauth_redirect_uri
         access_token = await exchange_github_code_for_access_token(
@@ -463,8 +474,6 @@ async def github_oauth_callback(
         github_login = profile.get("login")
         avatar_url = profile.get("avatar_url")
         mode = "signup" if state == "signup" else "login"
-        
-        frontend_url = settings.frontend_url or "http://localhost:3000"
 
         # 기존 유저 찾기
         user = None

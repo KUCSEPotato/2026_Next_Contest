@@ -35,9 +35,10 @@ function GithubCallbackContent() {
   const [linkInfo, setLinkInfo] = useState(null);
   const [errorReturnPath, setErrorReturnPath] = useState("/signup");
 
-  const handleGithubAccountLink = useCallback(async (code) => {
+  const handleGithubAccountLink = useCallback(async (code, oauthRedirectUri = null) => {
     try {
       const redirectUri =
+        oauthRedirectUri ||
         process.env.NEXT_PUBLIC_GITHUB_REDIRECT_URI ||
         `${window.location.origin}/auth/github/callback`;
 
@@ -184,8 +185,9 @@ function GithubCallbackContent() {
     }
 
     if (state === "link_github") {
+      const oauthRedirectUri = searchParams.get("oauth_redirect_uri");
       queueMicrotask(() => {
-        handleGithubAccountLink(code);
+        handleGithubAccountLink(code, oauthRedirectUri);
       });
       return;
     }
