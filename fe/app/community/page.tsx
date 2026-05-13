@@ -57,7 +57,7 @@ const HOT_SECTIONS: HotSection[] = [
 ];
 
 const ADMIN_ONLY_CATEGORIES = new Set(["announcement", "event"]);
-const POSTS_PER_PAGE = 10;
+const POSTS_PER_PAGE = 5;
 
 function isCampfirePost(post: PostSummary | null) {
   return Boolean(post && !ADMIN_ONLY_CATEGORIES.has(post.category || ""));
