@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import ProgressBloom from "../../components/ProgressBloom";
 import {
@@ -933,12 +934,12 @@ function MemoirContent() {
                         </p>
                       </div>
 
-                      <a
+                      <Link
                         href={`/memoir?projectId=${completedProject.id}`}
                         style={{ flexShrink: 0, borderRadius: 12, background: "#e60012", color: "#fff", padding: "10px 14px", fontSize: 14, fontWeight: 800, textDecoration: "none" }}
                       >
                         회고 보기
-                      </a>
+                      </Link>
                     </div>
 
                     {itemGrowth?.chips?.length ? (

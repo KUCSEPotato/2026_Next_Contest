@@ -184,7 +184,15 @@ export default function LoginPage() {
             width={110}
             height={80}
             priority
-            className="h-auto w-[110px]"
+            className="h-auto w-[110px] dark:hidden"
+          />
+          <Image
+            src="/logo_colored_white.svg"
+            alt="Devory 로고"
+            width={110}
+            height={80}
+            priority
+            className="hidden h-auto w-[110px] dark:block"
           />
         </div>
 
