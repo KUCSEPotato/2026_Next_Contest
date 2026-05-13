@@ -29,6 +29,11 @@ PAYMENT_STATUS_IN_PROGRESS = "IN_PROGRESS"
 PAYMENT_STATUS_DONE = "DONE"
 PAYMENT_STATUS_FAILED = "FAILED"
 
+COIN_PACKAGES = {
+    "drop": {"coin_amount": 1, "price_krw": 300, "label": "한 방울"},
+    "cup": {"coin_amount": 10, "price_krw": 2000, "label": "한 잔"},
+}
+
 
 class PaymentPrepareRequest(BaseModel):
     product_code: str | None = Field(default=None, min_length=1, max_length=50)
@@ -120,23 +125,36 @@ async def prepare_payment(
     if not product_code:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="product_code is required")
 
-    product = get_payment_product_or_404(db, product_code)
-    amount = int(product.price_krw)
-    order_name = product.name
-    order_id = f"devory_{product.product_code.lower()}_{current_user_id}_{uuid.uuid4().hex}"
-
-    payment = Payment(
-        user_id=current_user_id,
-        order_id=order_id,
-        order_name=order_name,
-        amount=amount,
-        product_id=product.id,
-        product_code=product.product_code,
-        product_type=product.product_type,
-        currency="KRW",
-        status=PAYMENT_STATUS_READY,
-        provider="TOSS",
-    )
+    package = COIN_PACKAGES.get(product_code)
+    if package:
+        order_id = f"devory_coin_{product_code}_{current_user_id}_{uuid.uuid4().hex}"
+        payment = Payment(
+            user_id=current_user_id,
+            order_id=order_id,
+            order_name=f"Devory 물방울 {package['label']}",
+            amount=int(package["price_krw"]),
+            coin_amount=int(package["coin_amount"]),
+            currency="KRW",
+            status=PAYMENT_STATUS_READY,
+            provider="TOSS",
+        )
+    else:
+        product = get_payment_product_or_404(db, product_code)
+        amount = int(product.price_krw)
+        order_name = product.name
+        order_id = f"devory_{product.product_code.lower()}_{current_user_id}_{uuid.uuid4().hex}"
+        payment = Payment(
+            user_id=current_user_id,
+            order_id=order_id,
+            order_name=order_name,
+            amount=amount,
+            product_id=product.id,
+            product_code=product.product_code,
+            product_type=product.product_type,
+            currency="KRW",
+            status=PAYMENT_STATUS_READY,
+            provider="TOSS",
+        )
     db.add(payment)
     db.commit()
     db.refresh(payment)

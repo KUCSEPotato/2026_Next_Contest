@@ -213,13 +213,22 @@ def create_entitlement_for_payment(db: Session, payment: Payment, product: Payme
     if existing is not None:
         return existing
 
+    return grant_entitlement(db, user_id=payment.user_id, product=product, payment=payment)
+
+
+def grant_entitlement(
+    db: Session,
+    user_id: int,
+    product: PaymentProduct,
+    payment: Payment | None = None,
+) -> UserEntitlement:
     starts_at = _now()
     expires_at = starts_at + timedelta(days=int(product.duration_days or 30))
     is_subscription = product.product_type == "SUBSCRIPTION"
     entitlement = UserEntitlement(
-        user_id=payment.user_id,
+        user_id=user_id,
         product_id=product.id,
-        payment_id=payment.id,
+        payment_id=payment.id if payment else None,
         product_code=product.product_code,
         product_type=product.product_type,
         starts_at=starts_at,
@@ -231,7 +240,8 @@ def create_entitlement_for_payment(db: Session, payment: Payment, product: Payme
     )
     db.add(entitlement)
     db.flush()
-    payment.entitlement_id = entitlement.id
+    if payment is not None:
+        payment.entitlement_id = entitlement.id
     return entitlement
 
 
