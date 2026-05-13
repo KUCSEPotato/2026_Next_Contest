@@ -105,7 +105,7 @@ def _serialize_comment(db: Session, comment: CommunityPostComment, current_user_
         "updated_at": comment.updated_at,
             "author": {
                 "id": author.id if not anon else None,
-                "nickname": "?듬챸" if anon else author.nickname,
+                "nickname": "익명" if anon else author.nickname,
                 "avatar_url": None if anon else author.avatar_url,
                 "role": None if anon else author.role,
             },
@@ -189,12 +189,12 @@ async def list_posts(
     # sort_by에 따른 초기 정렬 설정 (핀 된 글은 항상 먼저)
     if sort_by == "views":
         query = query.order_by(
-            CommunityPost.is_pinned.desc(),
             CommunityPost.view_count.desc(),
+            CommunityPost.created_at.desc(),
         )
     elif sort_by in ["likes", "recommend", "comments", "trending", "hot"]:
         # likes/recommend, comments, trending은 메모리에서 정렬하므로 일단 핀만 먼저
-        query = query.order_by(CommunityPost.is_pinned.desc())
+        query = query.order_by(CommunityPost.created_at.desc())
     else:  # newest (기본값)
         query = query.order_by(
             CommunityPost.is_pinned.desc(),
@@ -274,16 +274,13 @@ async def list_posts(
     # 메모리에서 정렬 (likes/recommend, comments, trending은 계산된 값이므로)
     if sort_by in ("likes", "recommend"):
         # 추천순으로 정렬 (핀 된 글 우선 유지)
-        pinned = [p for p in result if p["is_pinned"]]
-        unpinned = [p for p in result if not p["is_pinned"]]
-        unpinned.sort(key=lambda x: x["reaction_stats"]["recommend"], reverse=True)
-        result = pinned + unpinned
+        result.sort(
+            key=lambda x: (x["reaction_stats"]["recommend"], x["created_at"]),
+            reverse=True,
+        )
     elif sort_by == "comments":
         # 댓글순으로 정렬 (핀 된 글 우선 유지)
-        pinned = [p for p in result if p["is_pinned"]]
-        unpinned = [p for p in result if not p["is_pinned"]]
-        unpinned.sort(key=lambda x: x["comment_count"], reverse=True)
-        result = pinned + unpinned
+        result.sort(key=lambda x: (x["comment_count"], x["created_at"]), reverse=True)
     elif sort_by in ["trending", "hot"]:
         # 핫게 정렬: 조회수*0.1 + 추천 수*1.0 + 댓글*0.5
         def calculate_trending_score(post):
@@ -293,10 +290,10 @@ async def list_posts(
                 post["comment_count"] * 0.5
             )
         
-        pinned = [p for p in result if p["is_pinned"]]
-        unpinned = [p for p in result if not p["is_pinned"]]
-        unpinned.sort(key=calculate_trending_score, reverse=True)
-        result = pinned + unpinned
+        result.sort(
+            key=lambda x: (calculate_trending_score(x), x["created_at"]),
+            reverse=True,
+        )
 
     # 페이지네이션 적용 (likes, comments, trending은 이제 정렬이 완료됨)
     if sort_by in ["likes", "recommend", "comments", "trending", "hot"]:
@@ -408,6 +405,15 @@ async def update_post(
     db.refresh(post)
 
     author = db.get(User, post.author_id)
+    comment_count = (
+        db.query(func.count(CommunityPostComment.id))
+        .filter(
+            CommunityPostComment.post_id == post.id,
+            CommunityPostComment.deleted_at.is_(None),
+        )
+        .scalar() or 0
+    )
+    snapshot = _post_reaction_snapshot(db, post.id, current_user_id)
     return success_response(
         data={
             "id": post.id,
@@ -425,6 +431,9 @@ async def update_post(
                 "avatar_url": author.avatar_url,
                 "role": author.role,
             },
+            "comment_count": comment_count,
+            "reaction_stats": snapshot["reaction_stats"],
+            "user_reaction": snapshot["user_reaction"],
         },
     )
 
