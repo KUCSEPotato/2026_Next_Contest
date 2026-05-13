@@ -40,7 +40,6 @@ const CATEGORIES = [
   { label: "질문", value: "question" },
   { label: "아이디어", value: "idea" },
   { label: "작업 공유", value: "showcase" },
-  { label: "이벤트", value: "event" },
 ];
 
 const REACTIONS: {

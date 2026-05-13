@@ -82,9 +82,10 @@ export default function TopActionButtons({ tone = "default" }: TopActionButtonsP
 
       try {
         const result = await getNotificationsApi();
+        const notifications = Array.isArray(result) ? result : result.data || [];
         if (!ignore) {
           setHasUnreadNotification(
-            (result.data || []).some((notification: { is_read?: boolean }) => !notification.is_read)
+            notifications.some((notification: { is_read?: boolean }) => !notification.is_read)
           );
         }
       } catch {
@@ -93,10 +94,11 @@ export default function TopActionButtons({ tone = "default" }: TopActionButtonsP
 
       try {
         const result = await getMyChatRoomsApi();
+        const rooms = Array.isArray(result) ? result : result.data || [];
         const readCounts = getStoredChatReadCounts();
         if (!ignore) {
           setHasUnreadChat(
-            (result.data || []).some((room: { room_id?: number; message_count?: number }) => {
+            rooms.some((room: { room_id?: number; message_count?: number }) => {
               const roomId = String(room.room_id || "");
               return Math.max(Number(room.message_count || 0) - Number(readCounts[roomId] || 0), 0) > 0;
             })
