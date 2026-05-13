@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   getChatRoomsApi,
@@ -21,7 +21,7 @@ export default function ProjectChatRoomsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedMemberIds, setSelectedMemberIds] = useState([]);
 
-  const loadRooms = async () => {
+  const loadRooms = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -40,13 +40,17 @@ export default function ProjectChatRoomsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId]);
 
   useEffect(() => {
     if (projectId) {
-      loadRooms();
+      const timer = window.setTimeout(() => {
+        loadRooms();
+      }, 0);
+
+      return () => window.clearTimeout(timer);
     }
-  }, [projectId]);
+  }, [projectId, loadRooms]);
 
   const isLeader = project && profile && project.leader_id === profile.id;
   const canCreateRoom = isLeader && project?.status === "in_progress";

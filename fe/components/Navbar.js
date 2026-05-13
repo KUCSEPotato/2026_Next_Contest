@@ -10,7 +10,23 @@ import {
   loadCurrentUser,
   refreshAccessToken,
   removeToken,
+  updateStoredUser,
 } from "../lib/auth";
+import { getMyProfileApi } from "../lib/api";
+
+const THEME_STORAGE_KEY = "devory-theme";
+
+function getCurrentTheme() {
+  if (typeof document === "undefined") return "light";
+  return document.documentElement.classList.contains("dark") ? "dark" : "light";
+}
+
+function applyTheme(theme) {
+  const isDark = theme === "dark";
+  document.documentElement.classList.toggle("dark", isDark);
+  document.documentElement.dataset.theme = theme;
+  window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+}
 
 export default function Navbar() {
   const router = useRouter();
@@ -18,6 +34,18 @@ export default function Navbar() {
 
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
+  const [authStatus, setAuthStatus] = useState("checking");
+  const [theme, setTheme] = useState(getCurrentTheme);
+
+  useEffect(() => {
+    const frameId = window.requestAnimationFrame(() => {
+      setTheme(getCurrentTheme());
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -29,6 +57,7 @@ export default function Navbar() {
       if (!cancelled) {
         setToken(currentToken);
         setUser(storedUser);
+        setAuthStatus(currentToken ? "authenticated" : "anonymous");
       }
 
       if (!currentToken || storedUser?.role) {
@@ -36,14 +65,19 @@ export default function Navbar() {
       }
 
       try {
+        if (!cancelled) {
+          setAuthStatus("checking");
+        }
         const currentUser = await loadCurrentUser();
         if (!cancelled) {
           setToken(getToken());
           setUser(currentUser);
+          setAuthStatus("authenticated");
         }
       } catch {
         if (!cancelled) {
           setUser(getStoredUser());
+          setAuthStatus(getToken() ? "authenticated" : "anonymous");
         }
       }
     };
@@ -67,6 +101,41 @@ export default function Navbar() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!token) return;
+
+    let ignore = false;
+
+    async function syncLatestProfile() {
+      try {
+        const result = await getMyProfileApi();
+        if (ignore || !result?.data) return;
+
+        const latestUser = result.data;
+        const storedUser = getStoredUser();
+        const hasChanged =
+          storedUser?.id !== latestUser.id ||
+          storedUser?.email !== latestUser.email ||
+          storedUser?.nickname !== latestUser.nickname ||
+          storedUser?.avatar_url !== latestUser.avatar_url;
+
+        if (hasChanged) {
+          updateStoredUser(latestUser);
+        } else {
+          setUser(storedUser);
+        }
+      } catch {
+        // Keep the last stored user visible if profile sync fails.
+      }
+    }
+
+    syncLatestProfile();
+
+    return () => {
+      ignore = true;
+    };
+  }, [token]);
+
   if (pathname === "/login" || pathname === "/signup") {
     return null;
   }
@@ -75,15 +144,26 @@ export default function Navbar() {
     removeToken();
     setToken(null);
     setUser(null);
+    setAuthStatus("anonymous");
     router.push("/login");
   };
 
+  const handleThemeToggle = () => {
+    const currentTheme = getCurrentTheme();
+    const nextTheme = currentTheme === "dark" ? "light" : "dark";
+    applyTheme(nextTheme);
+    setTheme(nextTheme);
+  };
+
+  const isAuthenticated = authStatus === "authenticated" && token;
+  const isDarkTheme = theme === "dark";
+
   return (
-    <nav className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur">
+    <nav className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
         <button onClick={() => router.push("/mainpage")}>
           <Image
-            src="/logo_colored.svg"
+            src={isDarkTheme ? "/logo_colored_white.svg" : "/logo_colored.svg"}
             alt="Devory 로고"
             width={120}
             height={60}
@@ -93,25 +173,56 @@ export default function Navbar() {
         </button>
 
         <div className="flex items-center gap-3 text-sm font-semibold">
+          {isAuthenticated && (
+            <>
+              <button
+                onClick={() => router.push("/coins")}
+                className="text-slate-700 transition hover:text-red-600"
+              >
+                코인
+              </button>
+              <button
+                onClick={() => router.push("/mypage")}
+                className="text-slate-700 transition hover:text-red-600"
+              >
+                마이페이지
+              </button>
+            </>
+          )}
+
           <button
-            onClick={() => router.push("/mypage")}
-            className="text-slate-700 transition hover:text-red-600"
+            onClick={() => router.push("/memoir?view=list")}
+            className="text-slate-700 transition hover:text-red-600 dark:text-slate-200 dark:hover:text-red-400"
           >
-            마이페이지
+            나의 회고
           </button>
 
           {user?.role === "admin" && (
             <button
               onClick={() => router.push("/admin")}
-              className="text-slate-700 transition hover:text-red-600"
+              className="text-slate-700 transition hover:text-red-600 dark:text-slate-200 dark:hover:text-red-400"
             >
               관리자
             </button>
           )}
 
-          {token ? (
+          <button
+            type="button"
+            onClick={handleThemeToggle}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-slate-700 transition hover:border-red-200 hover:text-red-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-red-500 dark:hover:text-red-300"
+            aria-label={isDarkTheme ? "라이트 모드로 전환" : "다크 모드로 전환"}
+            title={isDarkTheme ? "라이트 모드" : "다크 모드"}
+          >
+            {isDarkTheme ? "라이트" : "다크"}
+          </button>
+
+          {authStatus === "checking" ? (
+            <span className="rounded-lg border border-slate-200 px-4 py-2 text-slate-500 dark:border-slate-700 dark:text-slate-400">
+              로그인 확인 중
+            </span>
+          ) : isAuthenticated ? (
             <>
-              <span className="hidden max-w-[180px] truncate text-slate-500 sm:inline">
+              <span className="hidden max-w-[180px] truncate text-slate-500 dark:text-slate-400 sm:inline">
                 {user?.nickname || user?.email || "로그인됨"}
               </span>
               <button

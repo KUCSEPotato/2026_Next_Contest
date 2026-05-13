@@ -1,7 +1,7 @@
-import { PostSummary, PostDetail, CommentItem, ReactionType } from "../_types";
-import { authenticatedFetch, getToken } from "../../../lib/auth";
+import { PostSummary, PostDetail, CommentItem, ReactionType, PostFile } from "../_types";
+import { authenticatedFetch, getApiBaseUrl, getToken } from "../../../lib/auth";
 
-const BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"}/api/v1/community`;
+const BASE = `${getApiBaseUrl()}/api/v1/community`;
 
 function authHeaders(): HeadersInit {
   const token = getToken();
@@ -56,6 +56,23 @@ export async function createPost(payload: {
   return handleResponse(res);
 }
 
+export async function uploadPostFile(postId: number, file: File): Promise<PostFile> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await authenticatedFetch(`${BASE}/${postId}/files`, {
+    method: "POST",
+    body: formData,
+  });
+  return handleResponse(res);
+}
+
+export async function getPostFiles(postId: number): Promise<PostFile[]> {
+  const res = await authenticatedFetch(`${BASE}/${postId}/files`);
+  const data = await handleResponse<{ files: PostFile[] }>(res);
+  return data.files;
+}
+
 export async function updatePost(
   postId: number,
   payload: { title?: string; content?: string; category?: string }
@@ -79,7 +96,12 @@ export async function deletePost(postId: number): Promise<void> {
 export async function reactToPost(
   postId: number,
   reactionType: ReactionType
-): Promise<{ action: "added" | "removed"; reaction_type: ReactionType }> {
+): Promise<{
+  action: "added" | "removed" | "updated";
+  reaction_type: ReactionType;
+  reaction_stats?: { recommend: number; not_recommend: number };
+  user_reaction?: ReactionType | null;
+}> {
   const res = await authenticatedFetch(`${BASE}/${postId}/reactions`, {
     method: "POST",
     headers: authHeaders(),
@@ -92,22 +114,22 @@ export async function reactToPost(
 
 export async function getHotPosts(): Promise<{
   popular: PostSummary | null;
-  most_liked: PostSummary | null;
+  most_recommended: PostSummary | null;
   most_commented: PostSummary | null;
   most_viewed: PostSummary | null;
   latest: PostSummary | null;
 }> {
   const fetchTop1 = async (sort_by: string): Promise<PostSummary | null> => {
-    const res = await fetch(`${BASE}?sort_by=${sort_by}&page=1&page_size=1`, {
+    const res = await authenticatedFetch(`${BASE}?sort_by=${sort_by}&page=1&page_size=1`, {
       headers: authHeaders(),
     });
     const data = await handleResponse<{ posts: PostSummary[] }>(res);
     return data.posts[0] ?? null;
   };
 
-  const [popular, most_liked, most_commented, most_viewed, latest] = await Promise.all([
+  const [popular, most_recommended, most_commented, most_viewed, latest] = await Promise.all([
     fetchTop1("hot"),
-    fetchTop1("likes"),
+    fetchTop1("recommend"),
     fetchTop1("comments"),
     fetchTop1("views"),
     fetchTop1("newest"),
@@ -119,10 +141,20 @@ export async function getHotPosts(): Promise<{
 
   return {
     popular,
-    most_liked:     most_liked     && !usedIds.has(most_liked.id)     ? (usedIds.add(most_liked.id),     most_liked)     : null,
-    most_commented: most_commented && !usedIds.has(most_commented.id) ? (usedIds.add(most_commented.id), most_commented) : null,
-    most_viewed:    most_viewed    && !usedIds.has(most_viewed.id)    ? (usedIds.add(most_viewed.id),    most_viewed)    : null,
-    latest:         latest         && !usedIds.has(latest.id)         ? (usedIds.add(latest.id),         latest)         : null,
+    most_recommended:
+      most_recommended && !usedIds.has(most_recommended.id)
+        ? (usedIds.add(most_recommended.id), most_recommended)
+        : null,
+    most_commented:
+      most_commented && !usedIds.has(most_commented.id)
+        ? (usedIds.add(most_commented.id), most_commented)
+        : null,
+    most_viewed:
+      most_viewed && !usedIds.has(most_viewed.id)
+        ? (usedIds.add(most_viewed.id), most_viewed)
+        : null,
+    latest:
+      latest && !usedIds.has(latest.id) ? (usedIds.add(latest.id), latest) : null,
   };
 }
 
@@ -144,7 +176,11 @@ export async function getComments(
 
 export async function createComment(
   postId: number,
-  payload: { content: string; parent_comment_id?: number | null }
+  payload: {
+    content: string;
+    parent_comment_id?: number | null;
+    is_anonymous?: boolean;
+  }
 ): Promise<CommentItem> {
   const res = await authenticatedFetch(`${BASE}/${postId}/comments`, {
     method: "POST",
@@ -182,7 +218,12 @@ export async function reactToComment(
   postId: number,
   commentId: number,
   reactionType: ReactionType
-): Promise<{ action: "added" | "removed"; reaction_type: ReactionType }> {
+): Promise<{
+  action: "added" | "removed" | "updated";
+  reaction_type: ReactionType;
+  reaction_stats?: { recommend: number; not_recommend: number };
+  user_reaction?: ReactionType | null;
+}> {
   const res = await authenticatedFetch(`${BASE}/${postId}/comments/${commentId}/reactions`, {
     method: "POST",
     headers: authHeaders(),

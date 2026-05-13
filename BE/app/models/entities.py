@@ -38,9 +38,12 @@ class User(Base):
     phone_number: Mapped[str | None] = mapped_column(String(20))
     bio: Mapped[str | None] = mapped_column(Text)
     avatar_url: Mapped[str | None] = mapped_column(Text)
+    avatar_s3_key: Mapped[str | None] = mapped_column(String(500))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     role: Mapped[str] = mapped_column(String(20), default="user")
+    suspended_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    suspension_reason: Mapped[str | None] = mapped_column(Text)
     coin_balance: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     onboarding_step: Mapped[str] = mapped_column(String(20), default="profile_pending", nullable=False)
     onboarding_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -221,6 +224,8 @@ class Application(Base):
     status: Mapped[str] = mapped_column(String(20), default="pending")
     decided_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class Invitation(Base):
@@ -391,6 +396,22 @@ class PaymentEvent(Base):
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class CoinPurchaseRequest(Base):
+    __tablename__ = "coin_purchase_requests"
+
+    id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    coin_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    price_krw: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    note: Mapped[str | None] = mapped_column(Text)
+    admin_note: Mapped[str | None] = mapped_column(Text)
+    handled_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    handled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class ChatRoom(Base):
     __tablename__ = "chat_rooms"
 
@@ -455,6 +476,8 @@ class Report(Base):
     reporter_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     target_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     target_project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id", ondelete="SET NULL"))
+    target_post_id: Mapped[int | None] = mapped_column(ForeignKey("community_posts.id", ondelete="SET NULL"))
+    target_chat_room_id: Mapped[int | None] = mapped_column(ForeignKey("chat_rooms.id", ondelete="SET NULL"))
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="open")
     handled_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
@@ -492,7 +515,7 @@ class CommunityPostComment(Base):
 
 class CommunityPostReaction(Base):
     __tablename__ = "community_post_reactions"
-    __table_args__ = (UniqueConstraint("post_id", "user_id", "reaction_type", name="community_post_reactions_unique"),)
+    __table_args__ = (UniqueConstraint("post_id", "user_id", name="community_post_reactions_unique"),)
 
     id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
     post_id: Mapped[int] = mapped_column(ForeignKey("community_posts.id", ondelete="CASCADE"), nullable=False)
@@ -503,7 +526,7 @@ class CommunityPostReaction(Base):
 
 class CommunityCommentReaction(Base):
     __tablename__ = "community_comment_reactions"
-    __table_args__ = (UniqueConstraint("comment_id", "user_id", "reaction_type", name="community_comment_reactions_unique"),)
+    __table_args__ = (UniqueConstraint("comment_id", "user_id", name="community_comment_reactions_unique"),)
 
     id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
     comment_id: Mapped[int] = mapped_column(ForeignKey("community_post_comments.id", ondelete="CASCADE"), nullable=False)

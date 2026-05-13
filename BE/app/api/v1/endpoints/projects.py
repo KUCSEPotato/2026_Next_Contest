@@ -1,7 +1,9 @@
 import asyncio
+import re
 from datetime import datetime, timezone, date
 from collections import defaultdict
 from math import ceil
+import os
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from fastapi import WebSocket, WebSocketDisconnect
@@ -60,6 +62,71 @@ from app.core.realtime import chat_room_channel
 from app.core.realtime import realtime_hub
 
 router = APIRouter()
+
+TODO_FINALIZED_MARKER_TITLE = "__team_todo_finalized__"
+
+
+IDEA_DESCRIPTION_SECTION_LABELS = (
+    "예상 진행 기간",
+    "이런 분과 함께하고 싶어요",
+)
+
+
+def _normalize_skill_name(skill_name: str) -> str:
+    return re.sub(r"\s+", " ", skill_name.strip()).lower()
+
+
+def _extract_idea_description_parts(description: str | None) -> dict[str, str]:
+    text = description or ""
+    labels = "|".join(re.escape(label) for label in IDEA_DESCRIPTION_SECTION_LABELS)
+    pattern = re.compile(
+        rf"<b>\[\s*(?P<label>{labels})\s*\]</b>\s*(?P<value>.*?)(?=\n\s*<b>\[|$)",
+        re.DOTALL,
+    )
+    sections = {match.group("label"): match.group("value").strip() for match in pattern.finditer(text)}
+    clean_description = pattern.sub("", text).strip()
+
+    return {
+        "description": clean_description,
+        "expected_period": sections.get("예상 진행 기간", ""),
+        "preferred_members": sections.get("이런 분과 함께하고 싶어요", ""),
+    }
+
+
+def _compose_idea_description(
+    description: str,
+    expected_period: str | None = None,
+    preferred_members: str | None = None,
+) -> str:
+    parts = [description.strip()]
+    if expected_period and expected_period.strip():
+        parts.append(f"<b>[ 예상 진행 기간 ]</b>\n{expected_period.strip()}")
+    if preferred_members and preferred_members.strip():
+        parts.append(f"<b>[ 이런 분과 함께하고 싶어요 ]</b>\n{preferred_members.strip()}")
+    return "\n\n".join(part for part in parts if part)
+
+
+def _sync_project_skills(db: Session, project_id: int, tech_stack: list[str]) -> None:
+    db.query(ProjectSkill).filter(ProjectSkill.project_id == project_id).delete()
+    seen_skill_ids: set[int] = set()
+
+    for skill_name in tech_stack:
+        skill_name = skill_name.strip()
+        if not skill_name:
+            continue
+
+        normalized_name = _normalize_skill_name(skill_name)
+        skill = db.query(Skill).filter(Skill.normalized_name == normalized_name).first()
+        if skill is None:
+            skill = Skill(name=skill_name, normalized_name=normalized_name)
+            db.add(skill)
+            db.flush()
+
+        if skill.id in seen_skill_ids:
+            continue
+
+        db.add(ProjectSkill(project_id=project_id, skill_id=skill.id))
+        seen_skill_ids.add(skill.id)
 
 
 def _calculate_days_left(deadline: date | None) -> int | None:
@@ -265,14 +332,14 @@ def _build_memoir_response(memoir: Retrospective) -> dict:
 
 def _fallback_ai_todo_titles(project: Project) -> list[str]:
     return [
-        f"기획 - {project.title} 핵심 사용자 흐름과 완료 기준 정리",
-        "기획 - 팀원별 역할, 담당 영역, 리뷰 방식을 문서화",
-        "설계 - 화면/기능 단위로 구현 범위를 세분화하고 우선순위 결정",
-        "설계 - 필요한 API, 데이터 모델, 상태 흐름 목록화",
-        "구현 - 가장 작은 MVP 기능을 먼저 구현하고 팀 리뷰 진행",
-        "구현 - 주요 사용자 액션별 예외 처리와 빈 상태 구현",
-        "검증 - 핵심 플로우를 실제 계정으로 점검하고 수정사항 기록",
-        "검증 - 배포 전 남은 이슈와 다음 스프린트 Todo 정리",
+        f"기획 단계 - {project.title} 핵심 사용자 흐름 확정하기 :: 프로젝트를 처음 사용하는 사용자가 어떤 순서로 기능을 이용하고, 어떤 상태가 완료 기준인지 문서로 정리한다.",
+        "기획 단계 - 프로젝트 세부 계획과 MVP 범위 결정하기 :: 반드시 구현할 기능, 시간이 남으면 구현할 기능, 제외할 기능을 나누어 팀이 같은 기준으로 개발하도록 한다.",
+        "기획 단계 - 팀원별 역할과 담당 영역 기록하기 :: 프론트엔드, 백엔드, 디자인, 검증 등 담당자를 정하고 각자가 맡을 산출물을 Todo 상세에 남긴다.",
+        "설계 단계 - 화면 단위 기능 목록과 이동 흐름 만들기 :: 주요 페이지별 입력값, 버튼, 빈 상태, 오류 상태를 정리해 구현 순서를 잡는다.",
+        "설계 단계 - API와 데이터 모델 목록 작성하기 :: 필요한 엔드포인트, 요청/응답 필드, 저장해야 할 테이블 또는 컬럼을 기능별로 정리한다.",
+        "개발 단계 - 백엔드 핵심 API 구현하기 :: 프로젝트 생성, 조회, 수정처럼 MVP에 필요한 API를 우선 구현하고 응답 형식을 프론트와 맞춘다.",
+        "개발 단계 - 프론트엔드 주요 화면 구현하기 :: 사용자가 가장 먼저 접하는 목록, 상세, 작성 화면을 연결하고 실제 API 데이터로 렌더링한다.",
+        "검증 단계 - 핵심 플로우 테스트와 수정 사항 기록하기 :: 실제 계정으로 생성부터 완료까지 진행해보고 실패한 케이스와 수정 담당자를 남긴다.",
     ]
 
 
@@ -310,13 +377,19 @@ def _build_ai_todo_context(
 
 async def _generate_ai_todo_titles(context_text: str, project: Project) -> list[str]:
     if not settings.gemini_api_key:
-        return _fallback_ai_todo_titles(project)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="There is no Gemini API key available",
+        )
 
     try:
         response_text = await _call_gemini_for_todo_list(context_text)
         todos_by_user = _parse_gemini_response(response_text)
-    except HTTPException:
-        return _fallback_ai_todo_titles(project)
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Gemini API request failed: {str(error)}",
+        )
 
     titles: list[str] = []
     for todos in todos_by_user.values():
@@ -327,38 +400,116 @@ async def _generate_ai_todo_titles(context_text: str, project: Project) -> list[
                 titles.append(todo.strip())
 
     deduped_titles = list(dict.fromkeys(titles))
-    return deduped_titles[:8] or _fallback_ai_todo_titles(project)
+    return deduped_titles[:18] or _fallback_ai_todo_titles(project)
 
 
-async def _call_gemini_for_memoir_refine(feelings: str, shortcomings: str) -> str:
-    if not settings.gemini_api_key:
+def _fallback_memoir_refine(feelings: str, shortcomings: str) -> str:
+    feeling_text = feelings.strip()
+    shortcoming_text = shortcomings.strip()
+    parts: list[str] = []
+
+    if feeling_text:
+        parts.append(
+            "이번 프로젝트에서 가장 의미 있었던 점은 결과보다 과정 안에서 직접 부딪히며 배운 감각입니다. "
+            f"'{feeling_text}'라는 기록에는 새롭게 시도한 일에 대한 설렘과, 그 경험을 다음 성장의 재료로 삼으려는 마음이 함께 담겨 있습니다."
+        )
+    if shortcoming_text:
+        parts.append(
+            f"아쉬움으로 남긴 '{shortcoming_text}' 역시 실패의 표시라기보다 다음번에 더 선명하게 준비할 수 있는 단서에 가깝습니다. "
+            "무엇이 막혔는지 알아차렸다는 것은 이미 개선의 출발선을 잡았다는 뜻이니까요."
+        )
+    parts.append(
+        "다음에는 이번에 발견한 강점을 조금 더 깊게 밀어붙일 수 있는 프로젝트를 골라보면 좋겠습니다. "
+        "특히 직접 구현한 기능을 사용자 흐름과 연결해보는 경험은 문제를 구조화하는 힘을 더 단단하게 키워줄 것입니다."
+    )
+    return "\n\n".join(parts)
+
+
+def _clean_memoir_refine_output(text: str) -> str:
+    forbidden_patterns = [
+        r"아래\s*프로젝트\s*맥락",
+        r"해석을\s*위한\s*배경",
+        r"그대로\s*(인용|옮겨|나열)",
+        r"프로젝트\s*(분야|난이도|기술|키워드|제목|한줄|상세)",
+        r"사용자가\s*고른\s*키워드",
+        r"성장\s*키워드\s*[:：]",
+        r"느낀\s*점\s*[:：]",
+        r"배운\s*점\s*[:：]",
+        r"다음\s*액션\s*[:：]",
+        r"부족했던\s*점\s*[:：]",
+    ]
+    cleaned_lines: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            if cleaned_lines and cleaned_lines[-1] != "":
+                cleaned_lines.append("")
+            continue
+        if any(re.search(pattern, stripped, re.IGNORECASE) for pattern in forbidden_patterns):
+            continue
+        cleaned_lines.append(stripped)
+
+    cleaned = "\n".join(cleaned_lines).strip()
+    return re.sub(r"\n{3,}", "\n\n", cleaned)
+
+
+def _build_project_memoir_context(db: Session, project: Project) -> str:
+    tech_stack = db.query(Skill.name).join(
+        ProjectSkill,
+        ProjectSkill.skill_id == Skill.id,
+    ).filter(ProjectSkill.project_id == project.id).all()
+    tech_stack_list = [skill[0] for skill in tech_stack if skill and skill[0]]
+    context_parts = [
+        f"분야={project.category}" if project.category else "",
+        f"난이도={project.difficulty}" if project.difficulty else "",
+        f"기술={', '.join(tech_stack_list[:5])}" if tech_stack_list else "",
+    ]
+    return " / ".join(part for part in context_parts if part)
+
+
+async def _call_gemini_for_memoir_refine(feelings: str, shortcomings: str, project_context: str = "") -> str:
+    gemini_api_key = settings.gemini_api_key
+
+    if not gemini_api_key:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Gemini API key is not configured",
+            detail="There is no Gemini API key available",
         )
-    return await asyncio.to_thread(_sync_call_gemini_for_memoir_refine, feelings, shortcomings)
+        return _fallback_memoir_refine(feelings, shortcomings)
+    return await asyncio.to_thread(_sync_call_gemini_for_memoir_refine, feelings, shortcomings, project_context)
 
 
-def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str) -> str:
+def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str, project_context: str = "") -> str:
     prompt = (
-        "당신은 프로젝트 회고를 작성하는 데 도움을 주는 AI입니다.\n"
-        "다음 두 항목을 읽고 자연스럽고 매끄러운 한국어 **감성적** 회고 문장으로 정제하세요.\n"
-        "1) 느낀 점\n"
-        "2) 부족했던 점\n\n"
+        "당신은 대학생 개발자의 프로젝트 경험을 바탕으로 "
+        "자연스럽고 진솔한 프로젝트 회고록 본문을 작성하는 작가입니다.\n\n"
 
-        "지침:\n"
-        "1. 텍스트의 핵심 의미를 유지하면서 표현을 개선해주세요.\n"
-        "2. 구체적이고 행동 지향적인 표현으로 변경하세요.\n"
-        "3. 문법과 띄어쓰기를 수정하세요.\n"
-        "4. 불필요한 반복을 제거하세요.\n"
-        "5. 전문적이고 이해하기 쉬운 한국어로 작성하세요.\n"
-        "6. 원문보다 더 짧고 명확하게 작성하세요.\n"
-        "7. 정제된 텍스트만 반환하고, 설명이나 추가 문장을 포함하지 마세요.\n\n"
-        
-        "반드시 의미를 유지하고, 문단을 분리해서 전달합니다.\n"
-        "출력은 오직 정제된 회고 텍스트 하나로만 하고, JSON이나 마크다운 포맷을 포함하지 마세요.\n\n"
-        f"느낀 점:\n{feelings}\n\n"
-        f"부족했던 점:\n{shortcomings}\n"
+        "중요:\n"
+        "입력 내용을 분석하거나 평가하지 마세요.\n"
+        "사용자가 작성한 문장을 그대로 인용하거나 반복하지 마세요.\n"
+        "'~라는 기록', '~라고 느꼈다', '~라고 적었다' 같은 메타 표현을 절대 사용하지 마세요.\n"
+        "입력은 회고록 작성을 위한 참고 메모일 뿐이며, "
+        "출력은 하나의 완성된 회고문이어야 합니다.\n\n"
+
+        "작성 규칙:\n"
+        "1. 실제 사용자가 직접 작성한 회고록처럼 자연스럽게 작성하세요.\n"
+        "2. 짧은 메모들을 하나의 흐름 있는 글로 재구성하세요.\n"
+        "3. 프로젝트 과정에서의 고민, 배움, 아쉬움, 성장을 자연스럽게 녹여내세요.\n"
+        "4. 입력 내용을 단순 나열하지 말고 문맥 속에 자연스럽게 통합하세요.\n"
+        "5. 지나치게 감성적이거나 AI스러운 문체는 피하세요.\n"
+        "6. 담백하고 진솔한 회고 스타일로 작성하세요.\n"
+        "7. 입력에 없는 경험을 새로 지어내지 마세요.\n"
+        "8. 2~3문단 분량으로 작성하세요.\n"
+        "9. 제목, JSON, 마크다운, 불릿포인트 없이 본문만 출력하세요.\n\n"
+
+        f"[프로젝트 정보]\n"
+        f"{project_context or '없음'}\n\n"
+
+        f"[회고 메모]\n"
+        f"{feelings}\n\n"
+
+        f"[아쉬웠던 점]\n"
+        f"{shortcomings}\n"
     )
 
     client = genai.Client(api_key=settings.gemini_api_key)
@@ -367,15 +518,16 @@ def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str) -> str
             model="gemini-3.1-flash-lite",
             contents=prompt,
             config={
-                    "temperature": 0.0,
-                    "max_output_tokens": 512,
-                },
+                "temperature": 0.72,
+                "max_output_tokens": 520,
+            },
         )
     except Exception as error:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Gemini API request failed: {str(error)}",
         )
+        #return _fallback_memoir_refine(feelings, shortcomings)
 
     text = getattr(response, "text", None) or getattr(response, "content", None)
     if not text:
@@ -384,18 +536,32 @@ def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str) -> str
             candidate = candidates[0]
             text = getattr(candidate, "content", None) or getattr(candidate, "output", None) or ""
 
-    return (text or "").strip()
+    if not text:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"No Text in Gemini Response",
+        )
+    
+    #cleaned_text = _clean_memoir_refine_output((text or "").strip())
+    return text # or _fallback_memoir_refine(feelings, shortcomings)
 
 
-def _split_ai_todo_title(raw_title: str) -> tuple[str, str]:
+def _split_ai_todo_item(raw_title: str) -> tuple[str, str, str | None]:
     normalized = raw_title.strip().strip("-• ")
+    detail = None
+    for separator in (" :: ", " - 상세: ", " 상세: "):
+        if separator in normalized:
+            normalized, detail = normalized.split(separator, 1)
+            detail = detail.strip()[:500] or None
+            break
+
     if " - " in normalized:
         stage, title = normalized.split(" - ", 1)
-        return stage.strip()[:30] or "planning", title.strip()[:200]
+        return stage.strip()[:30] or "planning", title.strip()[:200], detail
     if ":" in normalized:
         stage, title = normalized.split(":", 1)
-        return stage.strip()[:30] or "planning", title.strip()[:200]
-    return "AI 추천", normalized[:200]
+        return stage.strip()[:30] or "planning", title.strip()[:200], detail
+    return "AI 추천", normalized[:200], detail
 
 
 async def _broadcast_todo_snapshot(db: Session, project_id: int, todo: Todo, event_type: str) -> None:
@@ -405,6 +571,35 @@ async def _broadcast_todo_snapshot(db: Session, project_id: int, todo: Todo, eve
         {
             "type": event_type,
             "data": _build_todo_response(todo, assignments),
+        },
+    )
+
+
+def _get_todo_finalized_marker(db: Session, project_id: int) -> ProjectMilestone | None:
+    return (
+        db.query(ProjectMilestone)
+        .filter(
+            ProjectMilestone.project_id == project_id,
+            ProjectMilestone.title == TODO_FINALIZED_MARKER_TITLE,
+        )
+        .first()
+    )
+
+
+def _build_todo_state_response(db: Session, project_id: int) -> dict:
+    marker = _get_todo_finalized_marker(db, project_id)
+    return {
+        "project_id": project_id,
+        "is_finalized": marker is not None,
+    }
+
+
+async def _broadcast_todo_state(db: Session, project_id: int) -> None:
+    await realtime_hub.broadcast_json(
+        project_todo_channel(project_id),
+        {
+            "type": "todo.state.updated",
+            "data": _build_todo_state_response(db, project_id),
         },
     )
 
@@ -492,6 +687,16 @@ async def list_projects(
             Application.status == "pending",
         ).scalar() or 0
 
+        open_recruitment = (
+            db.query(ProjectRecruitment)
+            .filter(
+                ProjectRecruitment.project_id == p.id,
+                ProjectRecruitment.status == "open",
+            )
+            .order_by(ProjectRecruitment.created_at.desc())
+            .first()
+        )
+
         total_members = p.max_members or 0
         remaining_seats = max(total_members - current_members, 0)
 
@@ -517,6 +722,9 @@ async def list_projects(
             "applicantCount": applicant_count,
             "remainingSeats": remaining_seats,
             "competitionRatio": competition_ratio,
+            "openRecruitmentCount": 1 if open_recruitment else 0,
+            "openRecruitmentRequiredCount": open_recruitment.required_count if open_recruitment else 0,
+            "openRecruitmentPosition": open_recruitment.position_name if open_recruitment else None,
             "created_at": p.created_at.isoformat() if p.created_at else None,
         })
     
@@ -544,6 +752,22 @@ def _serialize_project_member(member: ProjectMember, user: User | None) -> dict:
     }
 
 
+@router.get("/{project_id}/status-check", summary="프로젝트 상태 확인", description="알림 이동 전에 프로젝트 삭제/생각의 뜰 상태를 확인합니다.")
+async def get_project_status_check(project_id: int, db: Session = Depends(get_db)) -> dict:
+    project = db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    source_idea = db.get(Idea, project.idea_id) if project.idea_id else None
+    return success_response(
+        data={
+            "id": project.id,
+            "deleted": project.deleted_at is not None,
+            "discarded": bool(source_idea and source_idea.is_discarded),
+        }
+    )
+
+
 @router.get("/{project_id}", summary="프로젝트 상세", description="프로젝트 상세와 활성 멤버 목록을 조회합니다.")
 async def get_project(project_id: int, db: Session = Depends(get_db)) -> dict:
     """프로젝트 상세 조회 API.
@@ -566,20 +790,31 @@ async def get_project(project_id: int, db: Session = Depends(get_db)) -> dict:
         ProjectSkill, ProjectSkill.skill_id == Skill.id
     ).filter(ProjectSkill.project_id == project_id).all()
     tech_stack_list = [s[0] for s in tech_stack]
+    source_idea = db.get(Idea, project.idea_id) if project.idea_id else None
+    idea_parts = _extract_idea_description_parts(source_idea.description if source_idea else "")
+    project_parts = _extract_idea_description_parts(project.description)
     
     return success_response(
         data={
             "id": project.id,
+            "idea_id": project.idea_id,
             "title": project.title,
             "summary": project.summary,
-            "description": project.description,
+            "description": project_parts["description"] or idea_parts["description"],
             "status": project.status,
             "difficulty": project.difficulty,
+            "category": project.category,
+            "domain": project.category,
             "progress_percent": float(project.progress_percent),
             "leader_id": project.leader_id,
             "currentMembers": len(members),
             "maxMembers": project.max_members,
+            "max_members": project.max_members,
             "techStack": tech_stack_list,
+            "tech_stack": tech_stack_list,
+            "hashtags": source_idea.hashtags if source_idea else [],
+            "expected_period": idea_parts["expected_period"] or project_parts["expected_period"],
+            "preferred_members": idea_parts["preferred_members"] or project_parts["preferred_members"],
             "members": [
                 _serialize_project_member(member, member_users.get(member.user_id))
                 for member in members
@@ -771,12 +1006,84 @@ async def update_project(
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
 
-    for field, value in payload.model_dump(exclude_none=True).items():
+    payload_data = payload.model_dump(exclude_none=True)
+    tech_stack = payload_data.pop("tech_stack", None)
+    hashtags = payload_data.pop("hashtags", None)
+    expected_period = payload_data.pop("expected_period", None)
+    preferred_members = payload_data.pop("preferred_members", None)
+
+    if "max_members" in payload_data:
+        if project.status in {"in_progress", "started", "completed"}:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="max_members cannot be changed after team formation",
+            )
+
+        active_member_count = (
+            db.query(ProjectMember)
+            .filter(
+                ProjectMember.project_id == project_id,
+                ProjectMember.left_at.is_(None),
+            )
+            .count()
+        )
+        if payload_data["max_members"] < active_member_count:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"max_members must be at least current member count ({active_member_count})",
+            )
+
+    for field, value in payload_data.items():
         setattr(project, field, value)
+
+    if tech_stack is not None:
+        _sync_project_skills(db, project_id, tech_stack)
+
+    source_idea = db.get(Idea, project.idea_id) if project.idea_id else None
+    if source_idea is not None:
+        if "title" in payload_data:
+            source_idea.title = project.title
+        if "summary" in payload_data:
+            source_idea.summary = project.summary
+        if "difficulty" in payload_data:
+            source_idea.difficulty = project.difficulty
+        if "category" in payload_data:
+            source_idea.domain = project.category
+        if "max_members" in payload_data:
+            source_idea.required_members = project.max_members
+        if tech_stack is not None:
+            source_idea.tech_stack = tech_stack
+        if hashtags is not None:
+            source_idea.hashtags = hashtags
+
+        idea_parts = _extract_idea_description_parts(source_idea.description)
+        clean_description = payload_data.get("description", idea_parts["description"])
+        source_idea.description = _compose_idea_description(
+            clean_description,
+            expected_period if expected_period is not None else idea_parts["expected_period"],
+            preferred_members if preferred_members is not None else idea_parts["preferred_members"],
+        )
 
     db.commit()
     db.refresh(project)
-    return success_response(data={"id": project.id, "updated": True})
+    current_member_count = (
+        db.query(ProjectMember)
+        .filter(
+            ProjectMember.project_id == project_id,
+            ProjectMember.left_at.is_(None),
+        )
+        .count()
+    )
+    return success_response(
+        data={
+            "id": project.id,
+            "updated": True,
+            "max_members": project.max_members,
+            "maxMembers": project.max_members,
+            "current_members": current_member_count,
+            "currentMembers": current_member_count,
+        }
+    )
 
 
 @router.delete("/{project_id}", summary="프로젝트 삭제", description="프로젝트를 soft delete 처리합니다.")
@@ -793,6 +1100,11 @@ async def delete_project(
     """
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
+    if project.status == "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Completed projects cannot be discarded",
+        )
     if project.idea_id is not None and project.status != "completed":
         reward_project_recycled(db, project)
     project.deleted_at = datetime.now(timezone.utc)
@@ -828,6 +1140,11 @@ async def revert_project_to_idea(
     """
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
+    if project.status == "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Completed projects cannot be discarded",
+        )
     
     # 원본 Idea 복원 (있으면)
     idea_reverted = False
@@ -883,6 +1200,25 @@ async def update_project_status(
         project.ended_at = completed_at
         project.completed_at = completed_at
         reward_project_completed(db, project)
+        members = (
+            db.query(ProjectMember)
+            .filter(ProjectMember.project_id == project_id, ProjectMember.left_at.is_(None))
+            .all()
+        )
+        for member in members:
+            db.add(
+                Notification(
+                    user_id=member.user_id,
+                    type="project_completed_review_requested",
+                    title="팀원 평가를 남겨주세요",
+                    body=f"'{project.title}' 프로젝트가 완료되었습니다. 함께한 팀원들을 평가해주세요.",
+                    data={
+                        **_project_notification_data(project_id),
+                        "project_id": project_id,
+                        "action": "review_teammates",
+                    },
+                )
+            )
 
     db.commit()
     return success_response(data={"id": project.id, "status": project.status})
@@ -1187,6 +1523,47 @@ async def list_todos(
     )
 
 
+@router.get("/{project_id}/todos/state", summary="Todo 확정 상태 조회", description="프로젝트 Todo 체크리스트 확정 여부를 조회합니다.")
+async def get_todo_state(
+    project_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Todo 확정 상태 조회 API(프로젝트 멤버 전용)."""
+    _get_project_or_404(db, project_id)
+    _ensure_project_member(db, project_id, current_user_id)
+    return success_response(data=_build_todo_state_response(db, project_id))
+
+
+@router.post("/{project_id}/todos/confirm", summary="Todo 체크리스트 확정", description="채팅방 Todo 체크리스트를 확정하여 채팅방에서는 읽기 전용으로 전환합니다.")
+async def confirm_todo_list(
+    project_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Todo 확정 API(프로젝트 멤버 전용).
+
+    확정 이후 수정/추가는 진행 관리 페이지에서 계속 가능합니다.
+    """
+    _get_project_or_404(db, project_id)
+    _ensure_project_member(db, project_id, current_user_id)
+
+    marker = _get_todo_finalized_marker(db, project_id)
+    if marker is None:
+        db.add(
+            ProjectMilestone(
+                project_id=project_id,
+                title=TODO_FINALIZED_MARKER_TITLE,
+                description="Team Todo checklist finalized in chat room.",
+                is_done=True,
+            )
+        )
+        db.commit()
+
+    await _broadcast_todo_state(db, project_id)
+    return success_response(data=_build_todo_state_response(db, project_id))
+
+
 @router.patch("/{project_id}/todos/{todo_id}", summary="Todo 수정", description="Todo 내용을 부분 수정하고 done 상태면 완료 시각을 기록합니다.")
 async def update_todo(
     project_id: int,
@@ -1280,7 +1657,7 @@ async def generate_project_todos_with_ai(
 
     created_todos: list[Todo] = []
     for index, raw_title in enumerate(titles, start=1):
-        stage, title = _split_ai_todo_title(raw_title)
+        stage, title, description = _split_ai_todo_item(raw_title)
         if title.lower() in existing_titles:
             continue
 
@@ -1289,7 +1666,7 @@ async def generate_project_todos_with_ai(
             creator_id=current_user_id,
             assignee_id=member_ids[0] if member_ids else None,
             title=title,
-            description="AI가 선택한 채팅 범위와 프로젝트 상세 정보를 바탕으로 생성한 Todo입니다.",
+            description=description,
             stage=stage,
             status="todo",
             priority=max_priority + index,
@@ -1444,6 +1821,12 @@ async def project_todos_websocket(
                 "data": [_build_todo_response(todo, assignments_by_todo.get(todo.id, [])) for todo in todos],
             }
         )
+        await websocket.send_json(
+            {
+                "type": "todo.state.updated",
+                "data": _build_todo_state_response(db, project_id),
+            }
+        )
 
         while True:
             payload = await websocket.receive_json()
@@ -1460,6 +1843,12 @@ async def project_todos_websocket(
                     {
                         "type": "todo.snapshot",
                         "data": [_build_todo_response(todo, assignments_by_todo.get(todo.id, [])) for todo in todos],
+                    }
+                )
+                await websocket.send_json(
+                    {
+                        "type": "todo.state.updated",
+                        "data": _build_todo_state_response(db, project_id),
                     }
                 )
                 continue
@@ -1514,7 +1903,7 @@ async def refine_memoir(
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict:
-    _get_project_or_404(db, project_id)
+    project = _get_project_or_404(db, project_id)
     _ensure_project_member(db, project_id, current_user_id)
 
     feelings = payload.felt_point.strip()
@@ -1522,7 +1911,8 @@ async def refine_memoir(
     if not feelings and not shortcomings:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="felt_point and lacked_point are required")
 
-    refined_text = await _call_gemini_for_memoir_refine(feelings, shortcomings)
+    project_context = _build_project_memoir_context(db, project)
+    refined_text = await _call_gemini_for_memoir_refine(feelings, shortcomings, project_context)
     return success_response(data={"refined_memoir": refined_text})
 
 
@@ -1674,6 +2064,14 @@ async def create_review(
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Review already exists")
 
+    raw_comment = (
+        payload.get("comment")
+        or payload.get("message")
+        or payload.get("review_message")
+        or payload.get("content")
+    )
+    comment = raw_comment.strip() if isinstance(raw_comment, str) else raw_comment
+
     review = Review(
         project_id=project_id,
         reviewer_id=current_user_id,
@@ -1681,7 +2079,7 @@ async def create_review(
         teamwork_score=payload.get("teamwork_score", 3),
         contribution_score=payload.get("contribution_score", 3),
         responsibility_score=payload.get("responsibility_score", 3),
-        comment=payload.get("comment"),
+        comment=comment or None,
     )
     db.add(review)
     db.flush()
@@ -1764,9 +2162,7 @@ async def complete_team(
 
     동작:
     - 리더 권한 확인
-    - 현재 활성 ProjectMember 수가 min_members 이상인지 확인
-    - 부족하면 400 반환
-    - 충분하면 project.status를 in_progress로 변경
+    - project.status를 in_progress로 변경
     - 팀원들에게 알림 생성
     - 프로젝트 이름으로 팀 채팅방 생성
     - 팀 채팅방에 시스템 메시지 추가
@@ -1775,11 +2171,7 @@ async def complete_team(
     _ensure_project_leader(project, current_user_id)
 
     active_members = _get_active_project_member_ids(db, project_id)
-    if len(active_members) < project.min_members:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Not enough members to complete team",
-        )
+    active_members.add(project.leader_id)
 
     project.status = "in_progress"
 

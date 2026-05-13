@@ -1,28 +1,55 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  createAdminNoticeApi,
+  getAdminCoinPurchaseRequestsApi,
+  grantAdminUserCoinsApi,
+  revokeAdminUserCoinsApi,
   getAdminOverviewApi,
   getAdminPaymentsApi,
   getAdminProjectsApi,
   getAdminReportsApi,
   getAdminUsersApi,
+  getAdminPostsApi,
   updateAdminPaymentApi,
+  updateAdminCoinPurchaseRequestApi,
   updateAdminReportApi,
   updateAdminUserStatusApi,
+  getAdminMyPostsApi,
+  adminUpdatePostApi,
+  adminDeletePostApi,
+  adminTakedownPostApi,
+  adminTakedownIdeaApi,
+  adminTakedownProjectApi,
 } from "../../lib/api";
 import { getStoredUser, getToken, loadCurrentUser } from "../../lib/auth";
+import { useDialog, useToast } from "../../components/AppFeedback";
 
 const TABS = [
   { id: "reports", label: "신고" },
   { id: "payments", label: "결제" },
   { id: "users", label: "사용자" },
+  { id: "notices", label: "공지" },
+  { id: "posts", label: "게시글" },
   { id: "projects", label: "프로젝트" },
 ];
 
 const REPORT_STATUSES = ["open", "reviewing", "resolved", "rejected"];
 const USER_ROLES = ["user", "leader", "admin"];
+const COIN_REQUEST_STATUSES = {
+  pending: "확인 대기",
+  approved: "승인",
+  rejected: "거절",
+};
+const REPORT_SCOPES = [
+  { value: "all", label: "전체" },
+  { value: "user", label: "사용자" },
+  { value: "project", label: "프로젝트" },
+  { value: "post", label: "게시글" },
+  { value: "chat", label: "채팅" },
+];
 
 function formatDate(value) {
   if (!value) return "-";
@@ -37,6 +64,12 @@ function formatDate(value) {
   });
 }
 
+function addDays(days) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date;
+}
+
 function shortJson(value) {
   if (!value) return "-";
   try {
@@ -48,12 +81,30 @@ function shortJson(value) {
 
 export default function AdminPage() {
   const router = useRouter();
+  const toast = useToast();
+  const { confirm, prompt } = useDialog();
   const [activeTab, setActiveTab] = useState("reports");
   const [overview, setOverview] = useState(null);
   const [users, setUsers] = useState([]);
   const [projects, setProjects] = useState([]);
   const [reports, setReports] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [coinRequests, setCoinRequests] = useState([]);
+  const [adminPosts, setAdminPosts] = useState([]);
+  const [posts, setPosts] = useState([]);
+  const [userSearch, setUserSearch] = useState("");
+  const [userRoleFilter, setUserRoleFilter] = useState("");
+  const [userActiveFilter, setUserActiveFilter] = useState("");
+  const [reportScope, setReportScope] = useState("all");
+  const [postSearch, setPostSearch] = useState("");
+  const [postCategoryFilter, setPostCategoryFilter] = useState("");
+  const [includeDeletedPosts, setIncludeDeletedPosts] = useState(false);
+  const [noticeForm, setNoticeForm] = useState({
+    title: "",
+    content: "",
+    category: "announcement",
+    isPinned: true,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [processingKey, setProcessingKey] = useState("");
@@ -63,22 +114,45 @@ export default function AdminPage() {
     () => reports.filter((report) => report.status === "open"),
     [reports]
   );
-  const pendingPayments = useMemo(
-    () => payments.filter((payment) => !payment.processed_at),
-    [payments]
+  const pendingCoinRequests = useMemo(
+    () => coinRequests.filter((request) => request.status === "pending"),
+    [coinRequests]
   );
 
-  async function loadAdminData() {
+  const loadAdminData = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
-      const [overviewResult, usersResult, projectsResult, reportsResult, paymentsResult] =
+      const [
+        overviewResult,
+        usersResult,
+        projectsResult,
+        reportsResult,
+        paymentsResult,
+        coinRequestsResult,
+        adminPostsResult,
+        postsResult,
+      ] =
         await Promise.all([
           getAdminOverviewApi(),
-          getAdminUsersApi(),
+          getAdminUsersApi({
+            q: userSearch.trim() || undefined,
+            role: userRoleFilter || undefined,
+            is_active:
+              userActiveFilter === ""
+                ? undefined
+                : userActiveFilter === "true",
+          }),
           getAdminProjectsApi(),
-          getAdminReportsApi(),
+          getAdminReportsApi({ scope: reportScope }),
           getAdminPaymentsApi(),
+          getAdminCoinPurchaseRequestsApi(),
+          getAdminMyPostsApi(),
+          getAdminPostsApi({
+            q: postSearch.trim() || undefined,
+            category: postCategoryFilter || undefined,
+            include_deleted: includeDeletedPosts,
+          }),
         ]);
 
       setOverview(overviewResult.data || null);
@@ -86,6 +160,9 @@ export default function AdminPage() {
       setProjects(projectsResult.data || []);
       setReports(reportsResult.data || []);
       setPayments(paymentsResult.data || []);
+      setCoinRequests(coinRequestsResult.data || []);
+      setAdminPosts(adminPostsResult.data || []);
+      setPosts(postsResult.data || []);
     } catch (err) {
       console.error(err);
       setError(
@@ -96,7 +173,7 @@ export default function AdminPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [includeDeletedPosts, postCategoryFilter, postSearch, reportScope, userActiveFilter, userSearch, userRoleFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -129,7 +206,11 @@ export default function AdminPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadAdminData]);
+
+  async function handleRefreshUsersAndReports() {
+    await loadAdminData();
+  }
 
   async function handleReportStatus(reportId, status) {
     try {
@@ -152,7 +233,66 @@ export default function AdminPage() {
           : prev
       );
     } catch (err) {
-      alert(err instanceof Error ? err.message : "신고 처리에 실패했습니다.");
+      toast.error(err instanceof Error ? err.message : "신고 처리에 실패했습니다.");
+    } finally {
+      setProcessingKey("");
+    }
+  }
+
+  async function handleTakedownReport(report) {
+    if (!report) return;
+
+    const targetPostId = report.target_post_id;
+    const targetProjectId = report.target_project_id;
+    // Idea id not present in reports model by default, but support if present
+    const targetIdeaId = report.target_idea_id || null;
+
+    if (!targetPostId && !targetProjectId && !targetIdeaId) {
+      toast.warning("이 신고에 대해 강제 내릴 수 있는 대상이 없습니다.");
+      return;
+    }
+
+    const ok = await confirm({
+      title: "신고 대상 강제 내리기",
+      message: "정말로 해당 대상을 강제 삭제(soft delete) 하시겠습니까?",
+      confirmText: "강제내리기",
+      tone: "danger",
+    });
+    if (!ok) return;
+
+    const reasonInput = await prompt({
+      title: "강제 내리기 사유",
+      message: "글 주인에게 전달할 사유를 입력하세요.",
+      defaultValue: report.reason || "",
+      placeholder: "사유를 입력하세요.",
+      confirmText: "전달",
+      multiline: true,
+    });
+    if (reasonInput === null) return;
+    const payload = { reason: reasonInput.trim() || undefined };
+
+    try {
+      setProcessingKey(`report-takedown-${report.id}`);
+
+      if (targetPostId) {
+        await adminTakedownPostApi(targetPostId, payload);
+      } else if (targetProjectId) {
+        await adminTakedownProjectApi(targetProjectId, payload);
+      } else if (targetIdeaId) {
+        await adminTakedownIdeaApi(targetIdeaId, payload);
+      }
+
+      // mark report resolved locally
+      setReports((prev) => prev.map((r) => (r.id === report.id ? { ...r, status: "resolved" } : r)));
+      setOverview((prev) =>
+        prev
+          ? { ...prev, reports_open: Math.max(0, (prev.reports_open || 0) - 1) }
+          : prev
+      );
+
+      toast.success("대상이 강제 내리기 처리되었고 작성자에게 알림을 보냈습니다.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "강제 내리기에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
@@ -170,23 +310,168 @@ export default function AdminPage() {
         )
       );
     } catch (err) {
-      alert(err instanceof Error ? err.message : "결제 이벤트 처리에 실패했습니다.");
+      toast.error(err instanceof Error ? err.message : "결제 이벤트 처리에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
   }
 
-  async function handleUserActive(userId, isActive) {
+  async function handleCoinRequest(request, status) {
+    const isApprove = status === "approved";
+    const noteInput = await prompt({
+      title: isApprove ? "코인 구매 승인" : "코인 구매 거절",
+      message: isApprove
+        ? `${request.user_nickname || request.user_email || `User #${request.user_id}`}에게 ${request.coin_amount}코인을 지급합니다. 관리자 메모를 입력하세요.`
+        : `${request.user_nickname || request.user_email || `User #${request.user_id}`}의 구매 요청을 거절합니다. 사유를 입력하세요.`,
+      placeholder: isApprove ? "예: 입금 확인 완료" : "예: 결제 내역을 확인할 수 없습니다.",
+      confirmText: isApprove ? "승인" : "거절",
+      required: !isApprove,
+      multiline: true,
+      tone: isApprove ? "default" : "danger",
+    });
+    if (noteInput === null) return;
+
     try {
-      setProcessingKey(`user-${userId}`);
-      await updateAdminUserStatusApi(userId, { is_active: isActive });
-      setUsers((prev) =>
-        prev.map((user) =>
-          user.id === userId ? { ...user, is_active: isActive } : user
+      setProcessingKey(`coin-request-${request.id}`);
+      const result = await updateAdminCoinPurchaseRequestApi(request.id, {
+        status,
+        admin_note: noteInput.trim() || undefined,
+      });
+
+      setCoinRequests((prev) =>
+        prev.map((item) =>
+          item.id === request.id
+            ? {
+                ...item,
+                status: result.data?.status || status,
+                admin_note: result.data?.admin_note || noteInput.trim() || null,
+                handled_at: result.data?.handled_at || new Date().toISOString(),
+                handled_by: result.data?.handled_by,
+              }
+            : item
         )
       );
+
+      if (isApprove && result.data?.balance_after !== undefined) {
+        setUsers((prev) =>
+          prev.map((user) =>
+            user.id === request.user_id
+              ? { ...user, coin_balance: result.data.balance_after }
+              : user
+          )
+        );
+      }
+
+      setOverview((prev) =>
+        prev
+          ? {
+              ...prev,
+              coin_purchase_requests_pending: Math.max(
+                0,
+                (prev.coin_purchase_requests_pending || 0) - 1
+              ),
+            }
+          : prev
+      );
+
+      toast.success(isApprove ? "코인을 지급하고 사용자에게 알림을 보냈습니다." : "구매 요청을 거절하고 사용자에게 알림을 보냈습니다.");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "사용자 상태 변경에 실패했습니다.");
+      toast.error(err instanceof Error ? err.message : "코인 구매 요청 처리에 실패했습니다.");
+    } finally {
+      setProcessingKey("");
+    }
+  }
+
+  async function handleSuspendUser(user) {
+    const daysInput = await prompt({
+      title: "사용자 정지 기간",
+      message: `${user.nickname || user.email || `User #${user.id}`} 사용자를 며칠 동안 정지할까요?\n비워두면 무기한 정지됩니다.`,
+      placeholder: "예: 7",
+      inputType: "number",
+      confirmText: "다음",
+    });
+    if (daysInput === null) return;
+
+    const trimmedDays = String(daysInput).trim();
+    let suspendedUntil = null;
+    if (trimmedDays) {
+      const days = Number(trimmedDays);
+      if (!Number.isFinite(days) || days <= 0) {
+        toast.warning("정지 기간은 1 이상의 숫자여야 합니다.");
+        return;
+      }
+      suspendedUntil = addDays(days).toISOString();
+    }
+
+    const reasonInput = await prompt({
+      title: "사용자 정지 사유",
+      message: "사용자에게 알림으로 전달됩니다.",
+      placeholder: "정지 사유를 입력하세요.",
+      confirmText: "정지",
+      required: true,
+      multiline: true,
+      tone: "danger",
+    });
+    if (reasonInput === null) return;
+    const reason = reasonInput.trim();
+    if (!reason) {
+      toast.warning("정지 사유를 입력해주세요.");
+      return;
+    }
+
+    try {
+      setProcessingKey(`user-${user.id}`);
+      const result = await updateAdminUserStatusApi(user.id, {
+        is_active: false,
+        suspended_until: suspendedUntil,
+        suspension_reason: reason,
+      });
+      setUsers((prev) =>
+        prev.map((item) =>
+          item.id === user.id
+            ? {
+                ...item,
+                is_active: result.data?.is_active ?? false,
+                suspended_until: result.data?.suspended_until ?? suspendedUntil,
+                suspension_reason: result.data?.suspension_reason ?? reason,
+              }
+            : item
+        )
+      );
+      toast.success("사용자를 정지했고 알림을 보냈습니다.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "사용자 정지에 실패했습니다.");
+    } finally {
+      setProcessingKey("");
+    }
+  }
+
+  async function handleRestoreUser(user) {
+    const ok = await confirm({
+      title: "사용자 복구",
+      message: `${user.nickname || user.email || `User #${user.id}`} 사용자의 정지를 해제할까요?`,
+      confirmText: "복구",
+    });
+    if (!ok) return;
+
+    try {
+      setProcessingKey(`user-${user.id}`);
+      const result = await updateAdminUserStatusApi(user.id, { is_active: true });
+      setUsers((prev) =>
+        prev.map((item) =>
+          item.id === user.id
+            ? {
+                ...item,
+                is_active: result.data?.is_active ?? true,
+                suspended_until: result.data?.suspended_until ?? null,
+                suspension_reason: result.data?.suspension_reason ?? null,
+              }
+            : item
+        )
+      );
+      toast.success("사용자를 복구했고 알림을 보냈습니다.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "사용자 복구에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
@@ -199,7 +484,12 @@ export default function AdminPage() {
         ? `${targetUser?.nickname || `User #${userId}`} 사용자를 관리자로 승격할까요?`
         : `${targetUser?.nickname || `User #${userId}`} 사용자의 권한을 ${role}로 변경할까요?`;
 
-    if (!window.confirm(message)) return;
+    const ok = await confirm({
+      title: "사용자 권한 변경",
+      message,
+      confirmText: "변경",
+    });
+    if (!ok) return;
 
     try {
       setProcessingKey(`user-role-${userId}`);
@@ -210,7 +500,267 @@ export default function AdminPage() {
         )
       );
     } catch (err) {
-      alert(err instanceof Error ? err.message : "사용자 권한 변경에 실패했습니다.");
+      toast.error(err instanceof Error ? err.message : "사용자 권한 변경에 실패했습니다.");
+    } finally {
+      setProcessingKey("");
+    }
+  }
+
+  async function handleGrantCoins(userId) {
+    const targetUser = users.find((user) => user.id === userId);
+    const amountInput = await prompt({
+      title: "코인 지급",
+      message: `${targetUser?.nickname || `User #${userId}`}에게 지급할 코인 수를 입력하세요.`,
+      defaultValue: "100",
+      inputType: "number",
+      required: true,
+    });
+
+    if (amountInput === null) return;
+
+    const amount = Number(amountInput);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.warning("코인 수는 1 이상의 숫자여야 합니다.");
+      return;
+    }
+
+    const noteInput = await prompt({
+      title: "코인 지급 사유",
+      message: "사용자에게 알림으로 전달됩니다.",
+      placeholder: "지급 사유를 입력하세요.",
+      required: true,
+      multiline: true,
+    });
+    if (noteInput === null) return;
+    const note = noteInput.trim();
+    if (!note) {
+      toast.warning("코인 지급 사유를 입력해주세요.");
+      return;
+    }
+
+    try {
+      setProcessingKey(`coin-${userId}`);
+      const result = await grantAdminUserCoinsApi(userId, {
+        amount,
+        note,
+      });
+
+      setUsers((prev) =>
+        prev.map((user) =>
+          user.id === userId
+            ? { ...user, coin_balance: result.data?.coin_balance ?? user.coin_balance }
+            : user
+        )
+      );
+
+      toast.success("코인을 지급했고 사용자에게 알림을 보냈습니다.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "코인 지급에 실패했습니다.");
+    } finally {
+      setProcessingKey("");
+    }
+  }
+
+  async function handleRevokeCoins(userId) {
+    const targetUser = users.find((user) => user.id === userId);
+    const amountInput = await prompt({
+      title: "코인 환수",
+      message: `${targetUser?.nickname || `User #${userId}`}으로부터 환수할 코인 수를 입력하세요.`,
+      defaultValue: "100",
+      inputType: "number",
+      required: true,
+    });
+
+    if (amountInput === null) return;
+
+    const amount = Number(amountInput);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.warning("환수할 코인 수는 1 이상의 숫자여야 합니다.");
+      return;
+    }
+
+    const noteInput = await prompt({
+      title: "코인 환수 사유",
+      message: "사용자에게 알림으로 전달됩니다.",
+      placeholder: "환수 사유를 입력하세요.",
+      required: true,
+      multiline: true,
+    });
+    if (noteInput === null) return;
+    const note = noteInput.trim();
+    if (!note) {
+      toast.warning("코인 환수 사유를 입력해주세요.");
+      return;
+    }
+
+    try {
+      setProcessingKey(`revoke-coin-${userId}`);
+      const result = await revokeAdminUserCoinsApi(userId, {
+        amount,
+        note,
+      });
+
+      setUsers((prev) =>
+        prev.map((user) =>
+          user.id === userId
+            ? { ...user, coin_balance: result.data?.coin_balance ?? (user.coin_balance - amount) }
+            : user
+        )
+      );
+
+      toast.success("코인을 환수했고 사용자에게 알림을 보냈습니다.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "코인 환수에 실패했습니다.");
+    } finally {
+      setProcessingKey("");
+    }
+  }
+
+  async function handleCreateNotice() {
+    if (!noticeForm.title.trim()) {
+      toast.warning("공지 제목을 입력해주세요.");
+      return;
+    }
+
+    if (!noticeForm.content.trim()) {
+      toast.warning("공지 내용을 입력해주세요.");
+      return;
+    }
+
+    try {
+      setProcessingKey("notice-create");
+      await createAdminNoticeApi({
+        title: noticeForm.title.trim(),
+        content: noticeForm.content.trim(),
+        category: noticeForm.category,
+        is_pinned: noticeForm.isPinned,
+      });
+
+      setNoticeForm({ title: "", content: "", category: "announcement", isPinned: true });
+      await loadAdminData();
+      toast.success("공지글을 작성했습니다.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "공지 작성에 실패했습니다.");
+    } finally {
+      setProcessingKey("");
+    }
+  }
+
+  async function handleEditAdminPost(postId) {
+    const post = adminPosts.find((p) => p.id === postId);
+    if (!post) return;
+
+    const newTitle = await prompt({
+      title: "게시물 제목 수정",
+      defaultValue: post.title,
+      required: true,
+    });
+    if (newTitle === null) return;
+    const newContent = await prompt({
+      title: "게시물 내용 수정",
+      defaultValue: post.content,
+      required: true,
+      multiline: true,
+    });
+    if (newContent === null) return;
+
+    try {
+      setProcessingKey(`admin-post-edit-${postId}`);
+      await adminUpdatePostApi(postId, { title: newTitle.trim(), content: newContent.trim() });
+      setAdminPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, title: newTitle, content: newContent } : p)));
+      toast.success("게시물을 수정했습니다.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "게시물 수정에 실패했습니다.");
+    } finally {
+      setProcessingKey("");
+    }
+  }
+
+  async function handleDeleteAdminPost(postId) {
+    const ok = await confirm({
+      title: "게시물 삭제",
+      message: "정말로 삭제하시겠습니까? (soft delete)",
+      confirmText: "삭제",
+      tone: "danger",
+    });
+    if (!ok) return;
+    try {
+      setProcessingKey(`admin-post-delete-${postId}`);
+      await adminDeletePostApi(postId);
+      setAdminPosts((prev) => prev.filter((p) => p.id !== postId));
+      toast.success("게시물을 삭제했습니다.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "게시물 삭제에 실패했습니다.");
+    } finally {
+      setProcessingKey("");
+    }
+  }
+
+  async function handleTakedownPost(postId) {
+    const ok = await confirm({
+      title: "게시글 강제 내리기",
+      message: "정말로 이 게시글을 강제로 내리겠습니까?",
+      confirmText: "강제내리기",
+      tone: "danger",
+    });
+    if (!ok) return;
+    const reasonInput = await prompt({
+      title: "강제 내리기 사유",
+      message: "글 주인에게 전달할 사유를 입력하세요.",
+      placeholder: "사유를 입력하세요.",
+      confirmText: "전달",
+      multiline: true,
+    });
+    if (reasonInput === null) return;
+
+    try {
+      setProcessingKey(`post-takedown-${postId}`);
+      await adminTakedownPostApi(postId, { reason: reasonInput.trim() || undefined });
+      setPosts((prev) =>
+        includeDeletedPosts
+          ? prev.map((post) =>
+              post.id === postId ? { ...post, deleted_at: new Date().toISOString() } : post
+            )
+          : prev.filter((post) => post.id !== postId)
+      );
+      toast.success("게시글을 강제로 내렸고 작성자에게 알림을 보냈습니다.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "게시글 강제 내리기에 실패했습니다.");
+    } finally {
+      setProcessingKey("");
+    }
+  }
+
+  async function handleTakedownProject(projectId) {
+    const ok = await confirm({
+      title: "프로젝트 강제 내리기",
+      message: "정말로 이 프로젝트를 강제로 내리겠습니까?",
+      confirmText: "강제내리기",
+      tone: "danger",
+    });
+    if (!ok) return;
+    const reasonInput = await prompt({
+      title: "강제 내리기 사유",
+      message: "리더에게 전달할 사유를 입력하세요.",
+      placeholder: "사유를 입력하세요.",
+      confirmText: "전달",
+      multiline: true,
+    });
+    if (reasonInput === null) return;
+
+    try {
+      setProcessingKey(`project-takedown-${projectId}`);
+      await adminTakedownProjectApi(projectId, { reason: reasonInput.trim() || undefined });
+      setProjects((prev) =>
+        prev.map((project) =>
+          project.id === projectId
+            ? { ...project, deleted_at: new Date().toISOString() }
+            : project
+        )
+      );
+      toast.success("프로젝트를 강제로 내렸고 리더에게 알림을 보냈습니다.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "프로젝트 강제 내리기에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
@@ -266,11 +816,12 @@ export default function AdminPage() {
           </div>
         )}
 
-        <section className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <section className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
           <Metric label="사용자" value={overview?.users_total} sub={`${overview?.users_active ?? 0} active`} />
           <Metric label="프로젝트" value={overview?.projects_total} sub={`${overview?.projects_active ?? 0} active`} />
           <Metric label="미처리 신고" value={overview?.reports_open} sub={`${overview?.reports_total ?? 0} total`} tone="danger" />
           <Metric label="결제 이벤트" value={overview?.payment_events_total} sub={`${overview?.payment_events_pending ?? 0} pending`} tone="warning" />
+          <Metric label="코인 구매" value={overview?.coin_purchase_requests_total} sub={`${overview?.coin_purchase_requests_pending ?? 0} pending`} tone="warning" />
         </section>
 
         <section className="mt-6 grid gap-4 lg:grid-cols-2">
@@ -280,7 +831,7 @@ export default function AdminPage() {
                 <div key={report.id} className="flex items-start justify-between gap-3 py-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900">
-                      신고 #{report.id}
+                      신고 #{report.id} · {report.target_scope || "user"}
                     </p>
                     <p className="mt-1 line-clamp-2 text-xs text-slate-500">
                       {report.reason}
@@ -299,28 +850,28 @@ export default function AdminPage() {
             </div>
           </Panel>
 
-          <Panel title="처리 대기 결제" description={`${pendingPayments.length}건`}>
+          <Panel title="처리 대기 코인 구매" description={`${pendingCoinRequests.length}건`}>
             <div className="divide-y divide-slate-100">
-              {pendingPayments.slice(0, 5).map((payment) => (
-                <div key={payment.id} className="flex items-start justify-between gap-3 py-3">
+              {pendingCoinRequests.slice(0, 5).map((request) => (
+                <div key={request.id} className="flex items-start justify-between gap-3 py-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900">
-                      {payment.provider} · {payment.event_type}
+                      {request.user_nickname || request.user_email || `User #${request.user_id}`}
                     </p>
                     <p className="mt-1 truncate text-xs text-slate-500">
-                      {payment.provider_event_id}
+                      {request.coin_amount?.toLocaleString("ko-KR")}코인 · {Number(request.price_krw || 0).toLocaleString("ko-KR")}원
                     </p>
                   </div>
                   <button
-                    onClick={() => handlePaymentProcessed(payment.id, true)}
-                    disabled={processingKey === `payment-${payment.id}`}
+                    onClick={() => handleCoinRequest(request, "approved")}
+                    disabled={processingKey === `coin-request-${request.id}`}
                     className="shrink-0 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
                   >
-                    처리
+                    승인
                   </button>
                 </div>
               ))}
-              {pendingPayments.length === 0 && <EmptyLine text="대기 중인 결제 이벤트가 없습니다." />}
+              {pendingCoinRequests.length === 0 && <EmptyLine text="대기 중인 코인 구매 요청이 없습니다." />}
             </div>
           </Panel>
         </section>
@@ -344,7 +895,31 @@ export default function AdminPage() {
 
           <div className="overflow-x-auto">
             {activeTab === "reports" && (
-              <table className="min-w-full text-left text-sm">
+              <div className="p-4">
+                <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-600">신고 범위</label>
+                    <select
+                      value={reportScope}
+                      onChange={(e) => setReportScope(e.target.value)}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    >
+                      {REPORT_SCOPES.map((scope) => (
+                        <option key={scope.value} value={scope.value}>
+                          {scope.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    onClick={handleRefreshUsersAndReports}
+                    className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+                  >
+                    필터 적용
+                  </button>
+                </div>
+
+                <table className="min-w-full text-left text-sm">
                 <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
                   <tr>
                     <Th>ID</Th>
@@ -359,9 +934,18 @@ export default function AdminPage() {
                     <tr key={report.id}>
                       <Td>#{report.id}</Td>
                       <Td>
-                        {report.target_user_id ? `User #${report.target_user_id}` : ""}
-                        {report.target_project_id ? `Project #${report.target_project_id}` : ""}
-                        {!report.target_user_id && !report.target_project_id ? "-" : ""}
+                        <div className="space-y-1">
+                          <p className="text-xs font-semibold uppercase text-slate-500">
+                            {report.target_scope || "user"}
+                          </p>
+                          <p>
+                            {report.target_user_id ? `User #${report.target_user_id}` : ""}
+                            {report.target_project_id ? `Project #${report.target_project_id}` : ""}
+                            {report.target_post_id ? `Post #${report.target_post_id}` : ""}
+                            {report.target_chat_room_id ? `Chat Room #${report.target_chat_room_id}` : ""}
+                            {!report.target_user_id && !report.target_project_id && !report.target_post_id && !report.target_chat_room_id ? "-" : ""}
+                          </p>
+                        </div>
                       </Td>
                       <Td className="max-w-md">
                         <span className="line-clamp-2">{report.reason}</span>
@@ -377,53 +961,183 @@ export default function AdminPage() {
                             <option key={status} value={status}>{status}</option>
                           ))}
                         </select>
+                        {(report.target_post_id || report.target_project_id || report.target_idea_id) && (
+                          <button
+                            onClick={() => handleTakedownReport(report)}
+                            disabled={processingKey === `report-takedown-${report.id}`}
+                            className="ml-2 rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                          >
+                            강제내리기
+                          </button>
+                        )}
                       </Td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             )}
 
             {activeTab === "payments" && (
-              <table className="min-w-full text-left text-sm">
-                <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
-                  <tr>
-                    <Th>ID</Th>
-                    <Th>Provider</Th>
-                    <Th>Event</Th>
-                    <Th>Payload</Th>
-                    <Th>Processed</Th>
-                    <Th>처리</Th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {payments.map((payment) => (
-                    <tr key={payment.id}>
-                      <Td>#{payment.id}</Td>
-                      <Td>{payment.provider}</Td>
-                      <Td>{payment.event_type}</Td>
-                      <Td className="max-w-md"><span className="line-clamp-2">{shortJson(payment.payload)}</span></Td>
-                      <Td>{formatDate(payment.processed_at)}</Td>
-                      <Td>
-                        <button
-                          onClick={() => handlePaymentProcessed(payment.id, !payment.processed_at)}
-                          className="rounded-md border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                          {payment.processed_at ? "해제" : "처리"}
-                        </button>
-                      </Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="space-y-8 p-4">
+                <section>
+                  <div className="mb-3 flex items-end justify-between gap-3">
+                    <div>
+                      <h2 className="text-base font-black text-slate-950">코인 구매 요청</h2>
+                      <p className="mt-1 text-xs text-slate-500">
+                        PG 연동 전 수동 결제 확인 후 승인하면 코인이 자동 지급됩니다.
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+                      대기 {pendingCoinRequests.length}건
+                    </span>
+                  </div>
+                  <table className="min-w-full text-left text-sm">
+                    <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+                      <tr>
+                        <Th>ID</Th>
+                        <Th>사용자</Th>
+                        <Th>코인</Th>
+                        <Th>금액</Th>
+                        <Th>상태</Th>
+                        <Th>요청 메모</Th>
+                        <Th>요청일</Th>
+                        <Th>처리</Th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {coinRequests.map((request) => (
+                        <tr key={request.id}>
+                          <Td>#{request.id}</Td>
+                          <Td>
+                            <div className="font-semibold text-slate-900">
+                              {request.user_nickname || `User #${request.user_id}`}
+                            </div>
+                            <div className="text-xs text-slate-500">{request.user_email}</div>
+                          </Td>
+                          <Td>{request.coin_amount?.toLocaleString("ko-KR")}개</Td>
+                          <Td>{Number(request.price_krw || 0).toLocaleString("ko-KR")}원</Td>
+                          <Td>{COIN_REQUEST_STATUSES[request.status] || request.status}</Td>
+                          <Td className="max-w-xs"><span className="line-clamp-2">{request.note || "-"}</span></Td>
+                          <Td>{formatDate(request.created_at)}</Td>
+                          <Td>
+                            {request.status === "pending" ? (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleCoinRequest(request, "approved")}
+                                  disabled={processingKey === `coin-request-${request.id}`}
+                                  className="rounded-md bg-slate-900 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                                >
+                                  승인
+                                </button>
+                                <button
+                                  onClick={() => handleCoinRequest(request, "rejected")}
+                                  disabled={processingKey === `coin-request-${request.id}`}
+                                  className="rounded-md border border-red-200 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                                >
+                                  거절
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-slate-500">{formatDate(request.handled_at)}</span>
+                            )}
+                          </Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+
+                <section>
+                  <h2 className="mb-3 text-base font-black text-slate-950">결제 이벤트 로그</h2>
+                  <table className="min-w-full text-left text-sm">
+                    <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+                      <tr>
+                        <Th>ID</Th>
+                        <Th>Provider</Th>
+                        <Th>Event</Th>
+                        <Th>Payload</Th>
+                        <Th>Processed</Th>
+                        <Th>처리</Th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {payments.map((payment) => (
+                        <tr key={payment.id}>
+                          <Td>#{payment.id}</Td>
+                          <Td>{payment.provider}</Td>
+                          <Td>{payment.event_type}</Td>
+                          <Td className="max-w-md"><span className="line-clamp-2">{shortJson(payment.payload)}</span></Td>
+                          <Td>{formatDate(payment.processed_at)}</Td>
+                          <Td>
+                            <button
+                              onClick={() => handlePaymentProcessed(payment.id, !payment.processed_at)}
+                              className="rounded-md border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                              {payment.processed_at ? "해제" : "처리"}
+                            </button>
+                          </Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+              </div>
             )}
 
             {activeTab === "users" && (
-              <table className="min-w-full text-left text-sm">
+              <div className="p-4">
+                <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="min-w-64 flex-1">
+                    <label className="mb-1 block text-xs font-semibold text-slate-600">검색</label>
+                    <input
+                      value={userSearch}
+                      onChange={(e) => setUserSearch(e.target.value)}
+                      placeholder="이메일 또는 닉네임"
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-600">Role</label>
+                    <select
+                      value={userRoleFilter}
+                      onChange={(e) => setUserRoleFilter(e.target.value)}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="">전체</option>
+                      {USER_ROLES.map((role) => (
+                        <option key={role} value={role}>
+                          {role}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-600">활성 상태</label>
+                    <select
+                      value={userActiveFilter}
+                      onChange={(e) => setUserActiveFilter(e.target.value)}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="">전체</option>
+                      <option value="true">활성</option>
+                      <option value="false">비활성</option>
+                    </select>
+                  </div>
+                  <button
+                    onClick={handleRefreshUsersAndReports}
+                    className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+                  >
+                    검색
+                  </button>
+                </div>
+
+                <table className="min-w-full text-left text-sm">
                 <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
                   <tr>
                     <Th>ID</Th>
                     <Th>계정</Th>
+                    <Th>연동</Th>
                     <Th>Role</Th>
                     <Th>Coin</Th>
                     <Th>Status</Th>
@@ -438,9 +1152,39 @@ export default function AdminPage() {
                         <p className="font-semibold text-slate-900">{user.nickname}</p>
                         <p className="text-xs text-slate-500">{user.email}</p>
                       </Td>
+                      <Td>
+                        <div className="flex flex-wrap gap-1.5">
+                          {user.is_github_linked ? (
+                            <span className="rounded-full bg-slate-900 px-2 py-0.5 text-xs font-semibold text-white">
+                              GitHub
+                            </span>
+                          ) : null}
+                          {user.is_google_linked ? (
+                            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                              Google
+                            </span>
+                          ) : null}
+                          {!user.is_github_linked && !user.is_google_linked ? (
+                            <span className="text-xs text-slate-400">일반</span>
+                          ) : null}
+                        </div>
+                        {user.github_id ? (
+                          <p className="mt-1 text-xs text-slate-400">github_id: {user.github_id}</p>
+                        ) : null}
+                      </Td>
                       <Td>{user.role}</Td>
                       <Td>{user.coin_balance}</Td>
-                      <Td><StatusBadge value={user.is_active ? "active" : "inactive"} /></Td>
+                      <Td>
+                        <StatusBadge value={user.is_active ? "active" : "suspended"} />
+                        {!user.is_active ? (
+                          <div className="mt-1 max-w-56 text-xs leading-5 text-slate-500">
+                            <p>종료: {user.suspended_until ? formatDate(user.suspended_until) : "무기한"}</p>
+                            {user.suspension_reason ? (
+                              <p className="line-clamp-2">사유: {user.suspension_reason}</p>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </Td>
                       <Td>
                         <div className="flex flex-wrap gap-2">
                           <select
@@ -455,19 +1199,224 @@ export default function AdminPage() {
                               </option>
                             ))}
                           </select>
+	                          <button
+	                            onClick={() => user.is_active ? handleSuspendUser(user) : handleRestoreUser(user)}
+	                            disabled={processingKey === `user-${user.id}`}
+	                            className="rounded-md border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+	                          >
+	                            {user.is_active ? "정지" : "복구"}
+                          </button>
                           <button
-                            onClick={() => handleUserActive(user.id, !user.is_active)}
-                            disabled={processingKey === `user-${user.id}`}
-                            className="rounded-md border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                            onClick={() => handleGrantCoins(user.id)}
+                            disabled={processingKey === `coin-${user.id}`}
+                            className="rounded-md bg-amber-500 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
                           >
-                            {user.is_active ? "정지" : "복구"}
+                            코인 지급
+                          </button>
+                          <button
+                            onClick={() => handleRevokeCoins(user.id)}
+                            disabled={processingKey === `revoke-coin-${user.id}`}
+                            className="rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                          >
+                            코인 환수
                           </button>
                         </div>
                       </Td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
+            )}
+
+            {activeTab === "notices" && (
+              <div className="p-4">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <h2 className="text-base font-bold text-slate-950">공지 작성</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    작성된 공지는 커뮤니티의 공지 게시글로 등록됩니다.
+                  </p>
+
+                  <div className="mt-4 space-y-3">
+                    <input
+                      value={noticeForm.title}
+                      onChange={(e) =>
+                        setNoticeForm((prev) => ({ ...prev, title: e.target.value }))
+                      }
+                      placeholder="공지 제목"
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none"
+                    />
+                    <div className="flex items-center gap-3">
+                      <select
+                        value={noticeForm.category}
+                        onChange={(e) => setNoticeForm((prev) => ({ ...prev, category: e.target.value }))}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none"
+                      >
+                        <option value="announcement">공지</option>
+                        <option value="event">이벤트</option>
+                      </select>
+                      <label className="flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={noticeForm.isPinned}
+                          onChange={(e) =>
+                            setNoticeForm((prev) => ({ ...prev, isPinned: e.target.checked }))
+                          }
+                        />
+                        상단 고정
+                      </label>
+                    </div>
+
+                    <textarea
+                      value={noticeForm.content}
+                      onChange={(e) =>
+                        setNoticeForm((prev) => ({ ...prev, content: e.target.value }))
+                      }
+                      placeholder="공지 내용을 입력하세요."
+                      rows={8}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none"
+                    />
+
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() =>
+                          setNoticeForm({
+                            title: "",
+                            content: "",
+                            category: "announcement",
+                            isPinned: true,
+                          })
+                        }
+                        className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+                      >
+                        초기화
+                      </button>
+                      <button
+                        onClick={handleCreateNotice}
+                        disabled={processingKey === "notice-create"}
+                        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                      >
+                        공지 작성
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4">
+                  <h2 className="text-base font-bold text-slate-950">내가 작성한 공지/이벤트</h2>
+                  <p className="mt-1 text-sm text-slate-500">관리자 계정으로 작성한 공지 및 이벤트 글을 수정하거나 삭제할 수 있습니다.</p>
+                  <div className="mt-4 divide-y divide-slate-100">
+                    {adminPosts.length === 0 && <EmptyLine text="작성한 공지/이벤트 글이 없습니다." />}
+                    {adminPosts.map((p) => (
+                      <div key={p.id} className="flex items-start justify-between gap-3 py-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-900">{p.title} · {p.category}</p>
+                          <p className="mt-1 line-clamp-2 text-xs text-slate-500">{p.content}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => handleEditAdminPost(p.id)} className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white">수정</button>
+                          <button onClick={() => handleDeleteAdminPost(p.id)} className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white">삭제</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "posts" && (
+              <div className="p-4">
+                <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="min-w-64 flex-1">
+                    <label className="mb-1 block text-xs font-semibold text-slate-600">검색</label>
+                    <input
+                      value={postSearch}
+                      onChange={(e) => setPostSearch(e.target.value)}
+                      placeholder="제목 또는 내용"
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-600">카테고리</label>
+                    <select
+                      value={postCategoryFilter}
+                      onChange={(e) => setPostCategoryFilter(e.target.value)}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="">전체</option>
+                      <option value="general">자유</option>
+                      <option value="question">질문</option>
+                      <option value="idea">아이디어</option>
+                      <option value="showcase">쇼케이스</option>
+                      <option value="event">이벤트</option>
+                      <option value="announcement">공지</option>
+                    </select>
+                  </div>
+                  <label className="flex items-center gap-2 pb-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={includeDeletedPosts}
+                      onChange={(e) => setIncludeDeletedPosts(e.target.checked)}
+                    />
+                    삭제 포함
+                  </label>
+                  <button
+                    onClick={loadAdminData}
+                    className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+                  >
+                    검색
+                  </button>
+                </div>
+
+                <table className="min-w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+                    <tr>
+                      <Th>ID</Th>
+                      <Th>게시글</Th>
+                      <Th>분류</Th>
+                      <Th>작성자</Th>
+                      <Th>상태</Th>
+                      <Th>생성일</Th>
+                      <Th>처리</Th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {posts.map((post) => (
+                      <tr key={post.id}>
+                        <Td>#{post.id}</Td>
+                        <Td className="max-w-md">
+                          <p className="font-semibold text-slate-900">{post.title}</p>
+                          <p className="mt-1 line-clamp-2 text-xs text-slate-500">{post.content}</p>
+                        </Td>
+                        <Td>{post.category}</Td>
+                        <Td>
+                          <p className="font-semibold text-slate-900">
+                            {post.author_nickname || `User #${post.author_id}`}
+                          </p>
+                          <p className="text-xs text-slate-500">User #{post.author_id}</p>
+                        </Td>
+                        <Td><StatusBadge value={post.deleted_at ? "deleted" : "active"} /></Td>
+                        <Td>{formatDate(post.created_at)}</Td>
+                        <Td>
+                          <button
+                            onClick={() => handleTakedownPost(post.id)}
+                            disabled={Boolean(post.deleted_at) || processingKey === `post-takedown-${post.id}`}
+                            className="rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                          >
+                            강제내리기
+                          </button>
+                        </Td>
+                      </tr>
+                    ))}
+                    {posts.length === 0 && (
+                      <tr>
+                        <Td colSpan={7}>
+                          <EmptyLine text="조건에 맞는 게시글이 없습니다." />
+                        </Td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             )}
 
             {activeTab === "projects" && (
@@ -480,6 +1429,7 @@ export default function AdminPage() {
                     <Th>리더</Th>
                     <Th>분야</Th>
                     <Th>생성일</Th>
+                    <Th>처리</Th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -488,9 +1438,23 @@ export default function AdminPage() {
                       <Td>#{project.id}</Td>
                       <Td className="font-semibold text-slate-900">{project.title}</Td>
                       <Td><StatusBadge value={project.deleted_at ? "deleted" : project.status} /></Td>
-                      <Td>User #{project.leader_id}</Td>
+                      <Td>
+                        <p className="font-semibold text-slate-900">
+                          {project.leader_nickname || `User #${project.leader_id}`}
+                        </p>
+                        <p className="text-xs text-slate-500">User #{project.leader_id}</p>
+                      </Td>
                       <Td>{project.category || "-"}</Td>
                       <Td>{formatDate(project.created_at)}</Td>
+                      <Td>
+                        <button
+                          onClick={() => handleTakedownProject(project.id)}
+                          disabled={Boolean(project.deleted_at) || processingKey === `project-takedown-${project.id}`}
+                          className="rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                        >
+                          강제내리기
+                        </button>
+                      </Td>
                     </tr>
                   ))}
                 </tbody>
@@ -540,14 +1504,14 @@ function Th({ children }) {
   return <th className="whitespace-nowrap px-4 py-3">{children}</th>;
 }
 
-function Td({ children, className = "" }) {
-  return <td className={`px-4 py-3 align-top text-slate-700 ${className}`}>{children}</td>;
+function Td({ children, className = "", ...props }) {
+  return <td {...props} className={`px-4 py-3 align-top text-slate-700 ${className}`}>{children}</td>;
 }
 
 function StatusBadge({ value }) {
   const normalized = String(value || "-");
   const tone =
-    ["open", "inactive", "deleted"].includes(normalized)
+    ["open", "inactive", "deleted", "suspended"].includes(normalized)
       ? "bg-red-50 text-red-700"
       : ["pending", "reviewing", "planning"].includes(normalized)
       ? "bg-amber-50 text-amber-700"

@@ -41,6 +41,10 @@ class ProjectUpdateRequest(CommonProjectUpdateRequest):
     progress_percent: float | None = Field(default=None, ge=0, le=100)
     max_members: int | None = Field(default=None, ge=1, le=100)
     min_members: int | None = Field(default=None, ge=1, le=100)
+    tech_stack: list[str] | None = None
+    hashtags: list[str] | None = None
+    expected_period: str | None = None
+    preferred_members: str | None = None
     is_public: bool | None = None
 
 
@@ -145,8 +149,8 @@ class MemoirUpdateRequest(BaseModel):
 
 
 class MemoirRefineRequest(BaseModel):
-    felt_point: str = Field(min_length=1, description="AI 정제를 위한 느낀 점")
-    lacked_point: str = Field(min_length=1, description="AI 정제를 위한 부족했던 점")
+    felt_point: str = Field(default="", description="AI 정제를 위한 느낀 점")
+    lacked_point: str = Field(default="", description="AI 정제를 위한 부족했던 점")
 
 
 class MemoirResponse(BaseModel):

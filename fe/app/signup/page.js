@@ -3,10 +3,16 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { authenticatedFetch, saveAuthSession } from "../../lib/auth";
+import {
+  authenticatedFetch,
+  getApiBaseUrl,
+  loadCurrentUser,
+  removeToken,
+  saveAuthSession,
+} from "../../lib/auth";
 
 // ─── 상수 ────────────────────────────────────────────────────────────────────
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const API_BASE = getApiBaseUrl();
 
 const SKILLS_LIST = [
   "React", "Next.js", "Vue.js", "Angular", "TypeScript", "JavaScript",
@@ -34,7 +40,19 @@ function validatePassword(pw) {
 // ─── [추가] FastAPI 에러 응답 파싱 헬퍼 ──────────────────────────────────────
 function parseApiError(data, fallback = "요청 처리 중 오류가 발생했습니다.") {
   if (!data?.detail) return fallback;
-  if (typeof data.detail === "string") return data.detail;
+  if (typeof data.detail === "string") {
+    if (data.detail === "중복된 아이디입니다.") {
+      return "중복된 아이디입니다.";
+    }
+    if (
+      data.detail === "Login id already exists" ||
+      data.detail === "Nickname already exists" ||
+      data.detail.includes("nickname")
+    ) {
+      return "이미 존재하는 닉네임입니다.";
+    }
+    return data.detail;
+  }
   if (Array.isArray(data.detail)) {
     return data.detail.map((e) => e.msg).join("\n");
   }
@@ -129,12 +147,18 @@ export default function SignupPage() {
     const via = params.get("via");
     const tokenFromQuery = params.get("access_token");
 
-    if (via === "github" && tokenFromQuery) {
-      queueMicrotask(() => {
+    if (via !== "github" || !tokenFromQuery) {
+      removeToken({ reason: "signup_entry" });
+      return;
+    }
+
+    queueMicrotask(async () => {
+      try {
         saveAuthSession({
           accessToken: tokenFromQuery,
           userId: params.get("user_id"),
         });
+        await loadCurrentUser();
         setAccessToken(tokenFromQuery);
 
         // 신규 유저는 온보딩 Step2, 기존 유저는 메인으로 이동
@@ -143,8 +167,13 @@ export default function SignupPage() {
         } else if (stepParam === "profile") {
           router.push("/mainpage");
         }
-      });
-    }
+      } catch (error) {
+        console.error(error);
+        removeToken({ reason: "invalid_signup_token" });
+        setAccessToken("");
+        window.history.replaceState(null, "", "/signup");
+      }
+    });
   }, [router]);
 
   // ── GitHub OAuth ─────────────────────────────────────────────────────────
@@ -159,7 +188,8 @@ export default function SignupPage() {
       return;
     }
 
-    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=user:email`;
+    const scope = encodeURIComponent("read:user user:email");
+    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&state=signup`;
   };
 
   // ── Step 1 제출 ───────────────────────────────────────────────────────────
@@ -341,7 +371,22 @@ export default function SignupPage() {
       <div className="w-full max-w-lg rounded-2xl bg-white p-8 shadow-lg">
         {/* 로고 */}
         <div className="mb-4 flex justify-center">
-          <Image src="/logo_colored.svg" alt="Devory 로고" width={100} height={72} className="h-auto w-[100px]" />
+          <Image
+            src="/logo_colored.svg"
+            alt="Devory 로고"
+            width={100}
+            height={72}
+            className="h-auto w-[100px] dark:hidden"
+            priority
+          />
+          <Image
+            src="/logo_colored_white.svg"
+            alt="Devory 로고"
+            width={100}
+            height={72}
+            className="hidden h-auto w-[100px] dark:block"
+            priority
+          />
         </div>
 
         {/* 스텝 인디케이터 */}

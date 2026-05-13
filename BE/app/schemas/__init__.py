@@ -1,4 +1,5 @@
 from app.schemas.auth import ForgotPasswordRequest
+from app.schemas.auth import FindLoginIdRequest
 from app.schemas.auth import LoginRequest
 from app.schemas.auth import LogoutRequest
 from app.schemas.auth import OAuthGithubLoginRequest
@@ -39,6 +40,7 @@ __all__ = [
 	"CommentCreateRequest",
 	"CommentUpdateRequest",
 	"ForgotPasswordRequest",
+	"FindLoginIdRequest",
 	"IdeaCreateRequest",
 	"IdeaUpdateRequest",
 	"LoginRequest",

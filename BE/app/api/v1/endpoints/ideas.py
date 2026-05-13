@@ -1,12 +1,14 @@
 import re
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status, File, UploadFile
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.v1.response import success_response
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
+from app.dependencies.auth import get_current_user_id_from_token
 from app.models import Idea
 from app.models import IdeaBookmark
 from app.models import IdeaFile
@@ -23,6 +25,16 @@ from app.services.economy import reward_project_registration
 from app.services.s3_upload import get_s3_service
 
 router = APIRouter()
+
+
+def _get_optional_user_id(authorization: str | None) -> int | None:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return None
+    token = authorization.split(" ", 1)[1].strip()
+    try:
+        return get_current_user_id_from_token(token)
+    except HTTPException:
+        return None
 
 
 def _normalize_skill_name(skill_name: str) -> str:
@@ -54,6 +66,24 @@ def _project_notification_data(project_id: int) -> dict:
     }
 
 
+def _compose_idea_description(
+    description: str,
+    expected_period: str | None = None,
+    preferred_members: str | None = None,
+) -> str:
+    parts = [description.strip()]
+    if expected_period and expected_period.strip():
+        parts.append(f"<b>[ 예상 진행 기간 ]</b>\n{expected_period.strip()}")
+    if preferred_members and preferred_members.strip():
+        parts.append(f"<b>[ 이런 분과 함께하고 싶어요 ]</b>\n{preferred_members.strip()}")
+    return "\n\n".join(part for part in parts if part)
+
+
+def _strip_idea_description_sections(description: str) -> str:
+    marker_pattern = r"\n*\s*<b>\[\s*(?:예상 진행 기간|이런 분과 함께하고 싶어요)\s*\]</b>[\s\S]*$"
+    return re.sub(marker_pattern, "", description or "").strip()
+
+
 def _notify_project_registered(db: Session, project: Project) -> None:
     db.add(
         Notification(
@@ -72,7 +102,7 @@ def _create_project_from_idea(db: Session, idea: Idea, current_user_id: int) -> 
         leader_id=current_user_id,
         title=idea.title,
         summary=idea.summary,
-        description=idea.description,
+        description=_strip_idea_description_sections(idea.description),
         category=idea.domain,
         difficulty=idea.difficulty,
         status="planning",
@@ -107,7 +137,11 @@ async def create_idea(
         author_id=current_user_id,
         title=payload.title,
         summary=payload.summary,
-        description=payload.description,
+        description=_compose_idea_description(
+            payload.description,
+            payload.expected_period,
+            payload.preferred_members,
+        ),
         domain=payload.domain,
         tech_stack=payload.tech_stack,
         hashtags=payload.hashtags,
@@ -140,6 +174,7 @@ async def list_ideas(
     size: int = Query(default=20, ge=1, le=100),
     difficulty: str | None = Query(default=None),
     discarded: bool | None = Query(default=None),
+    authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ) -> dict:
     """아이디어 목록 조회 API.
@@ -162,6 +197,37 @@ async def list_ideas(
 
     total = query.count()
     ideas = query.order_by(Idea.created_at.desc()).offset((page - 1) * size).limit(size).all()
+    idea_ids = [idea.id for idea in ideas]
+    like_counts = dict(
+        db.query(IdeaLike.idea_id, func.count(IdeaLike.id))
+        .filter(IdeaLike.idea_id.in_(idea_ids))
+        .group_by(IdeaLike.idea_id)
+        .all()
+    ) if idea_ids else {}
+    bookmark_counts = dict(
+        db.query(IdeaBookmark.idea_id, func.count(IdeaBookmark.id))
+        .filter(IdeaBookmark.idea_id.in_(idea_ids))
+        .group_by(IdeaBookmark.idea_id)
+        .all()
+    ) if idea_ids else {}
+
+    current_user_id = _get_optional_user_id(authorization)
+    liked_idea_ids: set[int] = set()
+    bookmarked_idea_ids: set[int] = set()
+    if current_user_id and idea_ids:
+        liked_idea_ids = {
+            idea_id
+            for (idea_id,) in db.query(IdeaLike.idea_id)
+            .filter(IdeaLike.user_id == current_user_id, IdeaLike.idea_id.in_(idea_ids))
+            .all()
+        }
+        bookmarked_idea_ids = {
+            idea_id
+            for (idea_id,) in db.query(IdeaBookmark.idea_id)
+            .filter(IdeaBookmark.user_id == current_user_id, IdeaBookmark.idea_id.in_(idea_ids))
+            .all()
+        }
+
     return success_response(
         data=[
             {
@@ -172,9 +238,14 @@ async def list_ideas(
             "summary": idea.summary,
             "tech_stack": idea.tech_stack,
             "hashtags": idea.hashtags,
+            "domain": idea.domain,
             "difficulty": idea.difficulty,
             "is_open": idea.is_open,
             "is_discarded": idea.is_discarded,
+            "like_count": int(like_counts.get(idea.id, 0)),
+            "bookmark_count": int(bookmark_counts.get(idea.id, 0)),
+            "is_liked": idea.id in liked_idea_ids,
+            "is_bookmarked": idea.id in bookmarked_idea_ids,
             "created_at": idea.created_at,
         }
             for idea in ideas
@@ -408,7 +479,7 @@ async def convert_idea_to_project(
         leader_id=current_user_id,
         title=payload.title,
         summary=payload.summary,
-        description=payload.description,
+        description=_strip_idea_description_sections(payload.description),
         category=payload.category,
         difficulty=payload.difficulty,
         status=payload.status,

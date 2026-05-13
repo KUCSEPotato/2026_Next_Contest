@@ -1,21 +1,63 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
+  confirmTodosApi,
   createTodoApi,
+  deleteTodoApi,
   generateAITodosApi,
   getMessagesApi,
   getProjectApi,
+  getTodoStateApi,
   getTodosApi,
   sendMessageApi,
-  toggleTodoDoneApi,
   updateTodoApi,
 } from "../../../lib/api";
 import { useRef } from "react";
 
+const TODO_STAGES = [
+  { value: "planning", label: "기획" },
+  { value: "design", label: "설계" },
+  { value: "development", label: "개발" },
+  { value: "verification", label: "검증" },
+];
+
+const CHAT_READ_COUNTS_STORAGE_KEY = "devory_chat_read_counts";
+
+const getStoredChatReadCounts = () => {
+  if (typeof window === "undefined") return {};
+
+  try {
+    return JSON.parse(localStorage.getItem(CHAT_READ_COUNTS_STORAGE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+};
+
+const markChatRoomRead = (roomId, messageCount) => {
+  if (typeof window === "undefined" || !roomId) return;
+
+  const readCounts = getStoredChatReadCounts();
+  readCounts[String(roomId)] = messageCount;
+  localStorage.setItem(CHAT_READ_COUNTS_STORAGE_KEY, JSON.stringify(readCounts));
+};
+
+const getDoneAssignmentNames = (todo) =>
+  (todo?.assignments || [])
+    .filter((assignment) => assignment.is_done)
+    .map(
+      (assignment) =>
+        assignment.nickname ||
+        assignment.user?.nickname ||
+        assignment.name ||
+        assignment.user?.name ||
+        `User #${assignment.user_id}`
+    );
+
 export default function ChatRoomPage() {
   const params = useParams();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const roomId = params.roomId;
   const projectId = searchParams.get("projectId");
@@ -34,14 +76,18 @@ export default function ChatRoomPage() {
   const [project, setProject] = useState(null);
   const [todos, setTodos] = useState([]);
   const [todoTitle, setTodoTitle] = useState("");
+  const [todoStage, setTodoStage] = useState("planning");
   const [todoLoading, setTodoLoading] = useState(false);
   const [creatingTodo, setCreatingTodo] = useState(false);
   const [generatingTodos, setGeneratingTodos] = useState(false);
+  const [confirmingTodos, setConfirmingTodos] = useState(false);
+  const [isTodoFinalized, setIsTodoFinalized] = useState(false);
   const [isSelectingMessages, setIsSelectingMessages] = useState(false);
   const [selectedMessageIds, setSelectedMessageIds] = useState([]);
   const [editingTodoId, setEditingTodoId] = useState(null);
   const [editingTodoTitle, setEditingTodoTitle] = useState("");
   const [editingTodoDescription, setEditingTodoDescription] = useState("");
+  const [expandedTodoIds, setExpandedTodoIds] = useState([]);
 
   const loadMessages = useCallback(async () => {
     try {
@@ -66,20 +112,77 @@ export default function ChatRoomPage() {
     try {
       setTodoLoading(true);
 
-      const [projectResult, todosResult] = await Promise.all([
+      const [projectResult, todosResult, todoStateResult] = await Promise.all([
         getProjectApi(projectId),
         getTodosApi(projectId),
+        getTodoStateApi(projectId).catch(() => ({ data: { is_finalized: false } })),
       ]);
 
       const members = projectResult.data?.members || [];
       setProject(projectResult.data);
       setProjectMembers(members);
       setTodos(Array.isArray(todosResult.data) ? todosResult.data : []);
+      setIsTodoFinalized(Boolean(todoStateResult.data?.is_finalized));
     } catch (error) {
       console.error(error);
     } finally {
       setTodoLoading(false);
     }
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) return;
+
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
+
+    const apiBaseUrl =
+      process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+    const wsBaseUrl = apiBaseUrl.replace(/^http/, "ws");
+    const socket = new WebSocket(
+      `${wsBaseUrl}/api/v1/projects/${projectId}/todos/ws?token=${token}`
+    );
+
+    socket.onmessage = (event) => {
+      const payload = JSON.parse(event.data);
+
+      if (payload.type === "todo.snapshot") {
+        setTodos(Array.isArray(payload.data) ? payload.data : []);
+      }
+
+      if (payload.type === "todo.created") {
+        setTodos((prev) => {
+          const exists = prev.some((todo) => todo.id === payload.data.id);
+          return exists
+            ? prev.map((todo) => (todo.id === payload.data.id ? payload.data : todo))
+            : [...prev, payload.data];
+        });
+      }
+
+      if (payload.type === "todo.updated") {
+        setTodos((prev) =>
+          prev.map((todo) => (todo.id === payload.data.id ? payload.data : todo))
+        );
+      }
+
+      if (payload.type === "todo.deleted") {
+        setTodos((prev) =>
+          prev.filter((todo) => todo.id !== payload.data?.todo_id)
+        );
+      }
+
+      if (payload.type === "todo.state.updated") {
+        setIsTodoFinalized(Boolean(payload.data?.is_finalized));
+      }
+    };
+
+    socket.onerror = (error) => {
+      console.error(error);
+    };
+
+    return () => {
+      socket.close();
+    };
   }, [projectId]);
 
   useEffect(() => {
@@ -126,6 +229,10 @@ export default function ChatRoomPage() {
     bottomRef.current?.scrollIntoView({ behavior: "auto" });
   }, [messages]);
 
+  useEffect(() => {
+    markChatRoomRead(roomId, messages.length);
+  }, [messages.length, roomId]);
+
   const handleSend = async () => {
     if (!input.trim()) {
       alert("메시지를 입력해주세요.");
@@ -161,6 +268,11 @@ export default function ChatRoomPage() {
       return;
     }
 
+    if (isTodoFinalized) {
+      alert("확정된 체크리스트는 진행 관리 페이지에서 수정할 수 있습니다.");
+      return;
+    }
+
     if (!todoTitle.trim()) {
       alert("Todo 제목을 입력해주세요.");
       return;
@@ -172,7 +284,7 @@ export default function ChatRoomPage() {
       await createTodoApi(projectId, {
         title: todoTitle.trim(),
         assignee_ids: getProjectMemberIds(),
-        stage: "planning",
+        stage: todoStage,
         status: "todo",
         priority: todos.length + 1,
       });
@@ -187,21 +299,14 @@ export default function ChatRoomPage() {
     }
   };
 
-  const handleToggleTodo = async (todoId) => {
-    if (!projectId) return;
-
-    try {
-      await toggleTodoDoneApi(projectId, todoId);
-      await loadProjectTodos();
-    } catch (error) {
-      console.error(error);
-      alert("Todo 완료 상태를 변경하지 못했습니다.");
-    }
-  };
-
   const handleGenerateTodos = async () => {
     if (!projectId) {
       alert("프로젝트 정보를 찾을 수 없습니다.");
+      return;
+    }
+
+    if (isTodoFinalized) {
+      alert("확정된 체크리스트는 진행 관리 페이지에서 수정할 수 있습니다.");
       return;
     }
 
@@ -242,6 +347,35 @@ export default function ChatRoomPage() {
 
   const isLeader = project?.leader_id === myId;
 
+  const handleConfirmTodos = async () => {
+    if (!projectId) {
+      alert("프로젝트 정보를 찾을 수 없습니다.");
+      return;
+    }
+
+    if (isTodoFinalized) return;
+
+    if (
+      !confirm(
+        "확정하시겠습니까? 진행 관리 페이지에서 수정 가능합니다."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setConfirmingTodos(true);
+      const result = await confirmTodosApi(projectId);
+      setIsTodoFinalized(Boolean(result.data?.is_finalized));
+      alert("Todo 체크리스트가 확정되었습니다.");
+    } catch (error) {
+      console.error(error);
+      alert("Todo 확정에 실패했습니다.");
+    } finally {
+      setConfirmingTodos(false);
+    }
+  };
+
   const toggleSelectedMessage = (messageId) => {
     setSelectedMessageIds((prev) =>
       prev.includes(messageId)
@@ -251,6 +385,11 @@ export default function ChatRoomPage() {
   };
 
   const startEditingTodo = (todo) => {
+    if (isTodoFinalized) {
+      alert("확정된 체크리스트는 진행 관리 페이지에서 수정할 수 있습니다.");
+      return;
+    }
+
     setEditingTodoId(todo.id);
     setEditingTodoTitle(todo.title || "");
     setEditingTodoDescription(todo.description || "");
@@ -264,6 +403,11 @@ export default function ChatRoomPage() {
 
   const handleSaveTodoEdit = async (todo) => {
     if (!projectId) return;
+    if (isTodoFinalized) {
+      alert("확정된 체크리스트는 진행 관리 페이지에서 수정할 수 있습니다.");
+      return;
+    }
+
     if (!editingTodoTitle.trim()) {
       alert("Todo 제목을 입력해주세요.");
       return;
@@ -282,30 +426,39 @@ export default function ChatRoomPage() {
     }
   };
 
-  const handleMoveTodo = async (todoIndex, direction) => {
+  const handleDeleteTodo = async (todo) => {
     if (!projectId) return;
+    if (isTodoFinalized) {
+      alert("확정된 체크리스트는 진행 관리 페이지에서 수정할 수 있습니다.");
+      return;
+    }
 
-    const targetIndex = todoIndex + direction;
-    if (targetIndex < 0 || targetIndex >= todos.length) return;
-
-    const currentTodo = todos[todoIndex];
-    const targetTodo = todos[targetIndex];
+    if (!confirm(`"${todo.title}" 항목을 삭제할까요?`)) {
+      return;
+    }
 
     try {
-      await Promise.all([
-        updateTodoApi(projectId, currentTodo.id, {
-          priority: targetTodo.priority || targetIndex + 1,
-        }),
-        updateTodoApi(projectId, targetTodo.id, {
-          priority: currentTodo.priority || todoIndex + 1,
-        }),
-      ]);
+      await deleteTodoApi(projectId, todo.id);
+      setExpandedTodoIds((prev) => prev.filter((id) => id !== todo.id));
+      if (editingTodoId === todo.id) {
+        cancelEditingTodo();
+      }
       await loadProjectTodos();
     } catch (error) {
       console.error(error);
-      alert("Todo 순서를 변경하지 못했습니다.");
+      alert("Todo 삭제에 실패했습니다.");
     }
   };
+
+  const toggleTodoDetail = (todoId) => {
+    setExpandedTodoIds((prev) =>
+      prev.includes(todoId)
+        ? prev.filter((id) => id !== todoId)
+        : [...prev, todoId]
+    );
+  };
+
+  const todoGroups = groupTodosByStage(todos);
 
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
@@ -435,16 +588,48 @@ export default function ChatRoomPage() {
 
               <button
                 onClick={handleGenerateTodos}
-                disabled={generatingTodos || !isLeader}
+                disabled={generatingTodos || !isLeader || isTodoFinalized}
                 className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:bg-slate-400"
                 title={
-                  isLeader
+                  isTodoFinalized
+                    ? "확정된 체크리스트는 진행 관리 페이지에서 수정할 수 있습니다."
+                    : isLeader
                     ? "선택한 채팅 범위와 프로젝트 정보를 바탕으로 Todo를 생성합니다."
                     : "AI Todo 생성은 팀장만 사용할 수 있습니다."
                 }
               >
                 {generatingTodos ? "생성 중..." : "AI 생성"}
               </button>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-2">
+              {isTodoFinalized ? (
+                <p className="text-xs text-slate-500">
+                  확정된 체크리스트입니다. 수정/추가는{" "}
+                  <button
+                    type="button"
+                    onClick={() => projectId && router.push(`/projects/${projectId}/manage`)}
+                    disabled={!projectId}
+                    className="font-semibold text-red-600 underline-offset-2 transition hover:text-red-700 hover:underline disabled:cursor-not-allowed disabled:text-slate-400"
+                  >
+                    진행 관리 페이지
+                  </button>
+                  에서 할 수 있습니다.
+                </p>
+              ) : (
+                <p className="text-xs text-slate-500">
+                  채팅방에서 초안을 만들고 확정하면 진행 관리 페이지로 넘깁니다.
+                </p>
+              )}
+
+              {!isTodoFinalized && (
+                <button
+                  onClick={handleConfirmTodos}
+                  disabled={confirmingTodos}
+                  className="shrink-0 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  {confirmingTodos ? "확정 중..." : "확정"}
+                </button>
+              )}
             </div>
             {!isLeader && (
               <p className="mt-2 text-xs text-slate-500">
@@ -453,29 +638,44 @@ export default function ChatRoomPage() {
             )}
           </header>
 
-          <div className="border-b border-slate-100 p-4">
-            <div className="flex gap-2">
-              <input
-                value={todoTitle}
-                onChange={(e) => setTodoTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.nativeEvent.isComposing && !creatingTodo) {
-                    handleCreateTodo();
-                  }
-                }}
-                placeholder="새 Todo 추가"
-                className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
-              />
+          {!isTodoFinalized && (
+            <div className="border-b border-slate-100 p-4">
+              <div className="grid gap-2">
+                <select
+                  value={todoStage}
+                  onChange={(e) => setTodoStage(e.target.value)}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-600 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
+                >
+                  {TODO_STAGES.map((stage) => (
+                    <option key={stage.value} value={stage.value}>
+                      {stage.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex gap-2">
+                  <input
+                    value={todoTitle}
+                    onChange={(e) => setTodoTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.nativeEvent.isComposing && !creatingTodo) {
+                        handleCreateTodo();
+                      }
+                    }}
+                    placeholder="새 Todo 추가"
+                    className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
+                  />
 
-              <button
-                onClick={handleCreateTodo}
-                disabled={creatingTodo}
-                className="rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:bg-slate-400"
-              >
-                추가
-              </button>
+                  <button
+                    onClick={handleCreateTodo}
+                    disabled={creatingTodo}
+                    className="rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:bg-slate-400"
+                  >
+                    추가
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
 
           <section className="flex-1 space-y-3 overflow-y-auto p-4">
             {todoLoading ? (
@@ -485,116 +685,189 @@ export default function ChatRoomPage() {
                 아직 Todo가 없습니다. 직접 추가하거나 AI 생성 버튼을 눌러 시작해보세요.
               </p>
             ) : (
-              todos.map((todo, index) => {
-                const isDone = todo.status === "done";
-                const isEditing = editingTodoId === todo.id;
+              todoGroups.map((group) => (
+                <div key={group.stage} className="space-y-2">
+                  <div className="sticky top-0 z-10 bg-white/95 py-1 backdrop-blur">
+                    <h3 className="text-xs font-bold text-red-600">
+                      {group.label}
+                    </h3>
+                  </div>
 
-                return (
-                  <div
-                    key={todo.id}
-                    className="rounded-xl border border-slate-200 p-3 transition hover:border-red-200 hover:bg-red-50"
-                  >
-                    <div className="flex gap-3">
-                      <input
-                        type="checkbox"
-                        checked={isDone}
-                        onChange={() => handleToggleTodo(todo.id)}
-                        className="mt-1 h-4 w-4 accent-red-600"
-                      />
+                  {group.items.map(({ todo }) => {
+                    const isDone = todo.status === "done";
+                    const isEditing = editingTodoId === todo.id;
+                    const description = getVisibleTodoDescription(todo);
+                    const isExpanded = expandedTodoIds.includes(todo.id);
+                    const doneAssignmentNames = getDoneAssignmentNames(todo);
 
-                      <div className="min-w-0 flex-1">
-                        {isEditing ? (
-                          <div className="space-y-2">
-                            <input
-                              value={editingTodoTitle}
-                              onChange={(e) => setEditingTodoTitle(e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-red-500"
-                            />
+                    return (
+                      <div
+                        key={todo.id}
+                        className="rounded-xl border border-slate-200 px-3 py-2 transition hover:border-red-200 hover:bg-red-50"
+                      >
+                        <div className="flex gap-2">
+                          <div className="min-w-0 flex-1">
+                            {isEditing ? (
+                              <div className="space-y-2">
+                                <input
+                                  value={editingTodoTitle}
+                                  onChange={(e) =>
+                                    setEditingTodoTitle(e.target.value)
+                                  }
+                                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-red-500"
+                                />
 
-                            <textarea
-                              value={editingTodoDescription}
-                              onChange={(e) => setEditingTodoDescription(e.target.value)}
-                              className="min-h-20 w-full resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-red-500"
-                              placeholder="상세 설명"
-                            />
+                                <textarea
+                                  value={editingTodoDescription}
+                                  onChange={(e) =>
+                                    setEditingTodoDescription(e.target.value)
+                                  }
+                                  className="min-h-20 w-full resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-red-500"
+                                  placeholder="세부 내용"
+                                />
 
-                            <div className="flex gap-2">
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => handleSaveTodoEdit(todo)}
+                                    className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white"
+                                  >
+                                    저장
+                                  </button>
+
+                                  <button
+                                    onClick={cancelEditingTodo}
+                                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500"
+                                  >
+                                    취소
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    description && toggleTodoDetail(todo.id)
+                                  }
+                                  className={`block w-full text-left text-sm font-semibold leading-5 ${
+                                    isDone
+                                      ? "text-slate-400 line-through"
+                                      : "text-slate-800"
+                                  }`}
+                                >
+                                  {todo.title}
+                                </button>
+
+                                {description && isExpanded && (
+                                  <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+                                    {description}
+                                  </p>
+                                )}
+
+                                {doneAssignmentNames.length > 0 && (
+                                  <p className="mt-2 text-xs font-semibold text-red-600">
+                                    수행: {doneAssignmentNames.join(", ")}
+                                  </p>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {!isEditing && (
+                          <div className="mt-2 flex items-center justify-between gap-2 pl-6">
+                            {description ? (
                               <button
-                                onClick={() => handleSaveTodoEdit(todo)}
-                                className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white"
+                                onClick={() => toggleTodoDetail(todo.id)}
+                                className="text-xs font-semibold text-slate-400 hover:text-red-600"
                               >
-                                저장
+                                {isExpanded ? "접기" : "상세"}
+                              </button>
+                            ) : (
+                              <span />
+                            )}
+
+                            {!isTodoFinalized && (
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => startEditingTodo(todo)}
+                                className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 hover:border-red-300 hover:text-red-600"
+                              >
+                                수정
                               </button>
 
                               <button
-                                onClick={cancelEditingTodo}
-                                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500"
+                                onClick={() => handleDeleteTodo(todo)}
+                                className="rounded-lg border border-red-100 px-2 py-1 text-xs font-semibold text-red-500 hover:border-red-300 hover:bg-red-50"
                               >
-                                취소
+                                삭제
                               </button>
                             </div>
+                            )}
                           </div>
-                        ) : (
-                          <>
-                            {todo.stage && (
-                              <span className="mb-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
-                                {todo.stage}
-                              </span>
-                            )}
-
-                            <span
-                              className={`block text-sm font-semibold ${
-                                isDone
-                                  ? "text-slate-400 line-through"
-                                  : "text-slate-800"
-                              }`}
-                            >
-                              {todo.title}
-                            </span>
-
-                            {todo.description && (
-                              <span className="mt-1 block text-xs leading-5 text-slate-500">
-                                {todo.description}
-                              </span>
-                            )}
-                          </>
                         )}
                       </div>
-                    </div>
-
-                    {!isEditing && (
-                      <div className="mt-3 flex justify-end gap-1">
-                        <button
-                          onClick={() => handleMoveTodo(index, -1)}
-                          disabled={index === 0}
-                          className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500 disabled:opacity-40"
-                        >
-                          위
-                        </button>
-
-                        <button
-                          onClick={() => handleMoveTodo(index, 1)}
-                          disabled={index === todos.length - 1}
-                          className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500 disabled:opacity-40"
-                        >
-                          아래
-                        </button>
-
-                        <button
-                          onClick={() => startEditingTodo(todo)}
-                          className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 hover:border-red-300 hover:text-red-600"
-                        >
-                          수정
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
+                    );
+                  })}
+                </div>
+              ))
             )}
           </section>
         </aside>
       </div>
     </main>
   );
+}
+
+function groupTodosByStage(todos) {
+  const groupMap = new Map(
+    TODO_STAGES.map((stage) => [
+      stage.value,
+      { stage: stage.value, label: stage.label, items: [] },
+    ])
+  );
+  const extraGroups = [];
+
+  todos.forEach((todo, index) => {
+    const stage = normalizeTodoStage(todo.stage);
+
+    if (!groupMap.has(stage)) {
+      const group = { stage, label: stage, items: [] };
+      groupMap.set(stage, group);
+      extraGroups.push(group);
+    }
+
+    groupMap.get(stage).items.push({ todo, index });
+  });
+
+  return [
+    ...TODO_STAGES.map((stage) => groupMap.get(stage.value)).filter(
+      (group) => group.items.length > 0
+    ),
+    ...extraGroups.filter((group) => group.items.length > 0),
+  ];
+}
+
+function normalizeTodoStage(stage) {
+  const value = String(stage || "").trim();
+
+  if (!value || value === "planning" || value.includes("기획")) return "planning";
+  if (value === "design" || value.includes("설계")) return "design";
+  if (value === "development" || value.includes("개발")) return "development";
+  if (value === "verification" || value.includes("검증")) return "verification";
+
+  return value;
+}
+
+function getVisibleTodoDescription(todo) {
+  const description = String(todo?.description || "").trim();
+
+  if (
+    description ===
+    "AI가 선택한 채팅 범위와 프로젝트 상세 정보를 바탕으로 생성한 Todo입니다."
+  ) {
+    return "";
+  }
+
+  return description;
 }

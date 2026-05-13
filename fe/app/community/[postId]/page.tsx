@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import {
   PostDetail,
   CommentItem as CommentItemType,
+  PostFile,
   User,
   ReactionType,
+  EMPTY_REACTION_STATS,
 } from "../_types";
 import {
   getPost,
@@ -18,10 +20,10 @@ import {
   updateComment,
   deleteComment,
   reactToComment,
+  getPostFiles,
 } from "../_lib/api";
 import {
   timeAgo,
-  tempId,
   buildCommentTree,
   updateCommentInTree,
   removeCommentFromTree,
@@ -29,6 +31,7 @@ import {
 import Avatar from "../_components/Avatar";
 import CommentItem from "../_components/CommentItem";
 import LoginModal from "../_components/LoginModal";
+import { ThumbDownIcon, ThumbUpIcon } from "../_components/ReactionThumbIcons";
 
 const CATEGORIES = [
   { label: "일반", value: "general" },
@@ -39,12 +42,30 @@ const CATEGORIES = [
   { label: "공지", value: "announcement" },
 ];
 
-const REACTIONS: { type: ReactionType; emoji: string }[] = [
-  { type: "like", emoji: "❤️" },
-  { type: "interested", emoji: "🤔" },
-  { type: "helpful", emoji: "👍" },
-  { type: "curious", emoji: "🧐" },
+const REACTIONS: {
+  type: ReactionType;
+  Icon: typeof ThumbUpIcon;
+  inactiveClass: string;
+  activeClass: string;
+}[] = [
+  {
+    type: "recommend",
+    Icon: ThumbUpIcon,
+    inactiveClass:
+      "border-gray-200 text-gray-500 hover:border-red-200 hover:text-red-600 [&_svg]:text-gray-400 hover:[&_svg]:text-red-600",
+    activeClass: "border-red-300 bg-red-50 text-red-600 [&_svg]:text-red-600",
+  },
+  {
+    type: "not_recommend",
+    Icon: ThumbDownIcon,
+    inactiveClass:
+      "border-gray-200 text-gray-500 hover:border-red-200 hover:text-red-600 [&_svg]:text-gray-400 hover:[&_svg]:text-red-600",
+    activeClass: "border-red-300 bg-red-50 text-red-600 [&_svg]:text-red-600",
+  },
 ];
+
+const getErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
 
 export default function PostDetailPage() {
   const router = useRouter();
@@ -52,13 +73,14 @@ export default function PostDetailPage() {
   const pid = Number(postId);
 
   const [post, setPost] = useState<PostDetail | null>(null);
+  const [files, setFiles] = useState<PostFile[]>([]);
   const [comments, setComments] = useState<CommentItemType[]>([]);
   const [loadingPost, setLoadingPost] = useState(true);
   const [loadingComments, setLoadingComments] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const [commentText, setCommentText] = useState("");
+  const [commentAnonymous, setCommentAnonymous] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
 
   const [editing, setEditing] = useState(false);
@@ -69,27 +91,34 @@ export default function PostDetailPage() {
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const postReactBusy = useRef(false);
+  const commentReactBusy = useRef(new Set<number>());
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    if (token) {
-      setIsLoggedIn(true);
-      try {
-        const raw = localStorage.getItem("user");
-        if (raw) setCurrentUser(JSON.parse(raw));
-      } catch (e) {
-        console.error("유저 정보 파싱 실패", e);
-        localStorage.removeItem("user");
+    Promise.resolve().then(() => {
+      const token = localStorage.getItem("access_token");
+      if (token) {
+        try {
+          const raw = localStorage.getItem("user");
+          if (raw) setCurrentUser(JSON.parse(raw) as User);
+        } catch (e) {
+          console.error("유저 정보 파싱 실패", e);
+          localStorage.removeItem("user");
+        }
       }
-    }
+    });
   }, []);
 
   useEffect(() => {
     (async () => {
       setLoadingPost(true);
       try {
-        const data = await getPost(pid);
+        const [data, fileData] = await Promise.all([
+          getPost(pid),
+          getPostFiles(pid).catch(() => []),
+        ]);
         setPost(data);
+        setFiles(fileData);
         setEditTitle(data.title ?? "");
         setEditContent(data.content);
         setEditCategory(data.category ?? "");
@@ -105,7 +134,7 @@ export default function PostDetailPage() {
     setLoadingComments(true);
     try {
       const res = await getComments(pid, { page_size: 100 });
-      setComments(res.comments.map((c) => ({ ...c, replies: [] })));
+      setComments(buildCommentTree(res.comments));
     } catch (e) {
       console.error(e);
     } finally {
@@ -114,34 +143,47 @@ export default function PostDetailPage() {
   }, [pid]);
 
   useEffect(() => {
-    loadComments();
+    Promise.resolve().then(() => loadComments());
   }, [loadComments]);
 
   // ── 게시물 반응 (단일 선택) ──────────────────────────────────────────────────
   const handleReactPost = async (type: ReactionType) => {
     if (!currentUser) { setShowLoginModal(true); return; }
     if (!post) return;
+    if (postReactBusy.current) return;
+    postReactBusy.current = true;
     try {
-      await reactToPost(pid, type);
+      const result = await reactToPost(pid, type);
       setPost((p) => {
         if (!p) return p;
-        const prevReaction = p.user_reaction;
-        const isRemoving = prevReaction === type;
+        if (result.reaction_stats) {
+          return {
+            ...p,
+            user_reaction: result.user_reaction ?? null,
+            reaction_stats: result.reaction_stats,
+          };
+        }
         const newStats = { ...p.reaction_stats };
-        if (prevReaction) {
+        if (result.action === "removed") {
+          const rt = result.reaction_type;
+          newStats[rt] = Math.max(0, newStats[rt] - 1);
+          return { ...p, user_reaction: null, reaction_stats: newStats };
+        }
+        const prevReaction = p.user_reaction;
+        if (prevReaction && prevReaction !== type) {
           newStats[prevReaction] = Math.max(0, newStats[prevReaction] - 1);
         }
-        if (!isRemoving) {
-          newStats[type] = newStats[type] + 1;
-        }
+        newStats[type] = newStats[type] + 1;
         return {
           ...p,
-          user_reaction: isRemoving ? null : type,
+          user_reaction: type,
           reaction_stats: newStats,
         };
       });
     } catch (e) {
       console.error(e);
+    } finally {
+      postReactBusy.current = false;
     }
   };
 
@@ -156,8 +198,8 @@ export default function PostDetailPage() {
       });
       setPost(updated as PostDetail);
       setEditing(false);
-    } catch (e: any) {
-      alert(e.message ?? "수정에 실패했어요.");
+    } catch (e: unknown) {
+      alert(getErrorMessage(e, "수정에 실패했어요."));
     } finally {
       setSavingEdit(false);
     }
@@ -168,8 +210,8 @@ export default function PostDetailPage() {
     try {
       await deletePost(pid);
       router.push("/community");
-    } catch (e: any) {
-      alert(e.message ?? "삭제에 실패했어요.");
+    } catch (e: unknown) {
+      alert(getErrorMessage(e, "삭제에 실패했어요."));
     }
   };
 
@@ -180,29 +222,33 @@ export default function PostDetailPage() {
       const newComment = await createComment(pid, {
         content: commentText.trim(),
         parent_comment_id: null,
+        is_anonymous: commentAnonymous,
       });
       setComments((prev) => [...prev, {
         ...newComment,
         replies: [],
-        reply_count: 0,
-        reaction_stats: { like: 0, interested: 0, helpful: 0, curious: 0 },
-        user_reaction: null,
+        reply_count: newComment.reply_count ?? 0,
+        reaction_stats: newComment.reaction_stats ?? { ...EMPTY_REACTION_STATS },
+        user_reaction: newComment.user_reaction ?? null,
+        updated_at: newComment.updated_at ?? newComment.created_at,
       }]);
       setCommentText("");
+      setCommentAnonymous(false);
       setPost((p) => p ? { ...p, comment_count: p.comment_count + 1 } : p);
-    } catch (e: any) {
-      alert(e.message ?? "댓글 작성에 실패했어요.");
+    } catch (e: unknown) {
+      alert(getErrorMessage(e, "댓글 작성에 실패했어요."));
     } finally {
       setSubmittingComment(false);
     }
   };
 
-  const handleAddReply = async (parentId: number, content: string) => {
+  const handleAddReply = async (parentId: number, content: string, isAnonymous: boolean) => {
     if (!currentUser) return;
     try {
       const newReply = await createComment(pid, {
         content,
         parent_comment_id: parentId,
+        is_anonymous: isAnonymous,
       });
       setComments((prev) =>
         updateCommentInTree(prev, parentId, (c) => ({
@@ -210,44 +256,62 @@ export default function PostDetailPage() {
           replies: [...(c.replies ?? []), {
             ...newReply,
             replies: [],
-            reply_count: 0,
-            reaction_stats: { like: 0, interested: 0, helpful: 0, curious: 0 },
-            user_reaction: null,
+            reply_count: newReply.reply_count ?? 0,
+            reaction_stats: newReply.reaction_stats ?? { ...EMPTY_REACTION_STATS },
+            user_reaction: newReply.user_reaction ?? null,
+            updated_at: newReply.updated_at ?? newReply.created_at,
           }],
           reply_count: c.reply_count + 1,
         }))
       );
       setPost((p) => p ? { ...p, comment_count: p.comment_count + 1 } : p);
-    } catch (e: any) {
-      alert(e.message ?? "답글 작성에 실패했어요.");
+    } catch (e: unknown) {
+      alert(getErrorMessage(e, "답글 작성에 실패했어요."));
     }
   };
 
   // ── 댓글 반응 (단일 선택) ────────────────────────────────────────────────────
   const handleReactComment = async (commentId: number, type: ReactionType) => {
     if (!currentUser) { setShowLoginModal(true); return; }
+    if (commentReactBusy.current.has(commentId)) return;
+    commentReactBusy.current.add(commentId);
     try {
-      await reactToComment(pid, commentId, type);
+      const result = await reactToComment(pid, commentId, type);
       setComments((prev) =>
         updateCommentInTree(prev, commentId, (c) => {
-          const prevReaction = c.user_reaction;
-          const isRemoving = prevReaction === type;
+          if (result.reaction_stats) {
+            return {
+              ...c,
+              user_reaction: result.user_reaction ?? null,
+              reaction_stats: result.reaction_stats,
+            };
+          }
           const newStats = { ...c.reaction_stats };
-          if (prevReaction) {
+          if (result.action === "removed") {
+            const rt = result.reaction_type;
+            newStats[rt] = Math.max(0, newStats[rt] - 1);
+            return {
+              ...c,
+              user_reaction: null,
+              reaction_stats: newStats,
+            };
+          }
+          const prevReaction = c.user_reaction;
+          if (prevReaction && prevReaction !== type) {
             newStats[prevReaction] = Math.max(0, newStats[prevReaction] - 1);
           }
-          if (!isRemoving) {
-            newStats[type] = newStats[type] + 1;
-          }
+          newStats[type] = newStats[type] + 1;
           return {
             ...c,
-            user_reaction: isRemoving ? null : type,
+            user_reaction: type,
             reaction_stats: newStats,
           };
         })
       );
     } catch (e) {
       console.error(e);
+    } finally {
+      commentReactBusy.current.delete(commentId);
     }
   };
 
@@ -257,8 +321,8 @@ export default function PostDetailPage() {
       setComments((prev) =>
         updateCommentInTree(prev, commentId, (c) => ({ ...c, content: updated.content }))
       );
-    } catch (e: any) {
-      alert(e.message ?? "수정에 실패했어요.");
+    } catch (e: unknown) {
+      alert(getErrorMessage(e, "수정에 실패했어요."));
     }
   };
 
@@ -268,8 +332,8 @@ export default function PostDetailPage() {
       await deleteComment(pid, commentId);
       setComments((prev) => removeCommentFromTree(prev, commentId));
       setPost((p) => p ? { ...p, comment_count: Math.max(0, p.comment_count - 1) } : p);
-    } catch (e: any) {
-      alert(e.message ?? "삭제에 실패했어요.");
+    } catch (e: unknown) {
+      alert(getErrorMessage(e, "삭제에 실패했어요."));
     }
   };
 
@@ -298,14 +362,14 @@ export default function PostDetailPage() {
   const isOwn = currentUser?.id === post.author_id;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 text-gray-900">
       <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
 
         <button
           onClick={() => router.push("/community")}
           className="mb-5 flex items-center gap-1.5 text-sm text-gray-500 transition hover:text-gray-800"
         >
-          ← 자유게시판
+          ← 모닥불
         </button>
 
         {/* Post */}
@@ -364,13 +428,13 @@ export default function PostDetailPage() {
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
                 placeholder="제목 (선택사항)"
-                className="mb-3 w-full border-b border-gray-100 pb-3 text-base font-semibold text-gray-900 placeholder-gray-300 outline-none"
+                className="mb-3 w-full border-b border-gray-100 bg-white pb-3 text-base font-semibold text-gray-900 outline-none placeholder:text-gray-300"
               />
               <textarea
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
                 rows={8}
-                className="w-full resize-none rounded-xl border border-gray-200 p-3 text-sm focus:border-red-400 focus:outline-none"
+                className="w-full resize-none rounded-xl border border-gray-200 bg-white p-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-red-400 focus:outline-none"
               />
               <div className="mt-3 flex flex-wrap gap-2">
                 {CATEGORIES.map((cat) => (
@@ -411,25 +475,66 @@ export default function PostDetailPage() {
               <p className="mb-3 whitespace-pre-wrap text-sm leading-relaxed text-gray-800">
                 {post.content}
               </p>
+              {files.length > 0 && (
+                <div
+                  className={`mt-4 grid gap-2 ${
+                    files.length === 1 ? "grid-cols-1" : "grid-cols-2"
+                  }`}
+                >
+                  {files.map((file) => {
+                    const isImage = file.file_type.startsWith("image/");
+                    const isVideo = file.file_type.startsWith("video/");
+
+                    return (
+                      <div
+                        key={file.id}
+                        className="overflow-hidden rounded-xl bg-gray-100"
+                      >
+                        {isImage ? (
+                          <img
+                            src={file.s3_url}
+                            alt={file.filename}
+                            className="h-48 w-full object-cover"
+                          />
+                        ) : isVideo ? (
+                          <video
+                            src={file.s3_url}
+                            controls
+                            className="h-48 w-full object-cover"
+                          />
+                        ) : (
+                          <a
+                            href={file.s3_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block px-4 py-3 text-xs font-medium text-gray-600 hover:text-red-500"
+                          >
+                            {file.filename}
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </>
           )}
 
           {!editing && (
             <div className="mt-4 flex items-center gap-2 border-t border-gray-50 pt-4">
-              {REACTIONS.map(({ type, emoji }) => {
+              {REACTIONS.map(({ type, Icon, inactiveClass, activeClass }) => {
                 const count = post.reaction_stats[type];
                 const isActive = post.user_reaction === type;
                 return (
                   <button
                     key={type}
                     onClick={() => handleReactPost(type)}
-                    className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition ${
-                      isActive
-                        ? "border-red-300 bg-red-50 text-red-500"
-                        : "border-gray-200 text-gray-400 hover:border-red-200 hover:text-red-400"
+                    className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition ${
+                      isActive ? activeClass : inactiveClass
                     }`}
                   >
-                    {emoji} {count > 0 && <span>{count}</span>}
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    {count > 0 && <span className="tabular-nums">{count}</span>}
                   </button>
                 );
               })}
@@ -448,7 +553,7 @@ export default function PostDetailPage() {
           ) : comments.length === 0 ? (
             <p className="mb-4 text-center text-xs text-gray-400">첫 댓글을 남겨보세요 💬</p>
           ) : (
-            <div className="mb-4 divide-y divide-gray-50">
+            <div className="mb-4 divide-y divide-gray-50 dark:divide-slate-800/70">
               {comments.map((c) => (
                 <CommentItem
                   key={c.id}
@@ -457,9 +562,9 @@ export default function PostDetailPage() {
                     if (!currentUser) { setShowLoginModal(true); return; }
                     handleReactComment(cid, type);
                   }}
-                  onReply={(parentId, text) => {
+                  onReply={(parentId, text, isAnonymous) => {
                     if (!currentUser) { setShowLoginModal(true); return; }
-                    handleAddReply(parentId, text);
+                    handleAddReply(parentId, text, isAnonymous);
                   }}
                   onEdit={handleEditComment}
                   onDelete={handleDeleteComment}
@@ -470,22 +575,33 @@ export default function PostDetailPage() {
           )}
 
           {currentUser ? (
-            <div className="flex items-center gap-2 border-t border-gray-50 pt-4">
-              <Avatar user={currentUser} size={32} />
-              <input
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleAddComment()}
-                placeholder="댓글을 입력하세요..."
-                className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-xs focus:border-red-400 focus:outline-none"
-              />
-              <button
-                onClick={handleAddComment}
-                disabled={submittingComment || !commentText.trim()}
-                className="rounded-xl bg-red-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-red-700 disabled:opacity-40"
-              >
-                {submittingComment ? "..." : "등록"}
-              </button>
+            <div className="space-y-2 border-t border-gray-50 pt-4 dark:border-slate-800/70">
+              <div className="flex items-center gap-2">
+                <Avatar user={currentUser} size={32} />
+                <input
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleAddComment()}
+                  placeholder="댓글을 입력하세요..."
+                  className="flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-900 placeholder:text-gray-400 focus:border-red-400 focus:outline-none"
+                />
+                <button
+                  onClick={handleAddComment}
+                  disabled={submittingComment || !commentText.trim()}
+                  className="rounded-xl bg-red-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-red-700 disabled:opacity-40"
+                >
+                  {submittingComment ? "..." : "등록"}
+                </button>
+              </div>
+              <label className="flex cursor-pointer items-center gap-2 pl-10 text-[11px] text-gray-500">
+                <input
+                  type="checkbox"
+                  checked={commentAnonymous}
+                  onChange={(e) => setCommentAnonymous(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                익명으로 댓글 달기
+              </label>
             </div>
           ) : (
             <button

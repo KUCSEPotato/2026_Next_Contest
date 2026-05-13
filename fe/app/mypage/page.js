@@ -1,14 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import ProgressBloom from "../../components/ProgressBloom";
+import { removeToken, updateStoredUser } from "../../lib/auth";
+import { useDialog, useToast } from "../../components/AppFeedback";
 import {
   getMyProfileApi,
   getMyReputationApi,
   getUserStatsApi,
+  getUserReceivedReviewsApi,
   getMyProjectsApi,
+  getMyApplicationsApi,
   getMyReceivedReviewsApi,
   updateMyProfileApi,
+  withdrawMyAccountApi,
   addMySkillApi,
   addMyInterestApi,
   discardProjectToWellApi,
@@ -16,22 +22,33 @@ import {
   createProjectReviewApi,
   uploadMyAvatarApi,
   getImageUrl,
+  getChatRoomsApi,
+  createChatRoomApi,
 } from "../../lib/api";
 
 export default function MyPage() {
   const router = useRouter();
+  const toast = useToast();
+  const { confirm } = useDialog();
+  const projectHistoryRef = useRef(null);
 
   const [profile, setProfile] = useState(null);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [reputation, setReputation] = useState(null);
   const [stats, setStats] = useState(null);
   const [projects, setProjects] = useState([]);
+  const [appliedProjects, setAppliedProjects] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [projectStatusFilter, setProjectStatusFilter] = useState("all");
+  const [projectSortOrder, setProjectSortOrder] = useState("latest");
 
   const [loading, setLoading] = useState(true);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [showReviews, setShowReviews] = useState(false);
   const [discardingId, setDiscardingId] = useState(null);
   const [discardConfirm, setDiscardConfirm] = useState(null);
+  const [openingChatProjectId, setOpeningChatProjectId] = useState(null);
 
   const [reviewProject, setReviewProject] = useState(null);
   const [reviewTargets, setReviewTargets] = useState([]);
@@ -64,6 +81,7 @@ export default function MyPage() {
       console.log("업로드 결과:", result);
       console.log("avatarUrl:", avatarUrl);
 
+      setAvatarLoadFailed(false);
 
       setProfile((prev) => ({
         ...prev,
@@ -71,6 +89,7 @@ export default function MyPage() {
       }));
 
       setEditAvatarUrl(avatarUrl);
+      await reloadProfile();
 
       alert("프로필 이미지가 업로드되었습니다.");
     } catch (error) {
@@ -90,14 +109,26 @@ export default function MyPage() {
     const profileData = profileResult.data;
 
     setProfile(profileData);
+    setAvatarLoadFailed(false);
     setEditNickname(profileData.nickname || "");
     setEditBio(profileData.bio || "");
     setEditAvatarUrl(profileData.avatar_url || "");
   }
 
   async function reloadMyProjects() {
-    const projectsResult = await getMyProjectsApi();
-    setProjects(projectsResult.data || []);
+    const [projectsResult, applicationsResult] = await Promise.allSettled([
+      getMyProjectsApi(),
+      getMyApplicationsApi(),
+    ]);
+
+    setProjects(
+      projectsResult.status === "fulfilled" ? projectsResult.value.data || [] : []
+    );
+    setAppliedProjects(
+      applicationsResult.status === "fulfilled"
+        ? applicationsResult.value.data || []
+        : []
+    );
   }
 
   useEffect(() => {
@@ -113,12 +144,12 @@ export default function MyPage() {
         setEditBio(profileData.bio || "");
         setEditAvatarUrl(profileData.avatar_url || "");
 
-        const [reputationResult, statsResult, projectsResult, reviewsResult] =
+        const [reputationResult, statsResult, projectsResult, applicationsResult] =
           await Promise.allSettled([
             getMyReputationApi(),
             getUserStatsApi(profileData.id),
             getMyProjectsApi(),
-            getMyReceivedReviewsApi(),
+            getMyApplicationsApi(),
           ]);
 
         setReputation(
@@ -127,27 +158,30 @@ export default function MyPage() {
             : null
         );
 
-        setStats(
+        const statsData =
           statsResult.status === "fulfilled"
             ? statsResult.value.data
             : {
                 lead_projects: 0,
                 completed_projects: 0,
                 review_received: 0,
-              }
-        );
+              };
+
+        setStats(statsData);
 
         setProjects(
           projectsResult.status === "fulfilled"
             ? projectsResult.value.data || []
             : []
         );
-
-        setReviews(
-          reviewsResult.status === "fulfilled"
-            ? reviewsResult.value.data || []
+        setAppliedProjects(
+          applicationsResult.status === "fulfilled"
+            ? applicationsResult.value.data || []
             : []
         );
+
+        const reviewsData = await loadReceivedReviews(profileData.id, statsData);
+        setReviews(reviewsData);
       } catch (error) {
         console.error("프로필 조회 실패:", error);
         alert("프로필 정보를 불러오지 못했습니다. 다시 로그인해주세요.");
@@ -160,13 +194,33 @@ export default function MyPage() {
     loadMyPage();
   }, [router]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("section") !== "projects") return;
+
+    requestAnimationFrame(() => {
+      projectHistoryRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }, [loading]);
+
   const isTeamFormedProject = (project) => {
-    return ["in_progress", "started", "completed", "paused"].includes(
+    return ["in_progress", "started", "paused"].includes(
       project?.status
     );
   };
 
   const openDiscardFlow = async (project) => {
+    if (project.status === "completed") {
+      alert("완료된 프로젝트는 버릴 수 없습니다.");
+      return;
+    }
+
     if (!project.can_discard) return;
 
     if (!isTeamFormedProject(project)) {
@@ -221,8 +275,9 @@ export default function MyPage() {
       setDiscardingId(project.id);
       await discardProjectToWellApi(project.id);
       setProjects((prev) => prev.filter((p) => p.id !== project.id));
+      await reloadMyProjects();
       setDiscardConfirm(null);
-      alert(`"${project.title}" 프로젝트가 영감의 샘으로 이동되었습니다.`);
+      alert(`"${project.title}" 프로젝트가 생각의 뜰으로 이동되었습니다.`);
     } catch (error) {
       console.error(error);
       alert("프로젝트 버리기에 실패했습니다.");
@@ -252,13 +307,14 @@ export default function MyPage() {
       await discardProjectToWellApi(reviewProject.id);
 
       setProjects((prev) => prev.filter((p) => p.id !== reviewProject.id));
+      await reloadMyProjects();
       setReviewProject(null);
       setReviewTargets([]);
       setReviewInputs({});
 
       await reloadProfile();
 
-      alert("팀원 평가가 저장되었고, 프로젝트가 영감의 샘으로 이동되었습니다.");
+      alert("팀원 평가가 저장되었고, 프로젝트가 생각의 뜰으로 이동되었습니다.");
     } catch (error) {
       console.error(error);
       alert("평가 저장 또는 프로젝트 버리기에 실패했습니다.");
@@ -283,10 +339,44 @@ export default function MyPage() {
         skills: prev?.skills,
         interests: prev?.interests,
       }));
+      updateStoredUser(result.data);
       setIsEditingProfile(false);
     } catch (error) {
       console.error(error);
+      const message = error?.message || "";
+      if (
+        message.includes("이미 존재하는 닉네임입니다") ||
+        message.includes("Nickname already exists")
+      ) {
+        alert("이미 존재하는 닉네임입니다.");
+        return;
+      }
       alert("프로필 수정에 실패했습니다.");
+    }
+  };
+
+  const handleWithdrawAccount = async () => {
+    const confirmed = await confirm({
+      title: "회원 탈퇴",
+      message: "회원 탈퇴 후 계정은 복구할 수 없습니다. 정말 탈퇴하시겠습니까?",
+      confirmText: "탈퇴하기",
+      cancelText: "취소",
+      tone: "danger",
+    });
+
+    if (!confirmed) return;
+
+    try {
+      setIsWithdrawing(true);
+      await withdrawMyAccountApi();
+      removeToken({ reason: "withdrawn" });
+      toast.success("회원 탈퇴가 완료되었습니다.");
+      router.replace("/login");
+    } catch (error) {
+      console.error(error);
+      toast.error("회원 탈퇴에 실패했습니다.");
+    } finally {
+      setIsWithdrawing(false);
     }
   };
 
@@ -324,6 +414,36 @@ export default function MyPage() {
     }
   };
 
+  const openTeamChat = async (project) => {
+    if (!project.can_chat) {
+      alert("팀에 속한 프로젝트만 채팅방으로 이동할 수 있습니다.");
+      return;
+    }
+
+    try {
+      setOpeningChatProjectId(project.id);
+
+      const roomsResult = await getChatRoomsApi(project.id);
+      const rooms = Array.isArray(roomsResult.data) ? roomsResult.data : [];
+      const activeRoom = rooms.find((room) => room.is_active) || rooms[0];
+
+      if (activeRoom) {
+        router.push(`/chat/${activeRoom.id}?projectId=${project.id}`);
+        return;
+      }
+
+      const created = await createChatRoomApi(project.id, {
+        name: project.title || `Project #${project.id}`,
+      });
+      router.push(`/chat/${created.data.id}?projectId=${project.id}`);
+    } catch (error) {
+      console.error(error);
+      alert("팀 채팅방으로 이동하지 못했습니다.");
+    } finally {
+      setOpeningChatProjectId(null);
+    }
+  };
+
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-50 px-6 py-10">
@@ -332,32 +452,40 @@ export default function MyPage() {
     );
   }
 
+  const projectHistory = buildProjectHistory(projects, appliedProjects);
+  const visibleProjects = getVisibleProjects(
+    projectHistory,
+    projectStatusFilter,
+    projectSortOrder
+  );
+  const rawAvatarUrl = profile?.avatar_url || profile?.avatarUrl || "";
+  const avatarUrl =
+    rawAvatarUrl && !avatarLoadFailed
+      ? getImageUrl(rawAvatarUrl)
+      : "";
+  const avatarFallback = profile?.nickname?.[0] || "D";
+
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
       <div className="mx-auto w-full max-w-5xl">
         <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
           <div className="flex items-center justify-between gap-6">
             <div className="flex items-center gap-6">
-            <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-red-100 text-3xl font-bold text-red-600">
-              {profile?.avatar_url ? (
-                <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-red-100 text-3xl font-bold text-red-600">
-                  {profile?.avatar_url ? (
-                    <img
-                      src={getImageUrl(profile.avatar_url)}
-                      alt=""
-                      className="h-full w-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  ) : (
-                    profile?.nickname?.[0] || "D"
-                  )}
-                </div>
-              ) : (
-                profile?.nickname?.[0] || "D"
-              )}
-            </div>
+              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-red-100 text-3xl font-bold text-red-600">
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt={`${profile?.nickname || "사용자"} 프로필 이미지`}
+                    className="h-full w-full object-cover"
+                    onError={() => {
+                      console.error("프로필 이미지 로드 실패:", avatarUrl);
+                      setAvatarLoadFailed(true);
+                    }}
+                  />
+                ) : (
+                  avatarFallback
+                )}
+              </div>
 
             <div>
               <h1 className="text-3xl font-bold text-slate-900">
@@ -370,12 +498,22 @@ export default function MyPage() {
             </div>
             </div>
 
-            <button
-              onClick={() => setIsEditingProfile(true)}
-              className="shrink-0 rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
-            >
-              수정하기
-            </button>
+            <div className="flex shrink-0 items-center gap-3">
+              <button
+                onClick={() => setIsEditingProfile(true)}
+                className="rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
+              >
+                수정하기
+              </button>
+              <button
+                type="button"
+                onClick={handleWithdrawAccount}
+                disabled={isWithdrawing}
+                className="rounded-xl border border-red-200 bg-white px-5 py-3 font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isWithdrawing ? "처리 중..." : "회원 탈퇴"}
+              </button>
+            </div>
           </div>
         </section>
 
@@ -472,41 +610,68 @@ export default function MyPage() {
             {reviews.length === 0 ? (
               <p className="text-sm text-slate-500">리뷰 없음</p>
             ) : (
-              reviews.map((review) => (
-                <div key={review.id} className="mb-3 rounded-xl border p-4">
-                  <p className="font-bold">
-                    {review.project?.title || "프로젝트"}
-                  </p>
+              reviews.map((review) => {
+                const reviewMessage = getReviewMessage(review);
 
-                  <p className="text-sm text-gray-400">
-                    익명{" "}
-                    {review.created_at
-                      ? `• ${new Date(review.created_at).toLocaleDateString()}`
-                      : ""}
-                  </p>
+                return (
+                  <div
+                    key={review.id}
+                    className="mb-3 rounded-xl border border-slate-200 p-4"
+                  >
+                    <p className="font-bold text-slate-900">
+                      {review.project?.title || "프로젝트"}
+                    </p>
 
-                  <div className="mt-2 text-sm">
-                    협업 {review.teamwork_score} / 기여{" "}
-                    {review.contribution_score} / 책임{" "}
-                    {review.responsibility_score}
+                    <p className="mt-1 text-sm text-slate-400">
+                      익명{" "}
+                      {review.created_at
+                        ? `• ${new Date(review.created_at).toLocaleDateString()}`
+                        : ""}
+                    </p>
+
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
+                      <span className="rounded-full bg-slate-100 px-3 py-1">
+                        협업 {review.teamwork_score}
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-3 py-1">
+                        기여 {review.contribution_score}
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-3 py-1">
+                        책임 {review.responsibility_score}
+                      </span>
+                    </div>
+
+                    <p
+                      className={`mt-3 rounded-xl px-4 py-3 text-sm leading-6 ${
+                        reviewMessage
+                          ? "bg-red-50 text-slate-700"
+                          : "bg-slate-50 text-slate-400"
+                      }`}
+                    >
+                      {reviewMessage || "작성된 리뷰 메시지가 없습니다."}
+                    </p>
                   </div>
-
-                  <p className="mt-2">{review.comment}</p>
-                </div>
-              ))
+                );
+              })
             )}
           </section>
         )}
 
         <section className="mb-6 rounded-2xl bg-white p-6 shadow">
-          <h2 className="mb-4 text-xl font-bold">신뢰도</h2>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">신뢰도</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                받은 리뷰를 바탕으로 평점 항목을 확인합니다.
+              </p>
+            </div>
 
-          <div className="grid grid-cols-4 gap-4">
-            <MiniStat label="종합" value={reputation?.score ?? 0} />
-            <MiniStat label="협업" value={reputation?.avg_teamwork ?? 0} />
-            <MiniStat label="기여" value={reputation?.avg_contribution ?? 0} />
-            <MiniStat label="책임" value={reputation?.avg_responsibility ?? 0} />
+            <div className="rounded-xl bg-slate-50 px-4 py-2 text-sm text-slate-600">
+              받은 평가 {reputation?.review_count ?? 0}개
+            </div>
           </div>
+
+          <RatingSummary reputation={reputation} />
         </section>
 
         <div className="mb-6 grid gap-6 lg:grid-cols-2">
@@ -589,25 +754,64 @@ export default function MyPage() {
           </section>
         </div>
 
-        <section className="rounded-2xl bg-white p-6 shadow">
-          <h2 className="mb-4 text-xl font-bold">프로젝트 이력</h2>
+        <section
+          ref={projectHistoryRef}
+          id="my-projects"
+          className="scroll-mt-24 rounded-2xl bg-white p-6 shadow"
+        >
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-xl font-bold">프로젝트 이력</h2>
+
+            <div className="flex flex-wrap gap-2">
+              <select
+                value={projectStatusFilter}
+                onChange={(e) => setProjectStatusFilter(e.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 outline-none transition focus:border-red-500"
+              >
+                <option value="all">전체</option>
+                <option value="planning">planning</option>
+                <option value="in_progress">in_progress</option>
+                <option value="completed">completed</option>
+              </select>
+
+              <select
+                value={projectSortOrder}
+                onChange={(e) => setProjectSortOrder(e.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 outline-none transition focus:border-red-500"
+              >
+                <option value="latest">최신순</option>
+                <option value="progress">진행율순</option>
+              </select>
+            </div>
+          </div>
 
           <div className="space-y-3">
-            {projects.length ? (
-              projects.map((project) => (
+            {visibleProjects.length ? (
+              visibleProjects.map((project) => (
                 <button
-                  key={project.id}
+                  key={project.historyKey || project.id}
                   onClick={() => router.push(`/projects/${project.id}`)}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-left transition hover:border-red-300 hover:bg-red-50"
                 >
                   <div className="flex items-center justify-between gap-4">
-                    <div>
+                    <div className="flex items-center gap-3">
+                      <ProgressBloom
+                        progress={project.progress_percent ?? 0}
+                        size="sm"
+                        showLabel={false}
+                      />
+                      <div>
                       <p className="font-semibold text-slate-900">
                         {project.title}
                       </p>
                       <p className="mt-1 text-sm text-slate-500">
                         난이도 {project.difficulty || "미정"}
+                        {" · "}
+                        진행률 {Math.round(project.progress_percent ?? 0)}%
+                        {project.historyType === "applied" &&
+                          ` · 지원 상태 ${project.applicationStatus || "확인중"}`}
                       </p>
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -615,7 +819,27 @@ export default function MyPage() {
                         {project.status || "상태 없음"}
                       </span>
 
-                      {project.can_discard && (
+                      {project.historyType === "applied" && (
+                        <span className="rounded-full bg-red-50 px-3 py-1 text-sm font-semibold text-red-600">
+                          내가 지원한 프로젝트
+                        </span>
+                      )}
+
+                      {project.historyType !== "applied" && project.can_chat && (
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openTeamChat(project);
+                          }}
+                          className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-sm font-semibold text-slate-700 transition hover:border-red-300 hover:text-red-600"
+                        >
+                          {openingChatProjectId === project.id ? "이동 중..." : "채팅"}
+                        </span>
+                      )}
+
+                      {project.historyType !== "applied" &&
+                        project.status !== "completed" &&
+                        project.can_discard && (
                         <span
                           onClick={(e) => {
                             e.stopPropagation();
@@ -627,21 +851,33 @@ export default function MyPage() {
                         </span>
                       )}
 
-                      <span
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/projects/${project.id}/manage`);
-                        }}
-                        className="rounded-lg bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-700"
-                      >
-                        진행 관리
-                      </span>
+                      {project.historyType === "applied" ? null : project.status === "completed" ? (
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/memoir?projectId=${project.id}`);
+                          }}
+                          className="rounded-lg bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-700"
+                        >
+                          회고
+                        </span>
+                      ) : (
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/projects/${project.id}/manage`);
+                          }}
+                          className="rounded-lg bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-700"
+                        >
+                          진행 관리
+                        </span>
+                      )}
                     </div>
                   </div>
                 </button>
               ))
             ) : (
-              <p className="text-sm text-slate-500">프로젝트 없음</p>
+              <p className="text-sm text-slate-500">조건에 맞는 프로젝트가 없습니다.</p>
             )}
           </div>
         </section>
@@ -656,17 +892,17 @@ export default function MyPage() {
 
           <div className="relative w-full max-w-sm rounded-2xl bg-white p-7 shadow-2xl">
             <h2 className="mb-2 text-center text-base font-bold text-slate-800">
-              프로젝트를 영감의 샘으로 이동할까요?
+              프로젝트를 생각의 뜰으로 이동할까요?
             </h2>
 
             <p className="mb-1 text-center text-sm font-semibold text-slate-700 line-clamp-1">
-              "{discardConfirm.title}"
+              &quot;{discardConfirm.title}&quot;
             </p>
 
             <p className="mb-6 text-center text-sm text-slate-400 leading-relaxed">
               이 프로젝트는 프로젝트 목록에서 사라지고,
               <br />
-              영감의 샘에 아이디어로 표시됩니다.
+              생각의 뜰에 아이디어로 표시됩니다.
               <br />
               이 작업은 되돌릴 수 없습니다.
             </p>
@@ -824,13 +1060,142 @@ function StatCard({ title, value }) {
   );
 }
 
-function MiniStat({ label, value }) {
+async function loadReceivedReviews(userId, statsData) {
+  try {
+    const result = await getMyReceivedReviewsApi();
+    const reviews = result.data || [];
+
+    if (reviews.length > 0 || !statsData?.review_received) {
+      return reviews;
+    }
+  } catch (error) {
+    console.error("내 리뷰 조회 실패, 공개 리뷰 API로 재시도합니다:", error);
+  }
+
+  try {
+    const fallbackResult = await getUserReceivedReviewsApi(userId);
+    return fallbackResult.data || [];
+  } catch (error) {
+    console.error("공개 리뷰 API 재시도 실패:", error);
+    return [];
+  }
+}
+
+function buildProjectHistory(projects, applications) {
+  const ownedProjectIds = new Set(projects.map((project) => Number(project.id)));
+  const normalizedApplications = (applications || [])
+    .filter((application) => !ownedProjectIds.has(Number(application.project_id)))
+    .map((application) => ({
+      id: application.project_id,
+      historyKey: `applied-${application.application_id}`,
+      historyType: "applied",
+      title: application.project_title,
+      status: application.project_status || "planning",
+      applicationStatus: application.status,
+      difficulty: application.difficulty,
+      category: application.category,
+      progress_percent: application.progress_percent ?? 0,
+      created_at: application.created_at,
+      can_discard: false,
+      can_chat: false,
+    }));
+
+  return [...projects, ...normalizedApplications];
+}
+
+function getVisibleProjects(projects, statusFilter, sortOrder) {
+  return [...projects]
+    .filter((project) =>
+      statusFilter === "all" ? true : project.status === statusFilter
+    )
+    .sort((a, b) => {
+      if (sortOrder === "progress") {
+        return (b.progress_percent ?? 0) - (a.progress_percent ?? 0);
+      }
+
+      return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+    });
+}
+
+function RatingSummary({ reputation }) {
+  const items = [
+    {
+      label: "협업",
+      value: reputation?.avg_teamwork,
+    },
+    {
+      label: "기여",
+      value: reputation?.avg_contribution,
+    },
+    {
+      label: "책임",
+      value: reputation?.avg_responsibility,
+    },
+  ];
+
   return (
-    <div className="rounded-xl bg-gray-100 p-4">
-      <p className="text-sm">{label}</p>
-      <p className="text-xl font-bold">{value}</p>
+    <div className="mt-5 grid gap-4 lg:grid-cols-[220px_1fr]">
+      <div className="rounded-2xl bg-red-50 p-5">
+        <p className="text-sm font-semibold text-red-600">종합 평점</p>
+        <p className="mt-2 text-4xl font-black text-slate-900">
+          {formatRating(reputation?.score)}
+        </p>
+        <p className="mt-1 text-sm text-slate-500">5점 만점</p>
+      </div>
+
+      <div className="space-y-3 rounded-2xl border border-slate-200 p-5">
+        {items.map((item) => (
+          <RatingRow key={item.label} label={item.label} value={item.value} />
+        ))}
+      </div>
     </div>
   );
+}
+
+function RatingRow({ label, value }) {
+  const ratingValue = normalizeRating(value);
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-[70px_1fr_48px] sm:items-center">
+      <p className="text-sm font-bold text-slate-800">{label}</p>
+
+      <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+        <div
+          className="h-full rounded-full bg-red-600"
+          style={{ width: `${(ratingValue / 5) * 100}%` }}
+        />
+      </div>
+
+      <p className="text-right text-sm font-bold text-slate-700">
+        {formatRating(ratingValue)}
+      </p>
+    </div>
+  );
+}
+
+function normalizeRating(value) {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+
+  return Math.min(5, Math.max(0, numericValue));
+}
+
+function formatRating(value) {
+  return normalizeRating(value).toFixed(1);
+}
+
+function getReviewMessage(review) {
+  const message =
+    review?.comment ||
+    review?.message ||
+    review?.review_message ||
+    review?.content ||
+    "";
+
+  return String(message).trim();
 }
 
 function ScoreSelect({ label, value, onChange }) {

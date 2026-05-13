@@ -45,15 +45,17 @@
 ## 2) Users
 
 - GET /users/me/profile: 내 프로필 + 기술 스택 + 선택한 아이디어 조회
+  - S3 아바타는 `avatar_s3_key`를 기반으로 매 응답마다 presigned GET URL을 `avatar_url`로 반환합니다.
 - GET /users/me/onboarding: 회원가입/프로필/아이디어 선택 상태 조회
 - PATCH /users/me/profile: 닉네임/이름/전화번호/소개/아바타 수정
- - PATCH /users/me/profile: 닉네임/이름/전화번호/소개/아바타 수정
- - POST /users/me/avatar: 아바타(프로필 사진) 파일 업로드 (multipart/form-data, S3에 저장)
+- POST /users/me/avatar: 아바타(프로필 사진) 파일 업로드 (multipart/form-data, private S3에 저장)
+  - DB에는 presigned URL이 아니라 `avatar_s3_key`만 저장합니다.
+  - 응답의 `avatar_url`은 만료 시간이 있는 presigned GET URL입니다.
 - GET /users/{user_id}/profile: 공개 프로필 조회
 - GET /users/{user_id}/stats: 활동 통계 조회
 - GET /users/{user_id}/projects: 사용자 프로젝트 이력
 - GET /users/{user_id}/reviews: **공개 리뷰 조회** (인증 불필요, 평점과 코멘트 포함)
-- GET /users/me/reviews: **내가 받은 리뷰 목록**(마이페이지용)
+- GET /users/me/reviews: **내가 받은 리뷰 목록**(마이페이지용, `comment`와 호환용 `message` 포함)
 - GET /users/me/applications: **내가 지원한 프로젝트 목록**(지원현황 조회)
 - POST /users/me/skills: 기술 스택 등록
 - DELETE /users/me/skills/{skill_id}: 기술 스택 제거
@@ -61,7 +63,7 @@
 - DELETE /users/me/interests/{interest_id}: 관심 분야 제거
 - 프로젝트 생성/시작/완료/재활용 시 코인 보상 이력이 누적됩니다.
 - POST /users/me/onboarding/ideas: 온보딩 마지막 단계에서 관심 아이디어 선택 및 가입 완료 처리
-- GET /users/me/reputation: 리뷰 기반 신뢰도/평점 요약
+- GET /users/me/reputation: 리뷰 기반 신뢰도/평점 요약(`score`, 항목별 평균 포함)
 
 ## 3) Ideas
 
@@ -214,9 +216,9 @@
   - `sort_by` 옵션:
     - `newest` (기본값): 최신순
     - `views`: 조회수 순
-    - `likes`: 좋아요 순
+    - `likes`: 추천 순
     - `comments`: 댓글 순
-    - `trending` 또는 `hot`: 핫게 (조회수×0.1 + 좋아요 + 댓글×0.5)
+    - `trending` 또는 `hot`: 핫게 (조회수×0.1 + 추천 + 댓글×0.5)
   - 핀 된 글은 항상 상단에 표시
 - GET /community/{post_id}: 게시물 상세(조회수 자동 증가, 반응 통계 포함)
 - PATCH /community/{post_id}: 게시물 수정(작성자만)
@@ -231,11 +233,20 @@
 - PATCH /community/{post_id}/comments/{comment_id}: 댓글 수정(작성자만)
 - DELETE /community/{post_id}/comments/{comment_id}: 댓글 삭제(소프트 삭제)
 
-### 반응(게시물/댓글에 like, interested, helpful, curious)
+### 반응(게시물/댓글에 recommend, not_recommend)
 - POST /community/{post_id}/reactions: 게시물 반응 추가/토글
 - POST /community/{post_id}/comments/{comment_id}/reactions: 댓글 반응 추가/토글
 
-## 13) Notifications
+## 13) Coins
+
+- GET /coins/me: 현재 로그인 사용자의 코인 잔액 조회
+- GET /coins/packages: 수동 구매 요청에 사용할 코인 패키지 목록 조회
+- POST /coins/purchase-requests: 코인 구매 요청 생성
+  - body: `{ "package_id": "starter|builder|maker", "note": "선택 메모" }`
+  - PG 연동 전 수동 확인용이며, 관리자가 승인하면 코인이 지급됩니다.
+- GET /coins/purchase-requests/me: 내가 만든 코인 구매 요청 목록 조회
+
+## 14) Notifications
 
 - GET /notifications: 현재 사용자의 알림 목록
   - 응답에 `data`, `project_id`, `url` 포함
@@ -249,16 +260,27 @@
 - 프로젝트 리뷰 작성: 리뷰 대상자에게 `review_received` 알림 생성, `/projects/{project_id}`로 이동
 - 커뮤니티 댓글 작성: 게시글 작성자에게 `system` 알림 생성, `/community/{post_id}`로 이동
 
-## 14) Admin
+## 15) Admin
 
-- GET /admin/overview: 운영 요약 지표(사용자/프로젝트/미처리 신고/결제 이벤트/활성 구독)
+- GET /admin/overview: 운영 요약 지표(사용자/프로젝트/미처리 신고/결제 이벤트/코인 구매 요청/활성 구독)
 - GET /admin/users: 전체 사용자 목록 조회(관리자)
+  - query: `q`(이메일/닉네임 검색), `role`, `is_active`
+- POST /admin/users/{user_id}/coins: 사용자 코인 수동 지급
+- POST /admin/users/{user_id}/coins/revoke: 사용자 코인 수동 환수
 - PATCH /admin/users/{user_id}/status: 사용자 상태/역할 변경(관리자)
+  - 정지: `{ "is_active": false, "suspended_until": "ISO8601 또는 null", "suspension_reason": "사유" }`
+  - 복구: `{ "is_active": true }`
+  - 정지 중인 사용자는 공통 인증 dependency에서 API 접근이 차단되며, 기간 만료 후 자동 복구됩니다.
 - GET /admin/projects: 전체 프로젝트 목록 조회(관리자)
 - GET /admin/reports: 신고 목록 조회(관리자)
+  - query: `scope=all|user|project|post|chat`
 - PATCH /admin/reports/{report_id}: 신고 처리 상태 변경(관리자)
+- POST /admin/notices: 공지글 작성(커뮤니티 `announcement` 게시글 생성)
 - GET /admin/payments: 결제 이벤트 목록 조회(관리자)
 - PATCH /admin/payments/{event_id}: 결제 이벤트 처리/해제(관리자)
+- GET /admin/coin-purchase-requests: 코인 구매 요청 목록 조회
+- PATCH /admin/coin-purchase-requests/{request_id}: 코인 구매 요청 승인/거절
+  - 승인 시 `coin.purchase` 코인 거래가 생성되고 사용자에게 알림이 발송됩니다.
 
 ## 참고 문서
 

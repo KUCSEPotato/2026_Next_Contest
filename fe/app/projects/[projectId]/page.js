@@ -9,6 +9,7 @@ import {
   updateProjectApi,
   deleteProjectApi,
   revertProjectToIdeaApi,
+  getMyApplicationsApi,
 } from "../../../lib/api";
 
 const DIFFICULTY_OPTIONS = [
@@ -53,10 +54,12 @@ export default function ProjectDetailPage() {
 
   const [message, setMessage] = useState("");
   const [isApplying, setIsApplying] = useState(false);
+  const [myApplication, setMyApplication] = useState(null);
 
   const [isEditing, setIsEditing] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDiscardOptions, setShowDiscardOptions] = useState(false);
 
   const [editForm, setEditForm] = useState({
     title: "",
@@ -66,6 +69,10 @@ export default function ProjectDetailPage() {
     category: "",
     progress_percent: 0,
     max_members: 10,
+    expected_period: "",
+    preferred_members: "",
+    tech_stack: "",
+    hashtags: "",
     is_public: true,
   });
 
@@ -75,6 +82,26 @@ export default function ProjectDetailPage() {
   const inputClassName =
     "w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100";
 
+  const buildEditFormFromProject = (projectData) => ({
+    title: projectData.title || "",
+    summary: projectData.summary || "",
+    description: projectData.description || "",
+    difficulty: projectData.difficulty || "",
+    category: projectData.category || projectData.domain || "",
+    progress_percent: projectData.progress_percent ?? 0,
+    max_members:
+      projectData.max_members ??
+      projectData.maxMembers ??
+      projectData.recruitment_count ??
+      projectData.member_limit ??
+      "",
+    expected_period: projectData.expected_period || "",
+    preferred_members: projectData.preferred_members || "",
+    tech_stack: (projectData.tech_stack || projectData.techStack || []).join(", "),
+    hashtags: (projectData.hashtags || []).join(", "),
+    is_public: projectData.is_public ?? true,
+  });
+
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [projectId]);
@@ -82,30 +109,32 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     async function fetchProject() {
       try {
-        const [projectResult, profileResult] = await Promise.all([
+        const [projectResult, profileResult, applicationsResult] = await Promise.allSettled([
           getProjectApi(projectId),
           getMyProfileApi(),
+          getMyApplicationsApi(),
         ]);
 
-        const projectData = projectResult.data;
+        if (projectResult.status !== "fulfilled") {
+          throw projectResult.reason;
+        }
+
+        const projectData = projectResult.value.data;
 
         setProject(projectData);
-        setMyProfile(profileResult.data);
+        setMyProfile(
+          profileResult.status === "fulfilled" ? profileResult.value.data : null
+        );
+        setMyApplication(
+          applicationsResult.status === "fulfilled"
+            ? (applicationsResult.value.data || []).find(
+                (application) =>
+                  String(application.project_id) === String(projectId)
+              ) || null
+            : null
+        );
 
-        setEditForm({
-          title: projectData.title || "",
-          summary: projectData.summary || "",
-          description: projectData.description || "",
-          difficulty: projectData.difficulty || "",
-          category: projectData.category || projectData.domain || "",
-          progress_percent: projectData.progress_percent ?? 0,
-          max_members:
-            projectData.max_members ??
-            projectData.recruitment_count ??
-            projectData.member_limit ??
-            "",
-          is_public: projectData.is_public ?? true,
-        });
+        setEditForm(buildEditFormFromProject(projectData));
       } catch (error) {
         console.error(error);
         alert("프로젝트 정보를 불러오지 못했습니다.");
@@ -116,6 +145,18 @@ export default function ProjectDetailPage() {
   }, [projectId]);
 
   const isLeader = project?.leader_id === myProfile?.id;
+  const isProjectCompleted = project?.status === "completed";
+  const isTeamFormed = ["in_progress", "started", "completed"].includes(
+    String(project?.status || "").replace("-", "_")
+  );
+  const isProjectMember =
+    project &&
+    myProfile &&
+    (project.leader_id === myProfile.id ||
+      (project.members || []).some(
+        (member) => getProjectMemberUserId(member) === myProfile.id
+      ));
+  const hasApplied = Boolean(myApplication);
   const acceptedMemberCount = project?.members?.length || 1;
 
   const handleEditChange = (field, value) => {
@@ -132,16 +173,16 @@ export default function ProjectDetailPage() {
     }
 
     if (!editForm.description.trim()) {
-      alert("프로젝트 설명을 입력해주세요.");
+      alert("상세 설명을 입력해주세요.");
       return;
     }
 
     if (!editForm.category) {
-      alert("카테고리를 선택해주세요.");
+      alert("프로젝트 유형을 선택해주세요.");
       return;
     }
 
-    if (Number(editForm.max_members) < acceptedMemberCount) {
+    if (!isTeamFormed && Number(editForm.max_members) < acceptedMemberCount) {
       alert(`현재 팀원수인 ${acceptedMemberCount}명 이상으로만 변경 가능합니다.`);
       return;
     }
@@ -149,63 +190,98 @@ export default function ProjectDetailPage() {
     try {
       setIsSavingEdit(true);
 
-      await updateProjectApi(projectId, {
+      const payload = {
         title: editForm.title,
         summary: editForm.summary,
         description: editForm.description,
         difficulty: editForm.difficulty,
         category: editForm.category,
         progress_percent: Number(editForm.progress_percent),
-        max_members: Number(editForm.max_members),
+        expected_period: editForm.expected_period.trim(),
+        preferred_members: editForm.preferred_members.trim(),
+        tech_stack: editForm.tech_stack
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+        hashtags: editForm.hashtags
+          .split(",")
+          .map((item) => item.trim().replace(/^#/, ""))
+          .filter(Boolean),
         is_public: editForm.is_public,
-      });
+      };
+
+      if (!isTeamFormed) {
+        payload.max_members = Number(editForm.max_members);
+      }
+
+      const updateResult = await updateProjectApi(projectId, payload);
 
       const refreshed = await getProjectApi(projectId);
-      setProject(refreshed.data);
+      const nextProject = {
+        ...refreshed.data,
+        max_members:
+          refreshed.data?.max_members ??
+          updateResult.data?.max_members ??
+          Number(editForm.max_members),
+        maxMembers:
+          refreshed.data?.maxMembers ??
+          updateResult.data?.maxMembers ??
+          Number(editForm.max_members),
+      };
+      setProject(nextProject);
+      setEditForm(buildEditFormFromProject(nextProject));
       setIsEditing(false);
 
-      alert("프로젝트 정보가 수정되었습니다.");
+      alert(
+        isTeamFormed
+          ? "프로젝트 정보가 수정되었습니다. 모집 인원은 팀 결성 완료 후 변경되지 않습니다."
+          : `프로젝트 정보가 수정되었습니다. 모집 인원은 ${Number(editForm.max_members)}명입니다.`
+      );
     } catch (error) {
       console.error(error);
-      alert("프로젝트 수정에 실패했습니다.");
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("current member count")) {
+        alert(`모집 인원은 현재 팀원수인 ${acceptedMemberCount}명 이상이어야 합니다.`);
+        return;
+      }
+      if (message.includes("team formation")) {
+        alert("팀 결성 완료 후에는 모집 인원을 변경할 수 없습니다.");
+        return;
+      }
+      alert(message || "프로젝트 수정에 실패했습니다.");
     } finally {
       setIsSavingEdit(false);
     }
   };
 
   const handleRevertToIdea = async () => {
-    const ok = window.confirm(
-      "이 프로젝트를 영감의 샘에 흘려보낼까요?\n\n프로젝트는 삭제 처리되고, 원본 아이디어는 다른 사람들이 주울 수 있는 상태로 돌아갑니다."
-    );
-
-    if (!ok) return;
+    if (isProjectCompleted) {
+      alert("완료된 프로젝트는 버릴 수 없습니다.");
+      return;
+    }
 
     try {
       setIsDeleting(true);
       await revertProjectToIdeaApi(projectId);
 
-      alert("프로젝트가 영감의 샘으로 이동되었습니다.");
+      alert("프로젝트가 생각의 뜰으로 이동되었습니다.");
       router.push("/ideas/pickup");
     } catch (error) {
       console.error(error);
-      alert("영감의 샘으로 보내는 데 실패했습니다.");
+      alert("생각의 뜰으로 보내는 데 실패했습니다.");
     } finally {
       setIsDeleting(false);
     }
   };
 
   const handleDeleteProject = async () => {
-    const suggestWell = window.confirm(
-      "정말 삭제하시겠습니까?\n\n그냥 삭제하기보다, 다른 사람들이 이어갈 수 있도록 '영감의 샘'에 흘려보내는 건 어떨까요?\n\n확인: 영감의 샘에 흘려보내기\n취소: 삭제 계속 진행"
-    );
-
-    if (suggestWell) {
-      await handleRevertToIdea();
+    if (isProjectCompleted) {
+      alert("완료된 프로젝트는 버릴 수 없습니다.");
       return;
     }
 
     const reallyDelete = window.confirm(
-      "영감의 샘에 보내지 않고 정말 삭제하시겠습니까?"
+      "정말 삭제하시겠습니까? 삭제한 프로젝트는 다시 이어가기 어렵습니다."
     );
 
     if (!reallyDelete) return;
@@ -225,6 +301,11 @@ export default function ProjectDetailPage() {
   };
 
   const handleApply = async () => {
+    if (hasApplied) {
+      alert("이미 지원한 프로젝트입니다.");
+      return;
+    }
+
     if (!message.trim()) {
       alert("지원 메시지를 입력해주세요.");
       return;
@@ -232,11 +313,18 @@ export default function ProjectDetailPage() {
 
     try {
       setIsApplying(true);
-      await applyProjectApi(projectId, message);
+      const result = await applyProjectApi(projectId, message);
+      setMyApplication(result.data || { project_id: Number(projectId), status: "pending" });
       alert("프로젝트 지원이 완료되었습니다.");
       setMessage("");
     } catch (error) {
       console.error(error);
+      const errorMessage = String(error?.message || "");
+      if (errorMessage.includes("Application already exists")) {
+        setMyApplication({ project_id: Number(projectId), status: "pending" });
+        alert("이미 지원한 프로젝트입니다.");
+        return;
+      }
       alert("프로젝트 지원에 실패했습니다.");
     } finally {
       setIsApplying(false);
@@ -280,25 +368,25 @@ export default function ProjectDetailPage() {
 
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  프로젝트 요약
+                  한 줄 요약
                 </label>
                 <input
                   className={inputClassName}
                   value={editForm.summary}
                   onChange={(e) => handleEditChange("summary", e.target.value)}
-                  placeholder="프로젝트 요약"
+                  placeholder="예: 아이디어를 공유하고 협업자를 구하는 플랫폼"
                 />
               </div>
 
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  프로젝트 설명
+                  상세 설명
                 </label>
                 <textarea
                   className={textareaClassName}
                   value={editForm.description}
                   onChange={(e) => handleEditChange("description", e.target.value)}
-                  placeholder="프로젝트 설명"
+                  placeholder="아이디어의 목적, 주요 기능, 필요한 역할 등을 설명해주세요."
                 />
               </div>
 
@@ -323,14 +411,14 @@ export default function ProjectDetailPage() {
 
                 <div>
                   <label className="mb-1 block text-sm font-semibold text-slate-700">
-                    카테고리
+                    프로젝트 유형
                   </label>
                   <select
                     className={inputClassName}
                     value={editForm.category}
                     onChange={(e) => handleEditChange("category", e.target.value)}
                   >
-                    <option value="">카테고리를 선택해주세요</option>
+                    <option value="">프로젝트 유형을 선택해주세요</option>
                     {CATEGORY_OPTIONS.map((category) => (
                       <option key={category} value={category}>
                         {category}
@@ -341,21 +429,78 @@ export default function ProjectDetailPage() {
 
                 <div>
                   <label className="mb-1 block text-sm font-semibold text-slate-700">
-                    모집 인원 (리더 포함)
+                    모집 인원 (리더 포함) (최대 인원: 100명)
                   </label>
                   <input
-                    className={inputClassName}
+                    className={`${inputClassName} disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500`}
                     type="number"
                     min={acceptedMemberCount}
                     max="100"
                     value={editForm.max_members}
+                    disabled={isTeamFormed}
                     onChange={(e) => handleEditChange("max_members", e.target.value)}
                     placeholder="모집 인원 (리더 포함)"
                   />
                   <p className="mt-1 text-xs text-slate-500">
-                    리더 포함 총 인원입니다. {acceptedMemberCount}명(현재 팀원수) 이상으로만 설정할 수 있습니다.
+                    {isTeamFormed
+                      ? "팀 결성 완료 후에는 모집 인원을 변경할 수 없습니다."
+                      : `리더 포함 총 인원입니다. ${acceptedMemberCount}명(현재 팀원수) 이상으로만 설정할 수 있습니다.`}
                   </p>
                 </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-700">
+                    예상 진행 기간
+                  </label>
+                  <input
+                    className={inputClassName}
+                    value={editForm.expected_period}
+                    onChange={(e) => handleEditChange("expected_period", e.target.value)}
+                    placeholder="예: 3개월, 한 학기, 2026년 3월까지"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  이런 분과 함께하고 싶어요
+                </label>
+                <textarea
+                  className="mt-4 min-h-28 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
+                  value={editForm.preferred_members}
+                  onChange={(e) => handleEditChange("preferred_members", e.target.value)}
+                  placeholder="예: 백엔드 경험이 있는 분, 주 1회 이상 회의 가능한 분, 꾸준히 소통 가능한 분"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  기술 스택
+                </label>
+                <input
+                  className={inputClassName}
+                  value={editForm.tech_stack}
+                  onChange={(e) => handleEditChange("tech_stack", e.target.value)}
+                  placeholder="예: React, FastAPI, PostgreSQL"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  쉼표로 구분해서 입력해주세요.
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  해시태그
+                </label>
+                <input
+                  className={inputClassName}
+                  value={editForm.hashtags}
+                  onChange={(e) => handleEditChange("hashtags", e.target.value)}
+                  placeholder="예: 협업, 초보환영, AI추천"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  쉼표로 구분해서 입력해주세요.
+                </p>
               </div>
 
               <div className="flex gap-3">
@@ -392,22 +537,8 @@ export default function ProjectDetailPage() {
 
               <p className="mt-3 text-lg text-slate-600">{project.summary}</p>
 
-              <div className="mt-6">
-                <div className="mb-2 flex justify-between text-sm font-semibold text-slate-700">
-                  <span>진행률</span>
-                  <span>{project.progress_percent}%</span>
-                </div>
-
-                <div className="h-3 overflow-hidden rounded-full bg-slate-200">
-                  <div
-                    className="h-full rounded-full bg-red-600"
-                    style={{ width: `${project.progress_percent}%` }}
-                  />
-                </div>
-              </div>
-
               {isLeader && (
-                <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                <div className="mt-6 grid gap-3 sm:grid-cols-2">
                   <button
                     onClick={() => setIsEditing(true)}
                     className="rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
@@ -415,30 +546,35 @@ export default function ProjectDetailPage() {
                     수정하기
                   </button>
 
-                  <button
-                    onClick={handleRevertToIdea}
-                    disabled={isDeleting}
-                    className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                  >
-                    영감의 샘에 흘려보내기
-                  </button>
-
-                  <button
-                    onClick={handleDeleteProject}
-                    disabled={isDeleting}
-                    className="rounded-xl border border-red-200 bg-white px-5 py-3 font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                  >
-                    {isDeleting ? "처리 중..." : "삭제하기"}
-                  </button>
+                  {!isProjectCompleted && (
+                    <button
+                      onClick={() => setShowDiscardOptions(true)}
+                      disabled={isDeleting}
+                      className="rounded-xl border border-red-200 bg-white px-5 py-3 font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                    >
+                      {isDeleting ? "처리 중..." : "버리기"}
+                    </button>
+                  )}
                 </div>
               )}
 
-              <button
-                onClick={() => router.push(`/projects/${projectId}/chat`)}
-                className="mt-6 w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800"
-              >
-                팀 채팅방 들어가기
-              </button>
+              {isProjectMember && isTeamFormed && (
+                <button
+                  onClick={() => router.push(`/projects/${projectId}/manage`)}
+                  className="mt-6 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
+                >
+                  진행 관리 페이지로 가기
+                </button>
+              )}
+
+              {isProjectMember && (
+                <button
+                  onClick={() => router.push(`/projects/${projectId}/chat`)}
+                  className={`${isTeamFormed ? "mt-3" : "mt-6"} w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800`}
+                >
+                  팀 채팅방 들어가기
+                </button>
+              )}
             </>
           )}
         </section>
@@ -452,6 +588,73 @@ export default function ProjectDetailPage() {
                 __html: project.description?.replace(/\n/g, "<br />"),
               }}
             />
+
+            {(project.expected_period || project.preferred_members) && (
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                {project.expected_period && (
+                  <div className="rounded-xl bg-slate-50 p-4">
+                    <p className="text-sm font-semibold text-slate-900">
+                      예상 진행 기간
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      {project.expected_period}
+                    </p>
+                  </div>
+                )}
+
+                {project.preferred_members && (
+                  <div className="rounded-xl bg-slate-50 p-4">
+                    <p className="text-sm font-semibold text-slate-900">
+                      이런 분과 함께하고 싶어요
+                    </p>
+                    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">
+                      {project.preferred_members}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {((project.tech_stack || project.techStack || []).length > 0 ||
+              (project.hashtags || []).length > 0) && (
+              <div className="mt-6 space-y-3">
+                {(project.tech_stack || project.techStack || []).length > 0 && (
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      기술 스택
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {(project.tech_stack || project.techStack || []).map((tech) => (
+                        <span
+                          key={tech}
+                          className="rounded-full bg-red-50 px-3 py-1 text-sm font-semibold text-red-700"
+                        >
+                          {tech}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(project.hashtags || []).length > 0 && (
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      해시태그
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {(project.hashtags || []).map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600"
+                        >
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
 
           <aside className="space-y-6">
@@ -529,29 +732,82 @@ export default function ProjectDetailPage() {
                   프로젝트 지원하기
                 </h2>
 
-                <p className="mt-2 text-sm text-slate-500">
-                  팀장에게 보낼 간단한 소개와 참여 의지를 적어주세요.
-                </p>
+                {hasApplied ? (
+                  <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                    이미 지원한 프로젝트입니다.
+                  </div>
+                ) : (
+                  <>
+                    <p className="mt-2 text-sm text-slate-500">
+                      팀장에게 보낼 간단한 소개와 참여 의지를 적어주세요.
+                    </p>
 
-                <textarea
-                  className={textareaClassName}
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="예: React와 UI 구현을 맡아 참여하고 싶습니다."
-                />
+                    <textarea
+                      className={textareaClassName}
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      placeholder="예: React와 UI 구현을 맡아 참여하고 싶습니다."
+                    />
 
-                <button
-                  onClick={handleApply}
-                  disabled={isApplying}
-                  className="mt-4 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-                >
-                  {isApplying ? "지원 중..." : "지원하기"}
-                </button>
+                    <button
+                      onClick={handleApply}
+                      disabled={isApplying}
+                      className="mt-4 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                    >
+                      {isApplying ? "지원 중..." : "지원하기"}
+                    </button>
+                  </>
+                )}
               </section>
             )}
           </aside>
         </div>
       </div>
+
+      {showDiscardOptions && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+            onClick={() => {
+              if (!isDeleting) setShowDiscardOptions(false);
+            }}
+          />
+
+          <div className="relative w-full max-w-md rounded-2xl bg-white p-7 shadow-2xl">
+            <h2 className="text-xl font-bold text-slate-900">프로젝트 버리기</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-500">
+              그냥 삭제하면 이 아이디어는 사라집니다. 아이디어 씨앗을 다른 사람이 이어서 키워볼 수 있도록
+              생각의 뜰에 뿌리는 선택을 추천해요.
+            </p>
+
+            <div className="mt-6 space-y-2">
+              <button
+                onClick={handleRevertToIdea}
+                disabled={isDeleting}
+                className="w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:bg-slate-300"
+              >
+                생각의 뜰에 뿌리기
+              </button>
+
+              <button
+                onClick={handleDeleteProject}
+                disabled={isDeleting}
+                className="w-full rounded-xl border border-slate-200 px-5 py-3 font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+              >
+                삭제하기
+              </button>
+
+              <button
+                onClick={() => setShowDiscardOptions(false)}
+                disabled={isDeleting}
+                className="w-full rounded-xl px-5 py-3 text-sm font-semibold text-slate-400 transition hover:bg-slate-50 disabled:cursor-not-allowed"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

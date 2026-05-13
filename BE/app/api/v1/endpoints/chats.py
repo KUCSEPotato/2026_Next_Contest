@@ -88,7 +88,7 @@ async def list_project_chat_rooms(
     )
 
 
-@router.post("/projects/{project_id}/rooms", summary="채팅방 생성", description="프로젝트 리더가 새 채팅방을 생성하고 참여자를 선택합니다.")
+@router.post("/projects/{project_id}/rooms", summary="채팅방 생성", description="프로젝트 멤버가 새 채팅방을 생성하고 참여자를 선택합니다.")
 async def create_project_chat_room(
     project_id: int,
     payload: dict = Body(default={}),
@@ -103,27 +103,15 @@ async def create_project_chat_room(
 
     검증:
     - 프로젝트가 없으면 `404`
-    - 프로젝트 리더가 아니면 `403`
-    - 프로젝트 상태가 in_progress가 아니면 `400`
-    - member_ids가 제공되지 않거나 비어있으면 `400`
+    - 프로젝트 멤버가 아니면 `403`
+    - member_ids가 없으면 모든 활성 프로젝트 멤버를 참여자로 사용
     - member_ids의 일부가 프로젝트 멤버가 아니면 `400`
     """
     project = db.get(Project, project_id)
     if project is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
     
-    # 리더 권한 검증
-    if project.leader_id != current_user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only project leader can create chat rooms")
-    
-    # 프로젝트 상태 검증
-    if project.status != "in_progress":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Chat room can only be created for in_progress projects")
-    
-    # member_ids 검증
-    member_ids = payload.get("member_ids")
-    if not member_ids or not isinstance(member_ids, list):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="member_ids must be a non-empty list")
+    _ensure_project_member(db, project_id, current_user_id)
     
     # member_ids의 모든 멤버가 프로젝트 멤버인지 검증
     project_member_ids = db.query(ProjectMember.user_id).filter(
@@ -131,6 +119,12 @@ async def create_project_chat_room(
         ProjectMember.left_at.is_(None),
     ).all()
     project_member_ids = {pm[0] for pm in project_member_ids}
+
+    member_ids = payload.get("member_ids")
+    if member_ids is None:
+        member_ids = sorted(project_member_ids)
+    if not member_ids or not isinstance(member_ids, list):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="member_ids must be a non-empty list")
     
     for member_id in member_ids:
         if member_id not in project_member_ids:
@@ -302,6 +296,7 @@ async def get_my_chat_rooms(
     - last_message: 마지막 메시지 텍스트
     - last_message_at: 마지막 메시지 시간
     - last_message_sender_nickname: 마지막 메시지 발송자 닉네임
+    - message_count: 채팅방 전체 메시지 수
     """
     # 사용자가 ChatRoomMember인 채팅방 찾기
     chat_room_members = (
@@ -336,6 +331,12 @@ async def get_my_chat_rooms(
             .order_by(desc(ChatMessage.created_at))
             .first()
         )
+        message_count = (
+            db.query(func.count(ChatMessage.id))
+            .filter(ChatMessage.room_id == room.id)
+            .scalar()
+            or 0
+        )
 
         last_message_sender = None
         if latest_message and latest_message.sender_id:
@@ -350,7 +351,12 @@ async def get_my_chat_rooms(
                 "last_message": latest_message.message if latest_message else None,
                 "last_message_at": latest_message.created_at.isoformat() if latest_message else None,
                 "last_message_sender_nickname": last_message_sender.nickname if last_message_sender else None,
+                "message_count": message_count,
             }
         )
 
+    response_data.sort(
+        key=lambda room: room["last_message_at"] or "",
+        reverse=True,
+    )
     return success_response(data=response_data)

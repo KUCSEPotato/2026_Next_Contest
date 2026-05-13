@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   getUserProfileApi,
+  getUserReputationApi,
   getUserStatsApi,
   getUserProjectsApi,
   getUserReceivedReviewsApi,
@@ -17,6 +18,7 @@ export default function UserProfilePage() {
 
   const [profile, setProfile] = useState(null);
   const [stats, setStats] = useState(null);
+  const [reputation, setReputation] = useState(null);
   const [projects, setProjects] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -27,9 +29,10 @@ export default function UserProfilePage() {
       try {
         setLoading(true);
 
-        const [profileResult, statsResult, projectsResult, reviewsResult] =
+        const [profileResult, reputationResult, statsResult, projectsResult, reviewsResult] =
           await Promise.allSettled([
             getUserProfileApi(userId),
+            getUserReputationApi(userId),
             getUserStatsApi(userId),
             getUserProjectsApi(userId),
             getUserReceivedReviewsApi(userId),
@@ -40,6 +43,12 @@ export default function UserProfilePage() {
         }
 
         setProfile(profileResult.value.data);
+
+        setReputation(
+          reputationResult.status === "fulfilled"
+            ? reputationResult.value.data
+            : null
+        );
 
         setStats(
           statsResult.status === "fulfilled"
@@ -143,31 +152,54 @@ export default function UserProfilePage() {
             {reviews.length === 0 ? (
               <p className="text-sm text-slate-500">리뷰 없음</p>
             ) : (
-              reviews.map((review) => (
-                <div key={review.id} className="mb-3 rounded-xl border p-4">
-                  <p className="font-bold">
-                    {review.project?.title || "프로젝트"}
-                  </p>
+              reviews.map((review) => {
+                const reviewMessage = getReviewMessage(review);
 
-                  <p className="text-sm text-gray-400">
-                    익명{" "}
-                    {review.created_at
-                      ? `• ${new Date(review.created_at).toLocaleDateString()}`
-                      : ""}
-                  </p>
+                return (
+                  <div key={review.id} className="mb-3 rounded-xl border p-4">
+                    <p className="font-bold">
+                      {review.project?.title || "프로젝트"}
+                    </p>
 
-                  <div className="mt-2 text-sm">
-                    협업 {review.teamwork_score} / 기여{" "}
-                    {review.contribution_score} / 책임{" "}
-                    {review.responsibility_score}
+                    <p className="text-sm text-gray-400">
+                      익명{" "}
+                      {review.created_at
+                        ? `• ${new Date(review.created_at).toLocaleDateString()}`
+                        : ""}
+                    </p>
+
+                    <div className="mt-2 text-sm">
+                      협업 {review.teamwork_score} / 기여{" "}
+                      {review.contribution_score} / 책임{" "}
+                      {review.responsibility_score}
+                    </div>
+
+                    <p className="mt-2">
+                      {reviewMessage || "작성된 리뷰 메시지가 없습니다."}
+                    </p>
                   </div>
-
-                  <p className="mt-2">{review.comment}</p>
-                </div>
-              ))
+                );
+              })
             )}
           </section>
         )}
+
+        <section className="mb-6 rounded-2xl bg-white p-6 shadow">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">신뢰도</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                받은 리뷰를 바탕으로 한 평점 정보입니다.
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-slate-50 px-4 py-2 text-sm text-slate-600">
+              받은 평가 {reputation?.review_count ?? 0}개
+            </div>
+          </div>
+
+          <RatingSummary reputation={reputation} />
+        </section>
 
         <div className="mb-6 grid gap-6 lg:grid-cols-2">
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -262,4 +294,75 @@ function StatCard({ title, value }) {
       <p className="text-3xl font-bold">{value}</p>
     </div>
   );
+}
+
+function RatingSummary({ reputation }) {
+  const items = [
+    ["협업", reputation?.avg_teamwork],
+    ["기여", reputation?.avg_contribution],
+    ["책임", reputation?.avg_responsibility],
+  ];
+
+  return (
+    <div className="mt-5 grid gap-4 lg:grid-cols-[220px_1fr]">
+      <div className="rounded-2xl bg-red-50 p-5">
+        <p className="text-sm font-semibold text-red-600">종합 평점</p>
+        <p className="mt-2 text-4xl font-black text-slate-900">
+          {formatRating(reputation?.score)}
+        </p>
+        <p className="mt-1 text-sm text-slate-500">5점 만점</p>
+      </div>
+
+      <div className="space-y-3 rounded-2xl border border-slate-200 p-5">
+        {items.map(([label, value]) => {
+          const ratingValue = normalizeRating(value);
+
+          return (
+            <div
+              key={label}
+              className="grid gap-2 sm:grid-cols-[70px_1fr_48px] sm:items-center"
+            >
+              <p className="text-sm font-bold text-slate-800">{label}</p>
+
+              <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-red-600"
+                  style={{ width: `${(ratingValue / 5) * 100}%` }}
+                />
+              </div>
+
+              <p className="text-right text-sm font-bold text-slate-700">
+                {formatRating(ratingValue)}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function normalizeRating(value) {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+
+  return Math.min(5, Math.max(0, numericValue));
+}
+
+function formatRating(value) {
+  return normalizeRating(value).toFixed(1);
+}
+
+function getReviewMessage(review) {
+  const message =
+    review?.comment ||
+    review?.message ||
+    review?.review_message ||
+    review?.content ||
+    "";
+
+  return String(message).trim();
 }
