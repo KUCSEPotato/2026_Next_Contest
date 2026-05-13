@@ -110,6 +110,7 @@ export default function SignupPage() {
   const [nickname, setNickname] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -190,7 +191,7 @@ export default function SignupPage() {
   // ── Step 1 제출 ───────────────────────────────────────────────────────────
   const handleStep1Submit = async () => {
     // ── [추가] 프론트 유효성 검사 ──────────────────────────────────────────
-    if (!email || !realName || !nickname || !phoneNumber || !password) {
+    if (!email || !realName || !nickname || !phoneNumber || !password || !passwordConfirm) {
       alert("모든 항목을 입력해주세요.");
       return;
     }
@@ -219,6 +220,11 @@ export default function SignupPage() {
       return;
     }
     // ─────────────────────────────────────────────────────────────────────
+
+    if (password !== passwordConfirm) {
+      alert("비밀번호가 일치하지 않습니다.");
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -486,6 +492,23 @@ export default function SignupPage() {
                       </div>
                     ))}
                   </div>
+                )}
+              </div>
+              <div>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="비밀번호 확인"
+                  value={passwordConfirm}
+                  onChange={(e) => setPasswordConfirm(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleStep1Submit(); }}
+                  className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-4 ${
+                    passwordConfirm && password !== passwordConfirm
+                      ? "border-red-400 focus:border-red-500 focus:ring-red-100"
+                      : "border-slate-300 focus:border-red-500 focus:ring-red-100"
+                  }`}
+                />
+                {passwordConfirm.length > 0 && password !== passwordConfirm && (
+                  <p className="mt-2 text-xs text-red-500">비밀번호가 일치하지 않습니다.</p>
                 )}
               </div>
             </div>
