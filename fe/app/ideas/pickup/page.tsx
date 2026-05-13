@@ -821,7 +821,7 @@ function CoinModal({
   isLoading: boolean;
 }) {
   const remainingBalance = coinBalance === null ? null : coinBalance - coinCost;
-  const isInsufficient = coinBalance !== null && remainingBalance < 0;
+  const isInsufficient = coinBalance !== null && coinBalance < coinCost;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
