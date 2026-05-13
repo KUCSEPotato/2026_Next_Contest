@@ -177,9 +177,25 @@ export default function Navbar() {
             <>
               <button
                 onClick={() => router.push("/coins")}
-                className="text-slate-700 transition hover:text-red-600"
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-slate-700 transition hover:border-sky-200 hover:text-sky-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-sky-500 dark:hover:text-sky-300"
+                aria-label="물방울 상점"
+                title="물방울 상점"
               >
-                코인
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M6 8h12l-1 12H7L6 8Z" />
+                  <path d="M9 8a3 3 0 0 1 6 0" />
+                  <path d="M9 13h.01" />
+                  <path d="M15 13h.01" />
+                </svg>
               </button>
               <button
                 onClick={() => router.push("/mypage")}

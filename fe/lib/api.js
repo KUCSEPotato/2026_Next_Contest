@@ -151,6 +151,15 @@ export async function getIdeaApi(ideaId) {
   return handleResponse(res, "아이디어 정보를 불러오지 못했습니다.");
 }
 
+export async function viewIdeaApi(ideaId) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}/view`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "아이디어 열람에 실패했습니다.");
+}
+
 export async function updateIdeaApi(ideaId, payload) {
   const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/ideas/${ideaId}`, {
     method: "PATCH",
@@ -912,7 +921,7 @@ export async function getMyCoinBalanceApi() {
     headers: authHeaders(),
   });
 
-  return handleResponse(res, "코인 잔액을 불러오지 못했습니다.");
+  return handleResponse(res, "물방울 잔액을 불러오지 못했습니다.");
 }
 
 export async function getCoinPackagesApi() {
@@ -920,7 +929,7 @@ export async function getCoinPackagesApi() {
     cache: "no-store",
   });
 
-  return handleResponse(res, "코인 패키지를 불러오지 못했습니다.");
+  return handleResponse(res, "물방울 패키지를 불러오지 못했습니다.");
 }
 
 export async function createCoinPurchaseRequestApi(payload) {
@@ -930,7 +939,7 @@ export async function createCoinPurchaseRequestApi(payload) {
     body: JSON.stringify(payload),
   });
 
-  return handleResponse(res, "코인 구매 요청에 실패했습니다.");
+  return handleResponse(res, "물방울 구매 요청에 실패했습니다.");
 }
 
 export async function getMyCoinPurchaseRequestsApi() {
@@ -938,7 +947,7 @@ export async function getMyCoinPurchaseRequestsApi() {
     headers: authHeaders(),
   });
 
-  return handleResponse(res, "코인 구매 요청 목록을 불러오지 못했습니다.");
+  return handleResponse(res, "물방울 구매 요청 목록을 불러오지 못했습니다.");
 }
 
 export async function preparePaymentApi(payload) {
@@ -1011,7 +1020,7 @@ export async function grantAdminUserCoinsApi(userId, payload) {
     body: JSON.stringify(payload),
   });
 
-  return handleResponse(res, "코인 지급에 실패했습니다.");
+  return handleResponse(res, "물방울 지급에 실패했습니다.");
 }
 
 export async function updateAdminUserStatusApi(userId, payload) {
@@ -1092,7 +1101,7 @@ export async function getAdminCoinPurchaseRequestsApi() {
     headers: authHeaders(),
   });
 
-  return handleResponse(res, "코인 구매 요청 목록을 불러오지 못했습니다.");
+  return handleResponse(res, "물방울 구매 요청 목록을 불러오지 못했습니다.");
 }
 
 export async function updateAdminCoinPurchaseRequestApi(requestId, payload) {
@@ -1102,7 +1111,7 @@ export async function updateAdminCoinPurchaseRequestApi(requestId, payload) {
     body: JSON.stringify(payload),
   });
 
-  return handleResponse(res, "코인 구매 요청 처리에 실패했습니다.");
+  return handleResponse(res, "물방울 구매 요청 처리에 실패했습니다.");
 }
 
 export async function createAdminNoticeApi(payload) {
@@ -1122,7 +1131,7 @@ export async function revokeAdminUserCoinsApi(userId, payload) {
     body: JSON.stringify(payload),
   });
 
-  return handleResponse(res, "코인 환수에 실패했습니다.");
+  return handleResponse(res, "물방울 환수에 실패했습니다.");
 }
 
 export async function getAdminMyPostsApi() {

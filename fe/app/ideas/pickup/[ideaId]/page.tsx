@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getIdeaApi, pickupIdeaApi } from "../../../../lib/api";
+import { useDialog, useToast } from "../../../../components/AppFeedback";
+import { confirmWaterdropSpend } from "../../../../lib/waterdrops";
 
 const DIFFICULTY_LABELS: Record<string, string> = {
   beginner: "입문",
@@ -22,6 +24,8 @@ interface IdeaDetail {
 export default function PickupIdeaDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const toast = useToast();
+  const { confirmCoinSpend } = useDialog();
   const ideaId = params.ideaId as string;
 
   const [idea, setIdea] = useState<IdeaDetail | null>(null);
@@ -60,6 +64,12 @@ export default function PickupIdeaDetailPage() {
 
     try {
       setIsPickingUp(true);
+      const canSpend = await confirmWaterdropSpend({
+        confirmCoinSpend,
+        toast,
+        actionLabel: "프로젝트 생성",
+      });
+      if (!canSpend) return;
 
       const result = await pickupIdeaApi(idea.id);
       const projectId = result.data?.project_id;

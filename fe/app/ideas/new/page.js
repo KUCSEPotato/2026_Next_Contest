@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createIdeaApi } from "../../../lib/api";
 import { SKILLS_LIST } from "../../../lib/profileOptions";
+import { confirmWaterdropSpend } from "../../../lib/waterdrops";
+import { useDialog, useToast } from "../../../components/AppFeedback";
 
 const CATEGORIES = [
   "IT/소프트웨어",
@@ -19,6 +21,8 @@ const CATEGORIES = [
 
 export default function NewIdeaPage() {
   const router = useRouter();
+  const toast = useToast();
+  const { confirmCoinSpend } = useDialog();
 
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
@@ -61,6 +65,12 @@ export default function NewIdeaPage() {
 
     try {
       setIsSubmitting(true);
+      const canSpend = await confirmWaterdropSpend({
+        confirmCoinSpend,
+        toast,
+        actionLabel: "프로젝트 생성",
+      });
+      if (!canSpend) return;
 
       const payload = {
         title: title.trim(),

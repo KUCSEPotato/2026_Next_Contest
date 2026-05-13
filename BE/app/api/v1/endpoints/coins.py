@@ -12,9 +12,8 @@ router = APIRouter()
 
 
 COIN_PACKAGES = [
-    {"id": "starter", "coin_amount": 100, "price_krw": 1000, "label": "Starter"},
-    {"id": "builder", "coin_amount": 500, "price_krw": 5000, "label": "Builder"},
-    {"id": "maker", "coin_amount": 1000, "price_krw": 10000, "label": "Maker"},
+    {"id": "drop", "coin_amount": 1, "price_krw": 300, "label": "한 방울"},
+    {"id": "cup", "coin_amount": 10, "price_krw": 2000, "label": "한 잔"},
 ]
 
 
@@ -30,7 +29,7 @@ def _get_package(package_id: str) -> dict:
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid coin package")
 
 
-@router.get("/me", summary="내 코인 잔액 조회", description="현재 로그인한 사용자의 코인 잔액을 조회합니다.")
+@router.get("/me", summary="내 물방울 잔액 조회", description="현재 로그인한 사용자의 물방울 잔액을 조회합니다.")
 async def get_my_coin_balance(
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
@@ -39,15 +38,15 @@ async def get_my_coin_balance(
     if user is None or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    return success_response(data={"coin_balance": user.coin_balance})
+    return success_response(data={"coin_balance": user.coin_balance, "waterdrop_balance": user.coin_balance})
 
 
-@router.get("/packages", summary="코인 패키지 목록", description="수동 결제 요청에 사용할 코인 패키지를 조회합니다.")
+@router.get("/packages", summary="물방울 패키지 목록", description="수동 결제 요청에 사용할 물방울 패키지를 조회합니다.")
 async def list_coin_packages() -> dict:
     return success_response(data=COIN_PACKAGES)
 
 
-@router.post("/purchase-requests", summary="코인 구매 요청 생성", description="PG 연동 전 수동 확인용 코인 구매 요청을 생성합니다.")
+@router.post("/purchase-requests", summary="물방울 구매 요청 생성", description="PG 연동 전 수동 확인용 물방울 구매 요청을 생성합니다.")
 async def create_coin_purchase_request(
     payload: CoinPurchaseRequestCreate,
     current_user_id: int = Depends(get_current_user_id),
@@ -82,7 +81,7 @@ async def create_coin_purchase_request(
     )
 
 
-@router.get("/purchase-requests/me", summary="내 코인 구매 요청 목록", description="내가 만든 수동 코인 구매 요청을 최신순으로 조회합니다.")
+@router.get("/purchase-requests/me", summary="내 물방울 구매 요청 목록", description="내가 만든 수동 물방울 구매 요청을 최신순으로 조회합니다.")
 async def list_my_coin_purchase_requests(
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),

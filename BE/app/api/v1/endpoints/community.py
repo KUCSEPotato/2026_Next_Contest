@@ -25,6 +25,7 @@ from app.schemas import (
     ReactionRequest,
 )
 from app.services.s3_upload import get_s3_service
+from app.services.economy import spend_coins
 
 router = APIRouter()
 
@@ -138,6 +139,16 @@ async def create_post(
         category=payload.category,
     )
     db.add(post)
+    db.flush()
+    spend_coins(
+        db,
+        user_id=current_user_id,
+        amount=1,
+        event_type="waterdrop.community.post",
+        source_type="community_post",
+        source_id=post.id,
+        note=f"Community post waterdrop for {post.title}",
+    )
     db.commit()
     db.refresh(post)
 

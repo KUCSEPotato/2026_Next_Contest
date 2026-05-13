@@ -54,9 +54,9 @@ from app.schemas import TodoUpdateRequest
 from app.schemas import MemoirCreateRequest
 from app.schemas import MemoirRefineRequest
 from app.services.economy import reward_project_completed
-from app.services.economy import reward_project_registration
 from app.services.economy import reward_project_recycled
 from app.services.economy import reward_project_started
+from app.services.economy import spend_coins
 from app.core.realtime import project_todo_channel
 from app.core.realtime import chat_room_channel
 from app.core.realtime import realtime_hub
@@ -634,7 +634,15 @@ async def create_project(
     db.flush()
 
     db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
-    reward_project_registration(db, project)
+    spend_coins(
+        db,
+        user_id=current_user_id,
+        amount=1,
+        event_type="waterdrop.project.create",
+        source_type="project",
+        source_id=project.id,
+        note=f"Project creation waterdrop for {project.title}",
+    )
     db.add(
         Notification(
             user_id=current_user_id,
@@ -846,6 +854,15 @@ async def apply_project(
     app_obj = Application(project_id=project_id, applicant_id=current_user_id, message=payload.message, status="pending")
     db.add(app_obj)
     db.flush()
+    spend_coins(
+        db,
+        user_id=current_user_id,
+        amount=1,
+        event_type="waterdrop.project.apply",
+        source_type="application",
+        source_id=app_obj.id,
+        note=f"Project application waterdrop for {project.title}",
+    )
     if project.leader_id != current_user_id:
         applicant = db.get(User, current_user_id)
         applicant_name = applicant.nickname if applicant else "새 지원자"
