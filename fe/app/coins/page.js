@@ -40,6 +40,69 @@ function formatWaterdrops(value) {
   return `${amount.toLocaleString("ko-KR")}${amount === 1 ? "방울" : "방울"}`;
 }
 
+function WaterdropMascot({ className = "h-28 w-28" }) {
+  return (
+    <svg
+      viewBox="0 0 120 120"
+      className={className}
+      aria-hidden="true"
+      style={{ animation: "floatWaterdrop 3s ease-in-out infinite" }}
+    >
+      <ellipse cx="60" cy="103" rx="28" ry="7" fill="#bae6fd" opacity="0.55" />
+      <path
+        d="M60 10C47 29 31 48 31 67c0 19 13 34 29 34s29-15 29-34C89 48 73 29 60 10Z"
+        fill="#38bdf8"
+      />
+      <path
+        d="M49 35c-8 10-12 20-12 31 0 14 9 25 22 29-6-11-4-23 3-36 6-11 8-22-1-37-4 5-8 9-12 13Z"
+        fill="#7dd3fc"
+        opacity="0.9"
+      />
+      <circle cx="51" cy="65" r="4" fill="#0f172a" />
+      <circle cx="71" cy="65" r="4" fill="#0f172a" />
+      <path d="M53 78c5 5 12 5 17 0" stroke="#0f172a" strokeWidth="4" strokeLinecap="round" fill="none" />
+      <circle cx="48" cy="53" r="8" fill="#e0f2fe" opacity="0.75" />
+      <path d="M78 27l7-8M86 38l10-3M32 38l-10-4" stroke="#facc15" strokeWidth="4" strokeLinecap="round" />
+      <style jsx>{`
+        @keyframes floatWaterdrop {
+          0%,
+          100% {
+            transform: translateY(0) rotate(-1deg);
+          }
+          50% {
+            transform: translateY(-10px) rotate(2deg);
+          }
+        }
+      `}</style>
+    </svg>
+  );
+}
+
+function PackageIllustration({ amount }) {
+  const isSingleDrop = Number(amount || 0) === 1;
+
+  if (isSingleDrop) {
+    return (
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-sky-50">
+        <WaterdropMascot className="h-12 w-12" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-sky-50">
+      <svg viewBox="0 0 80 80" className="h-14 w-14" aria-hidden="true">
+        <ellipse cx="40" cy="68" rx="22" ry="5" fill="#bae6fd" opacity="0.6" />
+        <path d="M22 27h36l-5 35H27L22 27Z" fill="#e0f2fe" stroke="#38bdf8" strokeWidth="4" />
+        <path d="M27 42c9 5 17 5 26 0l-3 16H30l-3-16Z" fill="#38bdf8" opacity="0.85" />
+        <path d="M58 35h7c5 0 7 4 6 8-1 6-6 9-14 9" fill="none" stroke="#38bdf8" strokeWidth="4" strokeLinecap="round" />
+        <path d="M38 10c-5 8-10 14-10 21 0 7 5 12 11 12s11-5 11-12c0-7-6-13-12-21Z" fill="#7dd3fc" />
+        <path d="M38 15c-3 5-6 10-6 15 0 4 2 7 6 9-2-7 0-14 4-21l-4-3Z" fill="#e0f2fe" opacity="0.8" />
+      </svg>
+    </div>
+  );
+}
+
 export default function CoinsPage() {
   const router = useRouter();
   const toast = useToast();
@@ -120,18 +183,21 @@ export default function CoinsPage() {
       <div className="mx-auto max-w-6xl">
         <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <p className="text-sm font-semibold text-red-600">Devory Waterdrops</p>
-          <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-6">
             <div>
               <h1 className="text-3xl font-black text-slate-950">물방울 구매</h1>
               <p className="mt-2 text-sm text-slate-600">
                 PG 연동 전까지는 구매 요청을 남기면 관리자가 결제 확인 후 물방울을 지급합니다.
               </p>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-right">
+            <div className="flex items-center gap-5">
+              <WaterdropMascot />
+              <div className="rounded-xl border border-sky-100 bg-sky-50 px-5 py-4 text-right shadow-sm">
               <p className="text-xs font-semibold text-slate-500">현재 잔액</p>
               <p className="text-2xl font-black text-slate-950">
                 {formatWaterdrops(balance)}
               </p>
+              </div>
             </div>
           </div>
         </section>
@@ -152,12 +218,17 @@ export default function CoinsPage() {
               {packages.map((packageItem) => (
                 <article
                   key={packageItem.id}
-                  className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                  className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-sky-200 hover:shadow-md"
                 >
-                  <p className="text-sm font-bold text-slate-500">{packageItem.label}</p>
-                  <h2 className="mt-2 text-3xl font-black text-slate-950">
-                    {formatWaterdrops(packageItem.coin_amount)}
-                  </h2>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-bold text-slate-500">{packageItem.label}</p>
+                      <h2 className="mt-2 text-3xl font-black text-slate-950">
+                        {formatWaterdrops(packageItem.coin_amount)}
+                      </h2>
+                    </div>
+                    <PackageIllustration amount={packageItem.coin_amount} />
+                  </div>
                   <p className="mt-1 text-lg font-bold text-red-600">
                     {formatKrw(packageItem.price_krw)}
                   </p>
