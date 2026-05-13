@@ -81,15 +81,54 @@ async function getMyTransactionsApi({ page = 1, pageSize = 50 } = {}) {
 // ── 히어로 물방울 일러스트 ────────────────────────────────────────────────────
 
 function WaterdropHeroIcon() {
-function getProjectCreateText(product) {
-  if (product?.benefits?.project_create_daily_limit) {
-    return `일 ${product.benefits.project_create_daily_limit}회`;
-  }
-  if (product?.benefits?.project_create_total_limit) {
-    return `총 ${product.benefits.project_create_total_limit}회`;
-  }
-  return "불가";
-}
+   return (
+     <svg
+       viewBox="0 0 96 96"
+       className="h-24 w-24"
+       aria-hidden
+       style={{ animation: "floatWaterdrop 3s ease-in-out infinite" }}
+     >
+       <defs>
+         <linearGradient id="wdHeroGrad" x1="20" y1="4" x2="76" y2="92" gradientUnits="userSpaceOnUse">
+           <stop offset="0%" stopColor="#bae6fd" />
+           <stop offset="55%" stopColor="#38bdf8" />
+           <stop offset="100%" stopColor="#0284c7" />
+         </linearGradient>
+       </defs>
+       <ellipse cx="48" cy="90" rx="26" ry="5.5" fill="#bae6fd" opacity="0.4" />
+       <path
+         d="M48 4C35 21 20 40 20 59c0 20 13 33 28 33s28-13 28-33C76 40 61 21 48 4Z"
+         fill="url(#wdHeroGrad)"
+       />
+       <ellipse cx="36" cy="30" rx="10" ry="16" fill="white" opacity="0.28" transform="rotate(-18 36 30)" />
+       <ellipse cx="59" cy="52" rx="3.5" ry="6" fill="white" opacity="0.14" transform="rotate(-10 59 52)" />
+       <path
+         d="M26 23c-5 10-7 20-7 29 0 11 4 20 13 26"
+         stroke="white"
+         strokeWidth="4"
+         strokeLinecap="round"
+         opacity="0.18"
+         fill="none"
+       />
+       <style jsx>{`
+         @keyframes floatWaterdrop {
+           0%, 100% { transform: translateY(0) scale(1); }
+           50% { transform: translateY(-8px) scale(1.03); }
+         }
+       `}</style>
+     </svg>
+   );
+ }
+
+ function getProjectCreateText(product) {
+   if (product?.benefits?.project_create_daily_limit) {
+     return `일 ${product.benefits.project_create_daily_limit}회`;
+   }
+   if (product?.benefits?.project_create_total_limit) {
+     return `총 ${product.benefits.project_create_total_limit}회`;
+   }
+   return "불가";
+ }
 
 function getProjectApplyText(product) {
   if (product?.benefits?.project_apply_unlimited) return "무제한";
@@ -379,6 +418,7 @@ export default function CoinsPage() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingPackage, setProcessingPackage] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
   const pendingRequests = useMemo(
     () => requests.filter((r) => r.status === "pending"),
     [requests],
@@ -569,6 +609,54 @@ export default function CoinsPage() {
               </div>
             )}
 
+            <section className="mb-8">
+              <div className="mb-4">
+                <h2 className="text-xl font-black text-slate-950">물방울 수동 충전</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  FREE/PASS 사용자의 아이디어 열람 등에 사용할 물방울입니다.
+                </p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                {packages.map((pkg) => (
+                  <article
+                    key={pkg.id}
+                    className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:border-sky-200 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/80 dark:hover:border-sky-500/30"
+                  >
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold text-sky-500 dark:text-sky-400">
+                          {pkg.label}
+                        </p>
+                        <h2 className="mt-1 text-2xl font-bold text-gray-900 dark:text-slate-50">
+                          {formatWaterdrops(pkg.coin_amount)}
+                        </h2>
+                        <p className="mt-0.5 text-sm font-bold text-red-500 dark:text-red-400">
+                          {formatKrw(pkg.price_krw)}
+                        </p>
+                      </div>
+                      <PackageIllustration type={PACKAGE_ILLUS_TYPE[pkg.id] ?? "drop"} />
+                    </div>
+
+                    <TossPaymentButton
+                      productId={pkg.id}
+                      label="카드 결제"
+                      onError={(err) =>
+                        toast.error(err instanceof Error ? err.message : "결제를 시작하지 못했습니다.")
+                      }
+                      className="mt-4 w-full rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRequestPurchase(pkg)}
+                      disabled={processingPackage === pkg.id}
+                      className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-bold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                    >
+                      {processingPackage === pkg.id ? "요청 중…" : "수동 구매 요청"}
+                    </button>
+                  </article>
+                ))}
+              </div>
+            </section>
             
             <section className="mb-8">
               <div className="mb-4">
@@ -640,53 +728,6 @@ export default function CoinsPage() {
                   </PlanCard>
                 ))}
               </div>
-            </section>
-
-            <div className="mb-4">
-              <h2 className="text-xl font-black text-slate-950">물방울 수동 충전</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                FREE/PASS 사용자의 아이디어 열람 등에 사용할 물방울입니다.
-              </p>
-            </div>
-            <section className="grid gap-4 md:grid-cols-3">
-              {packages.map((packageItem) => (
-                <article
-                  key={pkg.id}
-                  className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:border-sky-200 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/80 dark:hover:border-sky-500/30"
-                >
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold text-sky-500 dark:text-sky-400">
-                        {pkg.label}
-                      </p>
-                      <h2 className="mt-1 text-2xl font-bold text-gray-900 dark:text-slate-50">
-                        {formatWaterdrops(pkg.coin_amount)}
-                      </h2>
-                      <p className="mt-0.5 text-sm font-bold text-red-500 dark:text-red-400">
-                        {formatKrw(pkg.price_krw)}
-                      </p>
-                    </div>
-                    <PackageIllustration type={PACKAGE_ILLUS_TYPE[pkg.id] ?? "drop"} />
-                  </div>
-
-                  <TossPaymentButton
-                    productId={pkg.id}
-                    label="카드 결제"
-                    onError={(err) =>
-                      toast.error(err instanceof Error ? err.message : "결제를 시작하지 못했습니다.")
-                    }
-                    className="mt-4 w-full rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleRequestPurchase(pkg)}
-                    disabled={processingPackage === pkg.id}
-                    className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-bold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                  >
-                    {processingPackage === pkg.id ? "요청 중…" : "수동 구매 요청"}
-                  </button>
-                </article>
-              ))}
             </section>
 
             {/* 구매 요청 내역 */}
