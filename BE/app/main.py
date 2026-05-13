@@ -59,6 +59,10 @@ OPENAPI_TAGS = [
         "description": "프로젝트 채팅방 생성/조회와 메시지 송수신 API입니다.",
     },
     {
+        "name": "coins",
+        "description": "코인 잔액, 수동 구매 요청 생성 및 구매 요청 조회 API입니다.",
+    },
+    {
         "name": "notifications",
         "description": "사용자 알림 목록 조회 및 읽음 처리 API입니다.",
     },

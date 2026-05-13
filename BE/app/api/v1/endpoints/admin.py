@@ -9,6 +9,7 @@ from app.api.v1.response import success_response
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
 from app.models import CommunityPost
+from app.models import CoinPurchaseRequest
 from app.models import Notification
 from app.models import PaymentEvent
 from app.models import Project
@@ -37,6 +38,11 @@ class AdminNoticeCreateRequest(BaseModel):
 class AdminCoinRevokeRequest(BaseModel):
     amount: int = Field(gt=0)
     note: str | None = Field(default=None, max_length=500)
+
+
+class AdminCoinPurchaseRequestUpdate(BaseModel):
+    status: str = Field(pattern="^(approved|rejected)$")
+    admin_note: str | None = Field(default=None, max_length=1000)
 
 
 class AdminTakedownRequest(BaseModel):
@@ -113,6 +119,58 @@ def _notify_coin_adjustment(
     )
 
 
+def _parse_suspended_until(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    normalized = value.replace("Z", "+00:00")
+    parsed = datetime.fromisoformat(normalized)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _notify_user_suspension(
+    db: Session,
+    *,
+    user_id: int,
+    suspended_until: datetime | None,
+    reason: str | None,
+) -> None:
+    if suspended_until is None:
+        title = "계정 이용이 정지되었습니다"
+        body = "관리자에 의해 계정 이용이 정지되었습니다."
+    else:
+        title = "계정 이용이 일시 정지되었습니다"
+        body = f"관리자에 의해 {suspended_until.isoformat()}까지 계정 이용이 정지되었습니다."
+    if reason:
+        body = f"{body}\n사유: {reason}"
+
+    db.add(
+        Notification(
+            user_id=user_id,
+            type="admin_user_suspended",
+            title=title,
+            body=body,
+            data={
+                "suspended_until": suspended_until.isoformat() if suspended_until else None,
+                "reason": reason,
+            },
+        )
+    )
+
+
+def _notify_user_restored(db: Session, *, user_id: int) -> None:
+    db.add(
+        Notification(
+            user_id=user_id,
+            type="admin_user_restored",
+            title="계정 이용이 복구되었습니다",
+            body="관리자에 의해 계정 이용 제한이 해제되었습니다.",
+            data={},
+        )
+    )
+
+
 @router.get("/overview", summary="관리자 운영 요약", description="관리자 대시보드에 필요한 핵심 운영 지표를 조회합니다.")
 async def get_admin_overview(
     current_user_id: int = Depends(get_current_user_id),
@@ -121,6 +179,7 @@ async def get_admin_overview(
     _ensure_admin(db, current_user_id)
     open_reports = db.query(Report).filter(Report.status == "open").count()
     pending_payments = db.query(PaymentEvent).filter(PaymentEvent.processed_at.is_(None)).count()
+    pending_coin_requests = db.query(CoinPurchaseRequest).filter(CoinPurchaseRequest.status == "pending").count()
     return success_response(
         data={
             "users_total": db.query(User).count(),
@@ -131,6 +190,8 @@ async def get_admin_overview(
             "reports_total": db.query(Report).count(),
             "payment_events_total": db.query(PaymentEvent).count(),
             "payment_events_pending": pending_payments,
+            "coin_purchase_requests_total": db.query(CoinPurchaseRequest).count(),
+            "coin_purchase_requests_pending": pending_coin_requests,
             "subscriptions_active": db.query(UserSubscription).filter(UserSubscription.status == "active").count(),
         }
     )
@@ -172,6 +233,8 @@ async def list_users_for_admin(
                 "nickname": u.nickname,
                 "role": u.role,
                 "is_active": u.is_active,
+                "suspended_until": u.suspended_until,
+                "suspension_reason": u.suspension_reason,
                 "is_verified": u.is_verified,
                 "github_id": u.github_id,
                 "google_id": u.google_id,
@@ -240,14 +303,42 @@ async def update_user_status(
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     if "is_active" in payload:
-        user.is_active = bool(payload["is_active"])
+        next_active = bool(payload["is_active"])
+        if next_active:
+            user.is_active = True
+            user.suspended_until = None
+            user.suspension_reason = None
+            _notify_user_restored(db, user_id=user.id)
+        else:
+            suspended_until = _parse_suspended_until(payload.get("suspended_until"))
+            if suspended_until is not None and suspended_until <= datetime.now(timezone.utc):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Suspension end time must be in the future")
+            reason = payload.get("suspension_reason")
+            reason = reason.strip() if isinstance(reason, str) and reason.strip() else None
+            user.is_active = False
+            user.suspended_until = suspended_until
+            user.suspension_reason = reason
+            _notify_user_suspension(
+                db,
+                user_id=user.id,
+                suspended_until=suspended_until,
+                reason=reason,
+            )
     if "role" in payload:
         role = payload["role"]
         if role not in {"user", "leader", "admin"}:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role")
         user.role = role
     db.commit()
-    return success_response(data={"id": user.id, "is_active": user.is_active, "role": user.role})
+    return success_response(
+        data={
+            "id": user.id,
+            "is_active": user.is_active,
+            "role": user.role,
+            "suspended_until": user.suspended_until,
+            "suspension_reason": user.suspension_reason,
+        }
+    )
 
 
 @router.get("/projects", summary="관리자 프로젝트 목록", description="관리자 권한으로 프로젝트 목록을 조회합니다.")
@@ -598,6 +689,121 @@ async def update_payment_event_for_admin(
         event.processed_at = datetime.now(timezone.utc)
     db.commit()
     return success_response(data={"id": event.id, "processed_at": event.processed_at})
+
+
+@router.get("/coin-purchase-requests", summary="관리자 코인 구매 요청 목록", description="수동 코인 구매 요청을 최신순으로 조회합니다.")
+async def list_coin_purchase_requests_for_admin(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    _ensure_admin(db, current_user_id)
+    rows = (
+        db.query(CoinPurchaseRequest, User.nickname.label("user_nickname"), User.email.label("user_email"))
+        .join(User, User.id == CoinPurchaseRequest.user_id)
+        .order_by(CoinPurchaseRequest.id.desc())
+        .all()
+    )
+
+    return success_response(
+        data=[
+            {
+                "id": request.id,
+                "user_id": request.user_id,
+                "user_nickname": user_nickname,
+                "user_email": user_email,
+                "coin_amount": request.coin_amount,
+                "price_krw": request.price_krw,
+                "status": request.status,
+                "note": request.note,
+                "admin_note": request.admin_note,
+                "handled_by": request.handled_by,
+                "handled_at": request.handled_at,
+                "created_at": request.created_at,
+            }
+            for request, user_nickname, user_email in rows
+        ]
+    )
+
+
+@router.patch("/coin-purchase-requests/{request_id}", summary="관리자 코인 구매 요청 처리", description="수동 코인 구매 요청을 승인하거나 거절합니다.")
+async def update_coin_purchase_request_for_admin(
+    request_id: int,
+    payload: AdminCoinPurchaseRequestUpdate,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    _ensure_admin(db, current_user_id)
+    request = db.get(CoinPurchaseRequest, request_id)
+    if request is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coin purchase request not found")
+    if request.status != "pending":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Already handled coin purchase request")
+
+    admin_note = payload.admin_note.strip() if payload.admin_note else None
+    handled_at = datetime.now(timezone.utc)
+    request.status = payload.status
+    request.admin_note = admin_note
+    request.handled_by = current_user_id
+    request.handled_at = handled_at
+
+    balance_after = None
+    if payload.status == "approved":
+        balance_after = award_coins(
+            db,
+            user_id=request.user_id,
+            amount=request.coin_amount,
+            event_type="coin.purchase",
+            source_type="coin_purchase_request",
+            source_id=request.id,
+            note=admin_note or f"Coin purchase request #{request.id} approved",
+        )
+        body = f"구매 요청하신 코인 {request.coin_amount}개가 지급되었습니다."
+        if admin_note:
+            body = f"{body}\n관리자 메모: {admin_note}"
+        db.add(
+            Notification(
+                user_id=request.user_id,
+                type="coin_purchase_approved",
+                title="코인 구매 요청이 승인되었습니다",
+                body=body,
+                data={
+                    "request_id": request.id,
+                    "coin_amount": request.coin_amount,
+                    "price_krw": request.price_krw,
+                    "balance_after": balance_after,
+                },
+            )
+        )
+    else:
+        body = f"코인 {request.coin_amount}개 구매 요청이 거절되었습니다."
+        if admin_note:
+            body = f"{body}\n사유: {admin_note}"
+        db.add(
+            Notification(
+                user_id=request.user_id,
+                type="coin_purchase_rejected",
+                title="코인 구매 요청이 거절되었습니다",
+                body=body,
+                data={
+                    "request_id": request.id,
+                    "coin_amount": request.coin_amount,
+                    "price_krw": request.price_krw,
+                    "reason": admin_note,
+                },
+            )
+        )
+
+    db.commit()
+    return success_response(
+        data={
+            "id": request.id,
+            "status": request.status,
+            "admin_note": request.admin_note,
+            "handled_by": request.handled_by,
+            "handled_at": request.handled_at,
+            "balance_after": balance_after,
+        }
+    )
 
 
 @router.post("/projects/stale-reminders/run", summary="미진행 프로젝트 알림 배치 실행", description="30일 이상 시작되지 않은 프로젝트에 알림을 생성합니다.")

@@ -163,12 +163,20 @@ export default function Navbar() {
 
         <div className="flex items-center gap-3 text-sm font-semibold">
           {isAuthenticated && (
-            <button
-              onClick={() => router.push("/mypage")}
-              className="text-slate-700 transition hover:text-red-600 dark:text-slate-200 dark:hover:text-red-400"
-            >
-              마이페이지
-            </button>
+            <>
+              <button
+                onClick={() => router.push("/coins")}
+                className="text-slate-700 transition hover:text-red-600"
+              >
+                코인
+              </button>
+              <button
+                onClick={() => router.push("/mypage")}
+                className="text-slate-700 transition hover:text-red-600"
+              >
+                마이페이지
+              </button>
+            </>
           )}
 
           <button

@@ -237,7 +237,16 @@
 - POST /community/{post_id}/reactions: 게시물 반응 추가/토글
 - POST /community/{post_id}/comments/{comment_id}/reactions: 댓글 반응 추가/토글
 
-## 13) Notifications
+## 13) Coins
+
+- GET /coins/me: 현재 로그인 사용자의 코인 잔액 조회
+- GET /coins/packages: 수동 구매 요청에 사용할 코인 패키지 목록 조회
+- POST /coins/purchase-requests: 코인 구매 요청 생성
+  - body: `{ "package_id": "starter|builder|maker", "note": "선택 메모" }`
+  - PG 연동 전 수동 확인용이며, 관리자가 승인하면 코인이 지급됩니다.
+- GET /coins/purchase-requests/me: 내가 만든 코인 구매 요청 목록 조회
+
+## 14) Notifications
 
 - GET /notifications: 현재 사용자의 알림 목록
   - 응답에 `data`, `project_id`, `url` 포함
@@ -251,13 +260,17 @@
 - 프로젝트 리뷰 작성: 리뷰 대상자에게 `review_received` 알림 생성, `/projects/{project_id}`로 이동
 - 커뮤니티 댓글 작성: 게시글 작성자에게 `system` 알림 생성, `/community/{post_id}`로 이동
 
-## 14) Admin
+## 15) Admin
 
-- GET /admin/overview: 운영 요약 지표(사용자/프로젝트/미처리 신고/결제 이벤트/활성 구독)
+- GET /admin/overview: 운영 요약 지표(사용자/프로젝트/미처리 신고/결제 이벤트/코인 구매 요청/활성 구독)
 - GET /admin/users: 전체 사용자 목록 조회(관리자)
   - query: `q`(이메일/닉네임 검색), `role`, `is_active`
 - POST /admin/users/{user_id}/coins: 사용자 코인 수동 지급
+- POST /admin/users/{user_id}/coins/revoke: 사용자 코인 수동 환수
 - PATCH /admin/users/{user_id}/status: 사용자 상태/역할 변경(관리자)
+  - 정지: `{ "is_active": false, "suspended_until": "ISO8601 또는 null", "suspension_reason": "사유" }`
+  - 복구: `{ "is_active": true }`
+  - 정지 중인 사용자는 공통 인증 dependency에서 API 접근이 차단되며, 기간 만료 후 자동 복구됩니다.
 - GET /admin/projects: 전체 프로젝트 목록 조회(관리자)
 - GET /admin/reports: 신고 목록 조회(관리자)
   - query: `scope=all|user|project|post|chat`
@@ -265,6 +278,9 @@
 - POST /admin/notices: 공지글 작성(커뮤니티 `announcement` 게시글 생성)
 - GET /admin/payments: 결제 이벤트 목록 조회(관리자)
 - PATCH /admin/payments/{event_id}: 결제 이벤트 처리/해제(관리자)
+- GET /admin/coin-purchase-requests: 코인 구매 요청 목록 조회
+- PATCH /admin/coin-purchase-requests/{request_id}: 코인 구매 요청 승인/거절
+  - 승인 시 `coin.purchase` 코인 거래가 생성되고 사용자에게 알림이 발송됩니다.
 
 ## 참고 문서
 
