@@ -6,9 +6,9 @@ export async function confirmWaterdropSpend({
   confirmCoinSpend,
   toast,
   actionLabel,
-  message,
-  tone,
-  icon,
+  message = "",
+  tone = "default",
+  icon = "waterdrop",
 }) {
   let balance = 0;
 
