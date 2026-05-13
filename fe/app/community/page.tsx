@@ -139,7 +139,12 @@ export default function CommunityPage() {
     setLoading(true);
     setLoadError("");
     try {
-      const res = await getPosts({ category: selectedCategory, page, page_size: POSTS_PER_PAGE });
+      const res = await getPosts({
+        category: selectedCategory,
+        page,
+        page_size: POSTS_PER_PAGE,
+        exclude_admin_categories: !selectedCategory,
+      });
       setPosts((res.posts || []).filter(isCampfirePost));
       setTotalPages(res.total_pages);
     } catch (e) {

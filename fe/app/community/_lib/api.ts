@@ -27,12 +27,14 @@ export async function getPosts(params?: {
   page?: number;
   page_size?: number;
   sort_by?: string;
+  exclude_admin_categories?: boolean;
 }): Promise<{ posts: PostSummary[]; total: number; page: number; total_pages: number }> {
   const qs = new URLSearchParams();
   if (params?.category) qs.set("category", params.category);
   if (params?.page) qs.set("page", String(params.page));
   if (params?.page_size) qs.set("page_size", String(params.page_size));
   if (params?.sort_by) qs.set("sort_by", params.sort_by);
+  if (params?.exclude_admin_categories) qs.set("exclude_admin_categories", "true");
 
   const res = await authenticatedFetch(`${BASE}?${qs}`, { headers: authHeaders() });
   return handleResponse(res);
@@ -118,9 +120,10 @@ export async function getHotPosts(): Promise<{
   most_viewed: PostSummary | null;
 }> {
   const fetchTop1 = async (sort_by: string): Promise<PostSummary | null> => {
-    const res = await authenticatedFetch(`${BASE}?sort_by=${sort_by}&page=1&page_size=1`, {
-      headers: authHeaders(),
-    });
+    const res = await authenticatedFetch(
+      `${BASE}?sort_by=${sort_by}&page=1&page_size=1&exclude_admin_categories=true`,
+      { headers: authHeaders() }
+    );
     const data = await handleResponse<{ posts: PostSummary[] }>(res);
     return data.posts[0] ?? null;
   };

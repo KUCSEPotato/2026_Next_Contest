@@ -180,6 +180,7 @@ async def list_posts(
     page: int = 1,
     page_size: int = 20,
     sort_by: str = "newest",
+    exclude_admin_categories: bool = False,
     db: Session = Depends(get_db),
     authorization: str | None = Header(default=None),
 ) -> dict:
@@ -196,6 +197,8 @@ async def list_posts(
 
     if category:
         query = query.filter(CommunityPost.category == category)
+    elif exclude_admin_categories:
+        query = query.filter(CommunityPost.category.notin_(("announcement", "event")))
 
     # sort_by에 따른 초기 정렬 설정 (핀 된 글은 항상 먼저)
     if sort_by == "views":
