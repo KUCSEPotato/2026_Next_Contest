@@ -45,6 +45,8 @@ interface ProjectData {
   difficulty?: string | null;
   progress_percent?: number;
   created_at?: string | null;
+  updated_at?: string | null;
+  completed_at?: string | null;
   techStack?: string[];
   currentMembers?: number;
   maxMembers?: number;
@@ -213,6 +215,20 @@ function stringifyLessonsLearned(data: GrowthData) {
 }
 
 /* ── 서수 (1번째, 2번째…) ── */
+function getProjectRecentTime(project: ProjectData): number {
+  const value = project.completed_at || project.updated_at || project.created_at;
+  const time = value ? new Date(value).getTime() : NaN;
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function sortProjectsByRecent(projects: ProjectData[]): ProjectData[] {
+  return [...projects].sort((a, b) => {
+    const timeDiff = getProjectRecentTime(b) - getProjectRecentTime(a);
+    if (timeDiff !== 0) return timeDiff;
+    return Number(b.id) - Number(a.id);
+  });
+}
+
 function ordinalKo(n: number) {
   return `${n}번째`;
 }
@@ -596,8 +612,10 @@ function MemoirContent() {
 
         if (!requestedProjectId) {
           const myProjectsResult = await getMyProjectsApi();
-          const completedProjects = (myProjectsResult.data || []).filter(
-            (p: ProjectData) => p.status === "completed"
+          const completedProjects = sortProjectsByRecent(
+            (myProjectsResult.data || []).filter(
+              (p: ProjectData) => p.status === "completed"
+            )
           );
 
           const overviewItems = await Promise.all(
@@ -680,8 +698,10 @@ function MemoirContent() {
 
         // 몇 번째 수확인지 계산 (completed 프로젝트 수)
         if (myProjectsResult.status === "fulfilled") {
-          const completed = (myProjectsResult.value.data || []).filter(
-            (p: ProjectData) => p.status === "completed"
+          const completed = sortProjectsByRecent(
+            (myProjectsResult.value.data || []).filter(
+              (p: ProjectData) => p.status === "completed"
+            )
           );
           const idx = completed.findIndex((p: ProjectData) => Number(p.id) === Number(projectId));
           setHarvestCount(idx >= 0 ? idx + 1 : completed.length || 1);
