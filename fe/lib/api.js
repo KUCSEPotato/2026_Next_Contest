@@ -886,6 +886,44 @@ export async function readAllNotificationsApi() {
 }
 
 /* =========================
+   Coins
+========================= */
+
+export async function getMyCoinBalanceApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/coins/me`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "코인 잔액을 불러오지 못했습니다.");
+}
+
+export async function getCoinPackagesApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/coins/packages`, {
+    cache: "no-store",
+  });
+
+  return handleResponse(res, "코인 패키지를 불러오지 못했습니다.");
+}
+
+export async function createCoinPurchaseRequestApi(payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/coins/purchase-requests`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "코인 구매 요청에 실패했습니다.");
+}
+
+export async function getMyCoinPurchaseRequestsApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/coins/purchase-requests/me`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "코인 구매 요청 목록을 불러오지 못했습니다.");
+}
+
+/* =========================
    Admin
 ========================= */
 
@@ -989,6 +1027,24 @@ export async function updateAdminPaymentApi(eventId, payload) {
   });
 
   return handleResponse(res, "결제 이벤트 처리에 실패했습니다.");
+}
+
+export async function getAdminCoinPurchaseRequestsApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/coin-purchase-requests`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "코인 구매 요청 목록을 불러오지 못했습니다.");
+}
+
+export async function updateAdminCoinPurchaseRequestApi(requestId, payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/coin-purchase-requests/${requestId}`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "코인 구매 요청 처리에 실패했습니다.");
 }
 
 export async function createAdminNoticeApi(payload) {

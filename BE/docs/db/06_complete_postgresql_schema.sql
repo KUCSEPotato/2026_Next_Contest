@@ -37,3 +37,4 @@
 \ir 24_community_reaction_recommend.sql
 \ir 25_backfill_user_avatar_s3_key.sql
 \ir 26_add_report_target_fields.sql
+\ir 27_add_coin_purchase_requests.sql

@@ -98,6 +98,25 @@ export function AppFeedbackProvider({ children }) {
     });
   }, []);
 
+  const confirmCoinSpend = useCallback((options) => {
+    return new Promise((resolve) => {
+      const amount = Number(options.amount || 0);
+      const currentBalance = Number(options.currentBalance || 0);
+      dialogResolverRef.current = resolve;
+      setDialog({
+        type: "coin-confirm",
+        title: options.title || "코인을 사용할까요?",
+        message: options.message || "",
+        amount,
+        currentBalance,
+        remainingBalance: currentBalance - amount,
+        confirmText: options.confirmText || "사용하기",
+        cancelText: options.cancelText || "돌아가기",
+        tone: options.tone || "default",
+      });
+    });
+  }, []);
+
   useEffect(() => {
     const handleToastEvent = (event) => {
       const detail = event instanceof CustomEvent ? event.detail : null;
@@ -129,8 +148,8 @@ export function AppFeedbackProvider({ children }) {
   }, [showToast]);
 
   const value = useMemo(
-    () => ({ toast, confirm, prompt }),
-    [confirm, prompt, toast]
+    () => ({ toast, confirm, prompt, confirmCoinSpend }),
+    [confirm, confirmCoinSpend, prompt, toast]
   );
 
   return (
@@ -155,7 +174,11 @@ export function useDialog() {
   if (!context) {
     throw new Error("useDialog must be used within AppFeedbackProvider");
   }
-  return { confirm: context.confirm, prompt: context.prompt };
+  return {
+    confirm: context.confirm,
+    prompt: context.prompt,
+    confirmCoinSpend: context.confirmCoinSpend,
+  };
 }
 
 function ToastViewport({ toasts, onDismiss }) {
@@ -193,6 +216,7 @@ function ToastViewport({ toasts, onDismiss }) {
 function Dialog({ dialog, onClose }) {
   const [value, setValue] = useState(dialog.defaultValue || "");
   const isPrompt = dialog.type === "prompt" || dialog.type === "prompt-textarea";
+  const isCoinConfirm = dialog.type === "coin-confirm";
   const isDanger = dialog.tone === "danger";
 
   const submit = () => {
@@ -212,6 +236,29 @@ function Dialog({ dialog, onClose }) {
           <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">
             {dialog.message}
           </p>
+        ) : null}
+
+        {isCoinConfirm ? (
+          <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-xl border border-slate-200 text-center text-sm">
+            <div className="bg-slate-50 px-3 py-4">
+              <p className="text-xs font-semibold text-slate-500">사용량</p>
+              <p className="mt-1 text-lg font-black text-red-600">
+                {dialog.amount.toLocaleString("ko-KR")}
+              </p>
+            </div>
+            <div className="bg-white px-3 py-4">
+              <p className="text-xs font-semibold text-slate-500">현재 잔액</p>
+              <p className="mt-1 text-lg font-black text-slate-950">
+                {dialog.currentBalance.toLocaleString("ko-KR")}
+              </p>
+            </div>
+            <div className="bg-slate-50 px-3 py-4">
+              <p className="text-xs font-semibold text-slate-500">사용 후</p>
+              <p className="mt-1 text-lg font-black text-slate-950">
+                {dialog.remainingBalance.toLocaleString("ko-KR")}
+              </p>
+            </div>
+          </div>
         ) : null}
 
         {isPrompt ? (

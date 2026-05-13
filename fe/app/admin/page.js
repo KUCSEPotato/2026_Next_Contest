@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   createAdminNoticeApi,
+  getAdminCoinPurchaseRequestsApi,
   grantAdminUserCoinsApi,
   revokeAdminUserCoinsApi,
   getAdminOverviewApi,
@@ -13,6 +14,7 @@ import {
   getAdminUsersApi,
   getAdminPostsApi,
   updateAdminPaymentApi,
+  updateAdminCoinPurchaseRequestApi,
   updateAdminReportApi,
   updateAdminUserStatusApi,
   getAdminMyPostsApi,
@@ -36,6 +38,11 @@ const TABS = [
 
 const REPORT_STATUSES = ["open", "reviewing", "resolved", "rejected"];
 const USER_ROLES = ["user", "leader", "admin"];
+const COIN_REQUEST_STATUSES = {
+  pending: "확인 대기",
+  approved: "승인",
+  rejected: "거절",
+};
 const REPORT_SCOPES = [
   { value: "all", label: "전체" },
   { value: "user", label: "사용자" },
@@ -76,6 +83,7 @@ export default function AdminPage() {
   const [projects, setProjects] = useState([]);
   const [reports, setReports] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [coinRequests, setCoinRequests] = useState([]);
   const [adminPosts, setAdminPosts] = useState([]);
   const [posts, setPosts] = useState([]);
   const [userSearch, setUserSearch] = useState("");
@@ -100,16 +108,25 @@ export default function AdminPage() {
     () => reports.filter((report) => report.status === "open"),
     [reports]
   );
-  const pendingPayments = useMemo(
-    () => payments.filter((payment) => !payment.processed_at),
-    [payments]
+  const pendingCoinRequests = useMemo(
+    () => coinRequests.filter((request) => request.status === "pending"),
+    [coinRequests]
   );
 
   const loadAdminData = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
-      const [overviewResult, usersResult, projectsResult, reportsResult, paymentsResult, adminPostsResult, postsResult] =
+      const [
+        overviewResult,
+        usersResult,
+        projectsResult,
+        reportsResult,
+        paymentsResult,
+        coinRequestsResult,
+        adminPostsResult,
+        postsResult,
+      ] =
         await Promise.all([
           getAdminOverviewApi(),
           getAdminUsersApi({
@@ -123,6 +140,7 @@ export default function AdminPage() {
           getAdminProjectsApi(),
           getAdminReportsApi({ scope: reportScope }),
           getAdminPaymentsApi(),
+          getAdminCoinPurchaseRequestsApi(),
           getAdminMyPostsApi(),
           getAdminPostsApi({
             q: postSearch.trim() || undefined,
@@ -136,6 +154,7 @@ export default function AdminPage() {
       setProjects(projectsResult.data || []);
       setReports(reportsResult.data || []);
       setPayments(paymentsResult.data || []);
+      setCoinRequests(coinRequestsResult.data || []);
       setAdminPosts(adminPostsResult.data || []);
       setPosts(postsResult.data || []);
     } catch (err) {
@@ -286,6 +305,72 @@ export default function AdminPage() {
       );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "결제 이벤트 처리에 실패했습니다.");
+    } finally {
+      setProcessingKey("");
+    }
+  }
+
+  async function handleCoinRequest(request, status) {
+    const isApprove = status === "approved";
+    const noteInput = await prompt({
+      title: isApprove ? "코인 구매 승인" : "코인 구매 거절",
+      message: isApprove
+        ? `${request.user_nickname || request.user_email || `User #${request.user_id}`}에게 ${request.coin_amount}코인을 지급합니다. 관리자 메모를 입력하세요.`
+        : `${request.user_nickname || request.user_email || `User #${request.user_id}`}의 구매 요청을 거절합니다. 사유를 입력하세요.`,
+      placeholder: isApprove ? "예: 입금 확인 완료" : "예: 결제 내역을 확인할 수 없습니다.",
+      confirmText: isApprove ? "승인" : "거절",
+      required: !isApprove,
+      multiline: true,
+      tone: isApprove ? "default" : "danger",
+    });
+    if (noteInput === null) return;
+
+    try {
+      setProcessingKey(`coin-request-${request.id}`);
+      const result = await updateAdminCoinPurchaseRequestApi(request.id, {
+        status,
+        admin_note: noteInput.trim() || undefined,
+      });
+
+      setCoinRequests((prev) =>
+        prev.map((item) =>
+          item.id === request.id
+            ? {
+                ...item,
+                status: result.data?.status || status,
+                admin_note: result.data?.admin_note || noteInput.trim() || null,
+                handled_at: result.data?.handled_at || new Date().toISOString(),
+                handled_by: result.data?.handled_by,
+              }
+            : item
+        )
+      );
+
+      if (isApprove && result.data?.balance_after !== undefined) {
+        setUsers((prev) =>
+          prev.map((user) =>
+            user.id === request.user_id
+              ? { ...user, coin_balance: result.data.balance_after }
+              : user
+          )
+        );
+      }
+
+      setOverview((prev) =>
+        prev
+          ? {
+              ...prev,
+              coin_purchase_requests_pending: Math.max(
+                0,
+                (prev.coin_purchase_requests_pending || 0) - 1
+              ),
+            }
+          : prev
+      );
+
+      toast.success(isApprove ? "코인을 지급하고 사용자에게 알림을 보냈습니다." : "구매 요청을 거절하고 사용자에게 알림을 보냈습니다.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "코인 구매 요청 처리에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
@@ -646,11 +731,12 @@ export default function AdminPage() {
           </div>
         )}
 
-        <section className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <section className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
           <Metric label="사용자" value={overview?.users_total} sub={`${overview?.users_active ?? 0} active`} />
           <Metric label="프로젝트" value={overview?.projects_total} sub={`${overview?.projects_active ?? 0} active`} />
           <Metric label="미처리 신고" value={overview?.reports_open} sub={`${overview?.reports_total ?? 0} total`} tone="danger" />
           <Metric label="결제 이벤트" value={overview?.payment_events_total} sub={`${overview?.payment_events_pending ?? 0} pending`} tone="warning" />
+          <Metric label="코인 구매" value={overview?.coin_purchase_requests_total} sub={`${overview?.coin_purchase_requests_pending ?? 0} pending`} tone="warning" />
         </section>
 
         <section className="mt-6 grid gap-4 lg:grid-cols-2">
@@ -679,28 +765,28 @@ export default function AdminPage() {
             </div>
           </Panel>
 
-          <Panel title="처리 대기 결제" description={`${pendingPayments.length}건`}>
+          <Panel title="처리 대기 코인 구매" description={`${pendingCoinRequests.length}건`}>
             <div className="divide-y divide-slate-100">
-              {pendingPayments.slice(0, 5).map((payment) => (
-                <div key={payment.id} className="flex items-start justify-between gap-3 py-3">
+              {pendingCoinRequests.slice(0, 5).map((request) => (
+                <div key={request.id} className="flex items-start justify-between gap-3 py-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900">
-                      {payment.provider} · {payment.event_type}
+                      {request.user_nickname || request.user_email || `User #${request.user_id}`}
                     </p>
                     <p className="mt-1 truncate text-xs text-slate-500">
-                      {payment.provider_event_id}
+                      {request.coin_amount?.toLocaleString("ko-KR")}코인 · {Number(request.price_krw || 0).toLocaleString("ko-KR")}원
                     </p>
                   </div>
                   <button
-                    onClick={() => handlePaymentProcessed(payment.id, true)}
-                    disabled={processingKey === `payment-${payment.id}`}
+                    onClick={() => handleCoinRequest(request, "approved")}
+                    disabled={processingKey === `coin-request-${request.id}`}
                     className="shrink-0 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
                   >
-                    처리
+                    승인
                   </button>
                 </div>
               ))}
-              {pendingPayments.length === 0 && <EmptyLine text="대기 중인 결제 이벤트가 없습니다." />}
+              {pendingCoinRequests.length === 0 && <EmptyLine text="대기 중인 코인 구매 요청이 없습니다." />}
             </div>
           </Panel>
         </section>
@@ -808,37 +894,110 @@ export default function AdminPage() {
             )}
 
             {activeTab === "payments" && (
-              <table className="min-w-full text-left text-sm">
-                <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
-                  <tr>
-                    <Th>ID</Th>
-                    <Th>Provider</Th>
-                    <Th>Event</Th>
-                    <Th>Payload</Th>
-                    <Th>Processed</Th>
-                    <Th>처리</Th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {payments.map((payment) => (
-                    <tr key={payment.id}>
-                      <Td>#{payment.id}</Td>
-                      <Td>{payment.provider}</Td>
-                      <Td>{payment.event_type}</Td>
-                      <Td className="max-w-md"><span className="line-clamp-2">{shortJson(payment.payload)}</span></Td>
-                      <Td>{formatDate(payment.processed_at)}</Td>
-                      <Td>
-                        <button
-                          onClick={() => handlePaymentProcessed(payment.id, !payment.processed_at)}
-                          className="rounded-md border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                          {payment.processed_at ? "해제" : "처리"}
-                        </button>
-                      </Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="space-y-8 p-4">
+                <section>
+                  <div className="mb-3 flex items-end justify-between gap-3">
+                    <div>
+                      <h2 className="text-base font-black text-slate-950">코인 구매 요청</h2>
+                      <p className="mt-1 text-xs text-slate-500">
+                        PG 연동 전 수동 결제 확인 후 승인하면 코인이 자동 지급됩니다.
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+                      대기 {pendingCoinRequests.length}건
+                    </span>
+                  </div>
+                  <table className="min-w-full text-left text-sm">
+                    <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+                      <tr>
+                        <Th>ID</Th>
+                        <Th>사용자</Th>
+                        <Th>코인</Th>
+                        <Th>금액</Th>
+                        <Th>상태</Th>
+                        <Th>요청 메모</Th>
+                        <Th>요청일</Th>
+                        <Th>처리</Th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {coinRequests.map((request) => (
+                        <tr key={request.id}>
+                          <Td>#{request.id}</Td>
+                          <Td>
+                            <div className="font-semibold text-slate-900">
+                              {request.user_nickname || `User #${request.user_id}`}
+                            </div>
+                            <div className="text-xs text-slate-500">{request.user_email}</div>
+                          </Td>
+                          <Td>{request.coin_amount?.toLocaleString("ko-KR")}개</Td>
+                          <Td>{Number(request.price_krw || 0).toLocaleString("ko-KR")}원</Td>
+                          <Td>{COIN_REQUEST_STATUSES[request.status] || request.status}</Td>
+                          <Td className="max-w-xs"><span className="line-clamp-2">{request.note || "-"}</span></Td>
+                          <Td>{formatDate(request.created_at)}</Td>
+                          <Td>
+                            {request.status === "pending" ? (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleCoinRequest(request, "approved")}
+                                  disabled={processingKey === `coin-request-${request.id}`}
+                                  className="rounded-md bg-slate-900 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                                >
+                                  승인
+                                </button>
+                                <button
+                                  onClick={() => handleCoinRequest(request, "rejected")}
+                                  disabled={processingKey === `coin-request-${request.id}`}
+                                  className="rounded-md border border-red-200 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                                >
+                                  거절
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-slate-500">{formatDate(request.handled_at)}</span>
+                            )}
+                          </Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+
+                <section>
+                  <h2 className="mb-3 text-base font-black text-slate-950">결제 이벤트 로그</h2>
+                  <table className="min-w-full text-left text-sm">
+                    <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+                      <tr>
+                        <Th>ID</Th>
+                        <Th>Provider</Th>
+                        <Th>Event</Th>
+                        <Th>Payload</Th>
+                        <Th>Processed</Th>
+                        <Th>처리</Th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {payments.map((payment) => (
+                        <tr key={payment.id}>
+                          <Td>#{payment.id}</Td>
+                          <Td>{payment.provider}</Td>
+                          <Td>{payment.event_type}</Td>
+                          <Td className="max-w-md"><span className="line-clamp-2">{shortJson(payment.payload)}</span></Td>
+                          <Td>{formatDate(payment.processed_at)}</Td>
+                          <Td>
+                            <button
+                              onClick={() => handlePaymentProcessed(payment.id, !payment.processed_at)}
+                              className="rounded-md border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                              {payment.processed_at ? "해제" : "처리"}
+                            </button>
+                          </Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+              </div>
             )}
 
             {activeTab === "users" && (

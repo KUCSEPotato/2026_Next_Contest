@@ -9,6 +9,7 @@ from app.api.v1.response import success_response
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
 from app.models import CommunityPost
+from app.models import CoinPurchaseRequest
 from app.models import Notification
 from app.models import PaymentEvent
 from app.models import Project
@@ -37,6 +38,11 @@ class AdminNoticeCreateRequest(BaseModel):
 class AdminCoinRevokeRequest(BaseModel):
     amount: int = Field(gt=0)
     note: str | None = Field(default=None, max_length=500)
+
+
+class AdminCoinPurchaseRequestUpdate(BaseModel):
+    status: str = Field(pattern="^(approved|rejected)$")
+    admin_note: str | None = Field(default=None, max_length=1000)
 
 
 class AdminTakedownRequest(BaseModel):
@@ -121,6 +127,7 @@ async def get_admin_overview(
     _ensure_admin(db, current_user_id)
     open_reports = db.query(Report).filter(Report.status == "open").count()
     pending_payments = db.query(PaymentEvent).filter(PaymentEvent.processed_at.is_(None)).count()
+    pending_coin_requests = db.query(CoinPurchaseRequest).filter(CoinPurchaseRequest.status == "pending").count()
     return success_response(
         data={
             "users_total": db.query(User).count(),
@@ -131,6 +138,8 @@ async def get_admin_overview(
             "reports_total": db.query(Report).count(),
             "payment_events_total": db.query(PaymentEvent).count(),
             "payment_events_pending": pending_payments,
+            "coin_purchase_requests_total": db.query(CoinPurchaseRequest).count(),
+            "coin_purchase_requests_pending": pending_coin_requests,
             "subscriptions_active": db.query(UserSubscription).filter(UserSubscription.status == "active").count(),
         }
     )
@@ -598,6 +607,121 @@ async def update_payment_event_for_admin(
         event.processed_at = datetime.now(timezone.utc)
     db.commit()
     return success_response(data={"id": event.id, "processed_at": event.processed_at})
+
+
+@router.get("/coin-purchase-requests", summary="관리자 코인 구매 요청 목록", description="수동 코인 구매 요청을 최신순으로 조회합니다.")
+async def list_coin_purchase_requests_for_admin(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    _ensure_admin(db, current_user_id)
+    rows = (
+        db.query(CoinPurchaseRequest, User.nickname.label("user_nickname"), User.email.label("user_email"))
+        .join(User, User.id == CoinPurchaseRequest.user_id)
+        .order_by(CoinPurchaseRequest.id.desc())
+        .all()
+    )
+
+    return success_response(
+        data=[
+            {
+                "id": request.id,
+                "user_id": request.user_id,
+                "user_nickname": user_nickname,
+                "user_email": user_email,
+                "coin_amount": request.coin_amount,
+                "price_krw": request.price_krw,
+                "status": request.status,
+                "note": request.note,
+                "admin_note": request.admin_note,
+                "handled_by": request.handled_by,
+                "handled_at": request.handled_at,
+                "created_at": request.created_at,
+            }
+            for request, user_nickname, user_email in rows
+        ]
+    )
+
+
+@router.patch("/coin-purchase-requests/{request_id}", summary="관리자 코인 구매 요청 처리", description="수동 코인 구매 요청을 승인하거나 거절합니다.")
+async def update_coin_purchase_request_for_admin(
+    request_id: int,
+    payload: AdminCoinPurchaseRequestUpdate,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    _ensure_admin(db, current_user_id)
+    request = db.get(CoinPurchaseRequest, request_id)
+    if request is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coin purchase request not found")
+    if request.status != "pending":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Already handled coin purchase request")
+
+    admin_note = payload.admin_note.strip() if payload.admin_note else None
+    handled_at = datetime.now(timezone.utc)
+    request.status = payload.status
+    request.admin_note = admin_note
+    request.handled_by = current_user_id
+    request.handled_at = handled_at
+
+    balance_after = None
+    if payload.status == "approved":
+        balance_after = award_coins(
+            db,
+            user_id=request.user_id,
+            amount=request.coin_amount,
+            event_type="coin.purchase",
+            source_type="coin_purchase_request",
+            source_id=request.id,
+            note=admin_note or f"Coin purchase request #{request.id} approved",
+        )
+        body = f"구매 요청하신 코인 {request.coin_amount}개가 지급되었습니다."
+        if admin_note:
+            body = f"{body}\n관리자 메모: {admin_note}"
+        db.add(
+            Notification(
+                user_id=request.user_id,
+                type="coin_purchase_approved",
+                title="코인 구매 요청이 승인되었습니다",
+                body=body,
+                data={
+                    "request_id": request.id,
+                    "coin_amount": request.coin_amount,
+                    "price_krw": request.price_krw,
+                    "balance_after": balance_after,
+                },
+            )
+        )
+    else:
+        body = f"코인 {request.coin_amount}개 구매 요청이 거절되었습니다."
+        if admin_note:
+            body = f"{body}\n사유: {admin_note}"
+        db.add(
+            Notification(
+                user_id=request.user_id,
+                type="coin_purchase_rejected",
+                title="코인 구매 요청이 거절되었습니다",
+                body=body,
+                data={
+                    "request_id": request.id,
+                    "coin_amount": request.coin_amount,
+                    "price_krw": request.price_krw,
+                    "reason": admin_note,
+                },
+            )
+        )
+
+    db.commit()
+    return success_response(
+        data={
+            "id": request.id,
+            "status": request.status,
+            "admin_note": request.admin_note,
+            "handled_by": request.handled_by,
+            "handled_at": request.handled_at,
+            "balance_after": balance_after,
+        }
+    )
 
 
 @router.post("/projects/stale-reminders/run", summary="미진행 프로젝트 알림 배치 실행", description="30일 이상 시작되지 않은 프로젝트에 알림을 생성합니다.")
