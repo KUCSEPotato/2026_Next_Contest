@@ -9,11 +9,15 @@ import {
   getUserProjectsApi,
   getUserReceivedReviewsApi,
   getImageUrl,
+  createReportApi,
 } from "../../../lib/api";
+import { useDialog, useToast } from "../../../components/AppFeedback";
 
 export default function UserProfilePage() {
   const params = useParams();
   const router = useRouter();
+  const toast = useToast();
+  const { prompt } = useDialog();
   const userId = params.userId;
 
   const [profile, setProfile] = useState(null);
@@ -86,6 +90,40 @@ export default function UserProfilePage() {
     }
   }, [userId, router]);
 
+  const handleReportUser = async () => {
+    const myUserId = typeof window !== "undefined" ? localStorage.getItem("user_id") : null;
+    if (!myUserId) {
+      router.push("/login");
+      return;
+    }
+    if (String(myUserId) === String(userId)) {
+      toast.warning("본인 계정은 신고할 수 없습니다.");
+      return;
+    }
+
+    const reasonInput = await prompt({
+      title: "사용자 신고",
+      message: "관리자가 확인할 수 있도록 신고 사유를 입력해주세요.",
+      placeholder: "문제가 되는 이유를 입력하세요.",
+      confirmText: "신고하기",
+      required: true,
+      multiline: true,
+      tone: "danger",
+    });
+    if (reasonInput === null) return;
+
+    try {
+      await createReportApi({
+        target_type: "user",
+        target_id: Number(userId),
+        reason: reasonInput.trim(),
+      });
+      toast.success("신고가 접수되었습니다.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "신고 접수에 실패했습니다.");
+    }
+  };
+
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-50 px-6 py-10">
@@ -127,7 +165,7 @@ export default function UserProfilePage() {
               )}
             </div>
 
-            <div>
+            <div className="min-w-0 flex-1">
               <h1 className="text-3xl font-bold text-slate-900">
                 {profile?.nickname || "이름 없는 사용자"}
               </h1>
@@ -136,6 +174,12 @@ export default function UserProfilePage() {
                 {profile?.bio || "아직 자기소개가 없습니다."}
               </p>
             </div>
+            <button
+              onClick={handleReportUser}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-red-300 hover:text-red-600"
+            >
+              사용자 신고
+            </button>
           </div>
         </section>
 

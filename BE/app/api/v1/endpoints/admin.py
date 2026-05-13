@@ -9,6 +9,7 @@ from app.api.v1.response import success_response
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
 from app.models import CommunityPost
+from app.models import CommunityPostComment
 from app.models import CoinPurchaseRequest
 from app.models import Notification
 from app.models import PaymentEvent
@@ -182,8 +183,8 @@ async def get_admin_overview(
     pending_coin_requests = db.query(CoinPurchaseRequest).filter(CoinPurchaseRequest.status == "pending").count()
     return success_response(
         data={
-            "users_total": db.query(User).count(),
-            "users_active": db.query(User).filter(User.is_active.is_(True)).count(),
+            "users_total": db.query(User).filter(User.deleted_at.is_(None)).count(),
+            "users_active": db.query(User).filter(User.is_active.is_(True), User.deleted_at.is_(None)).count(),
             "projects_total": db.query(Project).count(),
             "projects_active": db.query(Project).filter(Project.deleted_at.is_(None)).count(),
             "reports_open": open_reports,
@@ -242,6 +243,7 @@ async def list_users_for_admin(
                 "is_google_linked": bool(u.google_id),
                 "coin_balance": u.coin_balance,
                 "created_at": u.created_at,
+                "deleted_at": u.deleted_at,
             }
             for u in users
         ]
@@ -259,6 +261,11 @@ async def grant_user_coins_for_admin(
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if user.deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot adjust coins for withdrawn user",
+        )
 
     note = payload.note.strip() if payload.note else None
     balance = award_coins(
@@ -302,6 +309,11 @@ async def update_user_status(
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if user.deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Withdrawn user cannot be restored or suspended from admin status controls",
+        )
     if "is_active" in payload:
         next_active = bool(payload["is_active"])
         if next_active:
@@ -380,7 +392,7 @@ async def list_projects_for_admin(
 
 @router.get("/reports", summary="관리자 신고 목록", description="신고 목록을 조회해 모더레이션 대상을 확인합니다.")
 async def list_reports_for_admin(
-    scope: str | None = Query(default=None, description="user/project/post/chat/all 중 하나"),
+    scope: str | None = Query(default=None, description="user/project/post/comment/chat/all 중 하나"),
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -400,6 +412,8 @@ async def list_reports_for_admin(
             query = query.filter(Report.target_project_id.isnot(None))
         elif scope == "post":
             query = query.filter(Report.target_post_id.isnot(None))
+        elif scope == "comment":
+            query = query.filter(Report.target_comment_id.isnot(None))
         elif scope == "chat":
             query = query.filter(Report.target_chat_room_id.isnot(None))
         else:
@@ -414,10 +428,13 @@ async def list_reports_for_admin(
                 "target_user_id": r.target_user_id,
                 "target_project_id": r.target_project_id,
                 "target_post_id": r.target_post_id,
+                "target_comment_id": r.target_comment_id,
                 "target_chat_room_id": r.target_chat_room_id,
                 "target_scope": (
                     "chat"
                     if r.target_chat_room_id is not None
+                    else "comment"
+                    if r.target_comment_id is not None
                     else "post"
                     if r.target_post_id is not None
                     else "project"
@@ -478,6 +495,8 @@ async def revoke_user_coins_for_admin(
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot adjust coins for withdrawn user")
 
     # perform revoke: create negative coin transaction
     amount = int(payload.amount)
@@ -841,6 +860,33 @@ async def admin_takedown_post(
     )
     db.commit()
     return success_response(data={"deleted": True, "post_id": post_id, "reason": reason})
+
+
+@router.post("/comments/{comment_id}/takedown", summary="관리자 댓글 강제 내리기", description="관리자가 특정 댓글을 강제로 내립니다 (soft delete).")
+async def admin_takedown_comment(
+    comment_id: int,
+    payload: AdminTakedownRequest | None = Body(default=None),
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    _ensure_admin(db, current_user_id)
+    comment = db.get(CommunityPostComment, comment_id)
+    if comment is None or comment.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
+    reason = payload.reason.strip() if payload and payload.reason else None
+    comment.deleted_at = datetime.now(timezone.utc)
+    target_title = comment.content.strip().replace("\n", " ")[:40] or f"댓글 #{comment.id}"
+    _notify_admin_takedown(
+        db,
+        user_id=comment.author_id,
+        target_type="community_comment",
+        target_id=comment.id,
+        target_title=target_title,
+        target_label="댓글",
+        reason=reason,
+    )
+    db.commit()
+    return success_response(data={"deleted": True, "comment_id": comment_id, "reason": reason})
 
 
 @router.post("/ideas/{idea_id}/takedown", summary="관리자 아이디어 강제 내리기", description="관리자가 특정 아이디어를 강제로 내립니다 (soft delete).")

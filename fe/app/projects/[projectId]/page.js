@@ -10,8 +10,10 @@ import {
   deleteProjectApi,
   revertProjectToIdeaApi,
   getMyApplicationsApi,
+  createReportApi,
 } from "../../../lib/api";
 import { SKILLS_LIST } from "../../../lib/profileOptions";
+import { useDialog, useToast } from "../../../components/AppFeedback";
 
 const DIFFICULTY_OPTIONS = [
   { value: "beginner", label: "입문" },
@@ -48,6 +50,8 @@ const getProjectMemberDisplayName = (member) => {
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const toast = useToast();
+  const { prompt } = useDialog();
   const projectId = params.projectId;
 
   const [project, setProject] = useState(null);
@@ -308,6 +312,35 @@ export default function ProjectDetailPage() {
       alert("프로젝트 삭제에 실패했습니다.");
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleReportProject = async () => {
+    if (!myProfile) {
+      router.push("/login");
+      return;
+    }
+
+    const reasonInput = await prompt({
+      title: "프로젝트 신고",
+      message: "관리자가 확인할 수 있도록 신고 사유를 입력해주세요.",
+      placeholder: "문제가 되는 이유를 입력하세요.",
+      confirmText: "신고하기",
+      required: true,
+      multiline: true,
+      tone: "danger",
+    });
+    if (reasonInput === null) return;
+
+    try {
+      await createReportApi({
+        target_type: "project",
+        target_id: Number(projectId),
+        reason: reasonInput.trim(),
+      });
+      toast.success("신고가 접수되었습니다.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "신고 접수에 실패했습니다.");
     }
   };
 
@@ -600,6 +633,15 @@ export default function ProjectDetailPage() {
                   className={`${isTeamFormed ? "mt-3" : "mt-6"} w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800`}
                 >
                   팀 채팅방 들어가기
+                </button>
+              )}
+
+              {!isLeader && (
+                <button
+                  onClick={handleReportProject}
+                  className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-600 transition hover:border-red-200 hover:text-red-600"
+                >
+                  프로젝트 신고
                 </button>
               )}
             </>

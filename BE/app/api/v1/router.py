@@ -12,6 +12,7 @@ from app.api.v1.endpoints import matching
 from app.api.v1.endpoints import notifications
 from app.api.v1.endpoints import projects
 from app.api.v1.endpoints import recommendations
+from app.api.v1.endpoints import reports
 from app.api.v1.endpoints import reviews
 from app.api.v1.endpoints import search
 from app.api.v1.endpoints import subscriptions
@@ -34,4 +35,5 @@ api_router.include_router(chats.router, prefix="/chats", tags=["chats"])
 api_router.include_router(coins.router, prefix="/coins", tags=["coins"])
 api_router.include_router(community.router, prefix="/community", tags=["community"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+api_router.include_router(reports.router, prefix="/reports", tags=["reports"])
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])

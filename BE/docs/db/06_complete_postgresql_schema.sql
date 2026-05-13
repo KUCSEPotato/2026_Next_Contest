@@ -36,6 +36,7 @@
 \ir 23_add_application_timestamps.sql
 \ir 24_community_reaction_recommend.sql
 \ir 25_backfill_user_avatar_s3_key.sql
-\ir 26_add_report_target_fields.sql
+\ir 26_add_report_target_scope_fields.sql
 \ir 27_add_coin_purchase_requests.sql
 \ir 28_add_user_suspension_fields.sql
+\ir 29_add_report_comment_target.sql

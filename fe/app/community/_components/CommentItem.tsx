@@ -33,6 +33,7 @@ export default function CommentItem({
   onReply,
   onEdit,
   onDelete,
+  onReport,
   currentUserId,
 }: {
   comment: CommentItemType;
@@ -41,6 +42,7 @@ export default function CommentItem({
   onReply: (parentId: number, content: string, isAnonymous: boolean) => void;
   onEdit: (commentId: number, content: string) => void;
   onDelete: (commentId: number) => void;
+  onReport: (commentId: number) => void;
   currentUserId: number;
 }) {
   const [replying, setReplying] = useState(false);
@@ -158,6 +160,14 @@ export default function CommentItem({
                 </button>
               </>
             )}
+            {!isOwn && (
+              <button
+                onClick={() => onReport(comment.id)}
+                className="text-[10px] text-gray-400 hover:text-red-500"
+              >
+                신고
+              </button>
+            )}
           </div>
 
           {replying && (
@@ -198,6 +208,7 @@ export default function CommentItem({
           onReply={onReply}
           onEdit={onEdit}
           onDelete={onDelete}
+          onReport={onReport}
           currentUserId={currentUserId}
         />
       ))}
