@@ -454,7 +454,13 @@ async def github_oauth_callback(
 
             tokens = _create_auth_tokens(user.id)
             access_token_value = tokens["access_token"]
-            redirect_url = f"{frontend_url}/signup?step=profile&via=github&access_token={access_token_value}&user_id={user.id}"
+            query = urlencode({
+                "step": "profile",
+                "via": "github",
+                "access_token": access_token_value,
+                "user_id": user.id,
+            })
+            redirect_url = f"{frontend_url}/signup?{query}"
             return RedirectResponse(url=redirect_url, status_code=302)
 
         withdrawn_email_user = db.query(User).filter(User.email == email, User.deleted_at.is_not(None)).first()
@@ -500,8 +506,14 @@ async def github_oauth_callback(
         tokens = _create_auth_tokens(user.id)
         access_token_value = tokens["access_token"]
         
-        # 프론트엔드로 리다이렉트
-        redirect_url = f"{frontend_url}/signup?step=2&via=github&access_token={access_token_value}&user_id={user.id}"
+        # 프론트엔드로 리다이렉트 (URL encoding 적용)
+        query = urlencode({
+            "step": "2",
+            "via": "github",
+            "access_token": access_token_value,
+            "user_id": user.id,
+        })
+        redirect_url = f"{frontend_url}/signup?{query}"
         
         return RedirectResponse(url=redirect_url, status_code=302)
     
