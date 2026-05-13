@@ -632,7 +632,14 @@ async def add_my_skill(
 
     exists = db.query(UserSkill).filter(UserSkill.user_id == current_user_id, UserSkill.skill_id == skill.id).first()
     if exists:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Skill already registered")
+        return success_response(
+            data={
+                "skill_id": skill.id,
+                "name": skill.name,
+                "proficiency": exists.proficiency,
+                "already_registered": True,
+            }
+        )
 
     user_skill = UserSkill(user_id=current_user_id, skill_id=skill.id, proficiency=proficiency)
     db.add(user_skill)
