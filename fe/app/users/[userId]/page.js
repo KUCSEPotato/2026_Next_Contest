@@ -61,6 +61,7 @@ export default function UserProfilePage() {
             : {
                 lead_projects: 0,
                 completed_projects: 0,
+                in_progress_projects: 0,
                 review_received: 0,
               }
         );
@@ -317,35 +318,45 @@ export default function UserProfilePage() {
 
           <div className="space-y-3">
             {visibleProjects.length ? (
-              visibleProjects.map((project) => (
-                <button
-                  key={project.id}
-                  onClick={() => router.push(`/projects/${project.id}`)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-left transition hover:border-red-300 hover:bg-red-50"
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="font-semibold text-slate-900">
-                        {project.title}
-                      </p>
+              visibleProjects.map((project) => {
+                const isLeader = isProjectLeader(project, profile?.id ?? userId);
 
-                      <p className="mt-1 text-sm text-slate-500">
-                        난이도 {project.difficulty || "미정"}
-                      </p>
+                return (
+                  <button
+                    key={project.id}
+                    onClick={() => router.push(`/projects/${project.id}`)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-left transition hover:border-red-300 hover:bg-red-50"
+                  >
+                    <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-center">
+                      <div>
+                        <p className="font-semibold text-slate-900">
+                          {project.title}
+                        </p>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                          난이도 {project.difficulty || "미정"}
+                        </p>
+                      </div>
+
+                      <div className="flex min-w-48 items-center justify-end gap-2">
+                        <span className={`rounded-full px-3 py-1 text-sm font-semibold ${getProjectStatusClassName(project.status)}`}>
+                          {formatProjectStatus(project.status)}
+                        </span>
+
+                        <span
+                          className={`min-w-14 rounded-full px-3 py-1 text-center text-sm font-semibold ${
+                            isLeader
+                              ? "bg-red-600 text-white"
+                              : "bg-slate-200 text-slate-600"
+                          }`}
+                        >
+                          {isLeader ? "리더" : "팀원"}
+                        </span>
+                      </div>
                     </div>
-
-                    <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-600">
-                      {project.status || "상태 없음"}
-                    </span>
-
-                    {isProjectLeader(project, profile?.id ?? userId) && (
-                      <span className="rounded-full bg-red-600 px-3 py-1 text-sm font-semibold text-white">
-                        리더
-                      </span>
-                    )}
-                  </div>
-                </button>
-              ))
+                  </button>
+                );
+              })
             ) : (
               <p className="text-sm text-slate-500">조건에 맞는 프로젝트가 없습니다.</p>
             )}
@@ -450,6 +461,30 @@ function isProjectLeader(project, userId) {
     project?.isLeader === true ||
     project?.role_in_project === "leader"
   );
+}
+
+function formatProjectStatus(status) {
+  const labels = {
+    planning: "모집중",
+    in_progress: "진행중",
+    started: "진행중",
+    paused: "일시중지",
+    completed: "완료",
+  };
+
+  return labels[status] || status || "상태 없음";
+}
+
+function getProjectStatusClassName(status) {
+  const classNames = {
+    planning: "bg-blue-50 text-blue-700",
+    in_progress: "bg-emerald-50 text-emerald-700",
+    started: "bg-emerald-50 text-emerald-700",
+    paused: "bg-amber-50 text-amber-700",
+    completed: "bg-slate-200 text-slate-700",
+  };
+
+  return classNames[status] || "bg-slate-100 text-slate-600";
 }
 
 function getVisibleProjects(projects, roleFilter, userId) {
