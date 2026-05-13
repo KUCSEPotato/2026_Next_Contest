@@ -899,7 +899,7 @@ function MemoirContent() {
               완료한 프로젝트에서 남긴 성장 기록
             </h1>
             <p style={{ margin: "12px 0 0", color: "var(--memoir-muted)", fontSize: 15 }}>
-              지금까지 완료한 프로젝트의 텃밭일기를 한눈에 모아봅니다.
+              지금까지 완료한 프로젝트의 정원을 한눈에 모아봅니다.
             </p>
           </section>
 
@@ -1067,7 +1067,7 @@ function MemoirContent() {
         </Section>
 
         {/* 3. 이런 프로젝트를 만들었어요 */}
-        <Section emoji="🗺️" label="프로젝트 소개" headline={<>나는 이런 프로젝트를<br />만들었어요</>}>
+        <Section emoji="🗺️" label="프로젝트 소개" headline={<>이런 프로젝트를 만들었어요</>}>
           <div style={{ fontSize: 14, color: "var(--memoir-rose-text)", lineHeight: 1.9, background: "var(--memoir-rose-soft-bg)", borderLeft: "3px solid var(--memoir-rose-border)", padding: "13px 16px", borderRadius: "0 12px 12px 0" }}>
             {projectDesc || "프로젝트 설명이 아직 없어요."}
           </div>
@@ -1081,7 +1081,7 @@ function MemoirContent() {
         </Section>
 
         {/* 4. n시간 동안 수행했어요 */}
-        <Section emoji="⏱️" label="투자한 시간" headline={<>나는 약 {hours}시간 동안<br />프로젝트를 수행했어요</>}>
+        <Section emoji="⏱️" label="투자한 시간" headline={<>약 {hours}시간 동안 프로젝트를 수행했어요</>}>
           <p style={{ fontSize: 52, fontWeight: 900, color: "var(--memoir-rose-text)", lineHeight: 1, margin: 0 }}>
             {hours}
             <span style={{ fontSize: 18, color: "var(--memoir-rose-muted)", marginLeft: 6 }}>시간</span>
@@ -1101,7 +1101,7 @@ function MemoirContent() {
         </Section>
 
         {/* 5. 이만큼 성장했어요 */}
-        <Section emoji="🌺" label="나의 성장" headline="나는 이만큼 성장했어요">
+        <Section emoji="🌺" label="나의 성장" headline="이만큼 성장했어요">
           {!growth ? (
             <div
               onClick={() => setModalOpen(true)}
@@ -1134,7 +1134,7 @@ function MemoirContent() {
         </Section>
 
         {/* 6. 이런 점을 느꼈어요 */}
-        <Section emoji="💬" label="AI 정제 회고" headline="나는 이런 점을 느꼈어요">
+        <Section emoji="💬" label="AI 정제 회고" headline="이런 점을 느꼈어요">
           {!growth || (!growth.good.trim() && !growth.bad.trim() && !growth.nextActions?.trim() && !growth.lessons?.trim()) ? (
             <p style={{ textAlign: "center", padding: 18, color: "var(--memoir-rose-muted)", fontSize: 13, lineHeight: 1.9, margin: 0 }}>
               위에서 성장 기록을 작성하면<br />AI가 느낀 점을 정리해드려요 🌹

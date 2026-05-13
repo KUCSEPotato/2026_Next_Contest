@@ -553,7 +553,7 @@ export default function PostDetailPage() {
           ) : comments.length === 0 ? (
             <p className="mb-4 text-center text-xs text-gray-400">첫 댓글을 남겨보세요 💬</p>
           ) : (
-            <div className="mb-4 divide-y divide-gray-50">
+            <div className="mb-4 divide-y divide-gray-50 dark:divide-slate-800/70">
               {comments.map((c) => (
                 <CommentItem
                   key={c.id}
@@ -575,7 +575,7 @@ export default function PostDetailPage() {
           )}
 
           {currentUser ? (
-            <div className="space-y-2 border-t border-gray-50 pt-4">
+            <div className="space-y-2 border-t border-gray-50 pt-4 dark:border-slate-800/70">
               <div className="flex items-center gap-2">
                 <Avatar user={currentUser} size={32} />
                 <input
