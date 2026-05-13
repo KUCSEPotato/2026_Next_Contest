@@ -69,7 +69,7 @@ export default function CommentItem({
   const myReaction = comment.user_reaction ?? null;
 
   return (
-    <div className={depth > 0 ? "ml-8 border-l-2 border-gray-100 pl-3" : ""}>
+    <div className={depth > 0 ? "ml-8 border-l-2 border-gray-100 pl-3 dark:border-slate-800/70" : ""}>
       <div className="flex gap-2 py-2">
         <Avatar user={comment.author} size={28} />
         <div className="flex-1">
