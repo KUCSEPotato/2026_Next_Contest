@@ -7,6 +7,8 @@ import {
   getCoinPackagesApi,
   getMyCoinBalanceApi,
   getMyCoinPurchaseRequestsApi,
+  getMyEntitlementApi,
+  getPaymentProductsApi,
 } from "../../lib/api";
 import { getToken } from "../../lib/auth";
 import { useDialog, useToast } from "../../components/AppFeedback";
@@ -43,6 +45,17 @@ function formatDate(value) {
   return date.toLocaleString("ko-KR", {
     year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function formatShortDate(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   });
 }
 
@@ -410,18 +423,46 @@ export default function CoinsPage() {
     () => requests.filter((r) => r.status === "pending"),
     [requests],
   );
+  const freeProduct = useMemo(
+    () =>
+      paymentProducts.find((product) => product.product_code === "FREE") || {
+        product_code: "FREE",
+        product_type: "FREE",
+        name: "무료",
+        price_krw: 0,
+        duration_days: null,
+        benefits: {
+          project_apply_daily_limit: 1,
+          community_write_daily_limit: 1,
+        },
+      },
+    [paymentProducts],
+  );
+  const subscriptionProducts = useMemo(
+    () => paymentProducts.filter((product) => product.product_type === "SUBSCRIPTION"),
+    [paymentProducts],
+  );
+  const passProducts = useMemo(
+    () => paymentProducts.filter((product) => product.product_type === "PASS"),
+    [paymentProducts],
+  );
+  const currentPlanCode = entitlement?.plan || entitlement?.product_code || "FREE";
 
   const loadCoins = useCallback(async () => {
     try {
       setLoading(true);
-      const [balanceResult, packagesResult, requestsResult] = await Promise.all([
+      const [balanceResult, packagesResult, requestsResult, productsResult, entitlementResult] = await Promise.all([
         getMyCoinBalanceApi(),
         getCoinPackagesApi(),
         getMyCoinPurchaseRequestsApi(),
+        getPaymentProductsApi(),
+        getMyEntitlementApi(),
       ]);
       setBalance(balanceResult.data?.waterdrop_balance ?? balanceResult.data?.coin_balance ?? 0);
       setPackages(packagesResult.data || []);
       setRequests(requestsResult.data || []);
+      setPaymentProducts(productsResult.data || []);
+      setEntitlement(entitlementResult.data || null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "물방울 정보를 불러오지 못했습니다.");
     } finally {
@@ -436,6 +477,44 @@ export default function CoinsPage() {
     }
     queueMicrotask(loadCoins);
   }, [loadCoins, router]);
+
+  const handlePaymentError = useCallback((err) => {
+    toast.error(err instanceof Error ? err.message : "결제를 시작하지 못했습니다.");
+  }, [toast]);
+
+  async function handleRequestProductPurchase(product) {
+    const ok = await confirm({
+      title: "이용권 구매 요청",
+      message: `${product.name} 구매 요청을 만들까요?\n금액: ${formatKrw(product.price_krw)}\n\n관리자가 결제 확인 후 이용권을 활성화합니다.`,
+      confirmText: "요청하기",
+      cancelText: "돌아가기",
+    });
+    if (!ok) return;
+
+    const noteInput = await prompt({
+      title: "구매 요청 메모",
+      message: "입금자명이나 확인에 필요한 메모가 있으면 남겨주세요.",
+      placeholder: "예: 입금자명 홍길동",
+      confirmText: "제출",
+      cancelText: "건너뛰기",
+      multiline: true,
+    });
+    if (noteInput === null) return;
+
+    try {
+      setProcessingPackage(product.product_code);
+      const result = await createCoinPurchaseRequestApi({
+        product_code: product.product_code,
+        note: noteInput.trim() || undefined,
+      });
+      setRequests((prev) => [result.data, ...prev]);
+      toast.success("이용권 구매 요청을 보냈습니다. 관리자가 확인 후 활성화합니다.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "이용권 구매 요청에 실패했습니다.");
+    } finally {
+      setProcessingPackage("");
+    }
+  }
 
   async function handleRequestPurchase(pkg) {
     const ok = await confirm({
