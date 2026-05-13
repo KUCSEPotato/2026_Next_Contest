@@ -2,7 +2,12 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { authenticatedFetch, getApiBaseUrl, saveAuthSession } from "../../../../lib/auth";
+import {
+  authenticatedFetch,
+  getApiBaseUrl,
+  loadCurrentUser,
+  saveAuthSession,
+} from "../../../../lib/auth";
 
 const API_BASE = getApiBaseUrl();
 
@@ -157,6 +162,39 @@ function GithubCallbackContent() {
   };
 
   useEffect(() => {
+    const accessToken = searchParams.get("access_token");
+    if (accessToken) {
+      queueMicrotask(async () => {
+        const refreshToken = searchParams.get("refresh_token");
+        const userId = searchParams.get("user_id");
+        const isNewUser = searchParams.get("is_new_user") === "1";
+
+        try {
+          saveAuthSession({
+            accessToken,
+            refreshToken,
+            userId,
+          });
+          const user = await loadCurrentUser();
+          saveAuthSession({
+            accessToken,
+            refreshToken,
+            userId: user?.id || userId,
+            user,
+          });
+          router.replace(isNewUser ? "/signup?step=2&via=github" : "/mainpage");
+        } catch (error) {
+          setStatus("error");
+          setErrorMsg(
+            error instanceof Error
+              ? error.message
+              : "GitHub 로그인 정보를 저장하지 못했습니다."
+          );
+        }
+      });
+      return;
+    }
+
     const linkToken = searchParams.get("link_token");
     if (linkToken) {
       queueMicrotask(() => {
