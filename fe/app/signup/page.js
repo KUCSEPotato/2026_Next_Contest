@@ -6,6 +6,7 @@ import Image from "next/image";
 import {
   authenticatedFetch,
   getApiBaseUrl,
+  getToken,
   loadCurrentUser,
   removeToken,
   saveAuthSession,
@@ -135,26 +136,31 @@ export default function SignupPage() {
     const via = params.get("via");
     const tokenFromQuery = params.get("access_token");
 
-    if (via !== "github" || !tokenFromQuery) {
+    if (via !== "github" || stepParam !== "2") {
       removeToken({ reason: "signup_entry" });
+      setAccessToken("");
+      setStep(1);
       return;
     }
 
     queueMicrotask(async () => {
+      const nextToken = tokenFromQuery || getToken();
+      if (!nextToken) {
+        removeToken({ reason: "missing_signup_token" });
+        setAccessToken("");
+        setStep(1);
+        window.history.replaceState(null, "", "/signup");
+        return;
+      }
+
       try {
         saveAuthSession({
-          accessToken: tokenFromQuery,
+          accessToken: nextToken,
           userId: params.get("user_id"),
         });
         await loadCurrentUser();
-        setAccessToken(tokenFromQuery);
-
-        // 신규 유저는 온보딩 Step2, 기존 유저는 메인으로 이동
-        if (stepParam === "2") {
-          setStep(2);
-        } else if (stepParam === "profile") {
-          router.push("/mainpage");
-        }
+        setAccessToken(nextToken);
+        setStep(2);
       } catch (error) {
         console.error(error);
         removeToken({ reason: "invalid_signup_token" });
@@ -166,6 +172,7 @@ export default function SignupPage() {
 
   // ── GitHub OAuth ─────────────────────────────────────────────────────────
   const handleGithubLogin = () => {
+    removeToken({ reason: "github_signup_start" });
     const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
     const redirectUri = encodeURIComponent(
       process.env.NEXT_PUBLIC_GITHUB_REDIRECT_URI

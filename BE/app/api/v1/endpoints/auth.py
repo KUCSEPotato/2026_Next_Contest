@@ -350,7 +350,14 @@ async def github_oauth_login(payload: OAuthGithubLoginRequest, db: Session = Dep
             user.avatar_url = avatar_url
         user.is_verified = True
         db.commit()
-        return success_response(data=_create_auth_tokens(user.id))
+        db.refresh(user)
+        return success_response(
+            data={
+                **_create_auth_tokens(user.id),
+                "user": _serialize_user_onboarding(user),
+                "is_new_user": False,
+            },
+        )
 
     withdrawn_email_user = db.query(User).filter(User.email == email, User.deleted_at.is_not(None)).first()
     if mode == "signup":

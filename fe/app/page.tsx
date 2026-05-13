@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AUTH_CHANGED_EVENT, getToken, removeToken } from "../lib/auth";
+import { AUTH_CHANGED_EVENT, getToken, logoutSession } from "../lib/auth";
 
 export default function HomePage() {
   const [token, setToken] = useState<string | null>(null);
@@ -19,8 +19,8 @@ export default function HomePage() {
     };
   }, []);
 
-  const handleLogout = () => {
-    removeToken();
+  const handleLogout = async () => {
+    await logoutSession({ reason: "logout" });
     setToken(null);
   };
 

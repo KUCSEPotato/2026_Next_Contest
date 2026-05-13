@@ -163,6 +163,9 @@ export async function refreshAccessToken() {
         if (!accessToken) {
           throw new Error("Refresh response did not include an access token");
         }
+        if (getRefreshToken() !== refreshToken) {
+          return null;
+        }
         saveToken(accessToken);
         return accessToken;
       })
@@ -176,6 +179,26 @@ export async function refreshAccessToken() {
   }
 
   return refreshPromise;
+}
+
+export async function logoutSession(options = {}) {
+  const accessToken = getToken();
+  const refreshToken = getRefreshToken();
+
+  removeToken(options);
+
+  try {
+    await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+  } catch {
+    // Local logout should still complete even when the server is unreachable.
+  }
 }
 
 export async function getValidAccessToken() {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
@@ -35,6 +35,10 @@ export default function LoginPage() {
   const [newPassword, setNewPassword] = useState("");
   const [isFinding, setIsFinding] = useState(false);
 
+  useEffect(() => {
+    removeToken({ reason: "login_entry" });
+  }, []);
+
   const closeModal = () => {
     setModalMode(null);
     setFindEmail("");
@@ -45,6 +49,7 @@ export default function LoginPage() {
   };
 
   const handleGithubLogin = () => {
+    removeToken({ reason: "github_login_start" });
     const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
     const redirectUri =
       process.env.NEXT_PUBLIC_GITHUB_REDIRECT_URI ||

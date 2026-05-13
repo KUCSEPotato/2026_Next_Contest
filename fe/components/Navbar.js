@@ -8,6 +8,7 @@ import {
   getStoredUser,
   getToken,
   loadCurrentUser,
+  logoutSession,
   refreshAccessToken,
   removeToken,
   updateStoredUser,
@@ -140,8 +141,8 @@ export default function Navbar() {
     return null;
   }
 
-  const handleLogout = () => {
-    removeToken();
+  const handleLogout = async () => {
+    await logoutSession({ reason: "logout" });
     setToken(null);
     setUser(null);
     setAuthStatus("anonymous");
@@ -177,25 +178,26 @@ export default function Navbar() {
             <>
               <button
                 onClick={() => router.push("/coins")}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-slate-700 transition hover:border-sky-200 hover:text-sky-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-sky-500 dark:hover:text-sky-300"
+                className="inline-flex items-center gap-2 rounded-xl border border-sky-100 bg-sky-50 px-3.5 py-2 text-sm font-black text-sky-700 shadow-sm transition hover:border-sky-300 hover:bg-white hover:text-sky-700 dark:border-sky-800/60 dark:bg-sky-950/40 dark:text-sky-200 dark:hover:border-sky-500"
                 aria-label="물방울 상점"
                 title="물방울 상점"
               >
                 <svg
                   aria-hidden="true"
                   viewBox="0 0 24 24"
-                  className="h-4 w-4"
+                  className="h-5 w-5"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="2"
+                  strokeWidth="2.4"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
                   <path d="M6 8h12l-1 12H7L6 8Z" />
                   <path d="M9 8a3 3 0 0 1 6 0" />
-                  <path d="M9 13h.01" />
-                  <path d="M15 13h.01" />
+                  <path d="M9.5 13h5" />
+                  <path d="M10 16h4" />
                 </svg>
+                <span>상점</span>
               </button>
               <button
                 onClick={() => router.push("/mypage")}

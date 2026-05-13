@@ -713,17 +713,17 @@ export default function ChatRoomPage() {
             </div>
           )}
 
-          <section className="flex-1 space-y-3 overflow-y-auto p-4">
+          <section className="flex-1 space-y-3 overflow-y-auto px-4 pb-4">
             {todoLoading ? (
-              <p className="text-sm text-slate-500">Todo를 불러오는 중...</p>
+              <p className="pt-4 text-sm text-slate-500">Todo를 불러오는 중...</p>
             ) : todos.length === 0 ? (
-              <p className="text-sm leading-6 text-slate-500">
+              <p className="pt-4 text-sm leading-6 text-slate-500">
                 아직 Todo가 없습니다. 직접 추가하거나 AI 생성 버튼을 눌러 시작해보세요.
               </p>
             ) : (
               todoGroups.map((group) => (
                 <div key={group.stage} className="space-y-2">
-                  <div className="sticky top-0 z-10 bg-white/95 py-1 backdrop-blur">
+                  <div className="sticky top-0 z-10 -mx-4 bg-white/95 px-4 py-2 backdrop-blur">
                     <h3 className="text-xs font-bold text-red-600">
                       {group.label}
                     </h3>
