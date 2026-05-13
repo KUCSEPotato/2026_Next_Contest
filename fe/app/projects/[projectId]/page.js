@@ -567,12 +567,14 @@ export default function ProjectDetailPage() {
                 </button>
               )}
 
-              <button
-                onClick={() => router.push(`/projects/${projectId}/chat`)}
-                className={`${isProjectMember && isTeamFormed ? "mt-3" : "mt-6"} w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800`}
-              >
-                팀 채팅방 들어가기
-              </button>
+              {isProjectMember && (
+                <button
+                  onClick={() => router.push(`/projects/${projectId}/chat`)}
+                  className={`${isTeamFormed ? "mt-3" : "mt-6"} w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800`}
+                >
+                  팀 채팅방 들어가기
+                </button>
+              )}
             </>
           )}
         </section>

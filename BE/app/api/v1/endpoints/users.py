@@ -13,6 +13,7 @@ from app.models import Project
 from app.models import ProjectMember
 from app.models import Review
 from app.models import Skill
+from app.models import Todo
 from app.models import User
 from app.models import UserInterest
 from app.models import UserRatingAggregate
@@ -25,6 +26,25 @@ from app.services.s3_upload import get_s3_service
 from app.services.s3_upload import resolve_avatar_url
 
 router = APIRouter()
+
+
+def _calculate_project_progress_percent(db: Session, project_id: int) -> float:
+    total = (
+        db.query(func.count(Todo.id))
+        .filter(Todo.project_id == project_id)
+        .scalar()
+        or 0
+    )
+    if total == 0:
+        return 0.0
+
+    done = (
+        db.query(func.count(Todo.id))
+        .filter(Todo.project_id == project_id, Todo.status == "done")
+        .scalar()
+        or 0
+    )
+    return round((done / total) * 100, 2)
 
 
 def _get_avatar_url(user: User | None) -> str | None:
@@ -401,7 +421,7 @@ async def get_my_projects(
             "status": project.status,
             "difficulty": project.difficulty,
             "category": project.category,
-            "progress_percent": float(project.progress_percent),
+            "progress_percent": _calculate_project_progress_percent(db, project.id),
             "created_at": project.created_at.isoformat() if project.created_at else None,
             "can_discard": can_discard,
             "can_chat": project.id in active_chat_project_ids,
@@ -812,7 +832,7 @@ async def get_my_applications(
                 "project_status": project.status,
                 "difficulty": project.difficulty,
                 "category": project.category,
-                "progress_percent": float(project.progress_percent),
+                "progress_percent": _calculate_project_progress_percent(db, project.id),
                 "applicant_count": applicant_count,
                 "current_members": current_members,
                 "max_members": max_members,
