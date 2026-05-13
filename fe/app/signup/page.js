@@ -371,7 +371,22 @@ export default function SignupPage() {
       <div className="w-full max-w-lg rounded-2xl bg-white p-8 shadow-lg">
         {/* 로고 */}
         <div className="mb-4 flex justify-center">
-          <Image src="/logo_colored.svg" alt="Devory 로고" width={100} height={72} className="h-auto w-[100px]" />
+          <Image
+            src="/logo_colored.svg"
+            alt="Devory 로고"
+            width={100}
+            height={72}
+            className="h-auto w-[100px] dark:hidden"
+            priority
+          />
+          <Image
+            src="/logo_colored_white.svg"
+            alt="Devory 로고"
+            width={100}
+            height={72}
+            className="hidden h-auto w-[100px] dark:block"
+            priority
+          />
         </div>
 
         {/* 스텝 인디케이터 */}
