@@ -40,6 +40,7 @@ export default function MyPage() {
   const [appliedProjects, setAppliedProjects] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [projectStatusFilter, setProjectStatusFilter] = useState("all");
+  const [projectRoleFilter, setProjectRoleFilter] = useState("all");
   const [projectSortOrder, setProjectSortOrder] = useState("latest");
 
   const [loading, setLoading] = useState(true);
@@ -456,6 +457,8 @@ export default function MyPage() {
   const visibleProjects = getVisibleProjects(
     projectHistory,
     projectStatusFilter,
+    projectRoleFilter,
+    profile?.id,
     projectSortOrder
   );
   const rawAvatarUrl = profile?.avatar_url || profile?.avatarUrl || "";
@@ -775,6 +778,16 @@ export default function MyPage() {
               </select>
 
               <select
+                value={projectRoleFilter}
+                onChange={(e) => setProjectRoleFilter(e.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 outline-none transition focus:border-red-500"
+              >
+                <option value="all">전체 역할</option>
+                <option value="leader">내가 리더</option>
+                <option value="member">팀원으로 참여</option>
+              </select>
+
+              <select
                 value={projectSortOrder}
                 onChange={(e) => setProjectSortOrder(e.target.value)}
                 className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 outline-none transition focus:border-red-500"
@@ -818,6 +831,12 @@ export default function MyPage() {
                       <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-600">
                         {project.status || "상태 없음"}
                       </span>
+
+                      {isProjectLeader(project, profile?.id) && (
+                        <span className="rounded-full bg-red-600 px-3 py-1 text-sm font-semibold text-white">
+                          내가 리더
+                        </span>
+                      )}
 
                       {project.historyType === "applied" && (
                         <span className="rounded-full bg-red-50 px-3 py-1 text-sm font-semibold text-red-600">
@@ -1103,11 +1122,43 @@ function buildProjectHistory(projects, applications) {
   return [...projects, ...normalizedApplications];
 }
 
-function getVisibleProjects(projects, statusFilter, sortOrder) {
+function getProjectLeaderId(project) {
+  return (
+    project?.leader_id ??
+    project?.leaderId ??
+    project?.leader?.id ??
+    project?.owner_id ??
+    project?.owner?.id ??
+    project?.created_by ??
+    project?.creator_id
+  );
+}
+
+function isProjectLeader(project, userId) {
+  const leaderId = Number(getProjectLeaderId(project));
+  const currentUserId = Number(userId);
+
+  if (Number.isFinite(leaderId) && Number.isFinite(currentUserId)) {
+    return leaderId === currentUserId;
+  }
+
+  return (
+    project?.is_leader === true ||
+    project?.isLeader === true ||
+    project?.role_in_project === "leader"
+  );
+}
+
+function getVisibleProjects(projects, statusFilter, roleFilter, userId, sortOrder) {
   return [...projects]
     .filter((project) =>
       statusFilter === "all" ? true : project.status === statusFilter
     )
+    .filter((project) => {
+      if (roleFilter === "leader") return isProjectLeader(project, userId);
+      if (roleFilter === "member") return !isProjectLeader(project, userId);
+      return true;
+    })
     .sort((a, b) => {
       if (sortOrder === "progress") {
         return (b.progress_percent ?? 0) - (a.progress_percent ?? 0);
