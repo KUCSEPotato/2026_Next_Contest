@@ -23,6 +23,38 @@ const TODO_STAGES = [
   { value: "verification", label: "검증" },
 ];
 
+const CHAT_READ_COUNTS_STORAGE_KEY = "devory_chat_read_counts";
+
+const getStoredChatReadCounts = () => {
+  if (typeof window === "undefined") return {};
+
+  try {
+    return JSON.parse(localStorage.getItem(CHAT_READ_COUNTS_STORAGE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+};
+
+const markChatRoomRead = (roomId, messageCount) => {
+  if (typeof window === "undefined" || !roomId) return;
+
+  const readCounts = getStoredChatReadCounts();
+  readCounts[String(roomId)] = messageCount;
+  localStorage.setItem(CHAT_READ_COUNTS_STORAGE_KEY, JSON.stringify(readCounts));
+};
+
+const getDoneAssignmentNames = (todo) =>
+  (todo?.assignments || [])
+    .filter((assignment) => assignment.is_done)
+    .map(
+      (assignment) =>
+        assignment.nickname ||
+        assignment.user?.nickname ||
+        assignment.name ||
+        assignment.user?.name ||
+        `User #${assignment.user_id}`
+    );
+
 export default function ChatRoomPage() {
   const params = useParams();
   const router = useRouter();
@@ -196,6 +228,10 @@ export default function ChatRoomPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "auto" });
   }, [messages]);
+
+  useEffect(() => {
+    markChatRoomRead(roomId, messages.length);
+  }, [messages.length, roomId]);
 
   const handleSend = async () => {
     if (!input.trim()) {
@@ -662,6 +698,7 @@ export default function ChatRoomPage() {
                     const isEditing = editingTodoId === todo.id;
                     const description = getVisibleTodoDescription(todo);
                     const isExpanded = expandedTodoIds.includes(todo.id);
+                    const doneAssignmentNames = getDoneAssignmentNames(todo);
 
                     return (
                       <div
@@ -724,6 +761,12 @@ export default function ChatRoomPage() {
                                 {description && isExpanded && (
                                   <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
                                     {description}
+                                  </p>
+                                )}
+
+                                {doneAssignmentNames.length > 0 && (
+                                  <p className="mt-2 text-xs font-semibold text-red-600">
+                                    수행: {doneAssignmentNames.join(", ")}
                                   </p>
                                 )}
                               </>

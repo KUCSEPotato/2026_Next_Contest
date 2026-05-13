@@ -96,7 +96,12 @@ export async function deletePost(postId: number): Promise<void> {
 export async function reactToPost(
   postId: number,
   reactionType: ReactionType
-): Promise<{ action: "added" | "removed"; reaction_type: ReactionType }> {
+): Promise<{
+  action: "added" | "removed" | "updated";
+  reaction_type: ReactionType;
+  reaction_stats?: { recommend: number; not_recommend: number };
+  user_reaction?: ReactionType | null;
+}> {
   const res = await authenticatedFetch(`${BASE}/${postId}/reactions`, {
     method: "POST",
     headers: authHeaders(),
@@ -213,7 +218,12 @@ export async function reactToComment(
   postId: number,
   commentId: number,
   reactionType: ReactionType
-): Promise<{ action: "added" | "removed"; reaction_type: ReactionType }> {
+): Promise<{
+  action: "added" | "removed" | "updated";
+  reaction_type: ReactionType;
+  reaction_stats?: { recommend: number; not_recommend: number };
+  user_reaction?: ReactionType | null;
+}> {
   const res = await authenticatedFetch(`${BASE}/${postId}/comments/${commentId}/reactions`, {
     method: "POST",
     headers: authHeaders(),

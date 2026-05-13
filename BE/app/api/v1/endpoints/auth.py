@@ -32,6 +32,7 @@ from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
 from app.models import User
 from app.schemas.auth import ForgotPasswordRequest
+from app.schemas.auth import FindLoginIdRequest
 from app.schemas.auth import LoginRequest
 from app.schemas.auth import LogoutRequest
 from app.schemas.auth import OAuthGithubLoginRequest
@@ -90,7 +91,31 @@ def _load_active_user(db: Session, user_id: int) -> User:
     user = db.get(User, user_id)
     if user is None or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
     return user
+
+
+def _reject_withdrawn_user(user: User | None) -> None:
+    if user is not None and (user.deleted_at is not None or not user.is_active):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="탈퇴한 계정입니다. 다시 가입하려면 회원가입에서 시작해주세요.",
+        )
+
+
+def _release_withdrawn_user_identity(user: User | None) -> bool:
+    if user is None or user.deleted_at is None:
+        return False
+
+    suffix = f"deleted_{user.id}_{int(datetime.now(timezone.utc).timestamp())}"
+    user.email = f"{suffix}@deleted.local"
+    user.nickname = suffix[:50]
+    user.github_id = None
+    user.google_id = None
+    user.password_hash = None
+    user.is_active = False
+    return True
 
 
 def _get_avatar_url(user: User) -> str | None:
@@ -161,11 +186,19 @@ async def signup(payload: SignupRequest, db: Session = Depends(get_db)) -> dict:
     phone_number = payload.phone_number
     password = payload.password
 
+    released_identity = False
+    deleted_email_user = db.query(User).filter(User.email == email, User.deleted_at.is_not(None)).first()
+    released_identity = _release_withdrawn_user_identity(deleted_email_user) or released_identity
+    deleted_login_user = db.query(User).filter(User.nickname == login_id, User.deleted_at.is_not(None)).first()
+    released_identity = _release_withdrawn_user_identity(deleted_login_user) or released_identity
+    if released_identity:
+        db.flush()
+
     if db.query(User).filter(User.email == email, User.deleted_at.is_(None)).first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists")
 
     if db.query(User).filter(User.nickname == login_id, User.deleted_at.is_(None)).first():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 존재하는 닉네임입니다.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="중복된 아이디입니다.")
 
     user = User(
         email=email,
@@ -239,21 +272,39 @@ async def github_oauth_login(payload: OAuthGithubLoginRequest, db: Session = Dep
     github_id = profile.get("provider_id")
     email = profile["email"]
     nickname = payload.nickname
+    mode = payload.mode or "login"
     github_login = profile.get("login")
     avatar_url = profile.get("avatar_url")
 
     user = None
+    released_identity = False
     if github_id:
+        withdrawn_github_user = db.query(User).filter(User.github_id == github_id, User.deleted_at.is_not(None)).first()
+        if mode == "signup":
+            released_identity = _release_withdrawn_user_identity(withdrawn_github_user) or released_identity
+        else:
+            _reject_withdrawn_user(withdrawn_github_user)
         user = db.query(User).filter(User.github_id == github_id, User.deleted_at.is_(None)).first()
     if user is not None:
+        _reject_withdrawn_user(user)
         if avatar_url and not user.avatar_url:
             user.avatar_url = avatar_url
         user.is_verified = True
         db.commit()
         return success_response(data=_create_auth_tokens(user.id))
 
+    withdrawn_email_user = db.query(User).filter(User.email == email, User.deleted_at.is_not(None)).first()
+    if mode == "signup":
+        released_identity = _release_withdrawn_user_identity(withdrawn_email_user) or released_identity
+    else:
+        _reject_withdrawn_user(withdrawn_email_user)
+
+    if released_identity:
+        db.flush()
+
     existing_email_user = db.query(User).filter(User.email == email, User.deleted_at.is_(None)).first()
     if existing_email_user is not None:
+        _reject_withdrawn_user(existing_email_user)
         if existing_email_user.github_id and existing_email_user.github_id != github_id:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email account is linked to another GitHub account")
         return success_response(data=_create_github_link_confirmation(existing_email_user, profile))
@@ -292,6 +343,9 @@ async def confirm_existing_github_link(
     github_id = token_data.get("github_id")
     if not github_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid GitHub account id")
+
+    withdrawn = db.query(User).filter(User.github_id == github_id, User.deleted_at.is_not(None)).first()
+    _reject_withdrawn_user(withdrawn)
 
     existing = db.query(User).filter(User.github_id == github_id, User.id != user.id, User.deleted_at.is_(None)).first()
     if existing:
@@ -349,14 +403,22 @@ async def github_oauth_callback(
         email = profile["email"]
         github_login = profile.get("login")
         avatar_url = profile.get("avatar_url")
+        mode = "signup" if state == "signup" else "login"
         
         frontend_url = settings.frontend_url or "http://localhost:3000"
 
         # 기존 유저 찾기
         user = None
+        released_identity = False
         if github_id:
+            withdrawn_github_user = db.query(User).filter(User.github_id == github_id, User.deleted_at.is_not(None)).first()
+            if mode == "signup":
+                released_identity = _release_withdrawn_user_identity(withdrawn_github_user) or released_identity
+            else:
+                _reject_withdrawn_user(withdrawn_github_user)
             user = db.query(User).filter(User.github_id == github_id, User.deleted_at.is_(None)).first()
         if user is not None:
+            _reject_withdrawn_user(user)
             if avatar_url and not user.avatar_url:
                 user.avatar_url = avatar_url
             user.is_verified = True
@@ -367,8 +429,18 @@ async def github_oauth_callback(
             redirect_url = f"{frontend_url}/signup?step=profile&via=github&access_token={access_token_value}&user_id={user.id}"
             return RedirectResponse(url=redirect_url, status_code=302)
 
+        withdrawn_email_user = db.query(User).filter(User.email == email, User.deleted_at.is_not(None)).first()
+        if mode == "signup":
+            released_identity = _release_withdrawn_user_identity(withdrawn_email_user) or released_identity
+        else:
+            _reject_withdrawn_user(withdrawn_email_user)
+
+        if released_identity:
+            db.flush()
+
         existing_email_user = db.query(User).filter(User.email == email, User.deleted_at.is_(None)).first()
         if existing_email_user is not None:
+            _reject_withdrawn_user(existing_email_user)
             if existing_email_user.github_id and existing_email_user.github_id != github_id:
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email account is linked to another GitHub account")
 
@@ -444,8 +516,12 @@ async def google_oauth_login(payload: OAuthGoogleLoginRequest, db: Session = Dep
 
     user = None
     if google_id:
+        withdrawn_google_user = db.query(User).filter(User.google_id == google_id, User.deleted_at.is_not(None)).first()
+        _reject_withdrawn_user(withdrawn_google_user)
         user = db.query(User).filter(User.google_id == google_id, User.deleted_at.is_(None)).first()
     if user is None:
+        withdrawn_email_user = db.query(User).filter(User.email == email, User.deleted_at.is_not(None)).first()
+        _reject_withdrawn_user(withdrawn_email_user)
         user = db.query(User).filter(User.email == email, User.deleted_at.is_(None)).first()
 
     if user is None:
@@ -461,6 +537,7 @@ async def google_oauth_login(payload: OAuthGoogleLoginRequest, db: Session = Dep
         db.commit()
         db.refresh(user)
     else:
+        _reject_withdrawn_user(user)
         if google_id and user.google_id != google_id:
             user.google_id = google_id
         if avatar_url and not user.avatar_url:
@@ -512,6 +589,9 @@ async def link_github_oauth(
     if not github_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid GitHub account id")
 
+    withdrawn = db.query(User).filter(User.github_id == github_id, User.deleted_at.is_not(None)).first()
+    _reject_withdrawn_user(withdrawn)
+
     existing = db.query(User).filter(User.github_id == github_id, User.id != user.id, User.deleted_at.is_(None)).first()
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="GitHub account already linked to another user")
@@ -553,6 +633,9 @@ async def link_google_oauth(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OAuth account email must match your account email")
     if not google_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Google account id")
+
+    withdrawn = db.query(User).filter(User.google_id == google_id, User.deleted_at.is_not(None)).first()
+    _reject_withdrawn_user(withdrawn)
 
     existing = db.query(User).filter(User.google_id == google_id, User.id != user.id, User.deleted_at.is_(None)).first()
     if existing:
@@ -630,7 +713,7 @@ async def logout(payload: LogoutRequest, authorization: str | None = Header(defa
 
 
 @router.post("/token/refresh", summary="Access Token 재발급", description="유효한 Refresh 토큰으로 새 Access 토큰을 발급합니다.")
-async def refresh_token(payload: TokenRefreshRequest) -> dict:
+async def refresh_token(payload: TokenRefreshRequest, db: Session = Depends(get_db)) -> dict:
     """토큰 재발급 API.
 
     Swagger 테스트 방법:
@@ -649,7 +732,23 @@ async def refresh_token(payload: TokenRefreshRequest) -> dict:
     if token_payload.get("type") != "refresh":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token type")
 
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unknown user")
+    _reject_withdrawn_user(user)
+
     return success_response(data={"access_token": create_access_token(user_id), "token_type": "bearer"})
+
+
+@router.post("/login-id/find", summary="아이디 찾기", description="가입 이메일로 로그인 아이디를 조회합니다.")
+async def find_login_id(payload: FindLoginIdRequest, db: Session = Depends(get_db)) -> dict:
+    user = db.query(User).filter(User.email == payload.email, User.deleted_at.is_(None)).first()
+    return success_response(
+        data={
+            "login_id": user.nickname if user else None,
+            "message": "If account exists, login id was found",
+        },
+    )
 
 
 @router.post("/password/forgot", summary="비밀번호 재설정 요청", description="계정이 존재하면 임시 재설정 토큰을 발급합니다.")
@@ -663,7 +762,7 @@ async def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(
     email = payload.email
 
     user = db.query(User).filter(User.email == email, User.deleted_at.is_(None)).first()
-    if user:
+    if user and user.is_active:
         token = secrets.token_urlsafe(32)
         set_password_reset_token(token, user.id, datetime.now(timezone.utc) + timedelta(minutes=15))
     else:
@@ -690,8 +789,10 @@ async def reset_password(payload: ResetPasswordRequest, db: Session = Depends(ge
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token")
 
     user = db.get(User, token_data["user_id"])
-    if user is None:
+    if user is None or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
 
     user.password_hash = hash_password(new_password)
     db.commit()
@@ -716,6 +817,8 @@ async def get_my_auth_info(
     user = db.get(User, current_user_id)
     if user is None or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
 
     return success_response(
         data={

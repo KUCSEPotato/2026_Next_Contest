@@ -34,7 +34,7 @@ function GithubCallbackContent() {
   const [errorMsg, setErrorMsg] = useState("");
   const [linkInfo, setLinkInfo] = useState(null);
 
-  const handleGithubCallback = useCallback(async (code) => {
+  const handleGithubCallback = useCallback(async (code, mode = "login") => {
     try {
       const res = await fetch(
         `${API_BASE}/api/v1/auth/oauth/github`,
@@ -43,7 +43,7 @@ function GithubCallbackContent() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ code }),
+          body: JSON.stringify({ code, mode }),
         }
       );
 
@@ -135,6 +135,7 @@ function GithubCallbackContent() {
     }
 
     const code = searchParams.get("code");
+    const mode = searchParams.get("state") === "signup" ? "signup" : "login";
     const error = searchParams.get("error");
 
     if (error || !code) {
@@ -146,7 +147,7 @@ function GithubCallbackContent() {
     }
 
     queueMicrotask(() => {
-      handleGithubCallback(code);
+      handleGithubCallback(code, mode);
     });
   }, [handleGithubCallback, searchParams]);
 

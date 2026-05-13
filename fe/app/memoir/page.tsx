@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import ProgressBloom from "../../components/ProgressBloom";
 import {
   createProjectRetrospectiveApi,
   getMyProjectsApi,
@@ -11,6 +12,7 @@ import {
   getProjectRetrospectivesApi,
   getProjectReviewsApi,
   getProjectsApi,
+  getTodosApi,
   refineProjectMemoirApi,
   updateProjectRetrospectiveApi,
 } from "../../lib/api";
@@ -43,6 +45,8 @@ interface ProjectData {
   difficulty?: string | null;
   progress_percent?: number;
   created_at?: string | null;
+  updated_at?: string | null;
+  completed_at?: string | null;
   techStack?: string[];
   currentMembers?: number;
   maxMembers?: number;
@@ -52,6 +56,19 @@ interface ProgressData {
   todo_total: number;
   todo_done: number;
   progress_percent: number;
+}
+
+interface TodoAssignment {
+  user_id?: number;
+  is_done?: boolean;
+}
+
+interface TodoData {
+  id: number;
+  title: string;
+  status?: string | null;
+  completed_at?: string | null;
+  assignments?: TodoAssignment[];
 }
 
 interface ProjectReview {
@@ -198,6 +215,20 @@ function stringifyLessonsLearned(data: GrowthData) {
 }
 
 /* ── 서수 (1번째, 2번째…) ── */
+function getProjectRecentTime(project: ProjectData): number {
+  const value = project.completed_at || project.updated_at || project.created_at;
+  const time = value ? new Date(value).getTime() : NaN;
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function sortProjectsByRecent(projects: ProjectData[]): ProjectData[] {
+  return [...projects].sort((a, b) => {
+    const timeDiff = getProjectRecentTime(b) - getProjectRecentTime(a);
+    if (timeDiff !== 0) return timeDiff;
+    return Number(b.id) - Number(a.id);
+  });
+}
+
 function ordinalKo(n: number) {
   return `${n}번째`;
 }
@@ -375,6 +406,7 @@ function GrowthModal({
     lessons.trim() ||
     nextActions.trim()
   );
+  const hasAiMemoir = Boolean(aiMemoir.trim());
 
   return (
     <div
@@ -386,6 +418,10 @@ function GrowthModal({
         <p style={{ fontSize: 20, fontWeight: 800, color: "#5c0a0a", marginBottom: 4 }}>🌹 성장 기록하기</p>
         <p style={{ fontSize: 13, color: "#c08080", marginBottom: 22 }}>
           새롭게 도전한 점과 회고 내용을 수정한 뒤 AI 요약본을 다시 만들 수 있어요.
+        </p>
+
+        <p style={{ fontSize: 12, color: "#c08080", lineHeight: 1.6, margin: "-6px 0 14px" }}>
+          AI 요약을 받은 뒤에도 새롭게 도전한 점을 수정하고 다시 요약받을 수 있어요.
         </p>
 
         {[
@@ -441,6 +477,16 @@ function GrowthModal({
           </div>
         ))}
 
+        <div style={{ background: "#fff8f8", border: "1px solid #f4cccc", borderRadius: 14, padding: 14, marginBottom: 12 }}>
+          <p style={{ fontSize: 13, fontWeight: 800, color: "#8f1d1d", marginBottom: 6 }}>
+            AI 요약과 저장은 달라요
+          </p>
+          <p style={{ fontSize: 12, color: "#a85555", lineHeight: 1.7, margin: 0 }}>
+            위 내용을 수정한 뒤 <strong>AI에게 요약 부탁하기</strong>를 누르면 요약본만 새로 만들어져요.
+            최종으로 남기려면 아래의 <strong>수확일기 저장하기</strong>를 눌러 저장해주세요.
+          </p>
+        </div>
+
         <button
           onClick={handleGenerate}
           disabled={saving || generating || !canGenerateMemoir}
@@ -460,12 +506,12 @@ function GrowthModal({
         >
           {generating
             ? "AI 요약본 만드는 중..."
-            : aiMemoir.trim()
-              ? "AI 요약본 다시 만들기"
-              : "AI 요약본 만들기"}
+            : hasAiMemoir
+              ? "수정 내용으로 AI에게 다시 요약 부탁하기"
+              : "AI에게 요약 부탁하기"}
         </button>
 
-        {aiMemoir.trim() && (
+        {hasAiMemoir && (
           <div style={{ marginBottom: 14 }}>
             <p style={{ fontSize: 12, color: "#a83030", fontWeight: 700, marginBottom: 9 }}>
               AI 회고록 초안
@@ -481,6 +527,15 @@ function GrowthModal({
             />
           </div>
         )}
+
+        <div style={{ borderTop: "1px solid #f2d6d6", paddingTop: 12, marginTop: 4 }}>
+          <p style={{ fontSize: 12, color: "#8f1d1d", fontWeight: 800, marginBottom: 4 }}>
+            최종 저장
+          </p>
+          <p style={{ fontSize: 12, color: "#a85555", lineHeight: 1.7, margin: "0 0 10px" }}>
+            AI 요약본을 확인한 뒤 이 버튼을 눌러야 수확일기에 저장돼요.
+          </p>
+        </div>
 
         <button
           onClick={handleSave}
@@ -533,6 +588,7 @@ function MemoirContent() {
   const [modalOpen, setModalOpen]           = useState(false);
   const [project, setProject]               = useState<ProjectData | null>(null);
   const [progress, setProgress]             = useState<ProgressData | null>(null);
+  const [todos, setTodos]                   = useState<TodoData[]>([]);
   const [reviews, setReviews]               = useState<ProjectReview[]>([]);
   const [growth, setGrowth]                 = useState<GrowthData | null>(null);
   const [memoirList, setMemoirList]         = useState<MemoirOverviewItem[]>([]);
@@ -556,8 +612,10 @@ function MemoirContent() {
 
         if (!requestedProjectId) {
           const myProjectsResult = await getMyProjectsApi();
-          const completedProjects = (myProjectsResult.data || []).filter(
-            (p: ProjectData) => p.status === "completed"
+          const completedProjects = sortProjectsByRecent(
+            (myProjectsResult.data || []).filter(
+              (p: ProjectData) => p.status === "completed"
+            )
           );
 
           const overviewItems = await Promise.all(
@@ -629,9 +687,10 @@ function MemoirContent() {
 
         const projectId = selectedProject.id;
 
-        const [progressResult, reviewsResult, retrospectivesResult, myProjectsResult] =
+        const [progressResult, todosResult, reviewsResult, retrospectivesResult, myProjectsResult] =
           await Promise.allSettled([
             getProjectProgressApi(projectId),
+            getTodosApi(projectId),
             getProjectReviewsApi(projectId),
             getProjectRetrospectivesApi(projectId),
             getMyProjectsApi(),
@@ -639,8 +698,10 @@ function MemoirContent() {
 
         // 몇 번째 수확인지 계산 (completed 프로젝트 수)
         if (myProjectsResult.status === "fulfilled") {
-          const completed = (myProjectsResult.value.data || []).filter(
-            (p: ProjectData) => p.status === "completed"
+          const completed = sortProjectsByRecent(
+            (myProjectsResult.value.data || []).filter(
+              (p: ProjectData) => p.status === "completed"
+            )
           );
           const idx = completed.findIndex((p: ProjectData) => Number(p.id) === Number(projectId));
           setHarvestCount(idx >= 0 ? idx + 1 : completed.length || 1);
@@ -673,6 +734,11 @@ function MemoirContent() {
         if (ignore) return;
         setProject(selectedProject);
         setProgress(progressResult.status === "fulfilled" ? progressResult.value.data : null);
+        setTodos(
+          todosResult.status === "fulfilled" && Array.isArray(todosResult.value.data)
+            ? todosResult.value.data
+            : []
+        );
         setReviews(reviewsResult.status === "fulfilled" ? reviewsResult.value.data || [] : []);
         setGrowth(loadedGrowth);
         setRetrospectiveId(loadedRetrospectiveId);
@@ -697,6 +763,17 @@ function MemoirContent() {
   const todoTotal    = progress?.todo_total    ?? 0;
   const todoDone     = progress?.todo_done     ?? 0;
   const todoPercent  = Math.round(progress?.progress_percent ?? 0);
+  const currentUserIdForTodo = getCurrentUserId();
+  const myDoneTodos = todos.filter((todo) =>
+    (todo.assignments || []).some(
+      (assignment) =>
+        Number(assignment.user_id) === Number(currentUserIdForTodo) &&
+        assignment.is_done
+    )
+  );
+  const myTodoDone = myDoneTodos.length;
+  const myTodoPercent = todoTotal ? Math.round((myTodoDone / todoTotal) * 100) : 0;
+  const myContributionPercent = todoDone ? Math.round((myTodoDone / todoDone) * 100) : 0;
   const durationDays = daysBetween(project?.created_at);
   const hours        = durationDays * 6;
   const techStack    = project?.techStack?.length ? project.techStack : [project?.category || "프로젝트"];
@@ -923,17 +1000,63 @@ function MemoirContent() {
         </section>
 
         {/* 1. 할 일 달성 */}
-        <Section emoji="✅" label="할 일 달성" headline={<>나는 {todoDone}개의 할 일을<br />달성했어요</>}>
-          <p style={{ fontSize: 48, fontWeight: 900, color: "#9b1c1c", lineHeight: 1, margin: 0 }}>
-            {todoDone}
-            <span style={{ fontSize: 16, color: "#c06060", marginLeft: 4 }}>개 완료</span>
-          </p>
-          <div style={{ height: 12, background: "#fce8e8", borderRadius: 12, overflow: "hidden", margin: "12px 0 5px", border: "1px solid #f0c0c0" }}>
-            <div style={{ height: "100%", background: "#c0392b", borderRadius: 12, width: `${todoPercent}%` }} />
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#c08080" }}>
-            <span>전체 {todoTotal}개 중</span>
-            <span style={{ color: "#9b1c1c", fontWeight: 700 }}>{todoPercent}% 달성 🎉</span>
+        <Section emoji="✅" label="할 일 달성" headline={<>우리팀은 {todoDone}개를 달성했고<br />나는 그중 {myTodoDone}개를 해냈어요</>}>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 14 }}>
+            <div style={{ border: "1px solid #f0cccc", borderRadius: 14, background: "#fdf4f4", padding: 14, minHeight: 250 }}>
+              <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 800, color: "#a83030" }}>
+                우리팀이 달성한 일
+              </p>
+              <div style={{ display: "flex", alignItems: "center", gap: 14, minHeight: 140 }}>
+                <ProgressBloom progress={todoPercent} size="sm" />
+                <p style={{ fontSize: 38, fontWeight: 900, color: "#9b1c1c", lineHeight: 1, margin: 0 }}>
+                  {todoDone}
+                  <span style={{ fontSize: 14, color: "#c06060", marginLeft: 4 }}>개 완료</span>
+                </p>
+              </div>
+              <div style={{ height: 10, background: "#fce8e8", borderRadius: 12, overflow: "hidden", margin: "12px 0 5px", border: "1px solid #f0c0c0" }}>
+                <div style={{ height: "100%", background: "#c0392b", borderRadius: 12, width: `${todoPercent}%` }} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#c08080" }}>
+                <span>전체 {todoTotal}개 중</span>
+                <span style={{ color: "#9b1c1c", fontWeight: 700 }}>{todoPercent}% 달성</span>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gap: 14 }}>
+              <div style={{ border: "1px solid #e2e8f0", borderRadius: 14, background: "#fff", padding: 14 }}>
+                <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 800, color: "#475569" }}>
+                  내가 달성한 일
+                </p>
+                <p style={{ fontSize: 30, fontWeight: 900, color: "#0f172a", lineHeight: 1, margin: 0 }}>
+                  {myTodoDone}
+                  <span style={{ fontSize: 14, color: "#64748b", marginLeft: 4 }}>개 체크</span>
+                </p>
+                <div style={{ height: 10, background: "#f1f5f9", borderRadius: 12, overflow: "hidden", margin: "14px 0 5px", border: "1px solid #e2e8f0" }}>
+                  <div style={{ height: "100%", background: "#0f172a", borderRadius: 12, width: `${myTodoPercent}%` }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b" }}>
+                  <span>팀 전체 Todo 기준</span>
+                  <span style={{ color: "#0f172a", fontWeight: 700 }}>{myTodoPercent}% 기여</span>
+                </div>
+              </div>
+
+              <div style={{ border: "1px solid #dbeafe", borderRadius: 14, background: "#f8fbff", padding: 14 }}>
+                <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 800, color: "#1e40af" }}>
+                  나의 기여도
+                </p>
+                <p style={{ fontSize: 30, fontWeight: 900, color: "#1e3a8a", lineHeight: 1, margin: 0 }}>
+                  {myContributionPercent}
+                  <span style={{ fontSize: 14, color: "#64748b", marginLeft: 4 }}>%</span>
+                </p>
+                <div style={{ height: 10, background: "#e0edff", borderRadius: 12, overflow: "hidden", margin: "14px 0 5px", border: "1px solid #bfdbfe" }}>
+                  <div style={{ height: "100%", background: "#2563eb", borderRadius: 12, width: `${myContributionPercent}%` }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b" }}>
+                  <span>팀이 완료한 {todoDone}개 중</span>
+                  <span style={{ color: "#1e3a8a", fontWeight: 700 }}>내가 {myTodoDone}개 수행</span>
+                </div>
+              </div>
+            </div>
           </div>
         </Section>
 

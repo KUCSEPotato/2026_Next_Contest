@@ -3,7 +3,13 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { authenticatedFetch, getApiBaseUrl, saveAuthSession } from "../../lib/auth";
+import {
+  authenticatedFetch,
+  getApiBaseUrl,
+  loadCurrentUser,
+  removeToken,
+  saveAuthSession,
+} from "../../lib/auth";
 
 // ─── 상수 ────────────────────────────────────────────────────────────────────
 const API_BASE = getApiBaseUrl();
@@ -35,6 +41,9 @@ function validatePassword(pw) {
 function parseApiError(data, fallback = "요청 처리 중 오류가 발생했습니다.") {
   if (!data?.detail) return fallback;
   if (typeof data.detail === "string") {
+    if (data.detail === "중복된 아이디입니다.") {
+      return "중복된 아이디입니다.";
+    }
     if (
       data.detail === "Login id already exists" ||
       data.detail === "Nickname already exists" ||
@@ -138,12 +147,18 @@ export default function SignupPage() {
     const via = params.get("via");
     const tokenFromQuery = params.get("access_token");
 
-    if (via === "github" && tokenFromQuery) {
-      queueMicrotask(() => {
+    if (via !== "github" || !tokenFromQuery) {
+      removeToken({ reason: "signup_entry" });
+      return;
+    }
+
+    queueMicrotask(async () => {
+      try {
         saveAuthSession({
           accessToken: tokenFromQuery,
           userId: params.get("user_id"),
         });
+        await loadCurrentUser();
         setAccessToken(tokenFromQuery);
 
         // 신규 유저는 온보딩 Step2, 기존 유저는 메인으로 이동
@@ -152,8 +167,13 @@ export default function SignupPage() {
         } else if (stepParam === "profile") {
           router.push("/mainpage");
         }
-      });
-    }
+      } catch (error) {
+        console.error(error);
+        removeToken({ reason: "invalid_signup_token" });
+        setAccessToken("");
+        window.history.replaceState(null, "", "/signup");
+      }
+    });
   }, [router]);
 
   // ── GitHub OAuth ─────────────────────────────────────────────────────────
@@ -169,7 +189,7 @@ export default function SignupPage() {
     }
 
     const scope = encodeURIComponent("read:user user:email");
-    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}`;
+    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&state=signup`;
   };
 
   // ── Step 1 제출 ───────────────────────────────────────────────────────────

@@ -82,6 +82,26 @@ export default function ProjectDetailPage() {
   const inputClassName =
     "w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100";
 
+  const buildEditFormFromProject = (projectData) => ({
+    title: projectData.title || "",
+    summary: projectData.summary || "",
+    description: projectData.description || "",
+    difficulty: projectData.difficulty || "",
+    category: projectData.category || projectData.domain || "",
+    progress_percent: projectData.progress_percent ?? 0,
+    max_members:
+      projectData.max_members ??
+      projectData.maxMembers ??
+      projectData.recruitment_count ??
+      projectData.member_limit ??
+      "",
+    expected_period: projectData.expected_period || "",
+    preferred_members: projectData.preferred_members || "",
+    tech_stack: (projectData.tech_stack || projectData.techStack || []).join(", "),
+    hashtags: (projectData.hashtags || []).join(", "),
+    is_public: projectData.is_public ?? true,
+  });
+
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [projectId]);
@@ -114,25 +134,7 @@ export default function ProjectDetailPage() {
             : null
         );
 
-        setEditForm({
-          title: projectData.title || "",
-          summary: projectData.summary || "",
-          description: projectData.description || "",
-          difficulty: projectData.difficulty || "",
-          category: projectData.category || projectData.domain || "",
-          progress_percent: projectData.progress_percent ?? 0,
-          max_members:
-            projectData.max_members ??
-            projectData.maxMembers ??
-            projectData.recruitment_count ??
-            projectData.member_limit ??
-            "",
-          expected_period: projectData.expected_period || "",
-          preferred_members: projectData.preferred_members || "",
-          tech_stack: (projectData.tech_stack || projectData.techStack || []).join(", "),
-          hashtags: (projectData.hashtags || []).join(", "),
-          is_public: projectData.is_public ?? true,
-        });
+        setEditForm(buildEditFormFromProject(projectData));
       } catch (error) {
         console.error(error);
         alert("프로젝트 정보를 불러오지 못했습니다.");
@@ -144,6 +146,16 @@ export default function ProjectDetailPage() {
 
   const isLeader = project?.leader_id === myProfile?.id;
   const isProjectCompleted = project?.status === "completed";
+  const isTeamFormed = ["in_progress", "started", "completed"].includes(
+    String(project?.status || "").replace("-", "_")
+  );
+  const isProjectMember =
+    project &&
+    myProfile &&
+    (project.leader_id === myProfile.id ||
+      (project.members || []).some(
+        (member) => getProjectMemberUserId(member) === myProfile.id
+      ));
   const hasApplied = Boolean(myApplication);
   const acceptedMemberCount = project?.members?.length || 1;
 
@@ -170,7 +182,7 @@ export default function ProjectDetailPage() {
       return;
     }
 
-    if (Number(editForm.max_members) < acceptedMemberCount) {
+    if (!isTeamFormed && Number(editForm.max_members) < acceptedMemberCount) {
       alert(`현재 팀원수인 ${acceptedMemberCount}명 이상으로만 변경 가능합니다.`);
       return;
     }
@@ -178,14 +190,13 @@ export default function ProjectDetailPage() {
     try {
       setIsSavingEdit(true);
 
-      await updateProjectApi(projectId, {
+      const payload = {
         title: editForm.title,
         summary: editForm.summary,
         description: editForm.description,
         difficulty: editForm.difficulty,
         category: editForm.category,
         progress_percent: Number(editForm.progress_percent),
-        max_members: Number(editForm.max_members),
         expected_period: editForm.expected_period.trim(),
         preferred_members: editForm.preferred_members.trim(),
         tech_stack: editForm.tech_stack
@@ -197,16 +208,47 @@ export default function ProjectDetailPage() {
           .map((item) => item.trim().replace(/^#/, ""))
           .filter(Boolean),
         is_public: editForm.is_public,
-      });
+      };
+
+      if (!isTeamFormed) {
+        payload.max_members = Number(editForm.max_members);
+      }
+
+      const updateResult = await updateProjectApi(projectId, payload);
 
       const refreshed = await getProjectApi(projectId);
-      setProject(refreshed.data);
+      const nextProject = {
+        ...refreshed.data,
+        max_members:
+          refreshed.data?.max_members ??
+          updateResult.data?.max_members ??
+          Number(editForm.max_members),
+        maxMembers:
+          refreshed.data?.maxMembers ??
+          updateResult.data?.maxMembers ??
+          Number(editForm.max_members),
+      };
+      setProject(nextProject);
+      setEditForm(buildEditFormFromProject(nextProject));
       setIsEditing(false);
 
-      alert("프로젝트 정보가 수정되었습니다.");
+      alert(
+        isTeamFormed
+          ? "프로젝트 정보가 수정되었습니다. 모집 인원은 팀 결성 완료 후 변경되지 않습니다."
+          : `프로젝트 정보가 수정되었습니다. 모집 인원은 ${Number(editForm.max_members)}명입니다.`
+      );
     } catch (error) {
       console.error(error);
-      alert("프로젝트 수정에 실패했습니다.");
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("current member count")) {
+        alert(`모집 인원은 현재 팀원수인 ${acceptedMemberCount}명 이상이어야 합니다.`);
+        return;
+      }
+      if (message.includes("team formation")) {
+        alert("팀 결성 완료 후에는 모집 인원을 변경할 수 없습니다.");
+        return;
+      }
+      alert(message || "프로젝트 수정에 실패했습니다.");
     } finally {
       setIsSavingEdit(false);
     }
@@ -390,16 +432,19 @@ export default function ProjectDetailPage() {
                     모집 인원 (리더 포함) (최대 인원: 100명)
                   </label>
                   <input
-                    className={inputClassName}
+                    className={`${inputClassName} disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500`}
                     type="number"
                     min={acceptedMemberCount}
                     max="100"
                     value={editForm.max_members}
+                    disabled={isTeamFormed}
                     onChange={(e) => handleEditChange("max_members", e.target.value)}
                     placeholder="모집 인원 (리더 포함)"
                   />
                   <p className="mt-1 text-xs text-slate-500">
-                    리더 포함 총 인원입니다. {acceptedMemberCount}명(현재 팀원수) 이상으로만 설정할 수 있습니다.
+                    {isTeamFormed
+                      ? "팀 결성 완료 후에는 모집 인원을 변경할 수 없습니다."
+                      : `리더 포함 총 인원입니다. ${acceptedMemberCount}명(현재 팀원수) 이상으로만 설정할 수 있습니다.`}
                   </p>
                 </div>
 
@@ -513,12 +558,23 @@ export default function ProjectDetailPage() {
                 </div>
               )}
 
-              <button
-                onClick={() => router.push(`/projects/${projectId}/chat`)}
-                className="mt-6 w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800"
-              >
-                팀 채팅방 들어가기
-              </button>
+              {isProjectMember && isTeamFormed && (
+                <button
+                  onClick={() => router.push(`/projects/${projectId}/manage`)}
+                  className="mt-6 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
+                >
+                  진행 관리 페이지로 가기
+                </button>
+              )}
+
+              {isProjectMember && (
+                <button
+                  onClick={() => router.push(`/projects/${projectId}/chat`)}
+                  className={`${isTeamFormed ? "mt-3" : "mt-6"} w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800`}
+                >
+                  팀 채팅방 들어가기
+                </button>
+              )}
             </>
           )}
         </section>

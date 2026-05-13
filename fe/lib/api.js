@@ -1,4 +1,4 @@
-import { authenticatedFetch, getToken, getApiBaseUrl } from "./auth";
+import { authenticatedFetch, getRefreshToken, getToken, getApiBaseUrl } from "./auth";
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -78,6 +78,36 @@ export async function loginApi(loginId, password) {
   
     return handleResponse(res, "로그인에 실패했습니다.");
   }
+
+export async function findLoginIdApi(email) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/auth/login-id/find`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify({ email }),
+  });
+
+  return handleResponse(res, "아이디 찾기에 실패했습니다.");
+}
+
+export async function requestPasswordResetApi(email) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/auth/password/forgot`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify({ email }),
+  });
+
+  return handleResponse(res, "비밀번호 재설정 요청에 실패했습니다.");
+}
+
+export async function resetPasswordApi(token, newPassword) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/auth/password/reset`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+
+  return handleResponse(res, "비밀번호 재설정에 실패했습니다.");
+}
 
 /* =========================
    Ideas
@@ -237,6 +267,14 @@ export async function getProjectApi(projectId) {
   });
 
   return handleResponse(res, "프로젝트 정보를 불러오지 못했습니다.");
+}
+
+export async function getProjectStatusApi(projectId) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/projects/${projectId}/status-check`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "프로젝트 상태를 확인하지 못했습니다.");
 }
 
 export async function getRecommendedProjectsApi(payload = {}, limit = 20) {
@@ -745,6 +783,16 @@ export async function updateMyProfileApi(payload) {
   return handleResponse(res, "프로필 수정 실패");
 }
 
+export async function withdrawMyAccountApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/users/me`, {
+    method: "DELETE",
+    headers: authHeaders(),
+    body: JSON.stringify({ refresh_token: getRefreshToken() }),
+  });
+
+  return handleResponse(res, "회원 탈퇴에 실패했습니다.");
+}
+
 export async function addMySkillApi(name, proficiency = 3) {
   const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/users/me/skills`, {
     method: "POST",
@@ -826,6 +874,53 @@ export async function readNotificationApi(notificationId) {
   );
 
   return handleResponse(res, "알림 읽음 처리에 실패했습니다.");
+}
+
+export async function readAllNotificationsApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/notifications/read-all`, {
+    method: "PATCH",
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "알림 모두 읽음 처리에 실패했습니다.");
+}
+
+/* =========================
+   Coins
+========================= */
+
+export async function getMyCoinBalanceApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/coins/me`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "코인 잔액을 불러오지 못했습니다.");
+}
+
+export async function getCoinPackagesApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/coins/packages`, {
+    cache: "no-store",
+  });
+
+  return handleResponse(res, "코인 패키지를 불러오지 못했습니다.");
+}
+
+export async function createCoinPurchaseRequestApi(payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/coins/purchase-requests`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "코인 구매 요청에 실패했습니다.");
+}
+
+export async function getMyCoinPurchaseRequestsApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/coins/purchase-requests/me`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "코인 구매 요청 목록을 불러오지 못했습니다.");
 }
 
 /* =========================
@@ -934,6 +1029,24 @@ export async function updateAdminPaymentApi(eventId, payload) {
   return handleResponse(res, "결제 이벤트 처리에 실패했습니다.");
 }
 
+export async function getAdminCoinPurchaseRequestsApi() {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/coin-purchase-requests`, {
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "코인 구매 요청 목록을 불러오지 못했습니다.");
+}
+
+export async function updateAdminCoinPurchaseRequestApi(requestId, payload) {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/coin-purchase-requests/${requestId}`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res, "코인 구매 요청 처리에 실패했습니다.");
+}
+
 export async function createAdminNoticeApi(payload) {
   const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/notices`, {
     method: "POST",
@@ -1002,28 +1115,31 @@ export async function adminDeletePostApi(postId) {
   return handleResponse(res, "게시물 삭제에 실패했습니다.");
 }
 
-export async function adminTakedownPostApi(postId) {
+export async function adminTakedownPostApi(postId, payload = {}) {
   const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/posts/${postId}/takedown`, {
     method: "POST",
     headers: authHeaders(),
+    body: JSON.stringify(payload),
   });
 
   return handleResponse(res, "게시물 강제 내리기에 실패했습니다.");
 }
 
-export async function adminTakedownIdeaApi(ideaId) {
+export async function adminTakedownIdeaApi(ideaId, payload = {}) {
   const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/ideas/${ideaId}/takedown`, {
     method: "POST",
     headers: authHeaders(),
+    body: JSON.stringify(payload),
   });
 
   return handleResponse(res, "아이디어 강제 내리기에 실패했습니다.");
 }
 
-export async function adminTakedownProjectApi(projectId) {
+export async function adminTakedownProjectApi(projectId, payload = {}) {
   const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/admin/projects/${projectId}/takedown`, {
     method: "POST",
     headers: authHeaders(),
+    body: JSON.stringify(payload),
   });
 
   return handleResponse(res, "프로젝트 강제 내리기에 실패했습니다.");

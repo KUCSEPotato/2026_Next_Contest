@@ -8,6 +8,7 @@ from app.models.entities import CommunityPostComment
 from app.models.entities import CommunityPostReaction
 from app.models.entities import CommunityCommentReaction
 from app.models.entities import CommunityPostFile
+from app.models.entities import CoinPurchaseRequest
 from app.models.entities import CoinTransaction
 from app.models.entities import FailureStory
 from app.models.entities import Idea
@@ -49,6 +50,7 @@ __all__ = [
 	"CommunityPostReaction",
 	"CommunityCommentReaction",
 	"CommunityPostFile",
+	"CoinPurchaseRequest",
 	"CoinTransaction",
 	"FailureStory",
 	"Idea",

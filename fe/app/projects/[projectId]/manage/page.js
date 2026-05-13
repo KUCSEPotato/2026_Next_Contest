@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import ProgressBloom, { getProgressBloomMessage } from "../../../../components/ProgressBloom";
 import {
   getProjectApi,
   getProjectApplicationsApi,
@@ -14,6 +15,8 @@ import {
   updateTodoApi,
   createTodoApi,
   createRecruitmentApi,
+  getChatRoomsApi,
+  createChatRoomApi,
   createProjectReviewApi,
   getProjectReviewsApi,
 } from "../../../../lib/api";
@@ -29,6 +32,18 @@ const isDoneTodo = (todo) =>
   todo?.is_done === true;
 
 const getMemberUserId = (member) => member?.user_id || member?.user?.id;
+
+const getDoneAssignmentNames = (todo) =>
+  (todo?.assignments || [])
+    .filter((assignment) => assignment.is_done)
+    .map(
+      (assignment) =>
+        assignment.nickname ||
+        assignment.user?.nickname ||
+        assignment.name ||
+        assignment.user?.name ||
+        `User #${assignment.user_id}`
+    );
 
 const TODO_STAGES = [
   { value: "planning", label: "기획" },
@@ -48,6 +63,8 @@ export default function ProjectManagePage() {
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
   const [isCompletingTeam, setIsCompletingTeam] = useState(false);
+  const [isOpeningChat, setIsOpeningChat] = useState(false);
+  const [teamChatRoomId, setTeamChatRoomId] = useState(null);
   const [todos, setTodos] = useState([]);
   const [todoLoading, setTodoLoading] = useState(false);
   const [togglingTodoId, setTogglingTodoId] = useState(null);
@@ -124,14 +141,15 @@ export default function ProjectManagePage() {
   const canAcceptMore = !maxMembers || displayCurrentMemberCount < maxMembers;
   const projectStatus = normalizeStatus(project?.status);
   const isProjectInProgress = ["in_progress", "started"].includes(projectStatus);
+  const isProjectCompleted = ["completed", "complete", "done"].includes(projectStatus);
   const doneTodoCount = todos.filter(isDoneTodo).length;
   const todoCompletionRate = todos.length
     ? Math.round((doneTodoCount / todos.length) * 100)
     : 0;
   const canCompleteProject =
     isProjectInProgress && todos.length > 0 && todoCompletionRate >= 70;
-  const isProjectCompleted = projectStatus === "completed";
   const canCompleteTeam = !isProjectInProgress && !isProjectCompleted;
+  const canRecruitAgain = isLeader && isProjectInProgress && !isProjectCompleted;
   const completionHelpText =
     !isProjectInProgress
       ? ""
@@ -272,7 +290,11 @@ export default function ProjectManagePage() {
     try {
       setIsCompletingTeam(true);
 
-      await completeTeamApi(projectId);
+      const completeResult = await completeTeamApi(projectId);
+      const completeData = unwrapResponseData(completeResult);
+      if (completeData?.chat_room_id) {
+        setTeamChatRoomId(completeData.chat_room_id);
+      }
 
       const proj = await getProjectApi(projectId);
       setProject(unwrapResponseData(proj));
@@ -283,6 +305,44 @@ export default function ProjectManagePage() {
       alert("팀 결성에 실패했습니다.");
     } finally {
       setIsCompletingTeam(false);
+    }
+  };
+
+  const openTeamChat = async () => {
+    if (!isProjectMember) {
+      alert("프로젝트 팀원만 채팅방으로 이동할 수 있습니다.");
+      return;
+    }
+
+    try {
+      setIsOpeningChat(true);
+
+      if (teamChatRoomId) {
+        router.push(`/chat/${teamChatRoomId}?projectId=${projectId}`);
+        return;
+      }
+
+      const roomsResult = await getChatRoomsApi(projectId);
+      const rooms = unwrapResponseData(roomsResult, []);
+      const activeRoom = rooms.find((room) => room.is_active) || rooms[0];
+
+      if (activeRoom) {
+        setTeamChatRoomId(activeRoom.id);
+        router.push(`/chat/${activeRoom.id}?projectId=${projectId}`);
+        return;
+      }
+
+      const created = await createChatRoomApi(projectId, {
+        name: project?.title || `Project #${projectId}`,
+      });
+      const createdRoom = unwrapResponseData(created);
+      setTeamChatRoomId(createdRoom.id);
+      router.push(`/chat/${createdRoom.id}?projectId=${projectId}`);
+    } catch (error) {
+      console.error(error);
+      alert("팀 채팅방으로 이동하지 못했습니다.");
+    } finally {
+      setIsOpeningChat(false);
     }
   };
 
@@ -639,28 +699,47 @@ export default function ProjectManagePage() {
             {maxMembers ? `${maxMembers}명 (리더 포함)` : "제한 없음"}
           </div>
 
-          {isLeader && !isProjectCompleted && (
+          {isLeader && canCompleteTeam && (
             <button
-              onClick={
-                isProjectInProgress
-                  ? () => setShowRecruitmentForm((prev) => !prev)
-                  : handleCompleteTeam
-              }
-              disabled={
-                isCompletingTeam ||
-                (!isProjectInProgress && !canCompleteTeam)
-              }
+              onClick={handleCompleteTeam}
+              disabled={isCompletingTeam}
               className="mt-4 w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
             >
-              {isProjectInProgress
-                ? "재모집하기"
-                : isCompletingTeam
-                ? "팀 결성 중..."
-                : "팀 결성하기"}
+              {isCompletingTeam ? "팀 결성 중..." : "팀 결성하기"}
             </button>
           )}
 
-          {isLeader && isProjectInProgress && showRecruitmentForm && (
+          {canRecruitAgain && (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <button
+                onClick={() => setShowRecruitmentForm((prev) => !prev)}
+                disabled={isCompletingTeam}
+                className="w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+              >
+                재모집하기
+              </button>
+
+              <button
+                onClick={openTeamChat}
+                disabled={isOpeningChat}
+                className="w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+              >
+                {isOpeningChat ? "이동 중..." : "팀 채팅방으로 가기"}
+              </button>
+            </div>
+          )}
+
+          {!isLeader && isProjectInProgress && !isProjectCompleted && (
+            <button
+              onClick={openTeamChat}
+              disabled={isOpeningChat}
+              className="mt-4 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+            >
+              {isOpeningChat ? "이동 중..." : "팀 채팅방으로 가기"}
+            </button>
+          )}
+
+          {canRecruitAgain && showRecruitmentForm && (
             <div className="mt-4 rounded-xl border border-red-100 bg-red-50/40 p-4">
               <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_160px]">
                 <div>
@@ -734,13 +813,19 @@ export default function ProjectManagePage() {
 
           <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold text-slate-900">
-                  Todo 진행률 {todoCompletionRate}%
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  {doneTodoCount} / {todos.length}개 완료
-                </p>
+              <div className="flex items-center gap-4">
+                <ProgressBloom progress={todoCompletionRate} size="md" />
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    Todo 진행률 {todoCompletionRate}%
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {doneTodoCount} / {todos.length}개 완료
+                  </p>
+                  <p className="mt-1 text-xs text-rose-500">
+                    {getProgressBloomMessage(todoCompletionRate)}
+                  </p>
+                </div>
               </div>
 
               {isLeader && isProjectInProgress && !isProjectCompleted && (
@@ -963,6 +1048,7 @@ export default function ProjectManagePage() {
                     {group.items.map(({ todo }) => {
                       const isDone = isDoneTodo(todo);
                       const isEditing = editingTodoId === todo.id;
+                      const doneAssignmentNames = getDoneAssignmentNames(todo);
 
                       return (
                         <div
@@ -1046,6 +1132,12 @@ export default function ProjectManagePage() {
                                     <p className="mt-2 text-xs text-slate-400">
                                       {group.label} · {todo.status || "todo"}
                                     </p>
+
+                                    {doneAssignmentNames.length > 0 && (
+                                      <p className="mt-2 text-xs font-semibold text-red-600">
+                                        수행: {doneAssignmentNames.join(", ")}
+                                      </p>
+                                    )}
                                   </div>
 
                                   {!isProjectCompleted && (

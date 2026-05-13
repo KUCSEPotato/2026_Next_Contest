@@ -3,6 +3,7 @@ import re
 from datetime import datetime, timezone, date
 from collections import defaultdict
 from math import ceil
+import os
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from fastapi import WebSocket, WebSocketDisconnect
@@ -376,13 +377,19 @@ def _build_ai_todo_context(
 
 async def _generate_ai_todo_titles(context_text: str, project: Project) -> list[str]:
     if not settings.gemini_api_key:
-        return _fallback_ai_todo_titles(project)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="There is no Gemini API key available",
+        )
 
     try:
         response_text = await _call_gemini_for_todo_list(context_text)
         todos_by_user = _parse_gemini_response(response_text)
-    except HTTPException:
-        return _fallback_ai_todo_titles(project)
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Gemini API request failed: {str(error)}",
+        )
 
     titles: list[str] = []
     for todos in todos_by_user.values():
@@ -461,10 +468,12 @@ def _build_project_memoir_context(db: Session, project: Project) -> str:
 
 
 async def _call_gemini_for_memoir_refine(feelings: str, shortcomings: str, project_context: str = "") -> str:
-    if not settings.gemini_api_key:
+    gemini_api_key = settings.gemini_api_key
+
+    if not gemini_api_key:
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"There is no Gemini API key available",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="There is no Gemini API key available",
         )
         return _fallback_memoir_refine(feelings, shortcomings)
     return await asyncio.to_thread(_sync_call_gemini_for_memoir_refine, feelings, shortcomings, project_context)
@@ -513,7 +522,7 @@ def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str, projec
                 "max_output_tokens": 520,
             },
         )
-    except Exception:
+    except Exception as error:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Gemini API request failed: {str(error)}",
@@ -530,7 +539,7 @@ def _sync_call_gemini_for_memoir_refine(feelings: str, shortcomings: str, projec
     if not text:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"No Text in Gemini Response: {str(error)}",
+            detail=f"No Text in Gemini Response",
         )
     
     #cleaned_text = _clean_memoir_refine_output((text or "").strip())
@@ -741,6 +750,22 @@ def _serialize_project_member(member: ProjectMember, user: User | None) -> dict:
         if user
         else None,
     }
+
+
+@router.get("/{project_id}/status-check", summary="프로젝트 상태 확인", description="알림 이동 전에 프로젝트 삭제/생각의 뜰 상태를 확인합니다.")
+async def get_project_status_check(project_id: int, db: Session = Depends(get_db)) -> dict:
+    project = db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    source_idea = db.get(Idea, project.idea_id) if project.idea_id else None
+    return success_response(
+        data={
+            "id": project.id,
+            "deleted": project.deleted_at is not None,
+            "discarded": bool(source_idea and source_idea.is_discarded),
+        }
+    )
 
 
 @router.get("/{project_id}", summary="프로젝트 상세", description="프로젝트 상세와 활성 멤버 목록을 조회합니다.")
@@ -987,6 +1012,27 @@ async def update_project(
     expected_period = payload_data.pop("expected_period", None)
     preferred_members = payload_data.pop("preferred_members", None)
 
+    if "max_members" in payload_data:
+        if project.status in {"in_progress", "started", "completed"}:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="max_members cannot be changed after team formation",
+            )
+
+        active_member_count = (
+            db.query(ProjectMember)
+            .filter(
+                ProjectMember.project_id == project_id,
+                ProjectMember.left_at.is_(None),
+            )
+            .count()
+        )
+        if payload_data["max_members"] < active_member_count:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"max_members must be at least current member count ({active_member_count})",
+            )
+
     for field, value in payload_data.items():
         setattr(project, field, value)
 
@@ -1020,7 +1066,24 @@ async def update_project(
 
     db.commit()
     db.refresh(project)
-    return success_response(data={"id": project.id, "updated": True})
+    current_member_count = (
+        db.query(ProjectMember)
+        .filter(
+            ProjectMember.project_id == project_id,
+            ProjectMember.left_at.is_(None),
+        )
+        .count()
+    )
+    return success_response(
+        data={
+            "id": project.id,
+            "updated": True,
+            "max_members": project.max_members,
+            "maxMembers": project.max_members,
+            "current_members": current_member_count,
+            "currentMembers": current_member_count,
+        }
+    )
 
 
 @router.delete("/{project_id}", summary="프로젝트 삭제", description="프로젝트를 soft delete 처리합니다.")

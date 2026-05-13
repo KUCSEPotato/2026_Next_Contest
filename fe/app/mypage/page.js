@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { updateStoredUser } from "../../lib/auth";
+import ProgressBloom from "../../components/ProgressBloom";
+import { removeToken, updateStoredUser } from "../../lib/auth";
+import { useDialog, useToast } from "../../components/AppFeedback";
 import {
   getMyProfileApi,
   getMyReputationApi,
@@ -12,6 +14,7 @@ import {
   getMyApplicationsApi,
   getMyReceivedReviewsApi,
   updateMyProfileApi,
+  withdrawMyAccountApi,
   addMySkillApi,
   addMyInterestApi,
   discardProjectToWellApi,
@@ -25,6 +28,8 @@ import {
 
 export default function MyPage() {
   const router = useRouter();
+  const toast = useToast();
+  const { confirm } = useDialog();
   const projectHistoryRef = useRef(null);
 
   const [profile, setProfile] = useState(null);
@@ -39,6 +44,7 @@ export default function MyPage() {
 
   const [loading, setLoading] = useState(true);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [showReviews, setShowReviews] = useState(false);
   const [discardingId, setDiscardingId] = useState(null);
   const [discardConfirm, setDiscardConfirm] = useState(null);
@@ -349,6 +355,31 @@ export default function MyPage() {
     }
   };
 
+  const handleWithdrawAccount = async () => {
+    const confirmed = await confirm({
+      title: "회원 탈퇴",
+      message: "회원 탈퇴 후 계정은 복구할 수 없습니다. 정말 탈퇴하시겠습니까?",
+      confirmText: "탈퇴하기",
+      cancelText: "취소",
+      tone: "danger",
+    });
+
+    if (!confirmed) return;
+
+    try {
+      setIsWithdrawing(true);
+      await withdrawMyAccountApi();
+      removeToken({ reason: "withdrawn" });
+      toast.success("회원 탈퇴가 완료되었습니다.");
+      router.replace("/login");
+    } catch (error) {
+      console.error(error);
+      toast.error("회원 탈퇴에 실패했습니다.");
+    } finally {
+      setIsWithdrawing(false);
+    }
+  };
+
   const handleAddSkill = async () => {
     if (!newSkill.trim()) {
       alert("기술 스택을 입력해주세요.");
@@ -467,12 +498,22 @@ export default function MyPage() {
             </div>
             </div>
 
-            <button
-              onClick={() => setIsEditingProfile(true)}
-              className="shrink-0 rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
-            >
-              수정하기
-            </button>
+            <div className="flex shrink-0 items-center gap-3">
+              <button
+                onClick={() => setIsEditingProfile(true)}
+                className="rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
+              >
+                수정하기
+              </button>
+              <button
+                type="button"
+                onClick={handleWithdrawAccount}
+                disabled={isWithdrawing}
+                className="rounded-xl border border-red-200 bg-white px-5 py-3 font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isWithdrawing ? "처리 중..." : "회원 탈퇴"}
+              </button>
+            </div>
           </div>
         </section>
 
@@ -753,7 +794,13 @@ export default function MyPage() {
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-left transition hover:border-red-300 hover:bg-red-50"
                 >
                   <div className="flex items-center justify-between gap-4">
-                    <div>
+                    <div className="flex items-center gap-3">
+                      <ProgressBloom
+                        progress={project.progress_percent ?? 0}
+                        size="sm"
+                        showLabel={false}
+                      />
+                      <div>
                       <p className="font-semibold text-slate-900">
                         {project.title}
                       </p>
@@ -764,6 +811,7 @@ export default function MyPage() {
                         {project.historyType === "applied" &&
                           ` · 지원 상태 ${project.applicationStatus || "확인중"}`}
                       </p>
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-2">
