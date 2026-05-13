@@ -10,6 +10,7 @@ import {
   removeToken,
   saveAuthSession,
 } from "../../lib/auth";
+import { getRecommendedProjectsApi } from "../../lib/api";
 import { INTERESTS_LIST, SKILLS_LIST } from "../../lib/profileOptions";
 
 // ─── 상수 ────────────────────────────────────────────────────────────────────
@@ -311,11 +312,8 @@ export default function SignupPage() {
     setShowCompletionModal(false);
     setIsLoadingProjects(true);
     try {
-      const res = await authenticatedFetch(`${API_BASE}/api/v1/matching/recommend-projects`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const data = await res.json();
-      setRecommendedProjects(data.data?.projects || data.data || []);
+      const result = await getRecommendedProjectsApi({}, 20);
+      setRecommendedProjects(result.data || []);
     } catch {
       setRecommendedProjects([]);
     } finally {
@@ -595,32 +593,45 @@ export default function SignupPage() {
               </div>
             ) : recommendedProjects.length > 0 ? (
               <div className="mt-6 space-y-3 max-h-96 overflow-y-auto">
-                {recommendedProjects.map((project, i) => (
-                  <div
-                    key={project.id || i}
-                    onClick={() => router.push(`/projects/${project.id}`)}
-                    className="cursor-pointer rounded-xl border border-slate-200 p-4 transition hover:border-red-300 hover:shadow-sm"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-semibold text-slate-800 line-clamp-1">{project.title}</h3>
-                      <span className="shrink-0 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600">
-                        추천
-                      </span>
-                    </div>
-                    <p className="mt-1 text-sm text-slate-500 line-clamp-2">{project.description}</p>
-                    {project.tech_stack && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {(Array.isArray(project.tech_stack) ? project.tech_stack : [project.tech_stack])
-                          .slice(0, 4)
-                          .map((tech) => (
+                {recommendedProjects.map((project, i) => {
+                  const projectId = project.project_id || project.id;
+                  const description =
+                    project.description ||
+                    project.summary ||
+                    project.reason ||
+                    "선택한 기술 스택과 관심 분야를 바탕으로 추천된 프로젝트입니다.";
+                  const techStack =
+                    project.matchedSkills ||
+                    project.tech_stack ||
+                    project.techStack ||
+                    [];
+                  const techList = Array.isArray(techStack) ? techStack : [techStack];
+
+                  return (
+                    <div
+                      key={projectId || i}
+                      onClick={() => projectId && router.push(`/projects/${projectId}`)}
+                      className="cursor-pointer rounded-xl border border-slate-200 p-4 transition hover:border-red-300 hover:shadow-sm"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-semibold text-slate-800 line-clamp-1">{project.title}</h3>
+                        <span className="shrink-0 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600">
+                          추천
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm text-slate-500 line-clamp-2">{description}</p>
+                      {techList.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {techList.slice(0, 4).map((tech) => (
                             <span key={tech} className="rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
                               {tech}
                             </span>
                           ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <div className="mt-10 text-center text-sm text-slate-400">
