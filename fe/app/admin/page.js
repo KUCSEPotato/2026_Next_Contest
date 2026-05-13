@@ -39,6 +39,14 @@ const TABS = [
 
 const REPORT_STATUSES = ["open", "reviewing", "resolved", "rejected"];
 const USER_ROLES = ["user", "leader", "admin"];
+const USER_PLANS = [
+  { value: "FREE", label: "무료" },
+  { value: "PLUS_MONTHLY", label: "Plus 월 구독" },
+  { value: "PRO_MONTHLY", label: "Pro 월 구독" },
+  { value: "PASS_1D", label: "1일권" },
+  { value: "PASS_3D", label: "3일권" },
+  { value: "PASS_7D", label: "7일권" },
+];
 const COIN_REQUEST_STATUSES = {
   pending: "확인 대기",
   approved: "승인",
@@ -564,6 +572,40 @@ export default function AdminPage() {
       );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "사용자 권한 변경에 실패했습니다.");
+    } finally {
+      setProcessingKey("");
+    }
+  }
+
+  async function handleUserPlan(userId, planCode) {
+    const targetUser = users.find((user) => user.id === userId);
+    const planLabel = USER_PLANS.find((plan) => plan.value === planCode)?.label || planCode;
+    const ok = await confirm({
+      title: "사용자 플랜 변경",
+      message: `${targetUser?.nickname || `User #${userId}`}의 플랜을 ${planLabel}로 변경할까요?`,
+      confirmText: "변경",
+    });
+    if (!ok) return;
+
+    try {
+      setProcessingKey(`user-plan-${userId}`);
+      const result = await updateAdminUserStatusApi(userId, { plan_code: planCode });
+      setUsers((prev) =>
+        prev.map((user) =>
+          user.id === userId
+            ? {
+                ...user,
+                current_plan_code: result.data?.current_plan_code ?? planCode,
+                current_plan_name: result.data?.current_plan_name ?? planLabel,
+                current_plan_type: result.data?.current_plan_type ?? (planCode === "FREE" ? "FREE" : "SUBSCRIPTION"),
+                current_plan_expires_at: result.data?.current_plan_expires_at ?? null,
+              }
+            : user
+        )
+      );
+      toast.success("사용자 플랜을 변경했습니다.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "사용자 플랜 변경에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
@@ -1224,6 +1266,7 @@ export default function AdminPage() {
                     <Th>계정</Th>
                     <Th>연동</Th>
                     <Th>Role</Th>
+                    <Th>Plan</Th>
                     <Th>Coin</Th>
                     <Th>Status</Th>
                     <Th>처리</Th>
@@ -1258,6 +1301,18 @@ export default function AdminPage() {
                         ) : null}
                       </Td>
                       <Td>{user.role}</Td>
+                      <Td>
+                        <div className="space-y-1">
+                          <p className="font-semibold text-slate-900">
+                            {user.current_plan_name || user.current_plan_code || "무료"}
+                          </p>
+                          {user.current_plan_type && user.current_plan_type !== "FREE" ? (
+                            <p className="text-xs text-slate-500">
+                              {user.current_plan_expires_at ? formatDate(user.current_plan_expires_at) : "만료일 없음"}
+                            </p>
+                          ) : null}
+                        </div>
+                      </Td>
                       <Td>{user.coin_balance}</Td>
                       <Td>
                         <StatusBadge value={user.deleted_at ? "withdrawn" : user.is_active ? "active" : "suspended"} />
@@ -1277,6 +1332,18 @@ export default function AdminPage() {
                       </Td>
                       <Td>
                         <div className="flex flex-wrap gap-2">
+                            <select
+                              value={user.current_plan_code || "FREE"}
+                              onChange={(e) => handleUserPlan(user.id, e.target.value)}
+                              disabled={Boolean(user.deleted_at) || processingKey === `user-plan-${user.id}`}
+                              className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-50"
+                            >
+                            {USER_PLANS.map((plan) => (
+                              <option key={plan.value} value={plan.value}>
+                                {plan.label}
+                              </option>
+                            ))}
+                            </select>
 	                          <select
 	                            value={user.role}
 	                            onChange={(e) => handleUserRole(user.id, e.target.value)}

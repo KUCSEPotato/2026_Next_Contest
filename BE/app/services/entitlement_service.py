@@ -216,6 +216,19 @@ def create_entitlement_for_payment(db: Session, payment: Payment, product: Payme
     return grant_entitlement(db, user_id=payment.user_id, product=product, payment=payment)
 
 
+def set_user_plan(db: Session, user_id: int, product_code: str | None) -> EffectivePlan:
+    db.query(UserEntitlement).filter(
+        UserEntitlement.user_id == user_id,
+        UserEntitlement.status == "ACTIVE",
+    ).update({"status": "EXPIRED"}, synchronize_session=False)
+
+    if product_code and product_code != "FREE":
+        product = get_payment_product_or_404(db, product_code)
+        grant_entitlement(db, user_id=user_id, product=product)
+
+    return get_effective_plan(db, user_id)
+
+
 def grant_entitlement(
     db: Session,
     user_id: int,
