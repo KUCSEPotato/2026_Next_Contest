@@ -58,6 +58,12 @@ const HOT_SECTIONS: HotSection[] = [
   { key: "latest", label: "최신글", emoji: "🆕" },
 ];
 
+const ADMIN_ONLY_CATEGORIES = new Set(["announcement", "event"]);
+
+function isCampfirePost(post: PostSummary | null) {
+  return Boolean(post && !ADMIN_ONLY_CATEGORIES.has(post.category || ""));
+}
+
 type Tab = "board" | "hot";
 type HotPostsState = {
   popular: PostSummary | null;
@@ -137,7 +143,7 @@ export default function CommunityPage() {
     setLoadError("");
     try {
       const res = await getPosts({ category: selectedCategory, page, page_size: 20 });
-      setPosts(res.posts);
+      setPosts((res.posts || []).filter(isCampfirePost));
       setTotalPages(res.total_pages);
     } catch (e) {
       console.error(e);
@@ -159,7 +165,13 @@ export default function CommunityPage() {
     setLoadingHot(true);
     try {
       const res = await getHotPosts();
-      setHotPosts(res);
+      setHotPosts({
+        popular: isCampfirePost(res.popular) ? res.popular : null,
+        most_recommended: isCampfirePost(res.most_recommended) ? res.most_recommended : null,
+        most_commented: isCampfirePost(res.most_commented) ? res.most_commented : null,
+        most_viewed: isCampfirePost(res.most_viewed) ? res.most_viewed : null,
+        latest: isCampfirePost(res.latest) ? res.latest : null,
+      });
     } catch (e) {
       console.error(e);
     } finally {
