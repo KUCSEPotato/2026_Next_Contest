@@ -100,6 +100,9 @@ ADD COLUMN IF NOT EXISTS billing_interval_days INTEGER;
 ALTER TABLE payment_products
 ADD COLUMN IF NOT EXISTS auto_renew_available BOOLEAN NOT NULL DEFAULT FALSE;
 
+ALTER TABLE payment_products
+ALTER COLUMN is_active SET DEFAULT TRUE;
+
 ALTER TABLE user_entitlements
 ADD COLUMN IF NOT EXISTS next_renewal_at TIMESTAMPTZ;
 
@@ -142,6 +145,7 @@ INSERT INTO payment_products (
     duration_days,
     billing_interval_days,
     auto_renew_available,
+    is_active,
     idea_view_daily_limit,
     idea_view_total_limit,
     project_create_daily_limit,
@@ -157,11 +161,11 @@ INSERT INTO payment_products (
     project_boost_total_limit
 )
 VALUES
-('PLUS_MONTHLY', 'SUBSCRIPTION', 'Devory Plus 월 구독', 7900, 30, 30, TRUE, 3, NULL, 1, NULL, TRUE, NULL, NULL, TRUE, TRUE, NULL, TRUE, TRUE, 0),
-('PRO_MONTHLY', 'SUBSCRIPTION', 'Devory Pro 월 구독', 12900, 30, 30, TRUE, NULL, NULL, 3, NULL, TRUE, NULL, NULL, TRUE, TRUE, NULL, TRUE, TRUE, 4),
-('PASS_1D', 'PASS', 'Devory 1일권', 1900, 1, NULL, FALSE, NULL, NULL, NULL, 1, TRUE, NULL, 3, FALSE, FALSE, NULL, TRUE, TRUE, 0),
-('PASS_3D', 'PASS', 'Devory 3일권', 2900, 3, NULL, FALSE, NULL, NULL, 1, 2, TRUE, 3, 5, FALSE, FALSE, NULL, TRUE, TRUE, 0),
-('PASS_7D', 'PASS', 'Devory 7일권', 4900, 7, NULL, FALSE, NULL, NULL, 1, 3, TRUE, 3, 10, FALSE, FALSE, NULL, TRUE, TRUE, 0)
+('PLUS_MONTHLY', 'SUBSCRIPTION', 'Devory Plus 월 구독', 7900, 30, 30, TRUE, TRUE, 3, NULL, 1, NULL, TRUE, NULL, NULL, TRUE, TRUE, NULL, TRUE, TRUE, 0),
+('PRO_MONTHLY', 'SUBSCRIPTION', 'Devory Pro 월 구독', 12900, 30, 30, TRUE, TRUE, NULL, NULL, 3, NULL, TRUE, NULL, NULL, TRUE, TRUE, NULL, TRUE, TRUE, 4),
+('PASS_1D', 'PASS', 'Devory 1일권', 1900, 1, NULL, FALSE, TRUE, NULL, NULL, NULL, 1, TRUE, NULL, 3, FALSE, FALSE, NULL, TRUE, TRUE, 0),
+('PASS_3D', 'PASS', 'Devory 3일권', 2900, 3, NULL, FALSE, TRUE, NULL, NULL, 1, 2, TRUE, 3, 5, FALSE, FALSE, NULL, TRUE, TRUE, 0),
+('PASS_7D', 'PASS', 'Devory 7일권', 4900, 7, NULL, FALSE, TRUE, NULL, NULL, 1, 3, TRUE, 3, 10, FALSE, FALSE, NULL, TRUE, TRUE, 0)
 ON CONFLICT (product_code)
 DO UPDATE SET
     product_type = EXCLUDED.product_type,
@@ -170,6 +174,7 @@ DO UPDATE SET
     duration_days = EXCLUDED.duration_days,
     billing_interval_days = EXCLUDED.billing_interval_days,
     auto_renew_available = EXCLUDED.auto_renew_available,
+    is_active = EXCLUDED.is_active,
     idea_view_daily_limit = EXCLUDED.idea_view_daily_limit,
     idea_view_total_limit = EXCLUDED.idea_view_total_limit,
     project_create_daily_limit = EXCLUDED.project_create_daily_limit,
