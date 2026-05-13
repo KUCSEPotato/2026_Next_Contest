@@ -14,6 +14,7 @@ interface Project {
   summary?: string;
   category: string;
   techStack: string[];
+  hashtags: string[];
   currentMembers: number;
   maxMembers: number;
   status: string;
@@ -36,6 +37,10 @@ interface ApiProject {
   category?: string;
   tech_stack?: string[];
   techStack?: string[];
+  hashtags?: string[];
+  hashTags?: string[];
+  hash_tags?: string[];
+  tags?: string[];
   currentMembers?: number;
   current_members?: number;
   maxMembers?: number;
@@ -160,6 +165,7 @@ function normalizeProject(project: ApiProject): Project {
     summary: project.summary,
     category: project.category || "IT/소프트웨어",
     techStack: project.techStack || project.tech_stack || [],
+    hashtags: project.hashtags || project.hashTags || project.hash_tags || project.tags || [],
     currentMembers: project.currentMembers ?? project.current_members ?? 0,
     maxMembers: project.maxMembers ?? project.max_members ?? 0,
     applicantCount: project.applicantCount ?? project.applicant_count ?? 0,
@@ -317,6 +323,9 @@ export default function MainPage() {
             project.description.toLowerCase().includes(query) ||
             project.techStack.some((tech) =>
               tech.toLowerCase().includes(query)
+            ) ||
+            project.hashtags.some((tag) =>
+              tag.toLowerCase().includes(query.replace(/^#/, ""))
             )
           : true;
 
@@ -467,7 +476,7 @@ export default function MainPage() {
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="프로젝트 제목이나 기술 스택을 검색해보세요"
+            placeholder="프로젝트 제목, 기술 스택, 해시태그를 검색해보세요"
             className="mb-4 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-red-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-red-400/60"
           />
 
@@ -857,6 +866,19 @@ function ProjectCard({
           </span>
         )}
       </div>
+
+      {project.hashtags.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-1">
+          {project.hashtags.slice(0, 4).map((tag) => (
+            <span
+              key={tag}
+              className="rounded-md bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-500 dark:bg-red-500/10 dark:text-red-200"
+            >
+              #{tag}
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="mt-auto flex items-center justify-between border-t border-gray-50 pt-3 dark:border-slate-700">
         <div className="flex items-center gap-3 text-xs text-gray-400 dark:text-slate-400">

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import ProgressBloom from "../../components/ProgressBloom";
 import { removeToken, updateStoredUser } from "../../lib/auth";
 import { useDialog, useToast } from "../../components/AppFeedback";
+import { INTERESTS_LIST, SKILLS_LIST } from "../../lib/profileOptions";
 import {
   getMyProfileApi,
   getMyReputationApi,
@@ -59,9 +60,6 @@ export default function MyPage() {
   const [editNickname, setEditNickname] = useState("");
   const [editBio, setEditBio] = useState("");
   const [editAvatarUrl, setEditAvatarUrl] = useState("");
-  const [newSkill, setNewSkill] = useState("");
-  const [newInterest, setNewInterest] = useState("");
-
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   const handleAvatarUpload = async (e) => {
@@ -381,15 +379,14 @@ export default function MyPage() {
     }
   };
 
-  const handleAddSkill = async () => {
-    if (!newSkill.trim()) {
+  const handleAddSkill = async (skillName) => {
+    if (!skillName.trim()) {
       alert("기술 스택을 입력해주세요.");
       return;
     }
 
     try {
-      await addMySkillApi(newSkill);
-      setNewSkill("");
+      await addMySkillApi(skillName);
       await reloadProfile();
       alert("기술 스택이 추가되었습니다.");
     } catch (error) {
@@ -398,15 +395,14 @@ export default function MyPage() {
     }
   };
 
-  const handleAddInterest = async () => {
-    if (!newInterest.trim()) {
+  const handleAddInterest = async (interestName) => {
+    if (!interestName.trim()) {
       alert("관심 분야를 입력해주세요.");
       return;
     }
 
     try {
-      await addMyInterestApi(newInterest);
-      setNewInterest("");
+      await addMyInterestApi(interestName);
       await reloadProfile();
       alert("관심 분야가 추가되었습니다.");
     } catch (error) {
@@ -679,80 +675,64 @@ export default function MyPage() {
 
         <div className="mb-6 grid gap-6 lg:grid-cols-2">
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-slate-900">기술 스택</h2>
-
-            <div className="mt-4 flex gap-3">
-              <input
-                value={newSkill}
-                onChange={(e) => setNewSkill(e.target.value)}
-                placeholder="예: React"
-                className={inputClassName}
-              />
-
-              <button
-                onClick={handleAddSkill}
-                className="rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
-              >
-                추가
-              </button>
-            </div>
+            <h2 className="text-xl font-bold text-slate-900">
+              기술 스택{" "}
+              <span className="text-sm font-normal text-slate-400">
+                ({profile?.skills?.length ?? 0}개 선택)
+              </span>
+            </h2>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              {profile?.skills?.length ? (
-                profile.skills.map((skill) => (
-                  <span
-                    key={typeof skill === "string" ? skill : skill.id || skill.name}
-                    className="rounded-full bg-red-50 px-3 py-1 text-sm font-semibold text-red-700"
+              {SKILLS_LIST.map((skill) => {
+                const selected = hasProfileOption(profile?.skills, skill);
+
+                return (
+                  <button
+                    key={skill}
+                    type="button"
+                    onClick={() => !selected && handleAddSkill(skill)}
+                    disabled={selected}
+                    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                      selected
+                        ? "border-red-600 bg-red-600 text-white shadow-sm"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:text-red-600"
+                    }`}
                   >
-                    {typeof skill === "string" ? skill : skill.name}
-                  </span>
-                ))
-              ) : (
-                <p className="text-sm text-slate-500">
-                  등록된 기술 스택이 없습니다.
-                </p>
-              )}
+                    {skill}
+                  </button>
+                );
+              })}
             </div>
           </section>
 
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-slate-900">관심 분야</h2>
-
-            <div className="mt-4 flex gap-3">
-              <input
-                value={newInterest}
-                onChange={(e) => setNewInterest(e.target.value)}
-                placeholder="예: AI"
-                className={inputClassName}
-              />
-
-              <button
-                onClick={handleAddInterest}
-                className="rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
-              >
-                추가
-              </button>
-            </div>
+            <h2 className="text-xl font-bold text-slate-900">
+              관심 분야{" "}
+              <span className="text-sm font-normal text-slate-400">
+                ({profile?.interests?.length ?? 0}개 선택)
+              </span>
+            </h2>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              {profile?.interests?.length ? (
-                profile.interests.map((interest) => (
-                  <span
-                    key={
-                      typeof interest === "string"
-                        ? interest
-                        : interest.id || interest.name
-                    }
-                    className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700"
+              {INTERESTS_LIST.map((interest) => {
+                const selected = hasProfileOption(profile?.interests, interest);
+
+                return (
+                  <button
+                    key={interest}
+                    type="button"
+                    onClick={() => !selected && handleAddInterest(interest)}
+                    disabled={selected}
+                    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                      selected
+                        ? "border-red-600 bg-red-50 text-red-600 shadow-sm"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:text-red-600"
+                    }`}
                   >
-                    {typeof interest === "string" ? interest : interest.name}
-                  </span>
-                ))
-              ) : (
-                <p className="text-sm text-slate-500">
-                  등록된 관심 분야가 없습니다.
-                </p>
-              )}
+                    {interest}
+                  </button>
+                );
+              })}
             </div>
           </section>
         </div>
@@ -1120,6 +1100,14 @@ function buildProjectHistory(projects, applications) {
     }));
 
   return [...projects, ...normalizedApplications];
+}
+
+function getProfileOptionName(option) {
+  return typeof option === "string" ? option : option?.name || "";
+}
+
+function hasProfileOption(options, name) {
+  return (options || []).some((option) => getProfileOptionName(option) === name);
 }
 
 function getProjectLeaderId(project) {

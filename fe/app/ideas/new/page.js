@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createIdeaApi } from "../../../lib/api";
+import { SKILLS_LIST } from "../../../lib/profileOptions";
 
 const CATEGORIES = [
   "IT/소프트웨어",
@@ -27,72 +28,78 @@ export default function NewIdeaPage() {
   const [requiredMembers, setRequiredMembers] = useState(3);
   const [expectedPeriod, setExpectedPeriod] = useState("");
   const [preferredMembers, setPreferredMembers] = useState("");
-  const [techStackText, setTechStackText] = useState("");
+  const [selectedTechStack, setSelectedTechStack] = useState([]);
   const [hashtagsText, setHashtagsText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const inputClassName =
     "w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100";
 
-    const handleSubmit = async () => {
-      if (!title.trim()) {
-        alert("프로젝트 제목을 입력해주세요.");
-        return;
+  const toggleTechStack = (skill) => {
+    setSelectedTechStack((prev) =>
+      prev.includes(skill)
+        ? prev.filter((item) => item !== skill)
+        : [...prev, skill]
+    );
+  };
+
+  const handleSubmit = async () => {
+    if (!title.trim()) {
+      alert("프로젝트 제목을 입력해주세요.");
+      return;
+    }
+
+    if (!summary.trim()) {
+      alert("한 줄 요약을 입력해주세요.");
+      return;
+    }
+
+    if (!description.trim()) {
+      alert("상세 설명을 입력해주세요.");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      const payload = {
+        title: title.trim(),
+        summary: summary.trim(),
+        description: description.trim(),
+        domain,
+        difficulty,
+        required_members: Number(requiredMembers),
+        expected_period: expectedPeriod.trim(),
+        preferred_members: preferredMembers.trim(),
+        tech_stack: selectedTechStack,
+        hashtags: hashtagsText
+          .split(",")
+          .map((item) => item.trim().replace(/^#/, ""))
+          .filter(Boolean),
+        is_open: true,
+      };
+
+      const result = await createIdeaApi(payload);
+
+      const projectId =
+        result?.data?.project_id ||
+        result?.data?.converted_to_project_id;
+
+      alert("아이디어가 등록되었습니다.");
+
+      if (projectId) {
+        router.push(`/projects/${projectId}`);
+      } else {
+        router.push("/mainpage");
       }
-    
-      if (!summary.trim()) {
-        alert("한 줄 요약을 입력해주세요.");
-        return;
-      }
-    
-      if (!description.trim()) {
-        alert("상세 설명을 입력해주세요.");
-        return;
-      }
-    
-      try {
-        setIsSubmitting(true);
-    
-        const payload = {
-          title: title.trim(),
-          summary: summary.trim(),
-          description: description.trim(),
-          domain,
-          difficulty,
-          required_members: Number(requiredMembers),
-          expected_period: expectedPeriod.trim(),
-          preferred_members: preferredMembers.trim(),
-          tech_stack: techStackText
-            .split(",")
-            .map((item) => item.trim())
-            .filter(Boolean),
-          hashtags: hashtagsText
-            .split(",")
-            .map((item) => item.trim().replace(/^#/, ""))
-            .filter(Boolean),
-          is_open: true,
-        };
-    
-        const result = await createIdeaApi(payload);
-    
-        const projectId =
-          result?.data?.project_id ||
-          result?.data?.converted_to_project_id;
-    
-        alert("아이디어가 등록되었습니다.");
-    
-        if (projectId) {
-          router.push(`/projects/${projectId}`);
-        } else {
-          router.push("/mainpage");
-        }
-      } catch (error) {
-        console.error(error);
-        alert("아이디어 등록에 실패했습니다.");
-      } finally {
-        setIsSubmitting(false);
-      }
-    };
+    } catch (error) {
+      console.error(error);
+      alert("아이디어 등록에 실패했습니다.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
       <div className="mx-auto w-full max-w-5xl rounded-2xl bg-white p-8 shadow">
@@ -217,17 +224,27 @@ export default function NewIdeaPage() {
 
           <div>
             <label className="mb-2 block text-sm font-semibold text-slate-700">
-              기술 스택
+              기술 스택{" "}
+              <span className="font-normal text-slate-400">
+                ({selectedTechStack.length}개 선택)
+              </span>
             </label>
-            <input
-              value={techStackText}
-              onChange={(e) => setTechStackText(e.target.value)}
-              placeholder="예: React, FastAPI, PostgreSQL"
-              className={inputClassName}
-            />
-            <p className="mt-2 text-sm text-slate-500">
-              쉼표로 구분해서 입력해주세요.
-            </p>
+            <div className="flex flex-wrap gap-2">
+              {SKILLS_LIST.map((skill) => (
+                <button
+                  key={skill}
+                  type="button"
+                  onClick={() => toggleTechStack(skill)}
+                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                    selectedTechStack.includes(skill)
+                      ? "border-red-600 bg-red-600 text-white shadow-sm"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:text-red-600"
+                  }`}
+                >
+                  {skill}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div>

@@ -11,6 +11,7 @@ import {
   revertProjectToIdeaApi,
   getMyApplicationsApi,
 } from "../../../lib/api";
+import { SKILLS_LIST } from "../../../lib/profileOptions";
 
 const DIFFICULTY_OPTIONS = [
   { value: "beginner", label: "입문" },
@@ -71,7 +72,7 @@ export default function ProjectDetailPage() {
     max_members: 10,
     expected_period: "",
     preferred_members: "",
-    tech_stack: "",
+    tech_stack: [],
     hashtags: "",
     is_public: true,
   });
@@ -97,8 +98,8 @@ export default function ProjectDetailPage() {
       "",
     expected_period: projectData.expected_period || "",
     preferred_members: projectData.preferred_members || "",
-    tech_stack: (projectData.tech_stack || projectData.techStack || []).join(", "),
-    hashtags: (projectData.hashtags || []).join(", "),
+    tech_stack: projectData.tech_stack || projectData.techStack || [],
+    hashtags: (projectData.hashtags || projectData.hash_tags || []).join(", "),
     is_public: projectData.is_public ?? true,
   });
 
@@ -166,6 +167,19 @@ export default function ProjectDetailPage() {
     }));
   };
 
+  const toggleEditTechStack = (skill) => {
+    setEditForm((prev) => {
+      const current = Array.isArray(prev.tech_stack) ? prev.tech_stack : [];
+
+      return {
+        ...prev,
+        tech_stack: current.includes(skill)
+          ? current.filter((item) => item !== skill)
+          : [...current, skill],
+      };
+    });
+  };
+
   const handleSaveEdit = async () => {
     if (!editForm.title.trim()) {
       alert("프로젝트 제목을 입력해주세요.");
@@ -199,10 +213,7 @@ export default function ProjectDetailPage() {
         progress_percent: Number(editForm.progress_percent),
         expected_period: editForm.expected_period.trim(),
         preferred_members: editForm.preferred_members.trim(),
-        tech_stack: editForm.tech_stack
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
+        tech_stack: Array.isArray(editForm.tech_stack) ? editForm.tech_stack : [],
         hashtags: editForm.hashtags
           .split(",")
           .map((item) => item.trim().replace(/^#/, ""))
@@ -475,17 +486,33 @@ export default function ProjectDetailPage() {
 
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  기술 스택
+                  기술 스택{" "}
+                  <span className="font-normal text-slate-400">
+                    ({Array.isArray(editForm.tech_stack) ? editForm.tech_stack.length : 0}개 선택)
+                  </span>
                 </label>
-                <input
-                  className={inputClassName}
-                  value={editForm.tech_stack}
-                  onChange={(e) => handleEditChange("tech_stack", e.target.value)}
-                  placeholder="예: React, FastAPI, PostgreSQL"
-                />
-                <p className="mt-1 text-xs text-slate-500">
-                  쉼표로 구분해서 입력해주세요.
-                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {SKILLS_LIST.map((skill) => {
+                    const selected = Array.isArray(editForm.tech_stack)
+                      ? editForm.tech_stack.includes(skill)
+                      : false;
+
+                    return (
+                      <button
+                        key={skill}
+                        type="button"
+                        onClick={() => toggleEditTechStack(skill)}
+                        className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                          selected
+                            ? "border-red-600 bg-red-600 text-white shadow-sm"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:text-red-600"
+                        }`}
+                      >
+                        {skill}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div>
