@@ -569,9 +569,7 @@ export default function CoinsPage() {
               </div>
             )}
 
-            {/* 패키지 카드 */}
-            <section className="mb-6 grid gap-4 sm:grid-cols-3">
-              {packages.map((pkg) => (
+            
             <section className="mb-8">
               <div className="mb-4">
                 <h2 className="text-xl font-black text-slate-950">무료 요금제</h2>
