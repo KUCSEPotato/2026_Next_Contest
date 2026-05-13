@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { User } from "../_types";
 import { createPost, uploadPostFile } from "../_lib/api";
 import MediaPreview, { MediaItem } from "../_components/MediaPreview";
+import { useDialog, useToast } from "../../../components/AppFeedback";
+import { confirmWaterdropSpend } from "../../../lib/waterdrops";
 
 const CATEGORIES = [
   { label: "일반", value: "general" },
@@ -21,6 +23,8 @@ const getErrorMessage = (error: unknown, fallback: string) =>
 
 export default function NewPostPage() {
   const router = useRouter();
+  const toast = useToast();
+  const { confirmCoinSpend } = useDialog();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -88,6 +92,13 @@ export default function NewPostPage() {
     setError("");
 
     try {
+      const canSpend = await confirmWaterdropSpend({
+        confirmCoinSpend,
+        toast,
+        actionLabel: "모닥불 글쓰기",
+      });
+      if (!canSpend) return;
+
       const post = await createPost({
         title: title.trim() || content.trim().slice(0, 50),
         content: content.trim(),

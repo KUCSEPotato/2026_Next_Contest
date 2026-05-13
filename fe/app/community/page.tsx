@@ -269,7 +269,7 @@ export default function CommunityPage() {
                       </div>
                     </div>
                     {isActive && (
-                      <span className="rounded-full bg-orange-600 px-2 py-0.5 text-[10px] font-semibold text-white dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-600">
+                      <span className="rounded-full bg-orange-600 px-2 py-0.5 text-[10px] font-semibold text-white dark:bg-orange-500/20 dark:text-orange-200 dark:ring-1 dark:ring-orange-400/30">
                         현재
                       </span>
                     )}

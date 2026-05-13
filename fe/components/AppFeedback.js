@@ -105,11 +105,12 @@ export function AppFeedbackProvider({ children }) {
       dialogResolverRef.current = resolve;
       setDialog({
         type: "coin-confirm",
-        title: options.title || "코인을 사용할까요?",
+        title: options.title || "물방울을 사용할까요?",
         message: options.message || "",
         amount,
         currentBalance,
         remainingBalance: currentBalance - amount,
+        unitLabel: options.unitLabel || "방울",
         confirmText: options.confirmText || "사용하기",
         cancelText: options.cancelText || "돌아가기",
         tone: options.tone || "default",
@@ -217,6 +218,7 @@ function Dialog({ dialog, onClose }) {
   const [value, setValue] = useState(dialog.defaultValue || "");
   const isPrompt = dialog.type === "prompt" || dialog.type === "prompt-textarea";
   const isCoinConfirm = dialog.type === "coin-confirm";
+  const isSpendInsufficient = isCoinConfirm && dialog.remainingBalance < 0;
   const isDanger = dialog.tone === "danger";
 
   const submit = () => {
@@ -241,24 +243,33 @@ function Dialog({ dialog, onClose }) {
         {isCoinConfirm ? (
           <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-xl border border-slate-200 text-center text-sm">
             <div className="bg-slate-50 px-3 py-4">
-              <p className="text-xs font-semibold text-slate-500">사용량</p>
+              <p className="text-xs font-semibold text-slate-500">현재 물방울</p>
               <p className="mt-1 text-lg font-black text-red-600">
-                {dialog.amount.toLocaleString("ko-KR")}
+                {dialog.currentBalance.toLocaleString("ko-KR")}
+                {dialog.unitLabel}
               </p>
             </div>
             <div className="bg-white px-3 py-4">
-              <p className="text-xs font-semibold text-slate-500">현재 잔액</p>
+              <p className="text-xs font-semibold text-slate-500">사용 물방울</p>
               <p className="mt-1 text-lg font-black text-slate-950">
-                {dialog.currentBalance.toLocaleString("ko-KR")}
+                {dialog.amount.toLocaleString("ko-KR")}
+                {dialog.unitLabel}
               </p>
             </div>
             <div className="bg-slate-50 px-3 py-4">
               <p className="text-xs font-semibold text-slate-500">사용 후</p>
-              <p className="mt-1 text-lg font-black text-slate-950">
+              <p className={`mt-1 text-lg font-black ${isSpendInsufficient ? "text-red-600" : "text-slate-950"}`}>
                 {dialog.remainingBalance.toLocaleString("ko-KR")}
+                {dialog.unitLabel}
               </p>
             </div>
           </div>
+        ) : null}
+
+        {isSpendInsufficient ? (
+          <p className="mt-3 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+            물방울이 부족합니다. 상점에서 물방울을 충전해주세요.
+          </p>
         ) : null}
 
         {isPrompt ? (
@@ -297,7 +308,7 @@ function Dialog({ dialog, onClose }) {
           <button
             type="button"
             onClick={submit}
-            disabled={isPrompt && dialog.required && !value.trim()}
+            disabled={(isPrompt && dialog.required && !value.trim()) || isSpendInsufficient}
             className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300 ${
               isDanger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"
             }`}
