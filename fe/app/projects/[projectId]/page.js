@@ -15,6 +15,7 @@ import {
 } from "../../../lib/api";
 import { INTERESTS_LIST, SKILLS_LIST } from "../../../lib/profileOptions";
 import { useDialog, useToast } from "../../../components/AppFeedback";
+import { confirmWaterdropSpend } from "../../../lib/waterdrops";
 
 const DIFFICULTY_OPTIONS = [
   { value: "beginner", label: "입문" },
@@ -52,7 +53,7 @@ export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
   const toast = useToast();
-  const { prompt } = useDialog();
+  const { prompt, confirmCoinSpend } = useDialog();
   const projectId = params.projectId;
 
   const [project, setProject] = useState(null);
@@ -167,8 +168,7 @@ export default function ProjectDetailPage() {
       ));
   const hasApplied = Boolean(myApplication);
   const acceptedMemberCount = project?.members?.length || 1;
-  const isBoosted =
-    project?.boosted_until && new Date(project.boosted_until).getTime() > Date.now();
+  const isBoosted = Boolean(project?.boosted_until);
 
   const handleEditChange = (field, value) => {
     setEditForm((prev) => ({
@@ -377,6 +377,13 @@ export default function ProjectDetailPage() {
 
     try {
       setIsApplying(true);
+      const canSpend = await confirmWaterdropSpend({
+        confirmCoinSpend,
+        toast,
+        actionLabel: "프로젝트 지원",
+      });
+      if (!canSpend) return;
+
       const result = await applyProjectApi(projectId, message);
       setMyApplication(result.data || { project_id: Number(projectId), status: "pending" });
       alert("프로젝트 지원이 완료되었습니다.");

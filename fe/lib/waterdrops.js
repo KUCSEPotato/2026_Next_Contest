@@ -6,6 +6,9 @@ export async function confirmWaterdropSpend({
   confirmCoinSpend,
   toast,
   actionLabel,
+  message,
+  tone,
+  icon,
 }) {
   let balance = 0;
 
@@ -24,12 +27,15 @@ export async function confirmWaterdropSpend({
   const ok = await confirmCoinSpend({
     title: `${actionLabel}에 물방울 1방울을 사용할까요?`,
     message:
+      message ||
       "이 물방울은 아이디어 씨앗을 무럭무럭 자라게 해주는 영양이 가득한 물방울입니다.",
     amount: WATERDROP_SPEND_AMOUNT,
     currentBalance: balance,
     unitLabel: "방울",
     confirmText: "물방울 사용하기",
     cancelText: "돌아가기",
+    tone,
+    icon,
   });
 
   return Boolean(ok);

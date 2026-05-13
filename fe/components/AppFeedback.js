@@ -114,6 +114,7 @@ export function AppFeedbackProvider({ children }) {
         confirmText: options.confirmText || "사용하기",
         cancelText: options.cancelText || "돌아가기",
         tone: options.tone || "default",
+        icon: options.icon || "waterdrop",
       });
     });
   }, []);
@@ -214,12 +215,31 @@ function ToastViewport({ toasts, onDismiss }) {
   );
 }
 
+function CampfireDialogIcon() {
+  return (
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-50">
+      <svg viewBox="0 0 48 48" className="h-7 w-7" aria-hidden>
+        <path
+          d="M25 43c9-3 14-9 14-17 0-8-5-13-9-18-1 6-5 9-8 12-2-4-2-7-1-11-7 5-12 12-12 20 0 8 7 14 16 14Z"
+          fill="#f97316"
+          opacity="1"
+        />
+        <path
+          d="M24 39c4-2 7-5 7-9 0-4-2-7-5-10-1 4-4 6-6 8-1 5 0 9 4 11Z"
+          fill="#facc15"
+        />
+      </svg>
+    </span>
+  );
+}
+
 function Dialog({ dialog, onClose }) {
   const [value, setValue] = useState(dialog.defaultValue || "");
   const isPrompt = dialog.type === "prompt" || dialog.type === "prompt-textarea";
   const isCoinConfirm = dialog.type === "coin-confirm";
   const isSpendInsufficient = isCoinConfirm && dialog.remainingBalance < 0;
   const isDanger = dialog.tone === "danger";
+  const isCampfire = dialog.tone === "campfire";
 
   const submit = () => {
     if (isPrompt) {
@@ -233,18 +253,25 @@ function Dialog({ dialog, onClose }) {
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/40 px-4 py-6">
       <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-        <h2 className="text-lg font-bold text-slate-950 dark:text-slate-50">{dialog.title}</h2>
-        {dialog.message ? (
-          <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600 dark:text-slate-300">
-            {dialog.message}
-          </p>
-        ) : null}
+        <div className="flex items-start gap-3">
+          {isCoinConfirm && dialog.icon === "campfire" ? <CampfireDialogIcon /> : null}
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-bold text-slate-950 dark:text-slate-50">{dialog.title}</h2>
+            {dialog.message ? (
+              <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600 dark:text-slate-300">
+                {dialog.message}
+              </p>
+            ) : null}
+          </div>
+        </div>
 
         {isCoinConfirm ? (
-          <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-xl border border-slate-200 text-center text-sm">
-            <div className="bg-slate-50 px-3 py-4">
+          <div className={`mt-4 grid grid-cols-3 overflow-hidden rounded-xl border text-center text-sm ${
+            isCampfire ? "border-orange-200" : "border-slate-200"
+          }`}>
+            <div className={`${isCampfire ? "bg-orange-50" : "bg-slate-50"} px-3 py-4`}>
               <p className="text-xs font-semibold text-slate-500">현재 물방울</p>
-              <p className="mt-1 text-lg font-black text-red-600">
+              <p className={`mt-1 text-lg font-black ${isCampfire ? "text-orange-600" : "text-red-600"}`}>
                 {dialog.currentBalance.toLocaleString("ko-KR")}
                 {dialog.unitLabel}
               </p>
@@ -256,7 +283,7 @@ function Dialog({ dialog, onClose }) {
                 {dialog.unitLabel}
               </p>
             </div>
-            <div className="bg-slate-50 px-3 py-4">
+            <div className={`${isCampfire ? "bg-orange-50" : "bg-slate-50"} px-3 py-4`}>
               <p className="text-xs font-semibold text-slate-500">사용 후</p>
               <p className={`mt-1 text-lg font-black ${isSpendInsufficient ? "text-red-600" : "text-slate-950"}`}>
                 {dialog.remainingBalance.toLocaleString("ko-KR")}
@@ -310,7 +337,11 @@ function Dialog({ dialog, onClose }) {
             onClick={submit}
             disabled={(isPrompt && dialog.required && !value.trim()) || isSpendInsufficient}
             className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300 ${
-              isDanger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"
+              isDanger
+                ? "bg-red-600 hover:bg-red-700"
+                : isCampfire
+                  ? "bg-orange-600 hover:bg-orange-700"
+                  : "bg-slate-900 hover:bg-slate-800"
             }`}
           >
             {dialog.confirmText}

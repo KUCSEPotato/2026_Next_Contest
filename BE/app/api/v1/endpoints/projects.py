@@ -56,12 +56,12 @@ from app.schemas import TodoCreateRequest
 from app.schemas import TodoUpdateRequest
 from app.schemas import MemoirCreateRequest
 from app.schemas import MemoirRefineRequest
+from app.services.economy import spend_coins
 from app.services.economy import reward_project_completed
 from app.services.economy import reward_project_recycled
 from app.services.economy import reward_project_started
 from app.services.entitlement_service import USAGE_PROJECT_APPLY
 from app.services.entitlement_service import USAGE_PROJECT_BOOST
-from app.services.entitlement_service import USAGE_PROJECT_CREATE
 from app.services.entitlement_service import USAGE_PROJECT_DISCARD
 from app.services.entitlement_service import check_usage_allowed
 from app.services.entitlement_service import record_usage
@@ -651,7 +651,6 @@ async def create_project(
     - Authorization 헤더를 설정하고 ProjectCreateRequest body를 전달합니다.
     - 생성 성공 시 프로젝트와 리더 멤버 매핑이 함께 생성됩니다.
     """
-    check_usage_allowed(db, current_user_id, USAGE_PROJECT_CREATE)
     project = Project(
         idea_id=payload.idea_id,
         leader_id=current_user_id,
@@ -671,7 +670,15 @@ async def create_project(
 
     _sync_project_interests(db, project.id, payload.interests)
     db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
-    record_usage(db, current_user_id, USAGE_PROJECT_CREATE, target_type="project", target_id=project.id)
+    spend_coins(
+        db,
+        user_id=current_user_id,
+        amount=1,
+        event_type="waterdrop.project.create",
+        source_type="project",
+        source_id=project.id,
+        note=f"Project creation waterdrop for {project.title}",
+    )
     db.add(
         Notification(
             user_id=current_user_id,
@@ -938,7 +945,15 @@ async def apply_project(
     )
     db.add(app_obj)
     db.flush()
-    record_usage(db, current_user_id, USAGE_PROJECT_APPLY, target_type="application", target_id=app_obj.id)
+    spend_coins(
+        db,
+        user_id=current_user_id,
+        amount=1,
+        event_type="waterdrop.project.apply",
+        source_type="application",
+        source_id=app_obj.id,
+        note=f"Project application waterdrop for project {project.id}",
+    )
     if project.leader_id != current_user_id:
         applicant = db.get(User, current_user_id)
         applicant_name = applicant.nickname if applicant else "새 지원자"

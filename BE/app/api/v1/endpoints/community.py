@@ -25,9 +25,7 @@ from app.schemas import (
     ReactionRequest,
 )
 from app.services.s3_upload import get_s3_service
-from app.services.entitlement_service import USAGE_COMMUNITY_WRITE
-from app.services.entitlement_service import check_usage_allowed
-from app.services.entitlement_service import record_usage
+from app.services.economy import spend_coins
 
 router = APIRouter()
 
@@ -134,8 +132,6 @@ async def create_post(
         user = db.get(User, current_user_id)
         if user is None or user.role != "admin":
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admin can create announcement or event posts")
-    else:
-        check_usage_allowed(db, current_user_id, USAGE_COMMUNITY_WRITE)
     post = CommunityPost(
         author_id=current_user_id,
         title=payload.title,
@@ -145,7 +141,15 @@ async def create_post(
     db.add(post)
     db.flush()
     if payload.category not in ("announcement", "event"):
-        record_usage(db, current_user_id, USAGE_COMMUNITY_WRITE, target_type="community_post", target_id=post.id)
+        spend_coins(
+            db,
+            user_id=current_user_id,
+            amount=1,
+            event_type="waterdrop.community.write",
+            source_type="community_post",
+            source_id=post.id,
+            note=f"Community post waterdrop for {post.title}",
+        )
     db.commit()
     db.refresh(post)
 

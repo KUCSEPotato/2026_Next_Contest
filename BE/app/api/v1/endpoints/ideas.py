@@ -21,13 +21,10 @@ from app.models import ProjectInterest
 from app.models import ProjectMember
 from app.models import ProjectSkill
 from app.models import Skill
-from app.models import UserUsageLog
 from app.schemas import IdeaCreateRequest
 from app.schemas import IdeaUpdateRequest
 from app.schemas import ProjectCreateRequest
 from app.services.economy import spend_coins
-from app.services.entitlement_service import USAGE_IDEA_VIEW
-from app.services.entitlement_service import record_usage
 from app.services.s3_upload import get_s3_service
 
 router = APIRouter()
@@ -301,7 +298,11 @@ async def list_ideas(
 
 
 @router.get("/{idea_id}", summary="아이디어 상세", description="아이디어 상세 정보를 조회합니다.")
-async def get_idea(idea_id: int, db: Session = Depends(get_db)) -> dict:
+async def get_idea(
+    idea_id: int,
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> dict:
     """아이디어 상세 조회 API.
 
     Swagger 테스트 방법:
@@ -313,6 +314,24 @@ async def get_idea(idea_id: int, db: Session = Depends(get_db)) -> dict:
     idea = db.get(Idea, idea_id)
     if idea is None or idea.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Idea not found")
+    current_user_id = _get_optional_user_id(authorization)
+    like_count = db.query(func.count(IdeaLike.id)).filter(IdeaLike.idea_id == idea.id).scalar() or 0
+    bookmark_count = db.query(func.count(IdeaBookmark.id)).filter(IdeaBookmark.idea_id == idea.id).scalar() or 0
+    is_liked = False
+    is_bookmarked = False
+    if current_user_id:
+        is_liked = (
+            db.query(IdeaLike.id)
+            .filter(IdeaLike.user_id == current_user_id, IdeaLike.idea_id == idea.id)
+            .first()
+            is not None
+        )
+        is_bookmarked = (
+            db.query(IdeaBookmark.id)
+            .filter(IdeaBookmark.user_id == current_user_id, IdeaBookmark.idea_id == idea.id)
+            .first()
+            is not None
+        )
     return success_response(
         data={
             "id": idea.id,
@@ -326,6 +345,10 @@ async def get_idea(idea_id: int, db: Session = Depends(get_db)) -> dict:
             "difficulty": idea.difficulty,
             "required_members": idea.required_members,
             "is_open": idea.is_open,
+            "like_count": int(like_count),
+            "bookmark_count": int(bookmark_count),
+            "is_liked": is_liked,
+            "is_bookmarked": is_bookmarked,
         },
     )
 
@@ -340,16 +363,6 @@ async def spend_for_idea_view(
     if idea is None or idea.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Idea not found")
 
-    already_used_entitlement = (
-        db.query(UserUsageLog)
-        .filter(
-            UserUsageLog.user_id == current_user_id,
-            UserUsageLog.usage_type == USAGE_IDEA_VIEW,
-            UserUsageLog.target_type == "idea",
-            UserUsageLog.target_id == idea.id,
-        )
-        .first()
-    )
     already_spent_coin = (
         db.query(CoinTransaction)
         .filter(
@@ -360,15 +373,8 @@ async def spend_for_idea_view(
         )
         .first()
     )
-    if already_used_entitlement is not None or already_spent_coin is not None:
+    if already_spent_coin is not None:
         return success_response(data={"idea_id": idea.id, "already_viewed": True})
-
-    try:
-        record_usage(db, current_user_id, USAGE_IDEA_VIEW, target_type="idea", target_id=idea.id)
-        db.commit()
-        return success_response(data={"idea_id": idea.id, "view_method": "entitlement"})
-    except HTTPException:
-        db.rollback()
 
     balance = spend_coins(
         db,

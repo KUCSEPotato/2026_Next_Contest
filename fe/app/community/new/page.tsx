@@ -96,6 +96,9 @@ export default function NewPostPage() {
         confirmCoinSpend,
         toast,
         actionLabel: "모닥불 글쓰기",
+        message: "모닥불에 새 이야기를 올리면 물방울 1방울이 사용됩니다.",
+        tone: "campfire",
+        icon: "campfire",
       });
       if (!canSpend) return;
 
