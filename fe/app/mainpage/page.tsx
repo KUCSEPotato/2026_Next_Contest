@@ -806,7 +806,7 @@ function SproutHeroIcon() {
         <path
           d="M45 41C23 39 15 24 15 11c19 0 33 9 36 29"
           fill="#22c55e"
-          transform="translate(-4 0)"
+          transform="translate(-3 0)"
         />
         <path
           d="M48 78V40"
@@ -818,6 +818,7 @@ function SproutHeroIcon() {
         <path
           d="M51 45c23-2 34-16 34-33-20 0-35 10-38 32"
           fill="#16a34a"
+          transform="translate(2 2)"
         />
       </g>
       <style jsx>{`
