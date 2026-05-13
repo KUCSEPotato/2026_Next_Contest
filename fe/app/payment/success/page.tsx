@@ -12,6 +12,7 @@ type ConfirmState =
 
 function PaymentSuccessContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const calledRef = useRef(false);
   const [state, setState] = useState<ConfirmState>({
     status: "loading",
