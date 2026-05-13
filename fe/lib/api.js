@@ -1,4 +1,4 @@
-import { authenticatedFetch, getToken, getApiBaseUrl } from "./auth";
+import { authenticatedFetch, getRefreshToken, getToken, getApiBaseUrl } from "./auth";
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -787,6 +787,7 @@ export async function withdrawMyAccountApi() {
   const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/users/me`, {
     method: "DELETE",
     headers: authHeaders(),
+    body: JSON.stringify({ refresh_token: getRefreshToken() }),
   });
 
   return handleResponse(res, "회원 탈퇴에 실패했습니다.");

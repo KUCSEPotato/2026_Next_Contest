@@ -1,9 +1,12 @@
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Body, Depends, HTTPException, status, File, UploadFile
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, status, File, UploadFile
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.v1.response import success_response
+from app.core.security import decode_token
+from app.core.token_store import revoke_access_token
+from app.core.token_store import revoke_refresh_token
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
 from app.models import Idea
@@ -63,6 +66,42 @@ def _backfill_avatar_s3_key_from_url(user: User) -> bool:
         return False
 
     user.avatar_s3_key = s3_key
+    return True
+
+
+def _release_user_identity(user: User) -> None:
+    suffix = f"deleted_{user.id}_{int(datetime.now(timezone.utc).timestamp())}"
+    user.email = f"{suffix}@deleted.local"
+    user.nickname = suffix[:50]
+    user.github_id = None
+    user.google_id = None
+    user.password_hash = None
+    user.is_active = False
+
+
+def _revoke_bearer_access_token(authorization: str | None) -> None:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return
+
+    access_token = authorization.split(" ", 1)[1].strip()
+    try:
+        access_payload = decode_token(access_token)
+        expires_at = datetime.fromtimestamp(int(access_payload["exp"]), tz=timezone.utc)
+    except HTTPException:
+        expires_at = None
+    revoke_access_token(access_token, expires_at=expires_at)
+
+
+def _revoke_refresh_token_if_present(refresh_token: str | None) -> bool:
+    if not refresh_token:
+        return False
+
+    try:
+        refresh_payload = decode_token(refresh_token)
+        expires_at = datetime.fromtimestamp(int(refresh_payload["exp"]), tz=timezone.utc)
+    except HTTPException:
+        expires_at = None
+    revoke_refresh_token(refresh_token, expires_at=expires_at)
     return True
 
 
@@ -299,6 +338,8 @@ async def update_my_profile(
 
 @router.delete("/me", summary="회원 탈퇴", description="현재 로그인한 사용자를 탈퇴 처리합니다.")
 async def withdraw_my_account(
+    payload: dict = Body(default={}),
+    authorization: str | None = Header(default=None),
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -307,12 +348,13 @@ async def withdraw_my_account(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     now = datetime.now(timezone.utc)
-    user.password_hash = None
-    user.is_active = False
+    _release_user_identity(user)
     user.deleted_at = now
+    _revoke_bearer_access_token(authorization)
+    refresh_revoked = _revoke_refresh_token_if_present(payload.get("refresh_token"))
 
     db.commit()
-    return success_response(data={"withdrawn": True})
+    return success_response(data={"withdrawn": True, "refresh_revoked": refresh_revoked})
 
 
 @router.get("/me/onboarding", summary="내 온보딩 상태 조회", description="회원가입/프로필/관심 아이디어 선택 진행 상태를 조회합니다.")
