@@ -64,6 +64,12 @@ function formatDate(value) {
   });
 }
 
+function addDays(days) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date;
+}
+
 function shortJson(value) {
   if (!value) return "-";
   try {
@@ -376,17 +382,96 @@ export default function AdminPage() {
     }
   }
 
-  async function handleUserActive(userId, isActive) {
+  async function handleSuspendUser(user) {
+    const daysInput = await prompt({
+      title: "사용자 정지 기간",
+      message: `${user.nickname || user.email || `User #${user.id}`} 사용자를 며칠 동안 정지할까요?\n비워두면 무기한 정지됩니다.`,
+      placeholder: "예: 7",
+      inputType: "number",
+      confirmText: "다음",
+    });
+    if (daysInput === null) return;
+
+    const trimmedDays = String(daysInput).trim();
+    let suspendedUntil = null;
+    if (trimmedDays) {
+      const days = Number(trimmedDays);
+      if (!Number.isFinite(days) || days <= 0) {
+        toast.warning("정지 기간은 1 이상의 숫자여야 합니다.");
+        return;
+      }
+      suspendedUntil = addDays(days).toISOString();
+    }
+
+    const reasonInput = await prompt({
+      title: "사용자 정지 사유",
+      message: "사용자에게 알림으로 전달됩니다.",
+      placeholder: "정지 사유를 입력하세요.",
+      confirmText: "정지",
+      required: true,
+      multiline: true,
+      tone: "danger",
+    });
+    if (reasonInput === null) return;
+    const reason = reasonInput.trim();
+    if (!reason) {
+      toast.warning("정지 사유를 입력해주세요.");
+      return;
+    }
+
     try {
-      setProcessingKey(`user-${userId}`);
-      await updateAdminUserStatusApi(userId, { is_active: isActive });
+      setProcessingKey(`user-${user.id}`);
+      const result = await updateAdminUserStatusApi(user.id, {
+        is_active: false,
+        suspended_until: suspendedUntil,
+        suspension_reason: reason,
+      });
       setUsers((prev) =>
-        prev.map((user) =>
-          user.id === userId ? { ...user, is_active: isActive } : user
+        prev.map((item) =>
+          item.id === user.id
+            ? {
+                ...item,
+                is_active: result.data?.is_active ?? false,
+                suspended_until: result.data?.suspended_until ?? suspendedUntil,
+                suspension_reason: result.data?.suspension_reason ?? reason,
+              }
+            : item
         )
       );
+      toast.success("사용자를 정지했고 알림을 보냈습니다.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "사용자 상태 변경에 실패했습니다.");
+      toast.error(err instanceof Error ? err.message : "사용자 정지에 실패했습니다.");
+    } finally {
+      setProcessingKey("");
+    }
+  }
+
+  async function handleRestoreUser(user) {
+    const ok = await confirm({
+      title: "사용자 복구",
+      message: `${user.nickname || user.email || `User #${user.id}`} 사용자의 정지를 해제할까요?`,
+      confirmText: "복구",
+    });
+    if (!ok) return;
+
+    try {
+      setProcessingKey(`user-${user.id}`);
+      const result = await updateAdminUserStatusApi(user.id, { is_active: true });
+      setUsers((prev) =>
+        prev.map((item) =>
+          item.id === user.id
+            ? {
+                ...item,
+                is_active: result.data?.is_active ?? true,
+                suspended_until: result.data?.suspended_until ?? null,
+                suspension_reason: result.data?.suspension_reason ?? null,
+              }
+            : item
+        )
+      );
+      toast.success("사용자를 복구했고 알림을 보냈습니다.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "사용자 복구에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
@@ -1089,7 +1174,17 @@ export default function AdminPage() {
                       </Td>
                       <Td>{user.role}</Td>
                       <Td>{user.coin_balance}</Td>
-                      <Td><StatusBadge value={user.is_active ? "active" : "inactive"} /></Td>
+                      <Td>
+                        <StatusBadge value={user.is_active ? "active" : "suspended"} />
+                        {!user.is_active ? (
+                          <div className="mt-1 max-w-56 text-xs leading-5 text-slate-500">
+                            <p>종료: {user.suspended_until ? formatDate(user.suspended_until) : "무기한"}</p>
+                            {user.suspension_reason ? (
+                              <p className="line-clamp-2">사유: {user.suspension_reason}</p>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </Td>
                       <Td>
                         <div className="flex flex-wrap gap-2">
                           <select
@@ -1104,12 +1199,12 @@ export default function AdminPage() {
                               </option>
                             ))}
                           </select>
-                          <button
-                            onClick={() => handleUserActive(user.id, !user.is_active)}
-                            disabled={processingKey === `user-${user.id}`}
-                            className="rounded-md border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                          >
-                            {user.is_active ? "정지" : "복구"}
+	                          <button
+	                            onClick={() => user.is_active ? handleSuspendUser(user) : handleRestoreUser(user)}
+	                            disabled={processingKey === `user-${user.id}`}
+	                            className="rounded-md border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+	                          >
+	                            {user.is_active ? "정지" : "복구"}
                           </button>
                           <button
                             onClick={() => handleGrantCoins(user.id)}
@@ -1416,7 +1511,7 @@ function Td({ children, className = "", ...props }) {
 function StatusBadge({ value }) {
   const normalized = String(value || "-");
   const tone =
-    ["open", "inactive", "deleted"].includes(normalized)
+    ["open", "inactive", "deleted", "suspended"].includes(normalized)
       ? "bg-red-50 text-red-700"
       : ["pending", "reviewing", "planning"].includes(normalized)
       ? "bg-amber-50 text-amber-700"

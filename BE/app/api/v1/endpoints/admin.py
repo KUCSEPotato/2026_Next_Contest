@@ -119,6 +119,58 @@ def _notify_coin_adjustment(
     )
 
 
+def _parse_suspended_until(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    normalized = value.replace("Z", "+00:00")
+    parsed = datetime.fromisoformat(normalized)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _notify_user_suspension(
+    db: Session,
+    *,
+    user_id: int,
+    suspended_until: datetime | None,
+    reason: str | None,
+) -> None:
+    if suspended_until is None:
+        title = "계정 이용이 정지되었습니다"
+        body = "관리자에 의해 계정 이용이 정지되었습니다."
+    else:
+        title = "계정 이용이 일시 정지되었습니다"
+        body = f"관리자에 의해 {suspended_until.isoformat()}까지 계정 이용이 정지되었습니다."
+    if reason:
+        body = f"{body}\n사유: {reason}"
+
+    db.add(
+        Notification(
+            user_id=user_id,
+            type="admin_user_suspended",
+            title=title,
+            body=body,
+            data={
+                "suspended_until": suspended_until.isoformat() if suspended_until else None,
+                "reason": reason,
+            },
+        )
+    )
+
+
+def _notify_user_restored(db: Session, *, user_id: int) -> None:
+    db.add(
+        Notification(
+            user_id=user_id,
+            type="admin_user_restored",
+            title="계정 이용이 복구되었습니다",
+            body="관리자에 의해 계정 이용 제한이 해제되었습니다.",
+            data={},
+        )
+    )
+
+
 @router.get("/overview", summary="관리자 운영 요약", description="관리자 대시보드에 필요한 핵심 운영 지표를 조회합니다.")
 async def get_admin_overview(
     current_user_id: int = Depends(get_current_user_id),
@@ -181,6 +233,8 @@ async def list_users_for_admin(
                 "nickname": u.nickname,
                 "role": u.role,
                 "is_active": u.is_active,
+                "suspended_until": u.suspended_until,
+                "suspension_reason": u.suspension_reason,
                 "is_verified": u.is_verified,
                 "github_id": u.github_id,
                 "google_id": u.google_id,
@@ -249,14 +303,42 @@ async def update_user_status(
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     if "is_active" in payload:
-        user.is_active = bool(payload["is_active"])
+        next_active = bool(payload["is_active"])
+        if next_active:
+            user.is_active = True
+            user.suspended_until = None
+            user.suspension_reason = None
+            _notify_user_restored(db, user_id=user.id)
+        else:
+            suspended_until = _parse_suspended_until(payload.get("suspended_until"))
+            if suspended_until is not None and suspended_until <= datetime.now(timezone.utc):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Suspension end time must be in the future")
+            reason = payload.get("suspension_reason")
+            reason = reason.strip() if isinstance(reason, str) and reason.strip() else None
+            user.is_active = False
+            user.suspended_until = suspended_until
+            user.suspension_reason = reason
+            _notify_user_suspension(
+                db,
+                user_id=user.id,
+                suspended_until=suspended_until,
+                reason=reason,
+            )
     if "role" in payload:
         role = payload["role"]
         if role not in {"user", "leader", "admin"}:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role")
         user.role = role
     db.commit()
-    return success_response(data={"id": user.id, "is_active": user.is_active, "role": user.role})
+    return success_response(
+        data={
+            "id": user.id,
+            "is_active": user.is_active,
+            "role": user.role,
+            "suspended_until": user.suspended_until,
+            "suspension_reason": user.suspension_reason,
+        }
+    )
 
 
 @router.get("/projects", summary="관리자 프로젝트 목록", description="관리자 권한으로 프로젝트 목록을 조회합니다.")
