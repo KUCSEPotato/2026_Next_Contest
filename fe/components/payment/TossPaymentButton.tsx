@@ -7,6 +7,7 @@ import { getStoredUser } from "../../lib/auth";
 
 type TossPaymentButtonProps = {
   productId: string;
+  productCode?: string;
   label?: string;
   className?: string;
   disabled?: boolean;
@@ -28,6 +29,7 @@ function buildCustomerKey() {
 
 export default function TossPaymentButton({
   productId,
+  productCode,
   label = "카드 결제",
   className = "",
   disabled = false,
@@ -44,7 +46,7 @@ export default function TossPaymentButton({
 
     try {
       setLoading(true);
-      const result = await preparePaymentApi({ product_id: productId });
+      const result = await preparePaymentApi({ product_code: productCode || productId });
       const paymentOrder = result.data;
       const user = getStoredUser();
       const tossPayments = await loadTossPayments(clientKey);

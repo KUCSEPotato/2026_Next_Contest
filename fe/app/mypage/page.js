@@ -14,6 +14,7 @@ import {
   getMyProjectsApi,
   getMyApplicationsApi,
   getMyReceivedReviewsApi,
+  getOAuthLinksApi,
   updateMyProfileApi,
   withdrawMyAccountApi,
   addMySkillApi,
@@ -24,7 +25,18 @@ import {
   getImageUrl,
   getChatRoomsApi,
   createChatRoomApi,
+  getMyEntitlementApi,
 } from "../../lib/api";
+
+function formatEntitlementDate(value) {
+  if (!value) return "제한 없음";
+
+  return new Date(value).toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
 
 export default function MyPage() {
   const router = useRouter();
@@ -39,6 +51,8 @@ export default function MyPage() {
   const [projects, setProjects] = useState([]);
   const [appliedProjects, setAppliedProjects] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [oauthLinks, setOauthLinks] = useState(null);
+  const [entitlement, setEntitlement] = useState(null);
   const [projectStatusFilter, setProjectStatusFilter] = useState("all");
   const [projectRoleFilter, setProjectRoleFilter] = useState("all");
   const [projectSortOrder, setProjectSortOrder] = useState("latest");
@@ -47,6 +61,7 @@ export default function MyPage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [showReviews, setShowReviews] = useState(false);
+  const [isStartingGithubLink, setIsStartingGithubLink] = useState(false);
   const [openingChatProjectId, setOpeningChatProjectId] = useState(null);
 
   const [editNickname, setEditNickname] = useState("");
@@ -117,12 +132,21 @@ export default function MyPage() {
         setEditNickname(profileData.nickname || "");
         setEditBio(profileData.bio || "");
 
-        const [reputationResult, statsResult, projectsResult, applicationsResult] =
+        const [
+          reputationResult,
+          statsResult,
+          projectsResult,
+          applicationsResult,
+          oauthLinksResult,
+          entitlementResult,
+        ] =
           await Promise.allSettled([
             getMyReputationApi(),
             getUserStatsApi(profileData.id),
             getMyProjectsApi(),
             getMyApplicationsApi(),
+            getOAuthLinksApi(),
+            getMyEntitlementApi(),
           ]);
 
         setReputation(
@@ -153,6 +177,16 @@ export default function MyPage() {
             ? applicationsResult.value.data || []
             : []
         );
+        setOauthLinks(
+          oauthLinksResult.status === "fulfilled"
+            ? oauthLinksResult.value.data
+            : null
+        );
+        setEntitlement(
+          entitlementResult.status === "fulfilled"
+            ? entitlementResult.value.data
+            : null
+        );
 
         const reviewsData = await loadReceivedReviews(profileData.id, statsData);
         setReviews(reviewsData);
@@ -167,6 +201,17 @@ export default function MyPage() {
 
     loadMyPage();
   }, [router]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("github_linked") !== "1") return;
+
+    toast.success("GitHub 계정이 연동되었습니다.");
+    router.replace("/mypage", { scroll: false });
+  }, [loading, router, toast]);
 
   useEffect(() => {
     if (loading) return;
@@ -238,6 +283,29 @@ export default function MyPage() {
     } finally {
       setIsWithdrawing(false);
     }
+  };
+
+  const handleStartGithubLink = () => {
+    const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
+    const redirectUri =
+      process.env.NEXT_PUBLIC_GITHUB_REDIRECT_URI ||
+      `${window.location.origin}/auth/github/callback`;
+
+    if (!clientId) {
+      toast.error("GitHub OAuth 환경변수가 설정되지 않았습니다.");
+      return;
+    }
+
+    setIsStartingGithubLink(true);
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      scope: "read:user user:email",
+      state: "link_github",
+    });
+
+    window.location.href = `https://github.com/login/oauth/authorize?${params.toString()}`;
   };
 
   const handleAddSkill = async (skillName) => {
@@ -425,10 +493,80 @@ export default function MyPage() {
                 items={profile?.interests}
                 tone="slate"
               />
+              {entitlement && (
+                <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-slate-700">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-bold text-red-700">
+                      현재 플랜: {entitlement.name || entitlement.plan || "무료"}
+                    </span>
+                    {entitlement.product_type !== "FREE" && (
+                      <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-red-600">
+                        {entitlement.product_type === "SUBSCRIPTION" ? "30일 이용권" : "기간권"}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">
+                    남은 기간:{" "}
+                    {entitlement.days_remaining === null || entitlement.days_remaining === undefined
+                      ? "제한 없음"
+                      : `${entitlement.days_remaining}일`}
+                    {" · "}
+                    만료일: {formatEntitlementDate(entitlement.expires_at)}
+                  </p>
+                  {entitlement.product_type === "SUBSCRIPTION" && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      다음 갱신일: {formatEntitlementDate(entitlement.next_renewal_at)}
+                      {" · "}
+                      자동 갱신:{" "}
+                      {entitlement.auto_renew_enabled
+                        ? "사용 중"
+                        : entitlement.renewal_status === "PENDING_BILLING_SETUP"
+                          ? "결제수단 등록 필요"
+                          : "꺼짐"}
+                    </p>
+                  )}
+                  <p className="mt-2 text-xs text-slate-600">
+                    프로젝트 생성:{" "}
+                    {entitlement.benefits?.project_create_daily_limit
+                      ? `일 ${entitlement.benefits.project_create_daily_limit}회`
+                      : entitlement.benefits?.project_create_total_limit
+                        ? `총 ${entitlement.benefits.project_create_total_limit}회`
+                        : "불가"}
+                    {" · "}
+                    지원:{" "}
+                    {entitlement.benefits?.project_apply_unlimited
+                      ? "무제한"
+                      : entitlement.benefits?.project_apply_daily_limit
+                        ? `일 ${entitlement.benefits.project_apply_daily_limit}회`
+                        : entitlement.benefits?.project_apply_total_limit
+                          ? `총 ${entitlement.benefits.project_apply_total_limit}회`
+                          : "일 1회"}
+                    {entitlement.benefits?.project_boost_remaining
+                      ? ` · 상단 노출 ${entitlement.benefits.project_boost_remaining}회 남음`
+                      : ""}
+                  </p>
+                </div>
+              )}
             </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-3">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-3">
+              {oauthLinks?.github_linked ? (
+                <span className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600">
+                  <GithubIcon />
+                  GitHub 연동됨
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleStartGithubLink}
+                  disabled={isStartingGithubLink}
+                  className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <GithubIcon />
+                  {isStartingGithubLink ? "연동 중..." : "GitHub 연동"}
+                </button>
+              )}
               <button
                 onClick={() => setIsEditingProfile(true)}
                 className="rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
@@ -758,6 +896,14 @@ export default function MyPage() {
       </div>
 
     </main>
+  );
+}
+
+function GithubIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.92.58.11.79-.25.79-.56v-2.1c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.27-1.68-1.27-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.16 1.18.92-.26 1.9-.38 2.88-.39.98 0 1.96.13 2.88.39 2.2-1.49 3.16-1.18 3.16-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.83 1.18 3.08 0 4.42-2.69 5.39-5.25 5.67.41.35.77 1.04.77 2.1v3.16c0 .31.21.67.79.56A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z" />
+    </svg>
   );
 }
 

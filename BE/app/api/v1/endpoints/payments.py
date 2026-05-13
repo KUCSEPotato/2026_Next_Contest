@@ -7,14 +7,19 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
-from app.api.v1.endpoints.coins import _get_package
 from app.api.v1.response import success_response
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
 from app.models import Payment
+from app.models import PaymentProduct
 from app.models import User
 from app.services.economy import award_coins
 from app.services.economy import notify_user
+from app.services.entitlement_service import create_entitlement_for_payment
+from app.services.entitlement_service import get_payment_product_or_404
+from app.services.entitlement_service import list_payment_products
+from app.services.entitlement_service import serialize_effective_plan
+from app.services.entitlement_service import serialize_product
 from app.services.toss_payment_service import confirm_toss_payment
 
 router = APIRouter()
@@ -26,7 +31,8 @@ PAYMENT_STATUS_FAILED = "FAILED"
 
 
 class PaymentPrepareRequest(BaseModel):
-    product_id: str = Field(min_length=1, max_length=50)
+    product_code: str | None = Field(default=None, min_length=1, max_length=50)
+    product_id: str | None = Field(default=None, min_length=1, max_length=50)
 
 
 class PaymentConfirmRequest(BaseModel):
@@ -52,6 +58,9 @@ def _payment_response(payment: Payment, *, balance: int | None = None) -> dict[s
         "order_name": payment.order_name,
         "amount": payment.amount,
         "coin_amount": payment.coin_amount,
+        "product_code": payment.product_code,
+        "product_type": payment.product_type,
+        "entitlement_id": payment.entitlement_id,
         "status": payment.status,
     }
     if balance is not None:
@@ -80,7 +89,24 @@ def _load_payment_for_user(db: Session, order_id: str, user_id: int) -> Payment:
     return payment
 
 
-@router.post("/prepare", summary="토스 결제 주문 생성", description="서버가 코인 상품 금액과 주문번호를 확정하고 결제 준비 데이터를 반환합니다.")
+@router.get("/products", summary="결제 상품 목록", description="구독제/기간권 결제 상품 목록을 조회합니다.")
+async def get_payment_products(db: Session = Depends(get_db)) -> dict:
+    products = list_payment_products(db)
+    db.commit()
+    return success_response(data=[serialize_product(product) for product in products])
+
+
+@router.get("/me/entitlement", summary="내 현재 권한 조회", description="현재 로그인 사용자의 활성 유료 권한 또는 FREE 권한을 조회합니다.")
+async def get_my_entitlement(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    data = serialize_effective_plan(db, current_user_id)
+    db.commit()
+    return success_response(data=data)
+
+
+@router.post("/prepare", summary="토스 결제 주문 생성", description="서버가 상품 금액과 주문번호를 확정하고 결제 준비 데이터를 반환합니다.")
 async def prepare_payment(
     payload: PaymentPrepareRequest,
     current_user_id: int = Depends(get_current_user_id),
@@ -90,18 +116,23 @@ async def prepare_payment(
     if user is None or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    package = _get_package(payload.product_id)
-    coin_amount = int(package["coin_amount"])
-    amount = int(package["price_krw"])
-    order_name = f"Devory 코인 {coin_amount}개"
-    order_id = f"devory_coin_{current_user_id}_{uuid.uuid4().hex}"
+    product_code = payload.product_code or payload.product_id
+    if not product_code:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="product_code is required")
+
+    product = get_payment_product_or_404(db, product_code)
+    amount = int(product.price_krw)
+    order_name = product.name
+    order_id = f"devory_{product.product_code.lower()}_{current_user_id}_{uuid.uuid4().hex}"
 
     payment = Payment(
         user_id=current_user_id,
         order_id=order_id,
         order_name=order_name,
         amount=amount,
-        coin_amount=coin_amount,
+        product_id=product.id,
+        product_code=product.product_code,
+        product_type=product.product_type,
         currency="KRW",
         status=PAYMENT_STATUS_READY,
         provider="TOSS",
@@ -177,23 +208,43 @@ async def confirm_payment(
     payment.method = toss_data.get("method")
     payment.approved_at = datetime.now(timezone.utc)
     payment.toss_raw_response = toss_data
-    balance = award_coins(
-        db,
-        user_id=payment.user_id,
-        amount=int(payment.coin_amount or 0),
-        event_type="coin.purchase",
-        source_type="payment",
-        source_id=payment.id,
-        note=payment.order_name,
-    )
-    notify_user(
-        db,
-        user_id=payment.user_id,
-        notification_type="coin.payment_done",
-        title="코인 충전이 완료되었습니다.",
-        body=f"{payment.coin_amount}코인이 충전되었습니다.",
-        data={"payment_id": payment.id, "order_id": payment.order_id, "coin_amount": payment.coin_amount},
-    )
+    balance = user.coin_balance
+    if payment.product_id is not None:
+        product = db.get(PaymentProduct, payment.product_id)
+        if product is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment product not found")
+        entitlement = create_entitlement_for_payment(db, payment, product)
+        notify_user(
+            db,
+            user_id=payment.user_id,
+            notification_type="payment.entitlement_done",
+            title="이용권이 활성화되었습니다.",
+            body=f"{product.name} 권한이 {entitlement.expires_at.date().isoformat()}까지 활성화되었습니다.",
+            data={
+                "payment_id": payment.id,
+                "order_id": payment.order_id,
+                "entitlement_id": entitlement.id,
+                "product_code": product.product_code,
+            },
+        )
+    elif payment.coin_amount:
+        balance = award_coins(
+            db,
+            user_id=payment.user_id,
+            amount=int(payment.coin_amount or 0),
+            event_type="coin.purchase",
+            source_type="payment",
+            source_id=payment.id,
+            note=payment.order_name,
+        )
+        notify_user(
+            db,
+            user_id=payment.user_id,
+            notification_type="coin.payment_done",
+            title="코인 충전이 완료되었습니다.",
+            body=f"{payment.coin_amount}코인이 충전되었습니다.",
+            data={"payment_id": payment.id, "order_id": payment.order_id, "coin_amount": payment.coin_amount},
+        )
     db.commit()
     db.refresh(payment)
 

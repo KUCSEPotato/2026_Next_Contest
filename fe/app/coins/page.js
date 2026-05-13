@@ -7,6 +7,7 @@ import {
   getCoinPackagesApi,
   getMyCoinBalanceApi,
   getMyCoinPurchaseRequestsApi,
+  getPaymentProductsApi,
 } from "../../lib/api";
 import { getToken } from "../../lib/auth";
 import { useDialog, useToast } from "../../components/AppFeedback";
@@ -245,14 +246,12 @@ export default function CoinsPage() {
   const router = useRouter();
   const toast  = useToast();
   const { confirm, prompt } = useDialog();
-
-  const [balance,           setBalance]           = useState(0);
-  const [packages,          setPackages]           = useState([]);
-  const [requests,          setRequests]           = useState([]);
-  const [loading,           setLoading]            = useState(true);
-  const [processingPackage, setProcessingPackage]  = useState("");
-  const [showHistory,       setShowHistory]        = useState(false);
-
+  const [balance, setBalance] = useState(0);
+  const [packages, setPackages] = useState([]);
+  const [paymentProducts, setPaymentProducts] = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [processingPackage, setProcessingPackage] = useState("");
   const pendingRequests = useMemo(
     () => requests.filter((r) => r.status === "pending"),
     [requests],
@@ -261,14 +260,16 @@ export default function CoinsPage() {
   const loadCoins = useCallback(async () => {
     try {
       setLoading(true);
-      const [balanceResult, packagesResult, requestsResult] = await Promise.all([
+      const [balanceResult, packagesResult, requestsResult, paymentProductsResult] = await Promise.all([
         getMyCoinBalanceApi(),
         getCoinPackagesApi(),
         getMyCoinPurchaseRequestsApi(),
+        getPaymentProductsApi(),
       ]);
       setBalance(balanceResult.data?.waterdrop_balance ?? balanceResult.data?.coin_balance ?? 0);
       setPackages(packagesResult.data || []);
       setRequests(requestsResult.data || []);
+      setPaymentProducts(paymentProductsResult.data || []);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "물방울 정보를 불러오지 못했습니다.");
     } finally {
@@ -385,6 +386,72 @@ export default function CoinsPage() {
             {/* 패키지 카드 */}
             <section className="mb-6 grid gap-4 sm:grid-cols-3">
               {packages.map((pkg) => (
+            <section className="mb-8">
+              <div className="mb-4">
+                <h2 className="text-xl font-black text-slate-950">이용권</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  구독제는 30일 이용권으로 먼저 제공되며, 기간권은 자동 갱신되지 않습니다.
+                </p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                {paymentProducts.map((product) => (
+                  <article
+                    key={product.product_code}
+                    className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-red-200 hover:shadow-md"
+                  >
+                    <p className="text-sm font-bold text-red-600">
+                      {product.product_type === "SUBSCRIPTION" ? "월 구독" : "기간권"}
+                    </p>
+                    <h3 className="mt-2 text-2xl font-black text-slate-950">{product.name}</h3>
+                    <p className="mt-1 text-lg font-bold text-slate-800">
+                      {formatKrw(product.price_krw)}
+                    </p>
+                    <p className="mt-2 text-sm text-slate-500">
+                      {product.duration_days}일 동안 활성화
+                    </p>
+                    <ul className="mt-4 space-y-1 text-sm text-slate-600">
+                      <li>
+                        프로젝트 생성:{" "}
+                        {product.benefits?.project_create_daily_limit
+                          ? `일 ${product.benefits.project_create_daily_limit}회`
+                          : product.benefits?.project_create_total_limit
+                          ? `총 ${product.benefits.project_create_total_limit}회`
+                          : "불가"}
+                      </li>
+                      <li>
+                        프로젝트 지원:{" "}
+                        {product.benefits?.project_apply_unlimited
+                          ? "무제한"
+                          : product.benefits?.project_apply_total_limit
+                          ? `총 ${product.benefits.project_apply_total_limit}회`
+                          : "제한"}
+                      </li>
+                      <li>
+                        자유게시판: {product.benefits?.community_write_unlimited ? "무제한" : "일 제한"}
+                      </li>
+                    </ul>
+                    <TossPaymentButton
+                      productId={product.product_code}
+                      productCode={product.product_code}
+                      label="카드 결제"
+                      onError={(err) =>
+                        toast.error(err instanceof Error ? err.message : "결제를 시작하지 못했습니다.")
+                      }
+                      className="mt-5 w-full rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    />
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <div className="mb-4">
+              <h2 className="text-xl font-black text-slate-950">물방울 수동 충전</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                FREE/PASS 사용자의 아이디어 열람 등에 사용할 물방울입니다.
+              </p>
+            </div>
+            <section className="grid gap-4 md:grid-cols-3">
+              {packages.map((packageItem) => (
                 <article
                   key={pkg.id}
                   className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:border-sky-200 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/80 dark:hover:border-sky-500/30"

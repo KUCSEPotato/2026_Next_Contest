@@ -1,6 +1,6 @@
 import asyncio
 import re
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone, date, timedelta
 from collections import defaultdict
 from math import ceil
 import os
@@ -8,6 +8,7 @@ import os
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from fastapi import WebSocket, WebSocketDisconnect
 from google import genai
+from sqlalchemy import case
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -56,7 +57,12 @@ from app.schemas import MemoirRefineRequest
 from app.services.economy import reward_project_completed
 from app.services.economy import reward_project_recycled
 from app.services.economy import reward_project_started
-from app.services.economy import spend_coins
+from app.services.entitlement_service import USAGE_PROJECT_APPLY
+from app.services.entitlement_service import USAGE_PROJECT_BOOST
+from app.services.entitlement_service import USAGE_PROJECT_CREATE
+from app.services.entitlement_service import USAGE_PROJECT_DISCARD
+from app.services.entitlement_service import check_usage_allowed
+from app.services.entitlement_service import record_usage
 from app.core.realtime import project_todo_channel
 from app.core.realtime import chat_room_channel
 from app.core.realtime import realtime_hub
@@ -616,6 +622,7 @@ async def create_project(
     - Authorization 헤더를 설정하고 ProjectCreateRequest body를 전달합니다.
     - 생성 성공 시 프로젝트와 리더 멤버 매핑이 함께 생성됩니다.
     """
+    check_usage_allowed(db, current_user_id, USAGE_PROJECT_CREATE)
     project = Project(
         idea_id=payload.idea_id,
         leader_id=current_user_id,
@@ -634,15 +641,7 @@ async def create_project(
     db.flush()
 
     db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
-    spend_coins(
-        db,
-        user_id=current_user_id,
-        amount=1,
-        event_type="waterdrop.project.create",
-        source_type="project",
-        source_id=project.id,
-        note=f"Project creation waterdrop for {project.title}",
-    )
+    record_usage(db, current_user_id, USAGE_PROJECT_CREATE, target_type="project", target_id=project.id)
     db.add(
         Notification(
             user_id=current_user_id,
@@ -676,7 +675,18 @@ async def list_projects(
         query = query.filter(Project.status == status_filter)
 
     total = query.count()
-    projects = query.order_by(Project.created_at.desc()).offset((page - 1) * size).limit(size).all()
+    now = datetime.now(timezone.utc)
+    boosted_rank = case((Project.boosted_until > now, 1), else_=0)
+    projects = (
+        query.order_by(
+            boosted_rank.desc(),
+            Project.boost_score.desc(),
+            Project.created_at.desc(),
+        )
+        .offset((page - 1) * size)
+        .limit(size)
+        .all()
+    )
     
     data = []
     for p in projects:
@@ -735,6 +745,8 @@ async def list_projects(
             "openRecruitmentCount": 1 if open_recruitment else 0,
             "openRecruitmentRequiredCount": open_recruitment.required_count if open_recruitment else 0,
             "openRecruitmentPosition": open_recruitment.position_name if open_recruitment else None,
+            "boosted_until": p.boosted_until.isoformat() if p.boosted_until else None,
+            "boost_score": p.boost_score,
             "created_at": p.created_at.isoformat() if p.created_at else None,
         })
     
@@ -817,6 +829,8 @@ async def get_project(project_id: int, db: Session = Depends(get_db)) -> dict:
             "domain": project.category,
             "progress_percent": float(project.progress_percent),
             "leader_id": project.leader_id,
+            "boosted_until": project.boosted_until.isoformat() if project.boosted_until else None,
+            "boost_score": project.boost_score,
             "currentMembers": len(members),
             "maxMembers": project.max_members,
             "max_members": project.max_members,
@@ -829,6 +843,29 @@ async def get_project(project_id: int, db: Session = Depends(get_db)) -> dict:
                 _serialize_project_member(member, member_users.get(member.user_id))
                 for member in members
             ],
+        }
+    )
+
+
+@router.post("/{project_id}/boost", summary="프로젝트 상단 노출", description="PRO 권한으로 프로젝트를 상단 노출합니다.")
+async def boost_project(
+    project_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    project = _get_project_or_404(db, project_id)
+    _ensure_project_leader(project, current_user_id)
+    record_usage(db, current_user_id, USAGE_PROJECT_BOOST, target_type="project", target_id=project.id)
+    now = datetime.now(timezone.utc)
+    project.boosted_until = max(project.boosted_until or now, now) + timedelta(days=7)
+    project.boost_score = int(project.boost_score or 0) + 1
+    db.commit()
+    db.refresh(project)
+    return success_response(
+        data={
+            "id": project.id,
+            "boosted_until": project.boosted_until,
+            "boost_score": project.boost_score,
         }
     )
 
@@ -851,18 +888,17 @@ async def apply_project(
     if exists:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Application already exists")
 
-    app_obj = Application(project_id=project_id, applicant_id=current_user_id, message=payload.message, status="pending")
+    usage = check_usage_allowed(db, current_user_id, USAGE_PROJECT_APPLY)
+    app_obj = Application(
+        project_id=project_id,
+        applicant_id=current_user_id,
+        message=payload.message,
+        status="pending",
+        is_priority=bool(usage.get("priority")),
+    )
     db.add(app_obj)
     db.flush()
-    spend_coins(
-        db,
-        user_id=current_user_id,
-        amount=1,
-        event_type="waterdrop.project.apply",
-        source_type="application",
-        source_id=app_obj.id,
-        note=f"Project application waterdrop for {project.title}",
-    )
+    record_usage(db, current_user_id, USAGE_PROJECT_APPLY, target_type="application", target_id=app_obj.id)
     if project.leader_id != current_user_id:
         applicant = db.get(User, current_user_id)
         applicant_name = applicant.nickname if applicant else "새 지원자"
@@ -881,7 +917,7 @@ async def apply_project(
         )
     db.commit()
     db.refresh(app_obj)
-    return success_response(data={"id": app_obj.id, "status": app_obj.status})
+    return success_response(data={"id": app_obj.id, "status": app_obj.status, "is_priority": app_obj.is_priority})
 
 
 @router.get("/{project_id}/applications", summary="지원자 목록", description="프로젝트 리더가 지원자 목록을 조회합니다.")
@@ -898,7 +934,12 @@ async def list_applications(
     """
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
-    apps = db.query(Application).filter(Application.project_id == project_id).order_by(Application.id.desc()).all()
+    apps = (
+        db.query(Application)
+        .filter(Application.project_id == project_id)
+        .order_by(Application.is_priority.desc(), Application.id.desc())
+        .all()
+    )
     applicant_ids = [app.applicant_id for app in apps]
     applicants = (
         {user.id: user for user in db.query(User).filter(User.id.in_(applicant_ids)).all()}
@@ -912,6 +953,7 @@ async def list_applications(
                 "applicant_id": app.applicant_id,
                 "message": app.message,
                 "status": app.status,
+                "is_priority": app.is_priority,
                 "applicant": {
                     "id": applicants[app.applicant_id].id,
                     "nickname": applicants[app.applicant_id].nickname,
@@ -1124,8 +1166,10 @@ async def delete_project(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Completed projects cannot be discarded",
         )
+    check_usage_allowed(db, current_user_id, USAGE_PROJECT_DISCARD)
     if project.idea_id is not None and project.status != "completed":
         reward_project_recycled(db, project)
+    record_usage(db, current_user_id, USAGE_PROJECT_DISCARD, target_type="project", target_id=project.id)
     project.deleted_at = datetime.now(timezone.utc)
     db.commit()
     return success_response(data={"deleted": True, "id": project_id})
@@ -1164,6 +1208,7 @@ async def revert_project_to_idea(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Completed projects cannot be discarded",
         )
+    check_usage_allowed(db, current_user_id, USAGE_PROJECT_DISCARD)
     
     # 원본 Idea 복원 (있으면)
     idea_reverted = False
@@ -1177,6 +1222,7 @@ async def revert_project_to_idea(
 
     if project.idea_id is not None:
         reward_project_recycled(db, project)
+    record_usage(db, current_user_id, USAGE_PROJECT_DISCARD, target_type="project", target_id=project.id)
     
     # 프로젝트 soft delete
     project.deleted_at = datetime.now(timezone.utc)

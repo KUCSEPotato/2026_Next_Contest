@@ -198,7 +198,17 @@ export default function PostDetailPage() {
         content: editContent.trim(),
         category: editCategory || undefined,
       });
-      setPost(updated as PostDetail);
+      setPost((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...updated,
+              comment_count: updated.comment_count ?? prev.comment_count,
+              reaction_stats: updated.reaction_stats ?? prev.reaction_stats,
+              user_reaction: updated.user_reaction ?? prev.user_reaction,
+            }
+          : (updated as PostDetail)
+      );
       setEditing(false);
     } catch (e: unknown) {
       alert(getErrorMessage(e, "수정에 실패했어요."));

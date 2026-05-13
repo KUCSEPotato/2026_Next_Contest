@@ -2,7 +2,12 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getApiBaseUrl, saveAuthSession } from "../../../../lib/auth";
+import {
+  authenticatedFetch,
+  getApiBaseUrl,
+  loadCurrentUser,
+  saveAuthSession,
+} from "../../../../lib/auth";
 
 const API_BASE = getApiBaseUrl();
 
@@ -33,6 +38,43 @@ function GithubCallbackContent() {
   const [status, setStatus] = useState("processing");
   const [errorMsg, setErrorMsg] = useState("");
   const [linkInfo, setLinkInfo] = useState(null);
+  const [errorReturnPath, setErrorReturnPath] = useState("/signup");
+
+  const handleGithubAccountLink = useCallback(async (code, oauthRedirectUri = null) => {
+    try {
+      const redirectUri =
+        oauthRedirectUri ||
+        process.env.NEXT_PUBLIC_GITHUB_REDIRECT_URI ||
+        `${window.location.origin}/auth/github/callback`;
+
+      const res = await authenticatedFetch(
+        `${API_BASE}/api/v1/auth/oauth/link/github`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ code, redirect_uri: redirectUri }),
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || "GitHub 계정 연동 실패");
+      }
+
+      router.replace("/mypage?github_linked=1");
+    } catch (err) {
+      setErrorReturnPath("/mypage");
+      setStatus("error");
+      setErrorMsg(
+        err instanceof Error
+          ? err.message
+          : "GitHub 계정 연동 중 알 수 없는 오류가 발생했어요."
+      );
+    }
+  }, [router]);
 
   const handleGithubCallback = useCallback(async (code, mode = "login") => {
     try {
@@ -120,6 +162,39 @@ function GithubCallbackContent() {
   };
 
   useEffect(() => {
+    const accessToken = searchParams.get("access_token");
+    if (accessToken) {
+      queueMicrotask(async () => {
+        const refreshToken = searchParams.get("refresh_token");
+        const userId = searchParams.get("user_id");
+        const isNewUser = searchParams.get("is_new_user") === "1";
+
+        try {
+          saveAuthSession({
+            accessToken,
+            refreshToken,
+            userId,
+          });
+          const user = await loadCurrentUser();
+          saveAuthSession({
+            accessToken,
+            refreshToken,
+            userId: user?.id || userId,
+            user,
+          });
+          router.replace(isNewUser ? "/signup?step=2&via=github" : "/mainpage");
+        } catch (error) {
+          setStatus("error");
+          setErrorMsg(
+            error instanceof Error
+              ? error.message
+              : "GitHub 로그인 정보를 저장하지 못했습니다."
+          );
+        }
+      });
+      return;
+    }
+
     const linkToken = searchParams.get("link_token");
     if (linkToken) {
       queueMicrotask(() => {
@@ -135,7 +210,8 @@ function GithubCallbackContent() {
     }
 
     const code = searchParams.get("code");
-    const mode = searchParams.get("state") === "signup" ? "signup" : "login";
+    const state = searchParams.get("state");
+    const mode = state === "signup" ? "signup" : "login";
     const error = searchParams.get("error");
 
     if (error || !code) {
@@ -146,10 +222,18 @@ function GithubCallbackContent() {
       return;
     }
 
+    if (state === "link_github") {
+      const oauthRedirectUri = searchParams.get("oauth_redirect_uri");
+      queueMicrotask(() => {
+        handleGithubAccountLink(code, oauthRedirectUri);
+      });
+      return;
+    }
+
     queueMicrotask(() => {
       handleGithubCallback(code, mode);
     });
-  }, [handleGithubCallback, searchParams]);
+  }, [handleGithubAccountLink, handleGithubCallback, searchParams]);
 
   if (status === "error") {
     return (
@@ -180,10 +264,10 @@ function GithubCallbackContent() {
           </p>
 
           <button
-            onClick={() => router.push("/signup")}
+            onClick={() => router.push(errorReturnPath)}
             className="mt-6 w-full rounded-xl bg-red-600 py-3 font-semibold text-white transition hover:bg-red-700"
           >
-            회원가입으로 돌아가기
+            {errorReturnPath === "/mypage" ? "마이페이지로 돌아가기" : "회원가입으로 돌아가기"}
           </button>
         </div>
       </main>

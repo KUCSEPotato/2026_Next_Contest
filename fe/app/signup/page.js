@@ -6,6 +6,7 @@ import Image from "next/image";
 import {
   authenticatedFetch,
   getApiBaseUrl,
+  getToken,
   loadCurrentUser,
   removeToken,
   saveAuthSession,
@@ -109,6 +110,7 @@ export default function SignupPage() {
   const [nickname, setNickname] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -135,26 +137,31 @@ export default function SignupPage() {
     const via = params.get("via");
     const tokenFromQuery = params.get("access_token");
 
-    if (via !== "github" || !tokenFromQuery) {
+    if (via !== "github" || stepParam !== "2") {
       removeToken({ reason: "signup_entry" });
+      setAccessToken("");
+      setStep(1);
       return;
     }
 
     queueMicrotask(async () => {
+      const nextToken = tokenFromQuery || getToken();
+      if (!nextToken) {
+        removeToken({ reason: "missing_signup_token" });
+        setAccessToken("");
+        setStep(1);
+        window.history.replaceState(null, "", "/signup");
+        return;
+      }
+
       try {
         saveAuthSession({
-          accessToken: tokenFromQuery,
+          accessToken: nextToken,
           userId: params.get("user_id"),
         });
         await loadCurrentUser();
-        setAccessToken(tokenFromQuery);
-
-        // 신규 유저는 온보딩 Step2, 기존 유저는 메인으로 이동
-        if (stepParam === "2") {
-          setStep(2);
-        } else if (stepParam === "profile") {
-          router.push("/mainpage");
-        }
+        setAccessToken(nextToken);
+        setStep(2);
       } catch (error) {
         console.error(error);
         removeToken({ reason: "invalid_signup_token" });
@@ -166,6 +173,7 @@ export default function SignupPage() {
 
   // ── GitHub OAuth ─────────────────────────────────────────────────────────
   const handleGithubLogin = () => {
+    removeToken({ reason: "github_signup_start" });
     const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
     const redirectUri = encodeURIComponent(
       process.env.NEXT_PUBLIC_GITHUB_REDIRECT_URI
@@ -183,7 +191,7 @@ export default function SignupPage() {
   // ── Step 1 제출 ───────────────────────────────────────────────────────────
   const handleStep1Submit = async () => {
     // ── [추가] 프론트 유효성 검사 ──────────────────────────────────────────
-    if (!email || !realName || !nickname || !phoneNumber || !password) {
+    if (!email || !realName || !nickname || !phoneNumber || !password || !passwordConfirm) {
       alert("모든 항목을 입력해주세요.");
       return;
     }
@@ -212,6 +220,11 @@ export default function SignupPage() {
       return;
     }
     // ─────────────────────────────────────────────────────────────────────
+
+    if (password !== passwordConfirm) {
+      alert("비밀번호가 일치하지 않습니다.");
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -479,6 +492,23 @@ export default function SignupPage() {
                       </div>
                     ))}
                   </div>
+                )}
+              </div>
+              <div>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="비밀번호 확인"
+                  value={passwordConfirm}
+                  onChange={(e) => setPasswordConfirm(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleStep1Submit(); }}
+                  className={`w-full rounded-xl border px-4 py-3 outline-none transition focus:ring-4 ${
+                    passwordConfirm && password !== passwordConfirm
+                      ? "border-red-400 focus:border-red-500 focus:ring-red-100"
+                      : "border-slate-300 focus:border-red-500 focus:ring-red-100"
+                  }`}
+                />
+                {passwordConfirm.length > 0 && password !== passwordConfirm && (
+                  <p className="mt-2 text-xs text-red-500">비밀번호가 일치하지 않습니다.</p>
                 )}
               </div>
             </div>

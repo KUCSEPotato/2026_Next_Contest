@@ -54,6 +54,10 @@ export default function CommentItem({
     comment.is_mine === true ||
     (comment.author_id != null && comment.author_id === currentUserId);
   const isAdminComment = comment.author?.role === "admin";
+  const authorNickname = comment.is_anonymous ? "익명" : comment.author.nickname;
+  const authorForAvatar = comment.is_anonymous
+    ? { ...comment.author, nickname: authorNickname, avatar_url: null }
+    : comment.author;
 
   const submitReply = () => {
     if (!replyText.trim()) return;
@@ -74,11 +78,11 @@ export default function CommentItem({
   return (
     <div className={depth > 0 ? "ml-8 border-l-2 border-gray-100 pl-3 dark:border-slate-800/70" : ""}>
       <div className="flex gap-2 py-2">
-        <Avatar user={comment.author} size={28} />
+        <Avatar user={authorForAvatar} size={28} />
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-xs font-semibold text-gray-800">
-              {comment.author.nickname}
+              {authorNickname}
             </span>
             {comment.is_anonymous && (
               <span className="rounded bg-gray-100 px-1 py-0.5 text-[9px] text-gray-500">
