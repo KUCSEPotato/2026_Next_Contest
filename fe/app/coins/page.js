@@ -602,6 +602,7 @@ export default function CoinsPage() {
                   </button>
                 </article>
               ))}
+              </div>
             </section>
 
             {/* 구매 요청 내역 */}
