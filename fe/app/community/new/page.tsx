@@ -138,12 +138,7 @@ export default function NewPostPage() {
 
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-1.5 text-sm text-gray-500 transition hover:text-gray-800"
-          >
-            ← 뒤로
-          </button>
+          <div className="w-[68px]" aria-hidden="true" />
           <h1 className="text-base font-bold text-gray-900">새 게시물</h1>
           <button
             onClick={handleSubmit}
