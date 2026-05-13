@@ -14,6 +14,7 @@ import {
   getMyProjectsApi,
   getMyApplicationsApi,
   getMyReceivedReviewsApi,
+  getOAuthLinksApi,
   updateMyProfileApi,
   withdrawMyAccountApi,
   addMySkillApi,
@@ -39,6 +40,7 @@ export default function MyPage() {
   const [projects, setProjects] = useState([]);
   const [appliedProjects, setAppliedProjects] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [oauthLinks, setOauthLinks] = useState(null);
   const [projectStatusFilter, setProjectStatusFilter] = useState("all");
   const [projectRoleFilter, setProjectRoleFilter] = useState("all");
   const [projectSortOrder, setProjectSortOrder] = useState("latest");
@@ -47,6 +49,7 @@ export default function MyPage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [showReviews, setShowReviews] = useState(false);
+  const [isStartingGithubLink, setIsStartingGithubLink] = useState(false);
   const [openingChatProjectId, setOpeningChatProjectId] = useState(null);
 
   const [editNickname, setEditNickname] = useState("");
@@ -117,12 +120,19 @@ export default function MyPage() {
         setEditNickname(profileData.nickname || "");
         setEditBio(profileData.bio || "");
 
-        const [reputationResult, statsResult, projectsResult, applicationsResult] =
+        const [
+          reputationResult,
+          statsResult,
+          projectsResult,
+          applicationsResult,
+          oauthLinksResult,
+        ] =
           await Promise.allSettled([
             getMyReputationApi(),
             getUserStatsApi(profileData.id),
             getMyProjectsApi(),
             getMyApplicationsApi(),
+            getOAuthLinksApi(),
           ]);
 
         setReputation(
@@ -153,6 +163,11 @@ export default function MyPage() {
             ? applicationsResult.value.data || []
             : []
         );
+        setOauthLinks(
+          oauthLinksResult.status === "fulfilled"
+            ? oauthLinksResult.value.data
+            : null
+        );
 
         const reviewsData = await loadReceivedReviews(profileData.id, statsData);
         setReviews(reviewsData);
@@ -167,6 +182,17 @@ export default function MyPage() {
 
     loadMyPage();
   }, [router]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("github_linked") !== "1") return;
+
+    toast.success("GitHub 계정이 연동되었습니다.");
+    router.replace("/mypage", { scroll: false });
+  }, [loading, router, toast]);
 
   useEffect(() => {
     if (loading) return;
@@ -238,6 +264,29 @@ export default function MyPage() {
     } finally {
       setIsWithdrawing(false);
     }
+  };
+
+  const handleStartGithubLink = () => {
+    const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
+    const redirectUri =
+      process.env.NEXT_PUBLIC_GITHUB_REDIRECT_URI ||
+      `${window.location.origin}/auth/github/callback`;
+
+    if (!clientId) {
+      toast.error("GitHub OAuth 환경변수가 설정되지 않았습니다.");
+      return;
+    }
+
+    setIsStartingGithubLink(true);
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      scope: "read:user user:email",
+      state: "link_github",
+    });
+
+    window.location.href = `https://github.com/login/oauth/authorize?${params.toString()}`;
   };
 
   const handleAddSkill = async (skillName) => {
@@ -428,7 +477,23 @@ export default function MyPage() {
             </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-3">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-3">
+              {oauthLinks?.github_linked ? (
+                <span className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600">
+                  <GithubIcon />
+                  GitHub 연동됨
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleStartGithubLink}
+                  disabled={isStartingGithubLink}
+                  className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <GithubIcon />
+                  {isStartingGithubLink ? "연동 중..." : "GitHub 연동"}
+                </button>
+              )}
               <button
                 onClick={() => setIsEditingProfile(true)}
                 className="rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
@@ -758,6 +823,14 @@ export default function MyPage() {
       </div>
 
     </main>
+  );
+}
+
+function GithubIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.92.58.11.79-.25.79-.56v-2.1c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.27-1.68-1.27-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.16 1.18.92-.26 1.9-.38 2.88-.39.98 0 1.96.13 2.88.39 2.2-1.49 3.16-1.18 3.16-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.83 1.18 3.08 0 4.42-2.69 5.39-5.25 5.67.41.35.77 1.04.77 2.1v3.16c0 .31.21.67.79.56A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z" />
+    </svg>
   );
 }
 

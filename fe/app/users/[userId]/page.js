@@ -187,54 +187,8 @@ export default function UserProfilePage() {
         <section className="mb-6 grid grid-cols-3 gap-4">
           <StatCard title="리드 프로젝트" value={stats?.lead_projects ?? 0} />
           <StatCard title="완료 프로젝트" value={stats?.completed_projects ?? 0} />
-
-          <button
-            onClick={() => setShowReviews(!showReviews)}
-            className="rounded-2xl bg-white p-6 text-left shadow transition hover:bg-red-50"
-          >
-            <p className="text-sm text-slate-500">받은 리뷰</p>
-            <p className="text-3xl font-bold">{stats?.review_received ?? 0}</p>
-          </button>
+          <StatCard title="진행중인 프로젝트" value={stats?.in_progress_projects ?? 0} />
         </section>
-
-        {showReviews && (
-          <section className="mb-6 rounded-2xl bg-white p-6 shadow">
-            <h2 className="mb-4 text-xl font-bold">받은 리뷰</h2>
-
-            {reviews.length === 0 ? (
-              <p className="text-sm text-slate-500">리뷰 없음</p>
-            ) : (
-              reviews.map((review) => {
-                const reviewMessage = getReviewMessage(review);
-
-                return (
-                  <div key={review.id} className="mb-3 rounded-xl border p-4">
-                    <p className="font-bold">
-                      {review.project?.title || "프로젝트"}
-                    </p>
-
-                    <p className="text-sm text-gray-400">
-                      익명{" "}
-                      {review.created_at
-                        ? `• ${new Date(review.created_at).toLocaleDateString()}`
-                        : ""}
-                    </p>
-
-                    <div className="mt-2 text-sm">
-                      협업 {review.teamwork_score} / 기여{" "}
-                      {review.contribution_score} / 책임{" "}
-                      {review.responsibility_score}
-                    </div>
-
-                    <p className="mt-2">
-                      {reviewMessage || "작성된 리뷰 메시지가 없습니다."}
-                    </p>
-                  </div>
-                );
-              })
-            )}
-          </section>
-        )}
 
         <section className="mb-6 rounded-2xl bg-white p-6 shadow">
           <div className="flex flex-wrap items-end justify-between gap-3">
@@ -245,12 +199,58 @@ export default function UserProfilePage() {
               </p>
             </div>
 
-            <div className="rounded-xl bg-slate-50 px-4 py-2 text-sm text-slate-600">
-              받은 평가 {reputation?.review_count ?? 0}개
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="rounded-xl bg-slate-50 px-4 py-2 text-sm text-slate-600">
+                받은 평가 {reputation?.review_count ?? stats?.review_received ?? 0}개
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowReviews((prev) => !prev)}
+                className="rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+              >
+                {showReviews ? "리뷰 접기" : "리뷰 상세보기"}
+              </button>
             </div>
           </div>
 
           <RatingSummary reputation={reputation} />
+
+          {showReviews && (
+            <div className="mt-5 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              {reviews.length === 0 ? (
+                <p className="text-sm text-slate-500">리뷰 없음</p>
+              ) : (
+                reviews.map((review) => {
+                  const reviewMessage = getReviewMessage(review);
+
+                  return (
+                    <div key={review.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                      <p className="font-bold text-slate-900">
+                        {review.project?.title || "프로젝트"}
+                      </p>
+
+                      <p className="text-sm text-slate-400">
+                        익명{" "}
+                        {review.created_at
+                          ? `• ${new Date(review.created_at).toLocaleDateString()}`
+                          : ""}
+                      </p>
+
+                      <div className="mt-2 text-sm text-slate-600">
+                        협업 {review.teamwork_score} / 기여{" "}
+                        {review.contribution_score} / 책임{" "}
+                        {review.responsibility_score}
+                      </div>
+
+                      <p className="mt-2 text-sm text-slate-700">
+                        {reviewMessage || "작성된 리뷰 메시지가 없습니다."}
+                      </p>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
         </section>
 
         <div className="mb-6 grid gap-6 lg:grid-cols-2">

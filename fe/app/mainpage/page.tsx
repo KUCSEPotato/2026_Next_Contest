@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AUTH_CHANGED_EVENT, getToken } from "../../lib/auth";
 import { getProjectsApi, getRecommendedProjectsApi } from "../../lib/api";
+import TopActionButtons from "../../components/TopActionButtons";
 
 interface Project {
   id: number;
@@ -378,28 +379,7 @@ export default function MainPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-slate-950 dark:text-slate-100">
-      <header className="mx-auto flex max-w-6xl items-center justify-end gap-3 px-4 py-4">
-        <button
-          onClick={() => router.push("/notices")}
-          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-red-300 hover:text-red-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-red-400/60 dark:hover:text-red-300"
-        >
-          공지
-        </button>
-
-        <button
-          onClick={() => router.push("/notifications")}
-          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-red-300 hover:text-red-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-red-400/60 dark:hover:text-red-300"
-        >
-          알림
-        </button>
-
-        <button
-          onClick={() => router.push("/chat")}
-          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-red-300 hover:text-red-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-red-400/60 dark:hover:text-red-300"
-        >
-          채팅
-        </button>
-      </header>
+      <TopActionButtons />
 
       <main className="mx-auto max-w-6xl px-4 pb-16">
         <section className="pb-10 pt-6 text-center">

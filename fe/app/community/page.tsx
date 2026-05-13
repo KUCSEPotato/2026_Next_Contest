@@ -7,6 +7,7 @@ import { getPosts, deletePost, reactToPost, getHotPosts } from "./_lib/api";
 import PostCard from "./_components/PostCard";
 import LoginModal from "./_components/LoginModal";
 import { ThumbUpIcon } from "./_components/ReactionThumbIcons";
+import TopActionButtons from "../../components/TopActionButtons";
 
 const CATEGORIES = [
   { label: "전체", value: undefined },
@@ -14,7 +15,6 @@ const CATEGORIES = [
   { label: "질문", value: "question" },
   { label: "아이디어", value: "idea" },
   { label: "작업 공유", value: "showcase" },
-  { label: "이벤트", value: "event" },
 ];
 
 const SERVICE_BLOCKS = [
@@ -45,17 +45,15 @@ const SERVICE_BLOCKS = [
 ];
 
 type HotSection = {
-  key: "popular" | "most_recommended" | "most_commented" | "most_viewed" | "latest";
+  key: "popular" | "most_recommended" | "most_viewed";
   label: string;
   emoji: string;
 };
 
 const HOT_SECTIONS: HotSection[] = [
   { key: "popular", label: "인기게시물", emoji: "🔥" },
-  { key: "most_recommended", label: "TOP", emoji: "" },
-  { key: "most_commented", label: "댓글 TOP", emoji: "💬" },
+  { key: "most_recommended", label: "추천 TOP", emoji: "" },
   { key: "most_viewed", label: "조회수 TOP", emoji: "👀" },
-  { key: "latest", label: "최신글", emoji: "🆕" },
 ];
 
 const ADMIN_ONLY_CATEGORIES = new Set(["announcement", "event"]);
@@ -68,9 +66,7 @@ type Tab = "board" | "hot";
 type HotPostsState = {
   popular: PostSummary | null;
   most_recommended: PostSummary | null;
-  most_commented: PostSummary | null;
   most_viewed: PostSummary | null;
-  latest: PostSummary | null;
 };
 
 function applyPostReaction(
@@ -168,9 +164,7 @@ export default function CommunityPage() {
       setHotPosts({
         popular: isCampfirePost(res.popular) ? res.popular : null,
         most_recommended: isCampfirePost(res.most_recommended) ? res.most_recommended : null,
-        most_commented: isCampfirePost(res.most_commented) ? res.most_commented : null,
         most_viewed: isCampfirePost(res.most_viewed) ? res.most_viewed : null,
-        latest: isCampfirePost(res.latest) ? res.latest : null,
       });
     } catch (e) {
       console.error(e);
@@ -235,27 +229,7 @@ export default function CommunityPage() {
 
   return (
     <div className="min-h-screen bg-orange-50/30 text-gray-900">
-      <header className="mx-auto flex max-w-6xl items-center justify-end gap-3 px-4 py-4">
-        <button
-          onClick={() => router.push("/notices")}
-          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-red-300 hover:text-red-600"
-        >
-          공지
-        </button>
-
-        <button
-          onClick={() => router.push("/notifications")}
-          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-red-300 hover:text-red-600"
-        >
-          알림
-        </button>
-        <button
-          onClick={() => router.push("/chat")}
-          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-red-300 hover:text-red-600"
-        >
-          채팅
-        </button>
-      </header>
+      <TopActionButtons />
 
       <main className="mx-auto max-w-6xl px-4 pb-16">
         <section className="pb-10 pt-6 text-center">
@@ -295,7 +269,7 @@ export default function CommunityPage() {
                       </div>
                     </div>
                     {isActive && (
-                      <span className="rounded-full bg-orange-600 px-2 py-0.5 text-[10px] font-semibold text-white dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-600">
+                      <span className="rounded-full bg-orange-600 px-2 py-0.5 text-[10px] font-semibold text-white dark:bg-orange-500/20 dark:text-orange-200 dark:ring-1 dark:ring-orange-400/30">
                         현재
                       </span>
                     )}

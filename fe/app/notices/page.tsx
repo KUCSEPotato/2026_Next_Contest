@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { PostSummary } from "../community/_types";
 import { getPosts } from "../community/_lib/api";
 import { timeAgo } from "../community/_lib/utils";
+import { NOTICE_LAST_SEEN_STORAGE_KEY } from "../../components/TopActionButtons";
 
 function getFirstLine(content: string) {
   const line = content
@@ -64,6 +65,18 @@ export default function NoticesPage() {
     return () => window.clearTimeout(timer);
   }, [loadNotices]);
 
+  useEffect(() => {
+    if (!notices.length) return;
+
+    const latestNoticeTime = Math.max(
+      ...notices.map((notice) => new Date(notice.created_at).getTime()).filter(Number.isFinite),
+      0
+    );
+    if (latestNoticeTime > 0) {
+      localStorage.setItem(NOTICE_LAST_SEEN_STORAGE_KEY, String(latestNoticeTime));
+    }
+  }, [notices]);
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <main className="mx-auto max-w-3xl px-4 pb-16 pt-8">
@@ -75,7 +88,7 @@ export default function NoticesPage() {
           </p>
         </section>
 
-        <section className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+        <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           {loading ? (
             <p className="px-5 py-12 text-center text-sm text-gray-400">공지 목록을 불러오는 중...</p>
           ) : error ? (
@@ -83,32 +96,32 @@ export default function NoticesPage() {
           ) : notices.length === 0 ? (
             <p className="px-5 py-12 text-center text-sm text-gray-400">등록된 공지가 없습니다.</p>
           ) : (
-            <div className="divide-y divide-gray-100">
+            <div className="space-y-3">
               {notices.map((notice) => (
                 <button
                   key={notice.id}
                   type="button"
                   onClick={() => router.push(`/notices/${notice.id}`)}
-                  className="block w-full px-5 py-5 text-left transition hover:bg-gray-50"
+                  className="block w-full rounded-xl border border-red-100 bg-red-50/40 px-5 py-4 text-left transition hover:border-red-200 hover:bg-red-50"
                 >
-                  <div className="flex items-start gap-4">
-                    <span className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-red-700" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                        <div className="min-w-0">
-                          <h2 className="line-clamp-1 text-base font-bold text-gray-900">
-                            {withEventPrefix(notice)}
-                          </h2>
-                          <p className="mt-1 text-xs font-medium text-red-700">관리자</p>
-                        </div>
-                        <div className="shrink-0 text-left text-xs text-gray-400 sm:text-right">
-                          <p className="font-semibold text-gray-700">게시일시:</p>
-                          <p>{timeAgo(notice.created_at)}</p>
-                        </div>
-                      </div>
-                      <p className="mt-2 line-clamp-1 text-sm leading-6 text-gray-700">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <h2 className="line-clamp-1 text-base font-bold text-gray-900">
+                        {withEventPrefix(notice)}
+                      </h2>
+                      <p className="mt-1 line-clamp-2 text-sm leading-6 text-gray-700">
                         {getFirstLine(notice.content)}
                       </p>
+                      <p className="mt-2 text-xs text-gray-400">{timeAgo(notice.created_at)}</p>
+                      <p className="mt-3 text-xs font-semibold text-red-600">
+                        클릭하면 공지 상세로 이동합니다.
+                      </p>
+                    </div>
+
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <span className="rounded-full bg-red-600 px-2 py-1 text-xs font-semibold text-white">
+                        관리자
+                      </span>
                     </div>
                   </div>
                 </button>

@@ -21,7 +21,7 @@ from app.models import Skill
 from app.schemas import IdeaCreateRequest
 from app.schemas import IdeaUpdateRequest
 from app.schemas import ProjectCreateRequest
-from app.services.economy import reward_project_registration
+from app.services.economy import spend_coins
 from app.services.s3_upload import get_s3_service
 
 router = APIRouter()
@@ -115,7 +115,15 @@ def _create_project_from_idea(db: Session, idea: Idea, current_user_id: int) -> 
     db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
     _sync_project_skills_from_idea(db, project.id, list(idea.tech_stack or []))
     idea.converted_to_project_id = project.id
-    reward_project_registration(db, project)
+    spend_coins(
+        db,
+        user_id=current_user_id,
+        amount=1,
+        event_type="waterdrop.project.create",
+        source_type="project",
+        source_id=project.id,
+        note=f"Project creation waterdrop for {project.title}",
+    )
     _notify_project_registered(db, project)
     return project
 
@@ -282,6 +290,30 @@ async def get_idea(idea_id: int, db: Session = Depends(get_db)) -> dict:
             "is_open": idea.is_open,
         },
     )
+
+
+@router.post("/{idea_id}/view", summary="아이디어 열람 물방울 사용", description="아이디어 상세 열람 전에 물방울 1방울을 사용합니다.")
+async def spend_for_idea_view(
+    idea_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    idea = db.get(Idea, idea_id)
+    if idea is None or idea.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Idea not found")
+
+    balance = spend_coins(
+        db,
+        user_id=current_user_id,
+        amount=1,
+        event_type="waterdrop.idea.view",
+        source_type="idea",
+        source_id=idea.id,
+        note=f"Idea view waterdrop for {idea.title}",
+    )
+    db.commit()
+
+    return success_response(data={"idea_id": idea.id, "waterdrop_balance": balance, "coin_balance": balance})
 
 
 @router.patch("/{idea_id}", summary="아이디어 수정", description="작성자 본인이 아이디어 필드를 부분 수정합니다.")
@@ -492,6 +524,15 @@ async def convert_idea_to_project(
     db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
     _sync_project_skills_from_idea(db, project.id, list(idea.tech_stack or []))
     idea.converted_to_project_id = project.id
+    spend_coins(
+        db,
+        user_id=current_user_id,
+        amount=1,
+        event_type="waterdrop.project.create",
+        source_type="project",
+        source_id=project.id,
+        note=f"Project creation waterdrop for {project.title}",
+    )
     _notify_project_registered(db, project)
     
     db.commit()

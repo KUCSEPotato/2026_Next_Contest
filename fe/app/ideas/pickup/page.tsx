@@ -9,8 +9,10 @@ import {
   likeIdeaApi,
   unbookmarkIdeaApi,
   unlikeIdeaApi,
+  viewIdeaApi,
 } from "../../../lib/api";
 import { getToken } from "../../../lib/auth";
+import TopActionButtons from "../../../components/TopActionButtons";
 
 interface Idea {
   id: number;
@@ -128,7 +130,7 @@ export default function InspirationWellPage() {
         ]);
         const raw: IdeaListItem[] = result.data || [];
 
-        setCoinBalance(coinResult?.data?.coin_balance ?? null);
+        setCoinBalance(coinResult?.data?.waterdrop_balance ?? coinResult?.data?.coin_balance ?? null);
         setIdeas(
           raw.map((item) => ({
             id: item.id,
@@ -258,7 +260,9 @@ export default function InspirationWellPage() {
 
     try {
       setPickingUp(true);
+      await viewIdeaApi(id);
       setCoinModal({ open: false, idea: null });
+      setCoinBalance((prev) => (prev === null ? prev : Math.max(0, prev - IDEA_VIEW_COIN_COST)));
       router.push(`/ideas/pickup/${id}`);
     } catch (error) {
       alert(error instanceof Error ? error.message : "아이디어를 열람하지 못했습니다.");
@@ -282,28 +286,9 @@ export default function InspirationWellPage() {
 
       <GardenGround />
 
-      <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-end gap-3 px-4 py-4">
-        <button
-          onClick={() => router.push("/notices")}
-          className="rounded-xl border border-emerald-100 bg-white/75 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-emerald-700 dark:border-emerald-800/50 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-emerald-300"
-        >
-          공지
-        </button>
-
-        <button
-          onClick={() => router.push("/notifications")}
-          className="rounded-xl border border-emerald-100 bg-white/75 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-emerald-700 dark:border-emerald-800/50 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-emerald-300"
-        >
-          알림
-        </button>
-
-        <button
-          onClick={() => router.push("/chat")}
-          className="rounded-xl border border-emerald-100 bg-white/75 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-emerald-700 dark:border-emerald-800/50 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-emerald-300"
-        >
-          채팅
-        </button>
-      </header>
+      <div className="relative z-10">
+        <TopActionButtons tone="emerald" />
+      </div>
 
       <main className="relative z-10 mx-auto max-w-6xl px-4 pb-20">
         <section className="pb-10 pt-6 text-center">
@@ -350,7 +335,7 @@ export default function InspirationWellPage() {
                   </div>
 
                   {block.isActive && (
-                    <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold text-white dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-600">
+                    <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold text-white dark:bg-emerald-500/20 dark:text-emerald-200 dark:ring-1 dark:ring-emerald-400/30">
                       현재
                     </span>
                   )}
@@ -374,7 +359,7 @@ export default function InspirationWellPage() {
             </div>
 
             <button
-              onClick={() => alert("아이디어를 클릭하면 코인 1개를 사용해 상세 내용을 확인할 수 있어요. 마음에 들면 상세 페이지에서 내 프로젝트로 만들 수 있습니다.")}
+              onClick={() => alert("아이디어를 클릭하면 물방울 1방울을 사용해 상세 내용을 확인할 수 있어요. 마음에 들면 상세 페이지에서 내 프로젝트로 만들 수 있습니다.")}
               className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-600 dark:hover:bg-slate-700"
             >
               생각의 뜰 가이드
@@ -417,7 +402,7 @@ export default function InspirationWellPage() {
 
               <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50/80 px-3 py-1 text-xs font-medium text-amber-700 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200">
                 <span>🪙</span>
-                <span>아이디어 열람 시 코인 1개가 차감됩니다</span>
+                <span>아이디어 열람 시 물방울 1방울이 사용됩니다</span>
               </span>
             </div>
 
@@ -860,14 +845,14 @@ function CoinModal({
 
         <p className="mb-5 text-center text-xs text-slate-400 dark:text-slate-400">
           이 아이디어를 열람하면{" "}
-          <span className="font-semibold text-amber-600">코인 {coinCost}개</span>가
-          차감됩니다.
+          <span className="font-semibold text-sky-600">물방울 {coinCost}방울</span>이
+          사용됩니다.
         </p>
 
         <div className="mb-5 grid grid-cols-3 overflow-hidden rounded-2xl border border-amber-100 bg-amber-50 text-center dark:border-amber-800/70 dark:bg-amber-950/40">
           <div className="px-3 py-3">
             <p className="text-[11px] font-semibold text-amber-700/70 dark:text-amber-200/70">
-              현재 잔액
+              현재 물방울
             </p>
             <p className="mt-1 text-base font-black text-amber-800 dark:text-amber-100">
               {coinBalance === null ? "-" : coinBalance.toLocaleString("ko-KR")}
@@ -875,7 +860,7 @@ function CoinModal({
           </div>
           <div className="border-x border-amber-100 bg-white/70 px-3 py-3 dark:border-amber-800/70 dark:bg-slate-900/55">
             <p className="text-[11px] font-semibold text-amber-700/70 dark:text-amber-200/70">
-              사용량
+              사용 물방울
             </p>
             <p className="mt-1 text-base font-black text-red-600 dark:text-red-300">
               -{coinCost.toLocaleString("ko-KR")}
@@ -893,7 +878,7 @@ function CoinModal({
 
         {isInsufficient ? (
           <p className="mb-4 rounded-2xl border border-red-100 bg-red-50 px-3 py-2 text-center text-xs font-semibold text-red-700 dark:border-red-800/70 dark:bg-red-950/50 dark:text-red-200">
-            코인이 부족합니다. 코인을 충전한 뒤 다시 열람해주세요.
+            물방울이 부족합니다. 상점에서 물방울을 충전한 뒤 다시 열람해주세요.
           </p>
         ) : null}
 
@@ -911,7 +896,7 @@ function CoinModal({
             disabled={isLoading || isInsufficient}
             className="flex-1 rounded-2xl bg-emerald-600 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-200 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-600 dark:shadow-none dark:hover:bg-slate-700 dark:disabled:bg-slate-700"
           >
-            {isLoading ? "여는 중..." : isInsufficient ? "코인 부족" : "열람하기"}
+            {isLoading ? "여는 중..." : isInsufficient ? "물방울 부족" : "열람하기"}
           </button>
         </div>
       </div>

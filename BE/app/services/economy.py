@@ -65,6 +65,54 @@ def award_coins(
     return user.coin_balance
 
 
+def spend_coins(
+    db: Session,
+    *,
+    user_id: int,
+    amount: int,
+    event_type: str,
+    source_type: str | None = None,
+    source_id: int | None = None,
+    note: str | None = None,
+) -> int:
+    if amount <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Coin amount must be positive")
+
+    existing = (
+        db.query(CoinTransaction)
+        .filter(
+            CoinTransaction.user_id == user_id,
+            CoinTransaction.event_type == event_type,
+            CoinTransaction.source_type == source_type,
+            CoinTransaction.source_id == source_id,
+        )
+        .first()
+    )
+    if existing is not None:
+        return existing.balance_after
+
+    user = db.get(User, user_id)
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    balance = int(user.coin_balance or 0)
+    if balance < amount:
+        raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Not enough waterdrops")
+
+    user.coin_balance = balance - amount
+    transaction = CoinTransaction(
+        user_id=user_id,
+        amount=-amount,
+        balance_after=user.coin_balance,
+        event_type=event_type,
+        source_type=source_type,
+        source_id=source_id,
+        note=note,
+    )
+    db.add(transaction)
+    return user.coin_balance
+
+
 def notify_user(
     db: Session,
     *,
