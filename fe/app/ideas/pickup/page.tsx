@@ -343,7 +343,7 @@ export default function InspirationWellPage() {
                   </div>
 
                   {block.isActive && (
-                    <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                    <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold text-white dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-600">
                       현재
                     </span>
                   )}
@@ -368,7 +368,7 @@ export default function InspirationWellPage() {
 
             <button
               onClick={() => alert("아이디어를 클릭하면 코인 1개를 사용해 상세 내용을 확인할 수 있어요. 마음에 들면 상세 페이지에서 내 프로젝트로 만들 수 있습니다.")}
-              className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+              className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-600 dark:hover:bg-slate-700"
             >
               생각의 뜰 가이드
             </button>
@@ -388,7 +388,7 @@ export default function InspirationWellPage() {
                 onClick={() => setSelectedCategory(cat.label)}
                 className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
                   selectedCategory === cat.label
-                    ? "border-emerald-600 bg-emerald-600 text-white shadow-sm shadow-emerald-200"
+                    ? "border-emerald-600 bg-emerald-600 text-white shadow-sm shadow-emerald-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:shadow-none"
                     : "border-emerald-100 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-emerald-500 dark:hover:text-emerald-300"
                 }`}
               >
@@ -438,7 +438,7 @@ export default function InspirationWellPage() {
                 onClick={() => setCollectionFilter(filter.value as "all" | "liked" | "bookmarked")}
                 className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                   collectionFilter === filter.value
-                    ? "border-emerald-600 bg-emerald-600 text-white shadow-sm shadow-emerald-100"
+                    ? "border-emerald-600 bg-emerald-600 text-white shadow-sm shadow-emerald-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:shadow-none"
                     : "border-emerald-100 bg-white/80 text-slate-500 hover:border-emerald-300 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:border-emerald-500 dark:hover:text-emerald-300"
                 }`}
               >
@@ -742,7 +742,7 @@ function IdeaCard({
           </button>
         </div>
 
-        <span className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1 text-[11px] font-semibold text-white shadow-sm shadow-emerald-200 transition group-hover:bg-emerald-700">
+        <span className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1 text-[11px] font-semibold text-white shadow-sm shadow-emerald-200 transition group-hover:bg-emerald-700 dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-600 dark:shadow-none dark:group-hover:bg-slate-700">
           살펴보기
         </span>
       </div>
@@ -902,7 +902,7 @@ function CoinModal({
           <button
             onClick={onConfirm}
             disabled={isLoading || isInsufficient}
-            className="flex-1 rounded-2xl bg-emerald-600 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-200 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+            className="flex-1 rounded-2xl bg-emerald-600 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-200 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-600 dark:shadow-none dark:hover:bg-slate-700 dark:disabled:bg-slate-700"
           >
             {isLoading ? "여는 중..." : isInsufficient ? "코인 부족" : "열람하기"}
           </button>
