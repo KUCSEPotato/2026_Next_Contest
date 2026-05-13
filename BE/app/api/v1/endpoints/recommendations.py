@@ -24,6 +24,10 @@ PROJECT_RECOMMENDATION_CANDIDATE_LIMIT = 30
 PROJECT_RECOMMENDATION_RESULT_LIMIT = 6
 
 
+def _normalize_match_name(name: str) -> str:
+    return " ".join(name.strip().lower().split())
+
+
 @router.post("/projects", summary="프로젝트 추천", description="로그인 사용자 기술 스택/관심분야 기반 규칙 추천입니다.")
 async def recommend_projects_llm(
     payload: dict = Body(default={}),
@@ -110,8 +114,8 @@ async def recommend_projects_llm(
 
     project_ids = [project.id for project in projects]
 
-    user_skill_set = {skill.lower() for skill in user_skill_names}
-    user_interest_set = {interest.lower() for interest in user_interest_names}
+    user_skill_set = {_normalize_match_name(skill) for skill in user_skill_names}
+    user_interest_set = {_normalize_match_name(interest) for interest in user_interest_names}
 
     project_skills: dict[int, list[str]] = defaultdict(list)
     for project_id, skill_name in (
@@ -145,8 +149,14 @@ async def recommend_projects_llm(
     for project in projects:
         skill_names = project_skills[project.id]
         interest_names = project_interests[project.id]
-        matched_skills = sorted(user_skill_set & {skill.lower() for skill in skill_names})
-        matched_interests = sorted(user_interest_set & {interest.lower() for interest in interest_names})
+        matched_skill_keys = user_skill_set & {_normalize_match_name(skill) for skill in skill_names}
+        matched_interest_keys = user_interest_set & {_normalize_match_name(interest) for interest in interest_names}
+        matched_skills = sorted(
+            {skill for skill in skill_names if _normalize_match_name(skill) in matched_skill_keys}
+        )
+        matched_interests = sorted(
+            {interest for interest in interest_names if _normalize_match_name(interest) in matched_interest_keys}
+        )
         current_members = int(current_member_counts.get(project.id, 0))
         if current_members >= project.max_members:
             continue
@@ -158,6 +168,7 @@ async def recommend_projects_llm(
             "current_members": current_members,
             "matched_skills": matched_skills,
             "matched_interests": matched_interests,
+            "project_interests": sorted(set(interest_names)),
             "skill_match_count": len(matched_skills),
             "interest_match_count": len(matched_interests),
             "reason": reason,
@@ -184,6 +195,7 @@ async def recommend_projects_llm(
                 "maxMembers": project.max_members,
                 "matchedSkills": item["matched_skills"],
                 "matchedInterests": item["matched_interests"],
+                "projectInterests": item["project_interests"],
                 "reason": item["reason"],
             }
         )

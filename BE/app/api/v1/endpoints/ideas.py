@@ -14,8 +14,10 @@ from app.models import IdeaBookmark
 from app.models import CoinTransaction
 from app.models import IdeaFile
 from app.models import IdeaLike
+from app.models import Interest
 from app.models import Notification
 from app.models import Project
+from app.models import ProjectInterest
 from app.models import ProjectMember
 from app.models import ProjectSkill
 from app.models import Skill
@@ -45,6 +47,10 @@ def _normalize_skill_name(skill_name: str) -> str:
     return re.sub(r"\s+", " ", skill_name.strip()).lower()
 
 
+def _normalize_interest_name(interest_name: str) -> str:
+    return re.sub(r"\s+", " ", interest_name.strip()).lower()
+
+
 def _sync_project_skills_from_idea(db: Session, project_id: int, tech_stack: list[str]) -> None:
     existing_skill_ids = {
         skill_id
@@ -61,6 +67,28 @@ def _sync_project_skills_from_idea(db: Session, project_id: int, tech_stack: lis
         if skill.id not in existing_skill_ids:
             db.add(ProjectSkill(project_id=project_id, skill_id=skill.id))
             existing_skill_ids.add(skill.id)
+
+
+def _sync_project_interests_from_names(db: Session, project_id: int, interests: list[str]) -> None:
+    existing_interest_ids = {
+        interest_id
+        for (interest_id,) in db.query(ProjectInterest.interest_id).filter(ProjectInterest.project_id == project_id).all()
+    }
+    for interest_name in interests:
+        interest_name = interest_name.strip()
+        if not interest_name:
+            continue
+
+        normalized_name = _normalize_interest_name(interest_name)
+        interest = db.query(Interest).filter(Interest.normalized_name == normalized_name).first()
+        if interest is None:
+            interest = Interest(name=interest_name, normalized_name=normalized_name)
+            db.add(interest)
+            db.flush()
+
+        if interest.id not in existing_interest_ids:
+            db.add(ProjectInterest(project_id=project_id, interest_id=interest.id))
+            existing_interest_ids.add(interest.id)
 
 
 def _project_notification_data(project_id: int) -> dict:
@@ -100,7 +128,12 @@ def _notify_project_registered(db: Session, project: Project) -> None:
     )
 
 
-def _create_project_from_idea(db: Session, idea: Idea, current_user_id: int) -> Project:
+def _create_project_from_idea(
+    db: Session,
+    idea: Idea,
+    current_user_id: int,
+    interests: list[str] | None = None,
+) -> Project:
     project = Project(
         idea_id=idea.id,
         leader_id=current_user_id,
@@ -118,6 +151,7 @@ def _create_project_from_idea(db: Session, idea: Idea, current_user_id: int) -> 
     db.flush()
     db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
     _sync_project_skills_from_idea(db, project.id, list(idea.tech_stack or []))
+    _sync_project_interests_from_names(db, project.id, interests or [])
     idea.converted_to_project_id = project.id
     spend_coins(
         db,
@@ -164,7 +198,7 @@ async def create_idea(
     db.add(idea)
     db.flush()
 
-    project = _create_project_from_idea(db, idea, current_user_id)
+    project = _create_project_from_idea(db, idea, current_user_id, payload.interests)
 
     db.commit()
     db.refresh(idea)
@@ -557,6 +591,7 @@ async def convert_idea_to_project(
     db.flush()
     db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
     _sync_project_skills_from_idea(db, project.id, list(idea.tech_stack or []))
+    _sync_project_interests_from_names(db, project.id, payload.interests)
     idea.converted_to_project_id = project.id
     spend_coins(
         db,

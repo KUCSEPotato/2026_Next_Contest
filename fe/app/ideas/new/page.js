@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createIdeaApi } from "../../../lib/api";
-import { SKILLS_LIST } from "../../../lib/profileOptions";
+import { INTERESTS_LIST, SKILLS_LIST } from "../../../lib/profileOptions";
 import { confirmWaterdropSpend } from "../../../lib/waterdrops";
 import { useDialog, useToast } from "../../../components/AppFeedback";
 
@@ -33,6 +33,7 @@ export default function NewIdeaPage() {
   const [expectedPeriod, setExpectedPeriod] = useState("");
   const [preferredMembers, setPreferredMembers] = useState("");
   const [selectedTechStack, setSelectedTechStack] = useState([]);
+  const [selectedInterests, setSelectedInterests] = useState([]);
   const [hashtagsText, setHashtagsText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -44,6 +45,14 @@ export default function NewIdeaPage() {
       prev.includes(skill)
         ? prev.filter((item) => item !== skill)
         : [...prev, skill]
+    );
+  };
+
+  const toggleInterest = (interest) => {
+    setSelectedInterests((prev) =>
+      prev.includes(interest)
+        ? prev.filter((item) => item !== interest)
+        : [...prev, interest]
     );
   };
 
@@ -82,6 +91,7 @@ export default function NewIdeaPage() {
         expected_period: expectedPeriod.trim(),
         preferred_members: preferredMembers.trim(),
         tech_stack: selectedTechStack,
+        interests: selectedInterests,
         hashtags: hashtagsText
           .split(",")
           .map((item) => item.trim().replace(/^#/, ""))
@@ -270,6 +280,31 @@ export default function NewIdeaPage() {
             <p className="mt-2 text-sm text-slate-500">
               쉼표로 구분해서 입력해주세요.
             </p>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              추천 관심분야{" "}
+              <span className="font-normal text-slate-400">
+                ({selectedInterests.length}개 선택)
+              </span>
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {INTERESTS_LIST.map((interest) => (
+                <button
+                  key={interest}
+                  type="button"
+                  onClick={() => toggleInterest(interest)}
+                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                    selectedInterests.includes(interest)
+                      ? "border-red-600 bg-red-600 text-white shadow-sm"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:text-red-600"
+                  }`}
+                >
+                  {interest}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-4">

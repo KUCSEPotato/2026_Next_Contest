@@ -28,8 +28,10 @@ from app.models import ChatRoomMember
 from app.models import FailureStory
 from app.models import Idea
 from app.models import Invitation
+from app.models import Interest
 from app.models import Notification
 from app.models import Project
+from app.models import ProjectInterest
 from app.models import ProjectMember
 from app.models import ProjectMilestone
 from app.models import ProjectRecruitment
@@ -80,6 +82,10 @@ IDEA_DESCRIPTION_SECTION_LABELS = (
 
 def _normalize_skill_name(skill_name: str) -> str:
     return re.sub(r"\s+", " ", skill_name.strip()).lower()
+
+
+def _normalize_interest_name(interest_name: str) -> str:
+    return re.sub(r"\s+", " ", interest_name.strip()).lower()
 
 
 def _extract_idea_description_parts(description: str | None) -> dict[str, str]:
@@ -133,6 +139,29 @@ def _sync_project_skills(db: Session, project_id: int, tech_stack: list[str]) ->
 
         db.add(ProjectSkill(project_id=project_id, skill_id=skill.id))
         seen_skill_ids.add(skill.id)
+
+
+def _sync_project_interests(db: Session, project_id: int, interests: list[str]) -> None:
+    db.query(ProjectInterest).filter(ProjectInterest.project_id == project_id).delete()
+    seen_interest_ids: set[int] = set()
+
+    for interest_name in interests:
+        interest_name = interest_name.strip()
+        if not interest_name:
+            continue
+
+        normalized_name = _normalize_interest_name(interest_name)
+        interest = db.query(Interest).filter(Interest.normalized_name == normalized_name).first()
+        if interest is None:
+            interest = Interest(name=interest_name, normalized_name=normalized_name)
+            db.add(interest)
+            db.flush()
+
+        if interest.id in seen_interest_ids:
+            continue
+
+        db.add(ProjectInterest(project_id=project_id, interest_id=interest.id))
+        seen_interest_ids.add(interest.id)
 
 
 def _calculate_days_left(deadline: date | None) -> int | None:
@@ -640,6 +669,7 @@ async def create_project(
     db.add(project)
     db.flush()
 
+    _sync_project_interests(db, project.id, payload.interests)
     db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
     record_usage(db, current_user_id, USAGE_PROJECT_CREATE, target_type="project", target_id=project.id)
     db.add(
@@ -699,6 +729,10 @@ async def list_projects(
             ProjectSkill, ProjectSkill.skill_id == Skill.id
         ).filter(ProjectSkill.project_id == p.id).all()
         tech_stack_list = [s[0] for s in tech_stack]
+        interests = db.query(Interest.name).join(
+            ProjectInterest, ProjectInterest.interest_id == Interest.id
+        ).filter(ProjectInterest.project_id == p.id).all()
+        interest_list = [interest[0] for interest in interests]
         source_idea = db.get(Idea, p.idea_id) if p.idea_id else None
 
         applicant_count = db.query(func.count(Application.id)).filter(
@@ -738,6 +772,7 @@ async def list_projects(
             "currentMembers": current_members,
             "maxMembers": p.max_members,
             "techStack": tech_stack_list,
+            "interests": interest_list,
             "hashtags": source_idea.hashtags if source_idea else [],
             "applicantCount": applicant_count,
             "remainingSeats": remaining_seats,
@@ -812,6 +847,10 @@ async def get_project(project_id: int, db: Session = Depends(get_db)) -> dict:
         ProjectSkill, ProjectSkill.skill_id == Skill.id
     ).filter(ProjectSkill.project_id == project_id).all()
     tech_stack_list = [s[0] for s in tech_stack]
+    interests = db.query(Interest.name).join(
+        ProjectInterest, ProjectInterest.interest_id == Interest.id
+    ).filter(ProjectInterest.project_id == project_id).all()
+    interest_list = [interest[0] for interest in interests]
     source_idea = db.get(Idea, project.idea_id) if project.idea_id else None
     idea_parts = _extract_idea_description_parts(source_idea.description if source_idea else "")
     project_parts = _extract_idea_description_parts(project.description)
@@ -836,6 +875,7 @@ async def get_project(project_id: int, db: Session = Depends(get_db)) -> dict:
             "max_members": project.max_members,
             "techStack": tech_stack_list,
             "tech_stack": tech_stack_list,
+            "interests": interest_list,
             "hashtags": source_idea.hashtags if source_idea else [],
             "expected_period": idea_parts["expected_period"] or project_parts["expected_period"],
             "preferred_members": idea_parts["preferred_members"] or project_parts["preferred_members"],
@@ -1069,6 +1109,7 @@ async def update_project(
 
     payload_data = payload.model_dump(exclude_none=True)
     tech_stack = payload_data.pop("tech_stack", None)
+    interests = payload_data.pop("interests", None)
     hashtags = payload_data.pop("hashtags", None)
     expected_period = payload_data.pop("expected_period", None)
     preferred_members = payload_data.pop("preferred_members", None)
@@ -1099,6 +1140,8 @@ async def update_project(
 
     if tech_stack is not None:
         _sync_project_skills(db, project_id, tech_stack)
+    if interests is not None:
+        _sync_project_interests(db, project_id, interests)
 
     source_idea = db.get(Idea, project.idea_id) if project.idea_id else None
     if source_idea is not None:

@@ -8,6 +8,7 @@ class IdeaCreateRequest(BaseModel):
     summary: str | None = None
     domain: str | None = None
     tech_stack: list[str] = Field(default_factory=list)
+    interests: list[str] = Field(default_factory=list)
     hashtags: list[str] = Field(default_factory=list)
     required_members: int = Field(default=1, ge=1, le=100)
     expected_period: str | None = None
