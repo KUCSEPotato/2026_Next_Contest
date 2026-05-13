@@ -18,6 +18,8 @@ import {
   withdrawMyAccountApi,
   addMySkillApi,
   addMyInterestApi,
+  removeMySkillApi,
+  removeMyInterestApi,
   discardProjectToWellApi,
   getProjectApi,
   createProjectReviewApi,
@@ -59,7 +61,6 @@ export default function MyPage() {
 
   const [editNickname, setEditNickname] = useState("");
   const [editBio, setEditBio] = useState("");
-  const [editAvatarUrl, setEditAvatarUrl] = useState("");
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   const handleAvatarUpload = async (e) => {
@@ -87,7 +88,6 @@ export default function MyPage() {
         avatar_url: avatarUrl,
       }));
 
-      setEditAvatarUrl(avatarUrl);
       await reloadProfile();
 
       alert("프로필 이미지가 업로드되었습니다.");
@@ -111,7 +111,6 @@ export default function MyPage() {
     setAvatarLoadFailed(false);
     setEditNickname(profileData.nickname || "");
     setEditBio(profileData.bio || "");
-    setEditAvatarUrl(profileData.avatar_url || "");
   }
 
   async function reloadMyProjects() {
@@ -141,7 +140,6 @@ export default function MyPage() {
         setProfile(profileData);
         setEditNickname(profileData.nickname || "");
         setEditBio(profileData.bio || "");
-        setEditAvatarUrl(profileData.avatar_url || "");
 
         const [reputationResult, statsResult, projectsResult, applicationsResult] =
           await Promise.allSettled([
@@ -215,6 +213,11 @@ export default function MyPage() {
   };
 
   const openDiscardFlow = async (project) => {
+    if (!isProjectLeader(project, profile?.id)) {
+      alert("프로젝트 리더만 프로젝트를 버릴 수 있습니다.");
+      return;
+    }
+
     if (project.status === "completed") {
       alert("완료된 프로젝트는 버릴 수 없습니다.");
       return;
@@ -395,6 +398,31 @@ export default function MyPage() {
     }
   };
 
+  const handleToggleSkill = async (skillName) => {
+    const selectedOption = findProfileOption(profile?.skills, skillName);
+
+    if (!selectedOption) {
+      await handleAddSkill(skillName);
+      return;
+    }
+
+    const skillId = getProfileOptionId(selectedOption);
+    if (!skillId) {
+      alert("이 기술 스택은 새로고침 후 삭제할 수 있습니다.");
+      await reloadProfile();
+      return;
+    }
+
+    try {
+      await removeMySkillApi(skillId);
+      await reloadProfile();
+      alert("기술 스택이 삭제되었습니다.");
+    } catch (error) {
+      console.error(error);
+      alert("기술 스택 삭제에 실패했습니다.");
+    }
+  };
+
   const handleAddInterest = async (interestName) => {
     if (!interestName.trim()) {
       alert("관심 분야를 입력해주세요.");
@@ -408,6 +436,31 @@ export default function MyPage() {
     } catch (error) {
       console.error(error);
       alert("관심 분야 추가에 실패했습니다.");
+    }
+  };
+
+  const handleToggleInterest = async (interestName) => {
+    const selectedOption = findProfileOption(profile?.interests, interestName);
+
+    if (!selectedOption) {
+      await handleAddInterest(interestName);
+      return;
+    }
+
+    const interestId = getProfileOptionId(selectedOption);
+    if (!interestId) {
+      alert("이 관심 분야는 새로고침 후 삭제할 수 있습니다.");
+      await reloadProfile();
+      return;
+    }
+
+    try {
+      await removeMyInterestApi(interestId);
+      await reloadProfile();
+      alert("관심 분야가 삭제되었습니다.");
+    } catch (error) {
+      console.error(error);
+      alert("관심 분야 삭제에 실패했습니다.");
     }
   };
 
@@ -494,6 +547,16 @@ export default function MyPage() {
               <p className="mt-2 text-slate-700">
                 {profile?.bio || "아직 자기소개가 없습니다."}
               </p>
+              <ProfileOptionPreview
+                title="기술 스택"
+                items={profile?.skills}
+                tone="red"
+              />
+              <ProfileOptionPreview
+                title="관심 분야"
+                items={profile?.interests}
+                tone="slate"
+              />
             </div>
             </div>
 
@@ -523,7 +586,6 @@ export default function MyPage() {
               onClick={() => {
                 setEditNickname(profile?.nickname || "");
                 setEditBio(profile?.bio || "");
-                setEditAvatarUrl(profile?.avatar_url || "");
                 setIsEditingProfile(false);
               }}
               className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
@@ -578,6 +640,23 @@ export default function MyPage() {
               placeholder="자기소개"
               className="min-h-32 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
             />
+
+            <div className="grid gap-5 lg:grid-cols-2">
+              <ProfileOptionEditor
+                title="기술 스택"
+                options={SKILLS_LIST}
+                selectedItems={profile?.skills}
+                selectedClassName="border-red-600 bg-red-600 text-white shadow-sm"
+                onToggle={handleToggleSkill}
+              />
+              <ProfileOptionEditor
+                title="관심 분야"
+                options={INTERESTS_LIST}
+                selectedItems={profile?.interests}
+                selectedClassName="border-red-600 bg-red-50 text-red-600 shadow-sm"
+                onToggle={handleToggleInterest}
+              />
+            </div>
 
             <button
               onClick={handleUpdateProfile}
@@ -673,70 +752,6 @@ export default function MyPage() {
           <RatingSummary reputation={reputation} />
         </section>
 
-        <div className="mb-6 grid gap-6 lg:grid-cols-2">
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-slate-900">
-              기술 스택{" "}
-              <span className="text-sm font-normal text-slate-400">
-                ({profile?.skills?.length ?? 0}개 선택)
-              </span>
-            </h2>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              {SKILLS_LIST.map((skill) => {
-                const selected = hasProfileOption(profile?.skills, skill);
-
-                return (
-                  <button
-                    key={skill}
-                    type="button"
-                    onClick={() => !selected && handleAddSkill(skill)}
-                    disabled={selected}
-                    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
-                      selected
-                        ? "border-red-600 bg-red-600 text-white shadow-sm"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:text-red-600"
-                    }`}
-                  >
-                    {skill}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-slate-900">
-              관심 분야{" "}
-              <span className="text-sm font-normal text-slate-400">
-                ({profile?.interests?.length ?? 0}개 선택)
-              </span>
-            </h2>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              {INTERESTS_LIST.map((interest) => {
-                const selected = hasProfileOption(profile?.interests, interest);
-
-                return (
-                  <button
-                    key={interest}
-                    type="button"
-                    onClick={() => !selected && handleAddInterest(interest)}
-                    disabled={selected}
-                    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
-                      selected
-                        ? "border-red-600 bg-red-50 text-red-600 shadow-sm"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:text-red-600"
-                    }`}
-                  >
-                    {interest}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        </div>
-
         <section
           ref={projectHistoryRef}
           id="my-projects"
@@ -780,101 +795,107 @@ export default function MyPage() {
 
           <div className="space-y-3">
             {visibleProjects.length ? (
-              visibleProjects.map((project) => (
-                <button
-                  key={project.historyKey || project.id}
-                  onClick={() => router.push(`/projects/${project.id}`)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-left transition hover:border-red-300 hover:bg-red-50"
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <ProgressBloom
-                        progress={project.progress_percent ?? 0}
-                        size="sm"
-                        showLabel={false}
-                      />
-                      <div>
-                      <p className="font-semibold text-slate-900">
-                        {project.title}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        난이도 {project.difficulty || "미정"}
-                        {" · "}
-                        진행률 {Math.round(project.progress_percent ?? 0)}%
-                        {project.historyType === "applied" &&
-                          ` · 지원 상태 ${project.applicationStatus || "확인중"}`}
-                      </p>
-                      </div>
+              visibleProjects.map((project) => {
+                const isLeader = isProjectLeader(project, profile?.id);
+                const isApplied = project.historyType === "applied";
+                const statusClassName = getProjectStatusClassName(project.status);
+
+                return (
+                  <article
+                    key={project.historyKey || project.id}
+                    className={`rounded-xl border px-5 py-4 transition hover:border-red-300 ${
+                      isApplied
+                        ? "border-red-200 bg-red-50/70"
+                        : "border-slate-200 bg-slate-50 hover:bg-white"
+                    }`}
+                  >
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/projects/${project.id}`)}
+                        className="flex flex-1 items-center gap-4 text-left"
+                      >
+                        <ProgressBloom
+                          progress={project.progress_percent ?? 0}
+                          size="sm"
+                          showLabel={false}
+                        />
+                        <div className="min-w-0">
+                          <div className="mb-1 flex flex-wrap gap-1.5">
+                            <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                              isLeader
+                                ? "bg-red-600 text-white"
+                                : isApplied
+                                  ? "bg-red-100 text-red-600"
+                                  : "bg-slate-200 text-slate-600"
+                            }`}>
+                              {isLeader ? "리더" : isApplied ? "지원 대기" : "팀원"}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="font-bold text-slate-900">
+                              {project.title}
+                            </h3>
+                            <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${statusClassName}`}>
+                              {formatProjectStatus(project.status)}
+                            </span>
+                          </div>
+
+                          <p className="mt-1 text-sm text-slate-500">
+                            난이도 {project.difficulty || "미정"} · 진행률 {Math.round(project.progress_percent ?? 0)}%
+                            {isApplied && ` · 지원 상태 ${project.applicationStatus || "확인중"}`}
+                          </p>
+                        </div>
+                      </button>
+
+                      {!isApplied && (
+                        <div className="flex flex-wrap justify-end gap-2">
+                          {project.can_chat && (
+                            <button
+                              type="button"
+                              onClick={() => openTeamChat(project)}
+                              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:border-red-300 hover:text-red-600"
+                            >
+                              {openingChatProjectId === project.id ? "이동 중..." : "채팅"}
+                            </button>
+                          )}
+
+                          {project.status === "completed" ? (
+                            <button
+                              type="button"
+                              onClick={() => router.push(`/memoir?projectId=${project.id}`)}
+                              className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
+                            >
+                              회고
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => router.push(`/projects/${project.id}/manage`)}
+                              className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
+                            >
+                              진행 관리
+                            </button>
+                          )}
+
+                          {isLeader &&
+                            project.status !== "completed" &&
+                            project.can_discard && (
+                            <button
+                              type="button"
+                              onClick={() => openDiscardFlow(project)}
+                              className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-600 transition hover:bg-blue-100"
+                            >
+                              버리기
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-600">
-                        {project.status || "상태 없음"}
-                      </span>
-
-                      {isProjectLeader(project, profile?.id) && (
-                        <span className="rounded-full bg-red-600 px-3 py-1 text-sm font-semibold text-white">
-                          내가 리더
-                        </span>
-                      )}
-
-                      {project.historyType === "applied" && (
-                        <span className="rounded-full bg-red-50 px-3 py-1 text-sm font-semibold text-red-600">
-                          내가 지원한 프로젝트
-                        </span>
-                      )}
-
-                      {project.historyType !== "applied" && project.can_chat && (
-                        <span
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openTeamChat(project);
-                          }}
-                          className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-sm font-semibold text-slate-700 transition hover:border-red-300 hover:text-red-600"
-                        >
-                          {openingChatProjectId === project.id ? "이동 중..." : "채팅"}
-                        </span>
-                      )}
-
-                      {project.historyType !== "applied" &&
-                        project.status !== "completed" &&
-                        project.can_discard && (
-                        <span
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openDiscardFlow(project);
-                          }}
-                          className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-600 transition hover:bg-blue-100"
-                        >
-                          프로젝트 버리기
-                        </span>
-                      )}
-
-                      {project.historyType === "applied" ? null : project.status === "completed" ? (
-                        <span
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/memoir?projectId=${project.id}`);
-                          }}
-                          className="rounded-lg bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-700"
-                        >
-                          회고
-                        </span>
-                      ) : (
-                        <span
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/projects/${project.id}/manage`);
-                          }}
-                          className="rounded-lg bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-700"
-                        >
-                          진행 관리
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              ))
+                  </article>
+                );
+              })
             ) : (
               <p className="text-sm text-slate-500">조건에 맞는 프로젝트가 없습니다.</p>
             )}
@@ -1050,6 +1071,75 @@ export default function MyPage() {
   );
 }
 
+function ProfileOptionPreview({ title, items, tone }) {
+  const values = (items || []).map(getProfileOptionName).filter(Boolean);
+
+  if (!values.length) return null;
+
+  const className =
+    tone === "red"
+      ? "bg-red-50 text-red-700"
+      : "bg-slate-100 text-slate-700";
+
+  return (
+    <div className="mt-3">
+      <p className="mb-2 text-xs font-bold text-slate-400">{title}</p>
+      <div className="flex flex-wrap gap-2">
+        {values.map((value) => (
+          <span
+            key={value}
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${className}`}
+          >
+            {value}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ProfileOptionEditor({
+  title,
+  options,
+  selectedItems,
+  selectedClassName,
+  onToggle,
+}) {
+  const selectedCount = selectedItems?.length ?? 0;
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+      <h3 className="text-sm font-bold text-slate-800">
+        {title}{" "}
+        <span className="font-normal text-slate-400">
+          ({selectedCount}개 선택)
+        </span>
+      </h3>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        {options.map((option) => {
+          const selected = hasProfileOption(selectedItems, option);
+
+          return (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onToggle(option)}
+              className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                selected
+                  ? selectedClassName
+                  : "border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:text-red-600"
+              }`}
+            >
+              {option}
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function StatCard({ title, value }) {
   return (
     <div className="rounded-2xl bg-white p-6 shadow">
@@ -1084,6 +1174,17 @@ function buildProjectHistory(projects, applications) {
   const ownedProjectIds = new Set(projects.map((project) => Number(project.id)));
   const normalizedApplications = (applications || [])
     .filter((application) => !ownedProjectIds.has(Number(application.project_id)))
+    .filter((application) => {
+      const status = application.status || application.applicationStatus;
+      const projectStatus = application.project_status || application.projectStatus;
+      const hasOpenRecruitment =
+        Number(application.open_recruitment_count ?? application.openRecruitmentCount ?? 0) > 0;
+
+      return (
+        status === "pending" &&
+        (projectStatus === "planning" || hasOpenRecruitment)
+      );
+    })
     .map((application) => ({
       id: application.project_id,
       historyKey: `applied-${application.application_id}`,
@@ -1106,8 +1207,41 @@ function getProfileOptionName(option) {
   return typeof option === "string" ? option : option?.name || "";
 }
 
+function getProfileOptionId(option) {
+  if (!option || typeof option === "string") return null;
+  return option.id ?? option.skill_id ?? option.interest_id ?? null;
+}
+
+function findProfileOption(options, name) {
+  return (options || []).find((option) => getProfileOptionName(option) === name);
+}
+
 function hasProfileOption(options, name) {
-  return (options || []).some((option) => getProfileOptionName(option) === name);
+  return Boolean(findProfileOption(options, name));
+}
+
+function formatProjectStatus(status) {
+  const labels = {
+    planning: "모집중",
+    in_progress: "진행중",
+    started: "진행중",
+    paused: "일시중지",
+    completed: "완료",
+  };
+
+  return labels[status] || status || "상태 없음";
+}
+
+function getProjectStatusClassName(status) {
+  const classNames = {
+    planning: "bg-blue-50 text-blue-700",
+    in_progress: "bg-emerald-50 text-emerald-700",
+    started: "bg-emerald-50 text-emerald-700",
+    paused: "bg-amber-50 text-amber-700",
+    completed: "bg-slate-200 text-slate-700",
+  };
+
+  return classNames[status] || "bg-slate-100 text-slate-600";
 }
 
 function getProjectLeaderId(project) {
@@ -1148,6 +1282,9 @@ function getVisibleProjects(projects, statusFilter, roleFilter, userId, sortOrde
       return true;
     })
     .sort((a, b) => {
+      if (a.historyType === "applied" && b.historyType !== "applied") return -1;
+      if (a.historyType !== "applied" && b.historyType === "applied") return 1;
+
       if (sortOrder === "progress") {
         return (b.progress_percent ?? 0) - (a.progress_percent ?? 0);
       }
