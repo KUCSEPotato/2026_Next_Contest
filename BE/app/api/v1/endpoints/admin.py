@@ -14,6 +14,7 @@ from app.models import ChatRoom
 from app.models import CoinPurchaseRequest
 from app.models import Notification
 from app.models import PaymentEvent
+from app.models import PaymentProduct
 from app.models import Project
 from app.models import Idea
 from app.models import Report
@@ -21,6 +22,7 @@ from app.models import UserSubscription
 from app.models import User
 from app.services.economy import award_coins
 from app.services.economy import send_stale_project_notifications
+from app.services.entitlement_service import grant_entitlement
 
 router = APIRouter()
 
@@ -851,8 +853,13 @@ async def list_coin_purchase_requests_for_admin(
                 "user_id": request.user_id,
                 "user_nickname": user_nickname,
                 "user_email": user_email,
+                "request_type": request.request_type,
                 "coin_amount": request.coin_amount,
                 "price_krw": request.price_krw,
+                "product_code": request.product_code,
+                "product_name": request.product_name,
+                "product_type": request.product_type,
+                "entitlement_days": request.entitlement_days,
                 "status": request.status,
                 "note": request.note,
                 "admin_note": request.admin_note,
@@ -888,48 +895,85 @@ async def update_coin_purchase_request_for_admin(
 
     balance_after = None
     if payload.status == "approved":
-        balance_after = award_coins(
-            db,
-            user_id=request.user_id,
-            amount=request.coin_amount,
-            event_type="coin.purchase",
-            source_type="coin_purchase_request",
-            source_id=request.id,
-            note=admin_note or f"Coin purchase request #{request.id} approved",
-        )
-        body = f"구매 요청하신 코인 {request.coin_amount}개가 지급되었습니다."
+        if request.request_type == "ENTITLEMENT":
+            product = (
+                db.query(PaymentProduct)
+                .filter(PaymentProduct.product_code == request.product_code)
+                .first()
+            )
+            if product is None:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment product not found")
+            entitlement = grant_entitlement(db, user_id=request.user_id, product=product)
+            body = f"구매 요청하신 {product.name} 권한이 활성화되었습니다."
+            notification_type = "entitlement_purchase_approved"
+            notification_title = "이용권 구매 요청이 승인되었습니다"
+            notification_data = {
+                "request_id": request.id,
+                "product_code": product.product_code,
+                "entitlement_id": entitlement.id,
+                "expires_at": entitlement.expires_at.isoformat(),
+                "price_krw": request.price_krw,
+            }
+        else:
+            balance_after = award_coins(
+                db,
+                user_id=request.user_id,
+                amount=request.coin_amount,
+                event_type="coin.purchase",
+                source_type="coin_purchase_request",
+                source_id=request.id,
+                note=admin_note or f"Coin purchase request #{request.id} approved",
+            )
+            body = f"구매 요청하신 코인 {request.coin_amount}개가 지급되었습니다."
+            notification_type = "coin_purchase_approved"
+            notification_title = "코인 구매 요청이 승인되었습니다"
+            notification_data = {
+                "request_id": request.id,
+                "coin_amount": request.coin_amount,
+                "price_krw": request.price_krw,
+                "balance_after": balance_after,
+            }
         if admin_note:
             body = f"{body}\n관리자 메모: {admin_note}"
         db.add(
             Notification(
                 user_id=request.user_id,
-                type="coin_purchase_approved",
-                title="코인 구매 요청이 승인되었습니다",
+                type=notification_type,
+                title=notification_title,
                 body=body,
-                data={
-                    "request_id": request.id,
-                    "coin_amount": request.coin_amount,
-                    "price_krw": request.price_krw,
-                    "balance_after": balance_after,
-                },
+                data=notification_data,
             )
         )
     else:
-        body = f"코인 {request.coin_amount}개 구매 요청이 거절되었습니다."
+        if request.request_type == "ENTITLEMENT":
+            body = f"{request.product_name or request.product_code or '이용권'} 구매 요청이 거절되었습니다."
+            notification_type = "entitlement_purchase_rejected"
+            notification_title = "이용권 구매 요청이 거절되었습니다"
+            notification_data = {
+                "request_id": request.id,
+                "product_code": request.product_code,
+                "price_krw": request.price_krw,
+                "reason": admin_note,
+            }
+        else:
+            body = f"코인 {request.coin_amount}개 구매 요청이 거절되었습니다."
+            notification_type = "coin_purchase_rejected"
+            notification_title = "코인 구매 요청이 거절되었습니다"
+            notification_data = {
+                "request_id": request.id,
+                "coin_amount": request.coin_amount,
+                "price_krw": request.price_krw,
+                "reason": admin_note,
+            }
         if admin_note:
             body = f"{body}\n사유: {admin_note}"
         db.add(
             Notification(
                 user_id=request.user_id,
-                type="coin_purchase_rejected",
-                title="코인 구매 요청이 거절되었습니다",
+                type=notification_type,
+                title=notification_title,
                 body=body,
-                data={
-                    "request_id": request.id,
-                    "coin_amount": request.coin_amount,
-                    "price_krw": request.price_krw,
-                    "reason": admin_note,
-                },
+                data=notification_data,
             )
         )
 
@@ -937,11 +981,13 @@ async def update_coin_purchase_request_for_admin(
     return success_response(
         data={
             "id": request.id,
+            "request_type": request.request_type,
             "status": request.status,
             "admin_note": request.admin_note,
             "handled_by": request.handled_by,
             "handled_at": request.handled_at,
             "balance_after": balance_after,
+            "product_code": request.product_code,
         }
     )
 

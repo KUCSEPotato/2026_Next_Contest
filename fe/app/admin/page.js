@@ -369,10 +369,14 @@ export default function AdminPage() {
 
   async function handleCoinRequest(request, status) {
     const isApprove = status === "approved";
+    const isEntitlement = request.request_type === "ENTITLEMENT";
+    const requestLabel = isEntitlement
+      ? request.product_name || request.product_code || "이용권"
+      : `${request.coin_amount}코인`;
     const noteInput = await prompt({
-      title: isApprove ? "코인 구매 승인" : "코인 구매 거절",
+      title: isApprove ? "구매 요청 승인" : "구매 요청 거절",
       message: isApprove
-        ? `${request.user_nickname || request.user_email || `User #${request.user_id}`}에게 ${request.coin_amount}코인을 지급합니다. 관리자 메모를 입력하세요.`
+        ? `${request.user_nickname || request.user_email || `User #${request.user_id}`}에게 ${requestLabel}을 지급합니다. 관리자 메모를 입력하세요.`
         : `${request.user_nickname || request.user_email || `User #${request.user_id}`}의 구매 요청을 거절합니다. 사유를 입력하세요.`,
       placeholder: isApprove ? "예: 입금 확인 완료" : "예: 결제 내역을 확인할 수 없습니다.",
       confirmText: isApprove ? "승인" : "거절",
@@ -918,7 +922,10 @@ export default function AdminPage() {
                       {request.user_nickname || request.user_email || `User #${request.user_id}`}
                     </p>
                     <p className="mt-1 truncate text-xs text-slate-500">
-                      {request.coin_amount?.toLocaleString("ko-KR")}코인 · {Number(request.price_krw || 0).toLocaleString("ko-KR")}원
+                      {request.request_type === "ENTITLEMENT"
+                        ? request.product_name || request.product_code
+                        : `${request.coin_amount?.toLocaleString("ko-KR")}코인`}{" "}
+                      · {Number(request.price_krw || 0).toLocaleString("ko-KR")}원
                     </p>
                   </div>
                   <button
@@ -1057,9 +1064,9 @@ export default function AdminPage() {
                 <section>
                   <div className="mb-3 flex items-end justify-between gap-3">
                     <div>
-                      <h2 className="text-base font-black text-slate-950">코인 구매 요청</h2>
+                      <h2 className="text-base font-black text-slate-950">수동 구매 요청</h2>
                       <p className="mt-1 text-xs text-slate-500">
-                        PG 연동 전 수동 결제 확인 후 승인하면 코인이 자동 지급됩니다.
+                        수동 결제 확인 후 승인하면 물방울 지급 또는 이용권 활성화가 처리됩니다.
                       </p>
                     </div>
                     <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
@@ -1071,7 +1078,7 @@ export default function AdminPage() {
                       <tr>
                         <Th>ID</Th>
                         <Th>사용자</Th>
-                        <Th>코인</Th>
+                        <Th>상품</Th>
                         <Th>금액</Th>
                         <Th>상태</Th>
                         <Th>요청 메모</Th>
@@ -1089,7 +1096,11 @@ export default function AdminPage() {
                             </div>
                             <div className="text-xs text-slate-500">{request.user_email}</div>
                           </Td>
-                          <Td>{request.coin_amount?.toLocaleString("ko-KR")}개</Td>
+                          <Td>
+                            {request.request_type === "ENTITLEMENT"
+                              ? request.product_name || request.product_code
+                              : `${request.coin_amount?.toLocaleString("ko-KR")}개`}
+                          </Td>
                           <Td>{Number(request.price_krw || 0).toLocaleString("ko-KR")}원</Td>
                           <Td>{COIN_REQUEST_STATUSES[request.status] || request.status}</Td>
                           <Td className="max-w-xs"><span className="line-clamp-2">{request.note || "-"}</span></Td>

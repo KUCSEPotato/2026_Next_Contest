@@ -7,6 +7,7 @@ import {
   getCoinPackagesApi,
   getMyCoinBalanceApi,
   getMyCoinPurchaseRequestsApi,
+  getMyEntitlementApi,
   getPaymentProductsApi,
 } from "../../lib/api";
 import { getToken } from "../../lib/auth";
@@ -36,9 +37,125 @@ function formatKrw(value) {
   return `${Number(value || 0).toLocaleString("ko-KR")}원`;
 }
 
+function formatShortDate(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 function formatWaterdrops(value) {
   const amount = Number(value || 0);
   return `${amount.toLocaleString("ko-KR")}${amount === 1 ? "방울" : "방울"}`;
+}
+
+function getProjectCreateText(product) {
+  if (product?.benefits?.project_create_daily_limit) {
+    return `일 ${product.benefits.project_create_daily_limit}회`;
+  }
+  if (product?.benefits?.project_create_total_limit) {
+    return `총 ${product.benefits.project_create_total_limit}회`;
+  }
+  return "불가";
+}
+
+function getProjectApplyText(product) {
+  if (product?.benefits?.project_apply_unlimited) return "무제한";
+  if (product?.benefits?.project_apply_daily_limit && product?.benefits?.project_apply_total_limit) {
+    return `총 ${product.benefits.project_apply_total_limit}회, 일 ${product.benefits.project_apply_daily_limit}회`;
+  }
+  if (product?.benefits?.project_apply_total_limit) {
+    return `총 ${product.benefits.project_apply_total_limit}회`;
+  }
+  if (product?.benefits?.project_apply_daily_limit) {
+    return `일 ${product.benefits.project_apply_daily_limit}회`;
+  }
+  return "제한";
+}
+
+function getIdeaViewText(product) {
+  if (product?.product_code === "PRO_MONTHLY") return "무제한";
+  if (product?.benefits?.idea_view_daily_limit) return `일 ${product.benefits.idea_view_daily_limit}회 무료`;
+  return "물방울 별도 사용";
+}
+
+function PlanCard({ eyebrow, product, isCurrent, onError, onManualPurchase, manualLoading, children }) {
+  return (
+    <article
+      className={`rounded-2xl border bg-white p-5 shadow-sm transition ${
+        isCurrent
+          ? "border-red-300 ring-2 ring-red-100"
+          : "border-slate-200 hover:border-red-200 hover:shadow-md"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold text-red-600">{eyebrow}</p>
+          <h3 className="mt-2 text-2xl font-black text-slate-950">{product.name}</h3>
+          <p className="mt-1 text-lg font-bold text-slate-800">
+            {product.price_krw ? formatKrw(product.price_krw) : "무료"}
+          </p>
+        </div>
+        {isCurrent && (
+          <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-700">
+            현재 사용 중
+          </span>
+        )}
+      </div>
+      <p className="mt-2 text-sm text-slate-500">{children}</p>
+      <ul className="mt-4 space-y-1 text-sm text-slate-600">
+        <li>아이디어 열람: {getIdeaViewText(product)}</li>
+        <li>프로젝트 생성: {getProjectCreateText(product)}</li>
+        <li>프로젝트 버리기: {product.benefits?.project_discard_unlimited ? "무제한" : "불가"}</li>
+        <li>프로젝트 지원: {getProjectApplyText(product)}</li>
+        {product.benefits?.project_apply_priority && (
+          <li>지원자 노출: 지원자 목록 상단 노출</li>
+        )}
+        {product.benefits?.project_boost_total_limit ? (
+          <li>프로젝트 상단 노출: 기간 내 {product.benefits.project_boost_total_limit}회</li>
+        ) : null}
+        <li>
+          자유게시판:{" "}
+          {product.benefits?.community_write_unlimited
+            ? "무제한"
+            : product.benefits?.community_write_daily_limit
+              ? `글쓰기 일 ${product.benefits.community_write_daily_limit}회, 댓글 무제한`
+              : "댓글 무제한"}
+        </li>
+      </ul>
+      {isCurrent || product.product_code === "FREE" ? (
+        <button
+          type="button"
+          disabled
+          className="mt-5 w-full rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700"
+        >
+          {isCurrent ? "현재 사용 중" : "기본 제공"}
+        </button>
+      ) : (
+        <div className="mt-5 grid gap-2 sm:grid-cols-2">
+          <TossPaymentButton
+            productId={product.product_code}
+            productCode={product.product_code}
+            label="카드 결제"
+            onError={onError}
+            className="w-full rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+          />
+          <button
+            type="button"
+            onClick={() => onManualPurchase(product)}
+            disabled={manualLoading}
+            className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+          >
+            {manualLoading ? "요청 중" : "수동 구매 요청"}
+          </button>
+        </div>
+      )}
+    </article>
+  );
 }
 
 function WaterdropMascot({ className = "h-28 w-28" }) {
@@ -111,6 +228,7 @@ export default function CoinsPage() {
   const [balance, setBalance] = useState(0);
   const [packages, setPackages] = useState([]);
   const [paymentProducts, setPaymentProducts] = useState([]);
+  const [entitlement, setEntitlement] = useState(null);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingPackage, setProcessingPackage] = useState("");
@@ -122,16 +240,18 @@ export default function CoinsPage() {
   const loadCoins = useCallback(async () => {
     try {
       setLoading(true);
-      const [balanceResult, packagesResult, requestsResult, paymentProductsResult] = await Promise.all([
+      const [balanceResult, packagesResult, requestsResult, paymentProductsResult, entitlementResult] = await Promise.all([
         getMyCoinBalanceApi(),
         getCoinPackagesApi(),
         getMyCoinPurchaseRequestsApi(),
         getPaymentProductsApi(),
+        getMyEntitlementApi(),
       ]);
       setBalance(balanceResult.data?.waterdrop_balance ?? balanceResult.data?.coin_balance ?? 0);
       setPackages(packagesResult.data || []);
       setRequests(requestsResult.data || []);
       setPaymentProducts(paymentProductsResult.data || []);
+      setEntitlement(entitlementResult.data || null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "물방울 정보를 불러오지 못했습니다.");
     } finally {
@@ -182,6 +302,63 @@ export default function CoinsPage() {
     }
   }
 
+  async function handleRequestProductPurchase(product) {
+    const ok = await confirm({
+      title: "이용권 수동 구매 요청",
+      message: `${product.name} 수동 구매 요청을 만들까요?\n금액: ${formatKrw(product.price_krw)}\n\n관리자가 결제 확인 후 이용권을 활성화합니다.`,
+      confirmText: "요청하기",
+      cancelText: "돌아가기",
+    });
+    if (!ok) return;
+
+    const noteInput = await prompt({
+      title: "구매 요청 메모",
+      message: "입금자명이나 확인에 필요한 메모가 있으면 남겨주세요.",
+      placeholder: "예: 입금자명 감자",
+      confirmText: "제출",
+      cancelText: "건너뛰기",
+      multiline: true,
+    });
+    if (noteInput === null) return;
+
+    try {
+      setProcessingPackage(product.product_code);
+      const result = await createCoinPurchaseRequestApi({
+        product_code: product.product_code,
+        note: noteInput.trim() || undefined,
+      });
+      setRequests((prev) => [result.data, ...prev]);
+      toast.success("이용권 수동 구매 요청을 보냈습니다. 관리자가 확인 후 활성화합니다.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "이용권 수동 구매 요청에 실패했습니다.");
+    } finally {
+      setProcessingPackage("");
+    }
+  }
+
+  const currentPlanCode = entitlement?.plan || "FREE";
+  const subscriptionProducts = paymentProducts.filter((product) => product.product_type === "SUBSCRIPTION");
+  const passProducts = paymentProducts.filter((product) => product.product_type === "PASS");
+  const freeProduct = {
+    product_code: "FREE",
+    product_type: "FREE",
+    name: "무료 요금제",
+    price_krw: 0,
+    benefits: {
+      idea_view_daily_limit: null,
+      project_create_daily_limit: 0,
+      project_create_total_limit: 0,
+      project_discard_unlimited: false,
+      project_apply_daily_limit: 1,
+      project_apply_total_limit: null,
+      project_apply_unlimited: false,
+      community_write_daily_limit: 1,
+      community_write_unlimited: false,
+    },
+  };
+  const handlePaymentError = (err) =>
+    toast.error(err instanceof Error ? err.message : "결제를 시작하지 못했습니다.");
+
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
       <div className="mx-auto max-w-6xl">
@@ -193,6 +370,14 @@ export default function CoinsPage() {
               <p className="mt-2 text-sm text-slate-600">
                 이용권은 카드 결제로 바로 활성화되고, 물방울은 수동 구매 요청으로 충전할 수 있습니다.
               </p>
+              {entitlement && (
+                <p className="mt-3 inline-flex rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-700">
+                  현재 플랜: {entitlement.name || entitlement.plan}
+                  {entitlement.days_remaining !== null && entitlement.days_remaining !== undefined
+                    ? ` · ${entitlement.days_remaining}일 남음`
+                    : ""}
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-5">
               <WaterdropMascot />
@@ -220,58 +405,72 @@ export default function CoinsPage() {
 
             <section className="mb-8">
               <div className="mb-4">
-                <h2 className="text-xl font-black text-slate-950">이용권</h2>
+                <h2 className="text-xl font-black text-slate-950">무료 요금제</h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  구독제는 30일 이용권으로 먼저 제공되며, 기간권은 자동 갱신되지 않습니다.
+                  결제 없이 기본으로 제공되는 사용 범위입니다.
                 </p>
               </div>
               <div className="grid gap-4 md:grid-cols-3">
-                {paymentProducts.map((product) => (
-                  <article
+                <PlanCard
+                  eyebrow="기본 제공"
+                  product={freeProduct}
+                  isCurrent={currentPlanCode === "FREE"}
+                  onError={handlePaymentError}
+                  onManualPurchase={handleRequestProductPurchase}
+                  manualLoading={false}
+                >
+                  물방울을 별도 사용하면서 가볍게 둘러볼 수 있습니다.
+                </PlanCard>
+              </div>
+            </section>
+
+            <section className="mb-8">
+              <div className="mb-4">
+                <h2 className="text-xl font-black text-slate-950">월정액 요금제</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  현재는 자동 결제 전 단계로, 결제 즉시 30일 동안 활성화됩니다.
+                  {entitlement?.product_type === "SUBSCRIPTION" && entitlement.next_renewal_at
+                    ? ` 다음 갱신 기준일은 ${formatShortDate(entitlement.next_renewal_at)}입니다.`
+                    : ""}
+                </p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                {subscriptionProducts.map((product) => (
+                  <PlanCard
                     key={product.product_code}
-                    className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-red-200 hover:shadow-md"
+                    eyebrow="월정액 30일권"
+                    product={product}
+                    isCurrent={currentPlanCode === product.product_code}
+                    onError={handlePaymentError}
+                    onManualPurchase={handleRequestProductPurchase}
+                    manualLoading={processingPackage === product.product_code}
                   >
-                    <p className="text-sm font-bold text-red-600">
-                      {product.product_type === "SUBSCRIPTION" ? "월 구독" : "기간권"}
-                    </p>
-                    <h3 className="mt-2 text-2xl font-black text-slate-950">{product.name}</h3>
-                    <p className="mt-1 text-lg font-bold text-slate-800">
-                      {formatKrw(product.price_krw)}
-                    </p>
-                    <p className="mt-2 text-sm text-slate-500">
-                      {product.duration_days}일 동안 활성화
-                    </p>
-                    <ul className="mt-4 space-y-1 text-sm text-slate-600">
-                      <li>
-                        프로젝트 생성:{" "}
-                        {product.benefits?.project_create_daily_limit
-                          ? `일 ${product.benefits.project_create_daily_limit}회`
-                          : product.benefits?.project_create_total_limit
-                          ? `총 ${product.benefits.project_create_total_limit}회`
-                          : "불가"}
-                      </li>
-                      <li>
-                        프로젝트 지원:{" "}
-                        {product.benefits?.project_apply_unlimited
-                          ? "무제한"
-                          : product.benefits?.project_apply_total_limit
-                          ? `총 ${product.benefits.project_apply_total_limit}회`
-                          : "제한"}
-                      </li>
-                      <li>
-                        자유게시판: {product.benefits?.community_write_unlimited ? "무제한" : "일 제한"}
-                      </li>
-                    </ul>
-                    <TossPaymentButton
-                      productId={product.product_code}
-                      productCode={product.product_code}
-                      label="카드 결제"
-                      onError={(err) =>
-                        toast.error(err instanceof Error ? err.message : "결제를 시작하지 못했습니다.")
-                      }
-                      className="mt-5 w-full rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                    />
-                  </article>
+                    {product.duration_days}일 동안 월정액 권한이 유지됩니다.
+                  </PlanCard>
+                ))}
+              </div>
+            </section>
+
+            <section className="mb-8">
+              <div className="mb-4">
+                <h2 className="text-xl font-black text-slate-950">정액제 기간권</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  짧은 기간 동안 프로젝트 생성/지원 권한을 쓰는 패스입니다. 기간권은 자동 갱신되지 않습니다.
+                </p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                {passProducts.map((product) => (
+                  <PlanCard
+                    key={product.product_code}
+                    eyebrow={`${product.duration_days}일 기간권`}
+                    product={product}
+                    isCurrent={currentPlanCode === product.product_code}
+                    onError={handlePaymentError}
+                    onManualPurchase={handleRequestProductPurchase}
+                    manualLoading={processingPackage === product.product_code}
+                  >
+                    결제일부터 {product.duration_days}일 동안 활성화됩니다.
+                  </PlanCard>
                 ))}
               </div>
             </section>
@@ -300,14 +499,22 @@ export default function CoinsPage() {
                   <p className="mt-1 text-lg font-bold text-red-600">
                     {formatKrw(packageItem.price_krw)}
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => handleRequestPurchase(packageItem)}
-                    disabled={processingPackage === packageItem.id}
-                    className="mt-5 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                  >
-                    {processingPackage === packageItem.id ? "요청 중" : "수동 구매 요청"}
-                  </button>
+                  <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                    <TossPaymentButton
+                      productId={packageItem.id}
+                      label="카드 결제"
+                      onError={handlePaymentError}
+                      className="w-full rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRequestPurchase(packageItem)}
+                      disabled={processingPackage === packageItem.id}
+                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                    >
+                      {processingPackage === packageItem.id ? "요청 중" : "수동 구매 요청"}
+                    </button>
+                  </div>
                 </article>
               ))}
             </section>
@@ -334,7 +541,7 @@ export default function CoinsPage() {
                     <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
                       <tr>
                         <th className="px-4 py-3">ID</th>
-                        <th className="px-4 py-3">물방울</th>
+                        <th className="px-4 py-3">상품</th>
                         <th className="px-4 py-3">금액</th>
                         <th className="px-4 py-3">상태</th>
                         <th className="px-4 py-3">요청일</th>
@@ -345,7 +552,11 @@ export default function CoinsPage() {
                       {requests.map((request) => (
                         <tr key={request.id}>
                           <td className="px-4 py-3 font-semibold text-slate-900">#{request.id}</td>
-                          <td className="px-4 py-3">{formatWaterdrops(request.coin_amount)}</td>
+                          <td className="px-4 py-3">
+                            {request.request_type === "ENTITLEMENT"
+                              ? request.product_name || request.product_code
+                              : formatWaterdrops(request.coin_amount)}
+                          </td>
                           <td className="px-4 py-3">{formatKrw(request.price_krw)}</td>
                           <td className="px-4 py-3">{STATUS_LABELS[request.status] || request.status}</td>
                           <td className="px-4 py-3">{formatDate(request.created_at)}</td>
