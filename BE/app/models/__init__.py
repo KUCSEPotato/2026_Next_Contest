@@ -17,6 +17,7 @@ from app.models.entities import IdeaFile
 from app.models.entities import IdeaLike
 from app.models.entities import Invitation
 from app.models.entities import Notification
+from app.models.entities import Payment
 from app.models.entities import PaymentEvent
 from app.models.entities import Project
 from app.models.entities import ProjectMember
@@ -59,6 +60,7 @@ __all__ = [
 	"IdeaLike",
 	"Invitation",
 	"Notification",
+	"Payment",
 	"PaymentEvent",
 	"Project",
 	"ProjectMember",

@@ -246,6 +246,17 @@
   - PG 연동 전 수동 확인용이며, 관리자가 승인하면 코인이 지급됩니다.
 - GET /coins/purchase-requests/me: 내가 만든 코인 구매 요청 목록 조회
 
+### Toss Payments
+- POST /payments/prepare: 코인 상품 결제 주문 생성
+  - body: `{ "product_id": "starter|builder|maker" }`
+  - 서버가 `order_id`, `order_name`, `amount`, `coin_amount`를 확정합니다.
+- POST /payments/confirm: 토스 결제 승인
+  - body: `{ "paymentKey": "...", "orderId": "...", "amount": 1000 }`
+  - DB 주문 금액과 요청 금액을 검증한 뒤 백엔드에서 Toss confirm API를 호출합니다.
+  - 이미 `DONE`인 주문은 중복 승인 요청에도 기존 성공 응답을 반환합니다.
+- POST /payments/fail: 토스 결제 실패 기록
+  - body: `{ "orderId": "...", "code": "...", "message": "..." }`
+
 ## 14) Notifications
 
 - GET /notifications: 현재 사용자의 알림 목록
