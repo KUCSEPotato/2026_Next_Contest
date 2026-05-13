@@ -801,14 +801,15 @@ function SproutHeroIcon() {
       aria-hidden
       style={{ animation: "floatSprout 3s ease-in-out infinite" }}
     >
-      <defs>
-        <linearGradient id="sproutStem" x1="44" y1="78" x2="44" y2="34">
-          <stop offset="0%" stopColor="#92400e" />
-          <stop offset="100%" stopColor="#16a34a" />
-        </linearGradient>
-      </defs>
       <g transform="translate(-7 -5) scale(1.15)">
-        <path d="M48 82V38" stroke="url(#sproutStem)" strokeWidth="8" strokeLinecap="round" />
+        <path d="M48 82V38" stroke="#92400e" strokeWidth="8" strokeLinecap="round" />
+        <path
+          d="M48 60c-9-9-18-15-31-21M49 57c11-9 21-20 34-37"
+          stroke="#92400e"
+          strokeWidth="5"
+          strokeLinecap="round"
+          fill="none"
+        />
         <path
           d="M45 41C23 39 15 24 15 11c19 0 33 9 36 29"
           fill="#22c55e"
