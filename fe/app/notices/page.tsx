@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { PostSummary } from "../community/_types";
 import { getPosts } from "../community/_lib/api";
 import { timeAgo } from "../community/_lib/utils";
+import { NOTICE_LAST_SEEN_STORAGE_KEY } from "../../components/TopActionButtons";
 
 function getFirstLine(content: string) {
   const line = content
@@ -63,6 +64,18 @@ export default function NoticesPage() {
 
     return () => window.clearTimeout(timer);
   }, [loadNotices]);
+
+  useEffect(() => {
+    if (!notices.length) return;
+
+    const latestNoticeTime = Math.max(
+      ...notices.map((notice) => new Date(notice.created_at).getTime()).filter(Number.isFinite),
+      0
+    );
+    if (latestNoticeTime > 0) {
+      localStorage.setItem(NOTICE_LAST_SEEN_STORAGE_KEY, String(latestNoticeTime));
+    }
+  }, [notices]);
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">

@@ -7,6 +7,7 @@ import { getPosts, deletePost, reactToPost, getHotPosts } from "./_lib/api";
 import PostCard from "./_components/PostCard";
 import LoginModal from "./_components/LoginModal";
 import { ThumbUpIcon } from "./_components/ReactionThumbIcons";
+import TopActionButtons from "../../components/TopActionButtons";
 
 const CATEGORIES = [
   { label: "전체", value: undefined },
@@ -235,27 +236,7 @@ export default function CommunityPage() {
 
   return (
     <div className="min-h-screen bg-orange-50/30 text-gray-900">
-      <header className="mx-auto flex max-w-6xl items-center justify-end gap-3 px-4 py-4">
-        <button
-          onClick={() => router.push("/notices")}
-          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-red-300 hover:text-red-600"
-        >
-          공지
-        </button>
-
-        <button
-          onClick={() => router.push("/notifications")}
-          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-red-300 hover:text-red-600"
-        >
-          알림
-        </button>
-        <button
-          onClick={() => router.push("/chat")}
-          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-red-300 hover:text-red-600"
-        >
-          채팅
-        </button>
-      </header>
+      <TopActionButtons />
 
       <main className="mx-auto max-w-6xl px-4 pb-16">
         <section className="pb-10 pt-6 text-center">

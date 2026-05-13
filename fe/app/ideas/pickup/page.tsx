@@ -11,6 +11,7 @@ import {
   unlikeIdeaApi,
 } from "../../../lib/api";
 import { getToken } from "../../../lib/auth";
+import TopActionButtons from "../../../components/TopActionButtons";
 
 interface Idea {
   id: number;
@@ -282,28 +283,9 @@ export default function InspirationWellPage() {
 
       <GardenGround />
 
-      <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-end gap-3 px-4 py-4">
-        <button
-          onClick={() => router.push("/notices")}
-          className="rounded-xl border border-emerald-100 bg-white/75 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-emerald-700 dark:border-emerald-800/50 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-emerald-300"
-        >
-          공지
-        </button>
-
-        <button
-          onClick={() => router.push("/notifications")}
-          className="rounded-xl border border-emerald-100 bg-white/75 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-emerald-700 dark:border-emerald-800/50 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-emerald-300"
-        >
-          알림
-        </button>
-
-        <button
-          onClick={() => router.push("/chat")}
-          className="rounded-xl border border-emerald-100 bg-white/75 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-emerald-700 dark:border-emerald-800/50 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-emerald-300"
-        >
-          채팅
-        </button>
-      </header>
+      <div className="relative z-10">
+        <TopActionButtons tone="emerald" />
+      </div>
 
       <main className="relative z-10 mx-auto max-w-6xl px-4 pb-20">
         <section className="pb-10 pt-6 text-center">
