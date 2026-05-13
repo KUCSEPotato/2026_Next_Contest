@@ -25,7 +25,18 @@ import {
   getImageUrl,
   getChatRoomsApi,
   createChatRoomApi,
+  getMyEntitlementApi,
 } from "../../lib/api";
+
+function formatEntitlementDate(value) {
+  if (!value) return "제한 없음";
+
+  return new Date(value).toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
 
 export default function MyPage() {
   const router = useRouter();
@@ -41,6 +52,7 @@ export default function MyPage() {
   const [appliedProjects, setAppliedProjects] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [oauthLinks, setOauthLinks] = useState(null);
+  const [entitlement, setEntitlement] = useState(null);
   const [projectStatusFilter, setProjectStatusFilter] = useState("all");
   const [projectRoleFilter, setProjectRoleFilter] = useState("all");
   const [projectSortOrder, setProjectSortOrder] = useState("latest");
@@ -126,6 +138,7 @@ export default function MyPage() {
           projectsResult,
           applicationsResult,
           oauthLinksResult,
+          entitlementResult,
         ] =
           await Promise.allSettled([
             getMyReputationApi(),
@@ -133,6 +146,7 @@ export default function MyPage() {
             getMyProjectsApi(),
             getMyApplicationsApi(),
             getOAuthLinksApi(),
+            getMyEntitlementApi(),
           ]);
 
         setReputation(
@@ -166,6 +180,11 @@ export default function MyPage() {
         setOauthLinks(
           oauthLinksResult.status === "fulfilled"
             ? oauthLinksResult.value.data
+            : null
+        );
+        setEntitlement(
+          entitlementResult.status === "fulfilled"
+            ? entitlementResult.value.data
             : null
         );
 
@@ -474,6 +493,60 @@ export default function MyPage() {
                 items={profile?.interests}
                 tone="slate"
               />
+              {entitlement && (
+                <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-slate-700">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-bold text-red-700">
+                      현재 플랜: {entitlement.name || entitlement.plan || "무료"}
+                    </span>
+                    {entitlement.product_type !== "FREE" && (
+                      <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-red-600">
+                        {entitlement.product_type === "SUBSCRIPTION" ? "30일 이용권" : "기간권"}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">
+                    남은 기간:{" "}
+                    {entitlement.days_remaining === null || entitlement.days_remaining === undefined
+                      ? "제한 없음"
+                      : `${entitlement.days_remaining}일`}
+                    {" · "}
+                    만료일: {formatEntitlementDate(entitlement.expires_at)}
+                  </p>
+                  {entitlement.product_type === "SUBSCRIPTION" && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      다음 갱신일: {formatEntitlementDate(entitlement.next_renewal_at)}
+                      {" · "}
+                      자동 갱신:{" "}
+                      {entitlement.auto_renew_enabled
+                        ? "사용 중"
+                        : entitlement.renewal_status === "PENDING_BILLING_SETUP"
+                          ? "결제수단 등록 필요"
+                          : "꺼짐"}
+                    </p>
+                  )}
+                  <p className="mt-2 text-xs text-slate-600">
+                    프로젝트 생성:{" "}
+                    {entitlement.benefits?.project_create_daily_limit
+                      ? `일 ${entitlement.benefits.project_create_daily_limit}회`
+                      : entitlement.benefits?.project_create_total_limit
+                        ? `총 ${entitlement.benefits.project_create_total_limit}회`
+                        : "불가"}
+                    {" · "}
+                    지원:{" "}
+                    {entitlement.benefits?.project_apply_unlimited
+                      ? "무제한"
+                      : entitlement.benefits?.project_apply_daily_limit
+                        ? `일 ${entitlement.benefits.project_apply_daily_limit}회`
+                        : entitlement.benefits?.project_apply_total_limit
+                          ? `총 ${entitlement.benefits.project_apply_total_limit}회`
+                          : "일 1회"}
+                    {entitlement.benefits?.project_boost_remaining
+                      ? ` · 상단 노출 ${entitlement.benefits.project_boost_remaining}회 남음`
+                      : ""}
+                  </p>
+                </div>
+              )}
             </div>
             </div>
 

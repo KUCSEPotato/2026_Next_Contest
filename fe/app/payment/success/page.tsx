@@ -8,7 +8,7 @@ import { confirmPaymentApi } from "../../../lib/api";
 
 type ConfirmState =
   | { status: "loading"; message: string }
-  | { status: "success"; message: string; coinBalance?: number }
+  | { status: "success"; message: string; coinBalance?: number; productCode?: string }
   | { status: "error"; message: string };
 
 function PaymentSuccessContent() {
@@ -41,19 +41,27 @@ function PaymentSuccessContent() {
           orderId,
           amount,
         });
+        const data = result.data || {};
+        const isEntitlementPayment = Boolean(data.product_code);
+
         setState({
           status: "success",
-          message: `${result.data?.coin_amount?.toLocaleString("ko-KR") || 0}코인이 충전되었습니다.`,
-          coinBalance: result.data?.coin_balance,
+          message: isEntitlementPayment
+            ? `${data.order_name || "이용권"} 권한이 활성화되었습니다.`
+            : `${data.coin_amount?.toLocaleString("ko-KR") || 0}코인이 충전되었습니다.`,
+          coinBalance: data.coin_balance,
+          productCode: data.product_code,
         });
 
         // 결제 완료 다이얼로그를 띄우고 사용자가 확인하면 메인으로 이동
         await confirm({
           title: "결제가 완료되었습니다",
-          message: "결제가 성공적으로 완료되었습니다.",
+          message: isEntitlementPayment
+            ? "결제가 성공적으로 완료되어 이용권이 활성화되었습니다."
+            : "결제가 성공적으로 완료되었습니다.",
           confirmText: "확인",
         });
-        router.push("/mainpage");
+        router.push(isEntitlementPayment ? "/mypage" : "/mainpage");
       } catch (error) {
         setState({
           status: "error",
@@ -76,6 +84,9 @@ function PaymentSuccessContent() {
           {state.message}
           {state.status === "success" && state.coinBalance !== undefined
             ? `\n현재 잔액: ${state.coinBalance.toLocaleString("ko-KR")}코인`
+            : ""}
+          {state.status === "success" && state.productCode
+            ? `\n상품 코드: ${state.productCode}`
             : ""}
         </p>
         <div className="mt-8 flex justify-center gap-3">
