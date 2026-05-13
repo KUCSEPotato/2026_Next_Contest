@@ -289,7 +289,7 @@ function Stars({ score, avg }: { score: number; avg: number }) {
       {[1, 2, 3, 4, 5].map((i) => (
         <span key={i} style={{ fontSize: 13, opacity: i <= score ? 1 : 0.2, color: "#c0392b" }}>⭐</span>
       ))}
-      <span style={{ fontSize: 11, color: "#c08080", marginLeft: 5 }}>
+      <span style={{ fontSize: 11, color: "var(--memoir-rose-muted)", marginLeft: 5 }}>
         {avg.toFixed(1)}
       </span>
     </div>
@@ -311,12 +311,12 @@ function ReviewSection({ rating }: { rating: Rating }) {
       {items.map(({ label, avg }) => {
         const score = Math.min(5, Math.max(1, Math.round(avg || 0)));
         return (
-          <div key={label} style={{ background: "#fdf4f4", border: "1px solid #f0cccc", borderRadius: 14, padding: "14px 16px" }}>
+          <div key={label} style={{ background: "var(--memoir-rose-bg)", border: "1px solid var(--memoir-rose-border)", borderRadius: 14, padding: "14px 16px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 7 }}>
-              <span style={{ fontSize: 12, color: "#a83030", fontWeight: 700 }}>{label}</span>
+              <span style={{ fontSize: 12, color: "var(--memoir-rose-text)", fontWeight: 700 }}>{label}</span>
               <Stars score={score} avg={avg || 0} />
             </div>
-            <p style={{ margin: 0, fontSize: 13, color: "#6b2020", lineHeight: 1.7 }}>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--memoir-rose-text)", lineHeight: 1.7 }}>
               {avg > 0 ? REVIEW_MESSAGES[label][score] : "아직 이 항목의 리뷰 데이터가 없어요."}
             </p>
           </div>
@@ -395,7 +395,7 @@ function GrowthModal({
   const inputStyle: React.CSSProperties = {
     width: "100%", border: "1px solid #f0c8c8", borderRadius: 10,
     padding: "10px 14px", fontSize: 13,
-    color: "#3c1010", background: "#fdf8f8", outline: "none", boxSizing: "border-box",
+    color: "#3c1010", background: "var(--memoir-rose-soft-bg)", outline: "none", boxSizing: "border-box",
   };
   const canGenerateMemoir = Boolean(
     selectedTech.length ||
@@ -413,14 +413,14 @@ function GrowthModal({
       onClick={(e) => e.target === e.currentTarget && onClose()}
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.38)", zIndex: 200, display: "flex", alignItems: "flex-end", justifyContent: "center" }}
     >
-      <div style={{ background: "#fff", borderRadius: "24px 24px 0 0", width: "100%", maxWidth: 480, padding: "22px 22px 40px", maxHeight: "85vh", overflowY: "auto" }}>
+      <div style={{ background: "var(--memoir-card-bg)", borderRadius: "24px 24px 0 0", width: "100%", maxWidth: 480, padding: "22px 22px 40px", maxHeight: "85vh", overflowY: "auto" }}>
         <div style={{ width: 38, height: 4, background: "#f0d0d0", borderRadius: 4, margin: "0 auto 18px" }} />
         <p style={{ fontSize: 20, fontWeight: 800, color: "#5c0a0a", marginBottom: 4 }}>🌹 성장 기록하기</p>
-        <p style={{ fontSize: 13, color: "#c08080", marginBottom: 22 }}>
+        <p style={{ fontSize: 13, color: "var(--memoir-rose-muted)", marginBottom: 22 }}>
           새롭게 도전한 점과 회고 내용을 수정한 뒤 AI 요약본을 다시 만들 수 있어요.
         </p>
 
-        <p style={{ fontSize: 12, color: "#c08080", lineHeight: 1.6, margin: "-6px 0 14px" }}>
+        <p style={{ fontSize: 12, color: "var(--memoir-rose-muted)", lineHeight: 1.6, margin: "-6px 0 14px" }}>
           AI 요약을 받은 뒤에도 새롭게 도전한 점을 수정하고 다시 요약받을 수 있어요.
         </p>
 
@@ -429,8 +429,8 @@ function GrowthModal({
           { title: "분야",     chips: FIELD_CHIPS, selected: selectedField, setSelected: setSelectedField },
         ].map(({ title, chips, selected, setSelected }) => (
           <div key={title} style={{ marginBottom: 18 }}>
-            <p style={{ fontSize: 12, color: "#a83030", fontWeight: 700, marginBottom: 9 }}>
-              {title} <span style={{ fontWeight: 400, color: "#c08080" }}>(복수 선택)</span>
+            <p style={{ fontSize: 12, color: "var(--memoir-rose-text)", fontWeight: 700, marginBottom: 9 }}>
+              {title} <span style={{ fontWeight: 400, color: "var(--memoir-rose-muted)" }}>(복수 선택)</span>
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
               {chips.map((chip) => (
@@ -440,9 +440,9 @@ function GrowthModal({
                   style={{
                     padding: "7px 15px", borderRadius: 20, border: "1px solid", cursor: "pointer",
                     fontSize: 13, transition: "all .15s",
-                    background: selected.includes(chip) ? "#9b1c1c" : "#fdf4f4",
-                    color:      selected.includes(chip) ? "#fdf0f0" : "#9b1c1c",
-                    borderColor: selected.includes(chip) ? "#9b1c1c" : "#f0c0c0",
+                    background: selected.includes(chip) ? "var(--memoir-rose-text)" : "var(--memoir-rose-bg)",
+                    color:      selected.includes(chip) ? "#fdf0f0" : "var(--memoir-rose-text)",
+                    borderColor: selected.includes(chip) ? "var(--memoir-rose-text)" : "var(--memoir-rose-border)",
                   }}
                 >
                   {chip}
@@ -452,8 +452,8 @@ function GrowthModal({
           </div>
         ))}
 
-        <p style={{ fontSize: 12, color: "#a83030", fontWeight: 700, marginBottom: 9 }}>
-          직접 입력 <span style={{ fontWeight: 400, color: "#c08080" }}>(쉼표로 구분)</span>
+        <p style={{ fontSize: 12, color: "var(--memoir-rose-text)", fontWeight: 700, marginBottom: 9 }}>
+          직접 입력 <span style={{ fontWeight: 400, color: "var(--memoir-rose-muted)" }}>(쉼표로 구분)</span>
         </p>
         <input value={customInput} onChange={(e) => setCustomInput(e.target.value)} placeholder="예: GraphQL, 외부 API 연동, 코드 리뷰" style={{ ...inputStyle, marginBottom: 14 }} />
 
@@ -464,8 +464,8 @@ function GrowthModal({
           { label: "다음 액션",   value: nextActions, setValue: setNextActions, ph: "다음에 시도할 구체적인 행동을 적어주세요" },
         ].map(({ label, value, setValue, ph }) => (
           <div key={label} style={{ marginBottom: 14 }}>
-            <p style={{ fontSize: 12, color: "#a83030", fontWeight: 700, marginBottom: 9 }}>
-              {label} <span style={{ fontWeight: 400, color: "#c08080" }}>(선택)</span>
+            <p style={{ fontSize: 12, color: "var(--memoir-rose-text)", fontWeight: 700, marginBottom: 9 }}>
+              {label} <span style={{ fontWeight: 400, color: "var(--memoir-rose-muted)" }}>(선택)</span>
             </p>
             <textarea
               value={value}
@@ -477,11 +477,11 @@ function GrowthModal({
           </div>
         ))}
 
-        <div style={{ background: "#fff8f8", border: "1px solid #f4cccc", borderRadius: 14, padding: 14, marginBottom: 12 }}>
-          <p style={{ fontSize: 13, fontWeight: 800, color: "#8f1d1d", marginBottom: 6 }}>
+        <div style={{ background: "var(--memoir-rose-soft-bg)", border: "1px solid var(--memoir-rose-border)", borderRadius: 14, padding: 14, marginBottom: 12 }}>
+          <p style={{ fontSize: 13, fontWeight: 800, color: "var(--memoir-rose-text)", marginBottom: 6 }}>
             AI 요약과 저장은 달라요
           </p>
-          <p style={{ fontSize: 12, color: "#a85555", lineHeight: 1.7, margin: 0 }}>
+          <p style={{ fontSize: 12, color: "var(--memoir-rose-muted)", lineHeight: 1.7, margin: 0 }}>
             위 내용을 수정한 뒤 <strong>AI에게 요약 부탁하기</strong>를 누르면 요약본만 새로 만들어져요.
             최종으로 남기려면 아래의 <strong>수확일기 저장하기</strong>를 눌러 저장해주세요.
           </p>
@@ -492,9 +492,9 @@ function GrowthModal({
           disabled={saving || generating || !canGenerateMemoir}
           style={{
             width: "100%",
-            background: generating ? "#f0a0a0" : "#fff",
-            color: generating ? "#fff" : "#9b1c1c",
-            border: "1px solid #f0c0c0",
+            background: generating ? "#f0a0a0" : "var(--memoir-card-bg)",
+            color: generating ? "var(--memoir-card-bg)" : "var(--memoir-rose-text)",
+            border: "1px solid var(--memoir-rose-border)",
             borderRadius: 14,
             padding: 14,
             fontSize: 15,
@@ -513,10 +513,10 @@ function GrowthModal({
 
         {hasAiMemoir && (
           <div style={{ marginBottom: 14 }}>
-            <p style={{ fontSize: 12, color: "#a83030", fontWeight: 700, marginBottom: 9 }}>
+            <p style={{ fontSize: 12, color: "var(--memoir-rose-text)", fontWeight: 700, marginBottom: 9 }}>
               AI 회고록 초안
             </p>
-            <p style={{ fontSize: 12, color: "#c08080", lineHeight: 1.7, marginBottom: 8 }}>
+            <p style={{ fontSize: 12, color: "var(--memoir-rose-muted)", lineHeight: 1.7, marginBottom: 8 }}>
               아직 저장되지 않은 초안입니다. 위 내용을 수정한 뒤 AI 요약본을 다시 만들거나, 아래에서 초안을 직접 다듬을 수 있어요.
             </p>
             <textarea
@@ -528,11 +528,11 @@ function GrowthModal({
           </div>
         )}
 
-        <div style={{ borderTop: "1px solid #f2d6d6", paddingTop: 12, marginTop: 4 }}>
-          <p style={{ fontSize: 12, color: "#8f1d1d", fontWeight: 800, marginBottom: 4 }}>
+        <div style={{ borderTop: "1px solid var(--memoir-rose-border)", paddingTop: 12, marginTop: 4 }}>
+          <p style={{ fontSize: 12, color: "var(--memoir-rose-text)", fontWeight: 800, marginBottom: 4 }}>
             최종 저장
           </p>
-          <p style={{ fontSize: 12, color: "#a85555", lineHeight: 1.7, margin: "0 0 10px" }}>
+          <p style={{ fontSize: 12, color: "var(--memoir-rose-muted)", lineHeight: 1.7, margin: "0 0 10px" }}>
             AI 요약본을 확인한 뒤 이 버튼을 눌러야 수확일기에 저장돼요.
           </p>
         </div>
@@ -541,7 +541,7 @@ function GrowthModal({
           onClick={handleSave}
           disabled={saving}
           style={{
-            width: "100%", background: saving ? "#f0a0a0" : "#9b1c1c", color: "#fdf0f0",
+            width: "100%", background: saving ? "#f0a0a0" : "var(--memoir-rose-text)", color: "#fdf0f0",
             border: "none", borderRadius: 14, padding: 16, fontSize: 16,
             cursor: saving ? "not-allowed" : "pointer", marginTop: 6,
           }}
@@ -563,15 +563,15 @@ function Section({ emoji, label, headline, children }: {
   children: React.ReactNode;
 }) {
   return (
-    <section style={{ marginTop: 20, background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", overflow: "hidden", boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)" }}>
+    <section style={{ marginTop: 20, background: "var(--memoir-card-bg)", borderRadius: 16, border: "1px solid var(--memoir-border)", overflow: "hidden", boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)" }}>
       <div style={{ padding: "20px 24px 0", display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ fontSize: 18, lineHeight: 1 }}>{emoji}</span>
         <span style={{ fontSize: 12, color: "#e60012", fontWeight: 700 }}>{label}</span>
       </div>
-      <p style={{ fontSize: 22, color: "#0f172a", padding: "8px 24px 18px", fontWeight: 800, lineHeight: 1.45, margin: 0 }}>
+      <p style={{ fontSize: 22, color: "var(--memoir-text)", padding: "8px 24px 18px", fontWeight: 800, lineHeight: 1.45, margin: 0 }}>
         {headline}
       </p>
-      <div style={{ height: 1, background: "#e2e8f0" }} />
+      <div style={{ height: 1, background: "var(--memoir-border)" }} />
       <div style={{ padding: "20px 24px" }}>{children}</div>
     </section>
   );
@@ -880,7 +880,7 @@ function MemoirContent() {
   /* 로딩 / 에러 */
   if (loading) {
     return (
-      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#f8fafc", fontSize: 14, color: "#64748b" }}>
+      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "var(--memoir-page-bg)", fontSize: 14, color: "var(--memoir-muted)" }}>
         회고 데이터를 불러오는 중이에요 🌹
       </div>
     );
@@ -888,22 +888,22 @@ function MemoirContent() {
 
   if (!requestedProjectId) {
     return (
-      <div style={{ minHeight: "100vh", background: "#f8fafc", color: "#0f172a", fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", padding: "40px 24px" }}>
+      <div style={{ minHeight: "100vh", background: "var(--memoir-page-bg)", color: "var(--memoir-text)", fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", padding: "40px 24px" }}>
         <div style={{ width: "100%", maxWidth: 1152, margin: "0 auto" }}>
-          <section style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 18, padding: "32px 36px", boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)" }}>
+          <section style={{ background: "var(--memoir-card-bg)", border: "1px solid var(--memoir-border)", borderRadius: 18, padding: "32px 36px", boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)" }}>
             <p style={{ color: "#e60012", fontSize: 14, fontWeight: 800, margin: 0 }}>
               나의 회고
             </p>
             <h1 style={{ margin: "8px 0 0", fontSize: 34, lineHeight: 1.25, fontWeight: 900 }}>
               완료한 프로젝트에서 남긴 성장 기록
             </h1>
-            <p style={{ margin: "12px 0 0", color: "#64748b", fontSize: 15 }}>
+            <p style={{ margin: "12px 0 0", color: "var(--memoir-muted)", fontSize: 15 }}>
               지금까지 완료한 프로젝트의 텃밭일기를 한눈에 모아봅니다.
             </p>
           </section>
 
           {memoirList.length === 0 ? (
-            <section style={{ marginTop: 20, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: 28, color: "#64748b" }}>
+            <section style={{ marginTop: 20, background: "var(--memoir-card-bg)", border: "1px solid var(--memoir-border)", borderRadius: 16, padding: 28, color: "var(--memoir-muted)" }}>
               아직 완료한 프로젝트 회고가 없습니다.
             </section>
           ) : (
@@ -918,17 +918,17 @@ function MemoirContent() {
                 return (
                   <article
                     key={completedProject.id}
-                    style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: 24, boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)" }}
+                    style={{ background: "var(--memoir-card-bg)", border: "1px solid var(--memoir-border)", borderRadius: 16, padding: 24, boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)" }}
                   >
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start" }}>
                       <div>
-                        <span style={{ display: "inline-block", background: "#fee2e2", color: "#e60012", borderRadius: 999, padding: "5px 10px", fontSize: 12, fontWeight: 800 }}>
+                        <span style={{ display: "inline-block", background: "var(--memoir-rose-bg)", color: "#e60012", borderRadius: 999, padding: "5px 10px", fontSize: 12, fontWeight: 800 }}>
                           completed
                         </span>
                         <h2 style={{ margin: "12px 0 0", fontSize: 22, fontWeight: 900 }}>
                           {completedProject.title}
                         </h2>
-                        <p style={{ margin: "8px 0 0", color: "#64748b", lineHeight: 1.7 }}>
+                        <p style={{ margin: "8px 0 0", color: "var(--memoir-muted)", lineHeight: 1.7 }}>
                           {summaryText}
                         </p>
                       </div>
@@ -944,7 +944,7 @@ function MemoirContent() {
                     {itemGrowth?.chips?.length ? (
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16 }}>
                         {itemGrowth.chips.map((chip) => (
-                          <span key={chip} style={{ background: "#f8fafc", color: "#475569", border: "1px solid #e2e8f0", borderRadius: 999, padding: "5px 10px", fontSize: 12, fontWeight: 700 }}>
+                          <span key={chip} style={{ background: "var(--memoir-page-bg)", color: "var(--memoir-muted)", border: "1px solid var(--memoir-border)", borderRadius: 999, padding: "5px 10px", fontSize: 12, fontWeight: 700 }}>
                             {chip}
                           </span>
                         ))}
@@ -962,10 +962,10 @@ function MemoirContent() {
 
   if (error || !project) {
     return (
-      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#f8fafc", textAlign: "center", padding: 24 }}>
-        <div style={{ width: "100%", maxWidth: 420, borderRadius: 16, border: "1px solid #e2e8f0", background: "#fff", padding: 28, boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)" }}>
-          <p style={{ fontSize: 18, fontWeight: 800, color: "#0f172a" }}>회고를 불러오지 못했어요</p>
-          <p style={{ marginTop: 8, fontSize: 14, color: "#64748b" }}>{error || "프로젝트 정보가 없습니다."}</p>
+      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "var(--memoir-page-bg)", textAlign: "center", padding: 24 }}>
+        <div style={{ width: "100%", maxWidth: 420, borderRadius: 16, border: "1px solid var(--memoir-border)", background: "var(--memoir-card-bg)", padding: 28, boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)" }}>
+          <p style={{ fontSize: 18, fontWeight: 800, color: "var(--memoir-text)" }}>회고를 불러오지 못했어요</p>
+          <p style={{ marginTop: 8, fontSize: 14, color: "var(--memoir-muted)" }}>{error || "프로젝트 정보가 없습니다."}</p>
         </div>
       </div>
     );
@@ -977,23 +977,23 @@ function MemoirContent() {
 
   return (
     <>
-      <div style={{ minHeight: "100vh", background: "#f8fafc", color: "#0f172a", fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", padding: "40px 24px" }}>
+      <div style={{ minHeight: "100vh", background: "var(--memoir-page-bg)", color: "var(--memoir-text)", fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", padding: "40px 24px" }}>
         <div style={{ width: "100%", maxWidth: 1152, margin: "0 auto" }}>
 
         {/* ── Hero ── */}
-        <section style={{ position: "relative", overflow: "hidden", background: "#fff", padding: "34px 36px", border: "1px solid #e2e8f0", borderRadius: 18, boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)" }}>
+        <section style={{ position: "relative", overflow: "hidden", background: "var(--memoir-card-bg)", padding: "34px 36px", border: "1px solid var(--memoir-border)", borderRadius: 18, boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)" }}>
           <div style={{ position: "absolute", right: -10, bottom: -30, opacity: 0.13, transform: "scale(1.45)" }}>
             <RoseSVG />
           </div>
           <div style={{ position: "relative", zIndex: 1 }}>
-            <div style={{ display: "inline-block", background: "#fee2e2", color: "#e60012", fontSize: 12, fontWeight: 800, padding: "6px 14px", borderRadius: 999, marginBottom: 14 }}>
+            <div style={{ display: "inline-block", background: "var(--memoir-rose-bg)", color: "#e60012", fontSize: 12, fontWeight: 800, padding: "6px 14px", borderRadius: 999, marginBottom: 14 }}>
               개발자의 장미 기록
             </div>
-            <p style={{ fontSize: 34, fontWeight: 900, color: "#0f172a", marginBottom: 8, lineHeight: 1.25 }}>
+            <p style={{ fontSize: 34, fontWeight: 900, color: "var(--memoir-text)", marginBottom: 8, lineHeight: 1.25 }}>
               {project.title}
             </p>
-            <p style={{ fontSize: 15, color: "#64748b", margin: 0 }}>프로젝트를 지나온 흔적을 차분히 남겨요.</p>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 999, padding: "7px 14px", fontSize: 13, color: "#475569", marginTop: 18 }}>
+            <p style={{ fontSize: 15, color: "var(--memoir-muted)", margin: 0 }}>프로젝트를 지나온 흔적을 차분히 남겨요.</p>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--memoir-page-bg)", border: "1px solid var(--memoir-border)", borderRadius: 999, padding: "7px 14px", fontSize: 13, color: "var(--memoir-muted)", marginTop: 18 }}>
               {toDateLabel(project.created_at)} 시작 · {durationDays}일간의 여정
             </div>
           </div>
@@ -1002,58 +1002,58 @@ function MemoirContent() {
         {/* 1. 할 일 달성 */}
         <Section emoji="✅" label="할 일 달성" headline={<>우리팀은 {todoDone}개를 달성했고<br />나는 그중 {myTodoDone}개를 해냈어요</>}>
           <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 14 }}>
-            <div style={{ border: "1px solid #f0cccc", borderRadius: 14, background: "#fdf4f4", padding: 14, minHeight: 250 }}>
-              <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 800, color: "#a83030" }}>
+            <div style={{ border: "1px solid var(--memoir-rose-border)", borderRadius: 14, background: "var(--memoir-rose-bg)", padding: 14, minHeight: 250 }}>
+              <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 800, color: "var(--memoir-rose-text)" }}>
                 우리팀이 달성한 일
               </p>
               <div style={{ display: "flex", alignItems: "center", gap: 14, minHeight: 140 }}>
                 <ProgressBloom progress={todoPercent} size="sm" />
-                <p style={{ fontSize: 38, fontWeight: 900, color: "#9b1c1c", lineHeight: 1, margin: 0 }}>
+                <p style={{ fontSize: 38, fontWeight: 900, color: "var(--memoir-rose-text)", lineHeight: 1, margin: 0 }}>
                   {todoDone}
-                  <span style={{ fontSize: 14, color: "#c06060", marginLeft: 4 }}>개 완료</span>
+                  <span style={{ fontSize: 14, color: "var(--memoir-rose-muted)", marginLeft: 4 }}>개 완료</span>
                 </p>
               </div>
-              <div style={{ height: 10, background: "#fce8e8", borderRadius: 12, overflow: "hidden", margin: "12px 0 5px", border: "1px solid #f0c0c0" }}>
+              <div style={{ height: 10, background: "var(--memoir-rose-bg)", borderRadius: 12, overflow: "hidden", margin: "12px 0 5px", border: "1px solid var(--memoir-rose-border)" }}>
                 <div style={{ height: "100%", background: "#c0392b", borderRadius: 12, width: `${todoPercent}%` }} />
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#c08080" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--memoir-rose-muted)" }}>
                 <span>전체 {todoTotal}개 중</span>
-                <span style={{ color: "#9b1c1c", fontWeight: 700 }}>{todoPercent}% 달성</span>
+                <span style={{ color: "var(--memoir-rose-text)", fontWeight: 700 }}>{todoPercent}% 달성</span>
               </div>
             </div>
 
             <div style={{ display: "grid", gap: 14 }}>
-              <div style={{ border: "1px solid #e2e8f0", borderRadius: 14, background: "#fff", padding: 14 }}>
-                <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 800, color: "#475569" }}>
+              <div style={{ border: "1px solid var(--memoir-border)", borderRadius: 14, background: "var(--memoir-card-bg)", padding: 14 }}>
+                <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 800, color: "var(--memoir-muted)" }}>
                   내가 달성한 일
                 </p>
-                <p style={{ fontSize: 30, fontWeight: 900, color: "#0f172a", lineHeight: 1, margin: 0 }}>
+                <p style={{ fontSize: 30, fontWeight: 900, color: "var(--memoir-text)", lineHeight: 1, margin: 0 }}>
                   {myTodoDone}
-                  <span style={{ fontSize: 14, color: "#64748b", marginLeft: 4 }}>개 체크</span>
+                  <span style={{ fontSize: 14, color: "var(--memoir-muted)", marginLeft: 4 }}>개 체크</span>
                 </p>
-                <div style={{ height: 10, background: "#f1f5f9", borderRadius: 12, overflow: "hidden", margin: "14px 0 5px", border: "1px solid #e2e8f0" }}>
-                  <div style={{ height: "100%", background: "#0f172a", borderRadius: 12, width: `${myTodoPercent}%` }} />
+                <div style={{ height: 10, background: "#f1f5f9", borderRadius: 12, overflow: "hidden", margin: "14px 0 5px", border: "1px solid var(--memoir-border)" }}>
+                  <div style={{ height: "100%", background: "var(--memoir-text)", borderRadius: 12, width: `${myTodoPercent}%` }} />
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--memoir-muted)" }}>
                   <span>팀 전체 Todo 기준</span>
-                  <span style={{ color: "#0f172a", fontWeight: 700 }}>{myTodoPercent}% 기여</span>
+                  <span style={{ color: "var(--memoir-text)", fontWeight: 700 }}>{myTodoPercent}% 기여</span>
                 </div>
               </div>
 
-              <div style={{ border: "1px solid #dbeafe", borderRadius: 14, background: "#f8fbff", padding: 14 }}>
-                <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 800, color: "#1e40af" }}>
+              <div style={{ border: "1px solid var(--memoir-blue-border)", borderRadius: 14, background: "var(--memoir-blue-bg)", padding: 14 }}>
+                <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 800, color: "var(--memoir-blue-text)" }}>
                   나의 기여도
                 </p>
-                <p style={{ fontSize: 30, fontWeight: 900, color: "#1e3a8a", lineHeight: 1, margin: 0 }}>
+                <p style={{ fontSize: 30, fontWeight: 900, color: "var(--memoir-blue-text)", lineHeight: 1, margin: 0 }}>
                   {myContributionPercent}
-                  <span style={{ fontSize: 14, color: "#64748b", marginLeft: 4 }}>%</span>
+                  <span style={{ fontSize: 14, color: "var(--memoir-muted)", marginLeft: 4 }}>%</span>
                 </p>
-                <div style={{ height: 10, background: "#e0edff", borderRadius: 12, overflow: "hidden", margin: "14px 0 5px", border: "1px solid #bfdbfe" }}>
+                <div style={{ height: 10, background: "var(--memoir-blue-bg)", borderRadius: 12, overflow: "hidden", margin: "14px 0 5px", border: "1px solid var(--memoir-blue-border)" }}>
                   <div style={{ height: "100%", background: "#2563eb", borderRadius: 12, width: `${myContributionPercent}%` }} />
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--memoir-muted)" }}>
                   <span>팀이 완료한 {todoDone}개 중</span>
-                  <span style={{ color: "#1e3a8a", fontWeight: 700 }}>내가 {myTodoDone}개 수행</span>
+                  <span style={{ color: "var(--memoir-blue-text)", fontWeight: 700 }}>내가 {myTodoDone}개 수행</span>
                 </div>
               </div>
             </div>
@@ -1067,12 +1067,12 @@ function MemoirContent() {
 
         {/* 3. 이런 프로젝트를 만들었어요 */}
         <Section emoji="🗺️" label="프로젝트 소개" headline={<>나는 이런 프로젝트를<br />만들었어요</>}>
-          <div style={{ fontSize: 14, color: "#7a3030", lineHeight: 1.9, background: "#fdf6f6", borderLeft: "3px solid #e05555", padding: "13px 16px", borderRadius: "0 12px 12px 0" }}>
+          <div style={{ fontSize: 14, color: "var(--memoir-rose-text)", lineHeight: 1.9, background: "var(--memoir-rose-soft-bg)", borderLeft: "3px solid #e05555", padding: "13px 16px", borderRadius: "0 12px 12px 0" }}>
             {projectDesc || "프로젝트 설명이 아직 없어요."}
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 14 }}>
             {techStack.map((tag) => (
-              <span key={tag} style={{ background: "#fce8e8", color: "#9b1c1c", fontSize: 12, padding: "5px 12px", borderRadius: 20, border: "1px solid #f0c0c0" }}>
+              <span key={tag} style={{ background: "var(--memoir-rose-bg)", color: "var(--memoir-rose-text)", fontSize: 12, padding: "5px 12px", borderRadius: 20, border: "1px solid var(--memoir-rose-border)" }}>
                 {tag}
               </span>
             ))}
@@ -1081,19 +1081,19 @@ function MemoirContent() {
 
         {/* 4. n시간 동안 수행했어요 */}
         <Section emoji="⏱️" label="투자한 시간" headline={<>나는 약 {hours}시간 동안<br />프로젝트를 수행했어요</>}>
-          <p style={{ fontSize: 52, fontWeight: 900, color: "#9b1c1c", lineHeight: 1, margin: 0 }}>
+          <p style={{ fontSize: 52, fontWeight: 900, color: "var(--memoir-rose-text)", lineHeight: 1, margin: 0 }}>
             {hours}
-            <span style={{ fontSize: 18, color: "#c06060", marginLeft: 6 }}>시간</span>
+            <span style={{ fontSize: 18, color: "var(--memoir-rose-muted)", marginLeft: 6 }}>시간</span>
           </p>
-          <p style={{ fontSize: 13, color: "#c08080", marginTop: 5 }}>{durationDays}일 × 하루 평균 6시간 기준</p>
+          <p style={{ fontSize: 13, color: "var(--memoir-rose-muted)", marginTop: 5 }}>{durationDays}일 × 하루 평균 6시간 기준</p>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 16 }}>
             {[
               { val: `${durationDays}일`, label: "총 프로젝트 기간" },
               { val: `${Math.ceil(durationDays / 7)}주`, label: "함께한 기간" },
             ].map(({ val, label }) => (
-              <div key={label} style={{ background: "#fdf4f4", border: "1px solid #f0cccc", borderRadius: 12, padding: 12, textAlign: "center" }}>
-                <p style={{ fontSize: 22, fontWeight: 700, color: "#9b1c1c", margin: 0 }}>{val}</p>
-                <p style={{ fontSize: 11, color: "#c08080", marginTop: 3 }}>{label}</p>
+              <div key={label} style={{ background: "var(--memoir-rose-bg)", border: "1px solid var(--memoir-rose-border)", borderRadius: 12, padding: 12, textAlign: "center" }}>
+                <p style={{ fontSize: 22, fontWeight: 700, color: "var(--memoir-rose-text)", margin: 0 }}>{val}</p>
+                <p style={{ fontSize: 11, color: "var(--memoir-rose-muted)", marginTop: 3 }}>{label}</p>
               </div>
             ))}
           </div>
@@ -1104,27 +1104,27 @@ function MemoirContent() {
           {!growth ? (
             <div
               onClick={() => setModalOpen(true)}
-              style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "22px 16px", gap: 10, cursor: "pointer", border: "2px dashed #f0b0b0", borderRadius: 14, background: "#fdf8f8", textAlign: "center" }}
+              style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "22px 16px", gap: 10, cursor: "pointer", border: "2px dashed var(--memoir-rose-border)", borderRadius: 14, background: "var(--memoir-rose-soft-bg)", textAlign: "center" }}
             >
               <span style={{ fontSize: 32 }}>✍️</span>
-              <div style={{ fontSize: 14, color: "#a83030", lineHeight: 1.7 }}>
+              <div style={{ fontSize: 14, color: "var(--memoir-rose-text)", lineHeight: 1.7 }}>
                 새롭게 도전한 것들을 기록해봐요<br />
-                <span style={{ fontSize: 12, color: "#c08080" }}>기술 스택, 분야, 느낀 점을 담을 수 있어요</span>
+                <span style={{ fontSize: 12, color: "var(--memoir-rose-muted)" }}>기술 스택, 분야, 느낀 점을 담을 수 있어요</span>
               </div>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div>
-                <p style={{ fontSize: 12, color: "#c08080", marginBottom: 8 }}>새롭게 도전한 것들</p>
+                <p style={{ fontSize: 12, color: "var(--memoir-rose-muted)", marginBottom: 8 }}>새롭게 도전한 것들</p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                   {growth.chips.map((c) => (
-                    <span key={c} style={{ background: "#fce8e8", color: "#9b1c1c", fontSize: 12, padding: "5px 13px", borderRadius: 20, border: "1px solid #f0c0c0" }}>{c}</span>
+                    <span key={c} style={{ background: "var(--memoir-rose-bg)", color: "var(--memoir-rose-text)", fontSize: 12, padding: "5px 13px", borderRadius: 20, border: "1px solid var(--memoir-rose-border)" }}>{c}</span>
                   ))}
                 </div>
               </div>
               <button
                 onClick={() => setModalOpen(true)}
-                style={{ alignSelf: "flex-start", fontSize: 12, color: "#a83030", background: "none", border: "1px solid #f0c0c0", borderRadius: 8, padding: "7px 14px", cursor: "pointer" }}
+                style={{ alignSelf: "flex-start", fontSize: 12, color: "var(--memoir-rose-text)", background: "none", border: "1px solid var(--memoir-rose-border)", borderRadius: 8, padding: "7px 14px", cursor: "pointer" }}
               >
                 ✏️ 수정하기
               </button>
@@ -1135,16 +1135,16 @@ function MemoirContent() {
         {/* 6. 이런 점을 느꼈어요 */}
         <Section emoji="💬" label="AI 정제 회고" headline="나는 이런 점을 느꼈어요">
           {!growth || (!growth.good.trim() && !growth.bad.trim() && !growth.nextActions?.trim() && !growth.lessons?.trim()) ? (
-            <p style={{ textAlign: "center", padding: 18, color: "#c08080", fontSize: 13, lineHeight: 1.9, margin: 0 }}>
+            <p style={{ textAlign: "center", padding: 18, color: "var(--memoir-rose-muted)", fontSize: 13, lineHeight: 1.9, margin: 0 }}>
               위에서 성장 기록을 작성하면<br />AI가 느낀 점을 정리해드려요 🌹
             </p>
           ) : (
-            <div style={{ background: "#fdf4f4", border: "1px solid #f0cccc", borderRadius: 14, padding: 18, position: "relative", overflow: "hidden" }}>
-              <span style={{ fontSize: 90, color: "#f0cccc", position: "absolute", top: -12, left: 10, lineHeight: 1 }}>&quot;</span>
-              <div style={{ fontSize: 14, color: "#6b2020", lineHeight: 1.9, position: "relative", zIndex: 1, paddingLeft: 8 }}>
+            <div style={{ background: "var(--memoir-rose-bg)", border: "1px solid var(--memoir-rose-border)", borderRadius: 14, padding: 18, position: "relative", overflow: "hidden" }}>
+              <span style={{ fontSize: 90, color: "var(--memoir-rose-border)", position: "absolute", top: -12, left: 10, lineHeight: 1 }}>&quot;</span>
+              <div style={{ fontSize: 14, color: "var(--memoir-rose-text)", lineHeight: 1.9, position: "relative", zIndex: 1, paddingLeft: 8 }}>
                 {buildFeelingText()}
               </div>
-              <span style={{ display: "inline-block", background: "rgba(155,28,28,0.1)", color: "#9b1c1c", fontSize: 11, padding: "4px 10px", borderRadius: 20, marginTop: 12 }}>
+              <span style={{ display: "inline-block", background: "rgba(155,28,28,0.1)", color: "var(--memoir-rose-text)", fontSize: 11, padding: "4px 10px", borderRadius: 20, marginTop: 12 }}>
                 ✨ AI가 정성껏 정리했어요
               </span>
             </div>
@@ -1190,7 +1190,7 @@ export default function MemoirPage() {
   return (
     <Suspense
       fallback={
-        <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#f8fafc", fontSize: 14, color: "#64748b" }}>
+        <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "var(--memoir-page-bg)", fontSize: 14, color: "var(--memoir-muted)" }}>
           회고 데이터를 준비하는 중이에요 🌹
         </div>
       }
