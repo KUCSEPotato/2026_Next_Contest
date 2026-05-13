@@ -513,6 +513,11 @@ export default function ProjectManagePage() {
       return;
     }
 
+    if (isProjectCompleted) {
+      alert("완료된 프로젝트는 재모집할 수 없습니다.");
+      return;
+    }
+
     if (!recruitmentPosition.trim()) {
       alert("재모집 포지션을 입력해주세요.");
       return;

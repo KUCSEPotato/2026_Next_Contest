@@ -47,10 +47,13 @@ from app.services.oauth import exchange_github_code_for_access_token
 from app.services.oauth import exchange_google_code_for_access_token
 from app.services.oauth import fetch_github_user_profile
 from app.services.oauth import fetch_google_user_profile
+from app.services.economy import award_coins
 from app.services.s3_upload import resolve_avatar_url
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+SIGNUP_BONUS_WATERDROPS = 5
 
 
 def _normalize_nickname_seed(raw_value: str | None) -> str:
@@ -73,6 +76,18 @@ def _build_unique_nickname(db: Session, preferred: str | None, fallback: str) ->
         candidate = f"{base[:50 - len(suffix)]}{suffix}"
         index += 1
     return candidate
+
+
+def _grant_signup_bonus(db: Session, user: User) -> None:
+    award_coins(
+        db,
+        user_id=user.id,
+        amount=SIGNUP_BONUS_WATERDROPS,
+        event_type="waterdrop.signup_bonus",
+        source_type="user",
+        source_id=user.id,
+        note="Signup bonus waterdrops",
+    )
 
 
 def _create_auth_tokens(user_id: int) -> dict:
@@ -280,6 +295,8 @@ async def signup(payload: SignupRequest, db: Session = Depends(get_db)) -> dict:
         onboarding_step="profile_pending",
     )
     db.add(user)
+    db.flush()
+    _grant_signup_bonus(db, user)
     db.commit()
     db.refresh(user)
 
@@ -397,6 +414,8 @@ async def github_oauth_login(payload: OAuthGithubLoginRequest, db: Session = Dep
         is_verified=True,
     )
     db.add(user)
+    db.flush()
+    _grant_signup_bonus(db, user)
     db.commit()
     db.refresh(user)
 
@@ -562,6 +581,8 @@ async def github_oauth_callback(
             is_verified=True,
         )
         db.add(user)
+        db.flush()
+        _grant_signup_bonus(db, user)
         db.commit()
         db.refresh(user)
         
@@ -637,6 +658,8 @@ async def google_oauth_login(payload: OAuthGoogleLoginRequest, db: Session = Dep
             is_verified=is_email_verified,
         )
         db.add(user)
+        db.flush()
+        _grant_signup_bonus(db, user)
         db.commit()
         db.refresh(user)
     else:

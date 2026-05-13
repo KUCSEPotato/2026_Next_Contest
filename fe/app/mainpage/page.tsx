@@ -834,8 +834,8 @@ function SproutHeroIcon() {
   );
 }
 
-function ServiceIcon({ type, active }: { type: string; active?: boolean }) {
-  const color = active ? "#dc2626" : "#64748b";
+function ServiceIcon({ type, active: _active }: { type: string; active?: boolean }) {
+  void _active;
 
   if (type === "seed") {
     return (
@@ -881,9 +881,16 @@ function ServiceIcon({ type, active }: { type: string; active?: boolean }) {
       <svg viewBox="0 0 48 48" className="h-7 w-7" aria-hidden>
         <path
           d="M24 40V20"
-          stroke={color}
+          stroke="#92400e"
           strokeWidth="4"
           strokeLinecap="round"
+        />
+        <path
+          d="M24 29c-4-4-8-7-13-9M24 27c5-4 9-8 14-14"
+          stroke="#92400e"
+          strokeWidth="3"
+          strokeLinecap="round"
+          fill="none"
         />
         <path
           d="M23 23C13 22 9 15 9 8c8 0 15 4 16 14"

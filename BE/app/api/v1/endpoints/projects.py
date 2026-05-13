@@ -1422,6 +1422,11 @@ async def create_recruitment(
     """
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
+    if project.status == "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Completed projects cannot be recruited again",
+        )
 
     recruitment = ProjectRecruitment(
         project_id=project_id,
@@ -1451,6 +1456,11 @@ async def update_recruitment(
     """재모집 포지션 수정 API(리더 전용)."""
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
+    if project.status == "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Completed projects cannot be recruited again",
+        )
 
     recruitment = db.get(ProjectRecruitment, recruitment_id)
     if recruitment is None or recruitment.project_id != project_id:

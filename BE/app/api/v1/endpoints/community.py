@@ -25,11 +25,18 @@ from app.schemas import (
     ReactionRequest,
 )
 from app.services.s3_upload import get_s3_service
+from app.services.s3_upload import resolve_avatar_url
 from app.services.economy import spend_coins
 
 router = APIRouter()
 
 _REACTION_STATS_ZERO: dict[str, int] = {"recommend": 0, "not_recommend": 0}
+
+
+def _get_avatar_url(user: User | None) -> str | None:
+    if user is None:
+        return None
+    return resolve_avatar_url(user.avatar_s3_key, user.avatar_url)
 
 
 def _merge_reaction_stats(rows: list[tuple[str, int]]) -> dict[str, int]:
@@ -107,7 +114,7 @@ def _serialize_comment(db: Session, comment: CommunityPostComment, current_user_
             "author": {
                 "id": author.id if not anon else None,
                 "nickname": "익명" if anon else author.nickname,
-                "avatar_url": None if anon else author.avatar_url,
+                "avatar_url": None if anon else _get_avatar_url(author),
                 "role": None if anon else author.role,
             },
         "reaction_stats": snapshot["reaction_stats"],
@@ -166,7 +173,7 @@ async def create_post(
             "author": {
                 "id": author.id,
                 "nickname": author.nickname,
-                "avatar_url": author.avatar_url,
+                "avatar_url": _get_avatar_url(author),
                 "role": author.role,
             },
             "created_at": post.created_at,
@@ -277,7 +284,7 @@ async def list_posts(
                 "author": {
                     "id": author.id,
                     "nickname": author.nickname,
-                    "avatar_url": author.avatar_url,
+                    "avatar_url": _get_avatar_url(author),
                     "role": author.role,
                 },
                 "comment_count": comment_count,
@@ -384,7 +391,7 @@ async def get_post(
             "author": {
                 "id": author.id,
                 "nickname": author.nickname,
-                "avatar_url": author.avatar_url,
+                "avatar_url": _get_avatar_url(author),
                 "role": author.role,
             },
             "comment_count": comment_count,
@@ -443,7 +450,7 @@ async def update_post(
             "author": {
                 "id": author.id,
                 "nickname": author.nickname,
-                "avatar_url": author.avatar_url,
+                "avatar_url": _get_avatar_url(author),
                 "role": author.role,
             },
             "comment_count": comment_count,
@@ -530,7 +537,7 @@ async def create_comment(
     author_info = {
         "id": author.id if not payload.is_anonymous else None,
         "nickname": "익명" if payload.is_anonymous else author.nickname,
-        "avatar_url": None if payload.is_anonymous else author.avatar_url,
+        "avatar_url": None if payload.is_anonymous else _get_avatar_url(author),
         "role": None if payload.is_anonymous else author.role,
     }
     
@@ -644,7 +651,7 @@ async def list_comments(
                 "author": {
                     "id": author.id if not comment.is_anonymous else None,
                     "nickname": "익명" if comment.is_anonymous else author.nickname,
-                    "avatar_url": None if comment.is_anonymous else author.avatar_url,
+                    "avatar_url": None if comment.is_anonymous else _get_avatar_url(author),
                     "role": None if comment.is_anonymous else author.role,
                 },
                 "reaction_stats": reaction_stats,
@@ -698,7 +705,7 @@ async def update_comment(
             "author": {
                 "id": author.id if not anon else None,
                 "nickname": "익명" if anon else author.nickname,
-                "avatar_url": None if anon else author.avatar_url,
+                "avatar_url": None if anon else _get_avatar_url(author),
                 "role": None if anon else author.role,
             },
         },
