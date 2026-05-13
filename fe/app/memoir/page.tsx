@@ -1001,12 +1001,12 @@ function MemoirContent() {
 
         {/* 1. 할 일 달성 */}
         <Section emoji="✅" label="할 일 달성" headline={<>우리팀은 {todoDone}개를 달성했고<br />나는 그중 {myTodoDone}개를 해냈어요</>}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
-            <div style={{ border: "1px solid #f0cccc", borderRadius: 14, background: "#fdf4f4", padding: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 14 }}>
+            <div style={{ border: "1px solid #f0cccc", borderRadius: 14, background: "#fdf4f4", padding: 16, minHeight: 286 }}>
               <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 800, color: "#a83030" }}>
                 우리팀이 달성한 일
               </p>
-              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14, minHeight: 170 }}>
                 <ProgressBloom progress={todoPercent} size="sm" />
                 <p style={{ fontSize: 38, fontWeight: 900, color: "#9b1c1c", lineHeight: 1, margin: 0 }}>
                   {todoDone}
@@ -1022,37 +1022,39 @@ function MemoirContent() {
               </div>
             </div>
 
-            <div style={{ border: "1px solid #e2e8f0", borderRadius: 14, background: "#fff", padding: 16 }}>
-              <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 800, color: "#475569" }}>
-                내가 달성한 일
-              </p>
-              <p style={{ fontSize: 38, fontWeight: 900, color: "#0f172a", lineHeight: 1, margin: 0 }}>
-                {myTodoDone}
-                <span style={{ fontSize: 14, color: "#64748b", marginLeft: 4 }}>개 체크</span>
-              </p>
-              <div style={{ height: 10, background: "#f1f5f9", borderRadius: 12, overflow: "hidden", margin: "17px 0 5px", border: "1px solid #e2e8f0" }}>
-                <div style={{ height: "100%", background: "#0f172a", borderRadius: 12, width: `${myTodoPercent}%` }} />
+            <div style={{ display: "grid", gap: 14 }}>
+              <div style={{ border: "1px solid #e2e8f0", borderRadius: 14, background: "#fff", padding: 16 }}>
+                <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 800, color: "#475569" }}>
+                  내가 달성한 일
+                </p>
+                <p style={{ fontSize: 32, fontWeight: 900, color: "#0f172a", lineHeight: 1, margin: 0 }}>
+                  {myTodoDone}
+                  <span style={{ fontSize: 14, color: "#64748b", marginLeft: 4 }}>개 체크</span>
+                </p>
+                <div style={{ height: 10, background: "#f1f5f9", borderRadius: 12, overflow: "hidden", margin: "14px 0 5px", border: "1px solid #e2e8f0" }}>
+                  <div style={{ height: "100%", background: "#0f172a", borderRadius: 12, width: `${myTodoPercent}%` }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b" }}>
+                  <span>팀 전체 Todo 기준</span>
+                  <span style={{ color: "#0f172a", fontWeight: 700 }}>{myTodoPercent}% 기여</span>
+                </div>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b" }}>
-                <span>팀 전체 Todo 기준</span>
-                <span style={{ color: "#0f172a", fontWeight: 700 }}>{myTodoPercent}% 기여</span>
-              </div>
-            </div>
 
-            <div style={{ border: "1px solid #dbeafe", borderRadius: 14, background: "#f8fbff", padding: 16 }}>
-              <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 800, color: "#1e40af" }}>
-                나의 기여도
-              </p>
-              <p style={{ fontSize: 38, fontWeight: 900, color: "#1e3a8a", lineHeight: 1, margin: 0 }}>
-                {myContributionPercent}
-                <span style={{ fontSize: 14, color: "#64748b", marginLeft: 4 }}>%</span>
-              </p>
-              <div style={{ height: 10, background: "#e0edff", borderRadius: 12, overflow: "hidden", margin: "17px 0 5px", border: "1px solid #bfdbfe" }}>
-                <div style={{ height: "100%", background: "#2563eb", borderRadius: 12, width: `${myContributionPercent}%` }} />
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b" }}>
-                <span>팀이 완료한 {todoDone}개 중</span>
-                <span style={{ color: "#1e3a8a", fontWeight: 700 }}>내가 {myTodoDone}개 수행</span>
+              <div style={{ border: "1px solid #dbeafe", borderRadius: 14, background: "#f8fbff", padding: 16 }}>
+                <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 800, color: "#1e40af" }}>
+                  나의 기여도
+                </p>
+                <p style={{ fontSize: 32, fontWeight: 900, color: "#1e3a8a", lineHeight: 1, margin: 0 }}>
+                  {myContributionPercent}
+                  <span style={{ fontSize: 14, color: "#64748b", marginLeft: 4 }}>%</span>
+                </p>
+                <div style={{ height: 10, background: "#e0edff", borderRadius: 12, overflow: "hidden", margin: "14px 0 5px", border: "1px solid #bfdbfe" }}>
+                  <div style={{ height: "100%", background: "#2563eb", borderRadius: 12, width: `${myContributionPercent}%` }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b" }}>
+                  <span>팀이 완료한 {todoDone}개 중</span>
+                  <span style={{ color: "#1e3a8a", fontWeight: 700 }}>내가 {myTodoDone}개 수행</span>
+                </div>
               </div>
             </div>
           </div>
