@@ -112,6 +112,8 @@ def _serialize_review(db: Session, review: Review) -> dict:
 
     return {
         "id": review.id,
+        "reviewer_id": review.reviewer_id,
+        "reviewee_id": review.reviewee_id,
         "reviewer": {
             "id": reviewer.id if reviewer else review.reviewer_id,
             "nickname": reviewer.nickname if reviewer else "탈퇴한 사용자",

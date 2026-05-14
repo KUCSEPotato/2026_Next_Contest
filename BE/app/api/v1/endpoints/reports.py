@@ -13,13 +13,15 @@ from app.models import CommunityPost
 from app.models import CommunityPostComment
 from app.models import Project
 from app.models import Report
+from app.models import AdoptionRequest
+from app.models import Review
 from app.models import User
 
 router = APIRouter()
 
 
 class ReportCreateRequest(BaseModel):
-    target_type: Literal["user", "project", "post", "comment", "chat"]
+    target_type: Literal["user", "project", "post", "comment", "chat", "review", "adoption_request"]
     target_id: int = Field(gt=0)
     reason: str = Field(min_length=1, max_length=1000)
 
@@ -37,7 +39,7 @@ def _ensure_not_admin_content(db: Session, author_id: int) -> None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Admin-authored content cannot be reported")
 
 
-@router.post("", summary="신고 접수", description="사용자가 사용자/프로젝트/게시글/댓글/채팅방을 신고합니다.")
+@router.post("", summary="신고 접수", description="사용자가 사용자/프로젝트/게시글/댓글/채팅방/평가/팀장 넘겨주기 요청을 신고합니다.")
 async def create_report(
     payload: ReportCreateRequest,
     current_user_id: int = Depends(get_current_user_id),
@@ -90,6 +92,20 @@ async def create_report(
         if member is None:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chat room access required")
         report_data["target_chat_room_id"] = chat_room.id
+
+    elif payload.target_type == "review":
+        review = db.get(Review, payload.target_id)
+        if review is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found")
+        _ensure_not_admin_content(db, review.reviewer_id)
+        report_data["target_review_id"] = review.id
+
+    elif payload.target_type == "adoption_request":
+        adoption_request = db.get(AdoptionRequest, payload.target_id)
+        if adoption_request is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Adoption request not found")
+        _ensure_not_admin_content(db, adoption_request.requester_id)
+        report_data["target_adoption_request_id"] = adoption_request.id
 
     report = Report(**report_data)
     db.add(report)
