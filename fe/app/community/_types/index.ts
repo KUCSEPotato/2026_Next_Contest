@@ -34,6 +34,7 @@ export interface PostSummary {
   comment_count: number;
   reaction_stats: ReactionStats;
   user_reaction: ReactionType | null; // BE 추가 필드
+  files?: PostFile[];
 }
 
 /** GET /community/{post_id} 상세 */

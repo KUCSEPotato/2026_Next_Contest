@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PostSummary, User, ReactionType } from "../_types";
+import { PostFile, PostSummary, User, ReactionType } from "../_types";
 import { timeAgo } from "../_lib/utils";
 import Avatar from "./Avatar";
 import { ThumbDownIcon, ThumbUpIcon } from "./ReactionThumbIcons";
@@ -36,6 +36,81 @@ const REACTIONS: {
     activeClass: "border-red-300 bg-red-50 text-red-600 [&_svg]:text-red-600",
   },
 ];
+
+function isImageFile(file: PostFile) {
+  return file.file_type.startsWith("image/");
+}
+
+function isVideoFile(file: PostFile) {
+  return file.file_type.startsWith("video/");
+}
+
+function formatFileSize(size: number) {
+  return `${(size / 1024 / 1024).toFixed(2)}MB`;
+}
+
+function AttachmentPreview({ files }: { files?: PostFile[] }) {
+  if (!files?.length) return null;
+
+  const mediaFiles = files.filter((file) => isImageFile(file) || isVideoFile(file));
+  const otherFiles = files.filter((file) => !isImageFile(file) && !isVideoFile(file));
+
+  return (
+    <div className="mt-3 space-y-2">
+      {mediaFiles.length > 0 && (
+        <div
+          className={`grid gap-2 ${
+            mediaFiles.length === 1 ? "grid-cols-1" : "grid-cols-2"
+          }`}
+        >
+          {mediaFiles.map((file) => (
+            <div
+              key={file.id}
+              className="overflow-hidden rounded-xl border border-gray-100 bg-gray-100"
+            >
+              {isImageFile(file) ? (
+                <img
+                  src={file.s3_url}
+                  alt={file.filename}
+                  className="h-40 w-full object-cover"
+                />
+              ) : (
+                <video
+                  src={file.s3_url}
+                  controls
+                  className="h-40 w-full bg-black object-cover"
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {otherFiles.length > 0 && (
+        <div className="space-y-2">
+          {otherFiles.map((file) => (
+            <div
+              key={file.id}
+              className="flex min-h-14 items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2"
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[10px] font-bold text-gray-500 shadow-sm">
+                FILE
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-semibold text-gray-800">
+                  {file.filename}
+                </p>
+                <p className="mt-0.5 text-[11px] text-gray-400">
+                  {formatFileSize(file.file_size)}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function PostCard({
   post,
@@ -136,6 +211,8 @@ export default function PostCard({
           {post.category}
         </span>
       )}
+
+      <AttachmentPreview files={post.files} />
 
       {/* Actions */}
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-50 pt-3 dark:border-slate-800/70">

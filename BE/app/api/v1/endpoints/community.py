@@ -385,6 +385,22 @@ async def list_posts(
     else:
         paginated_result = result
 
+    s3_service = get_s3_service()
+    for post_data in paginated_result:
+        post_files = (
+            db.query(CommunityPostFile)
+            .filter(
+                CommunityPostFile.post_id == post_data["id"],
+                CommunityPostFile.deleted_at.is_(None),
+            )
+            .order_by(CommunityPostFile.created_at.asc())
+            .all()
+        )
+        post_data["files"] = [
+            _serialize_post_file(file_record, s3_service)
+            for file_record in post_files
+        ]
+
     if page == 1 and paginated_result and sort_by in ["views", "recommend", "trending", "hot"]:
         _notify_hot_post_once(db, paginated_result[0], source=sort_by)
         db.commit()
