@@ -463,7 +463,7 @@ export default function MainPage() {
               <button
                 key={block.title}
                 onClick={() => handleServiceClick(block.path)}
-                className={`rounded-2xl border p-5 shadow-sm transition hover:border-red-300 hover:shadow-md ${
+                className={`rounded-2xl border p-5 text-left shadow-sm transition hover:border-red-300 hover:shadow-md ${
                   block.isActive
                     ? "border-red-200 bg-red-50 dark:border-red-500/35 dark:bg-red-500/10 dark:hover:border-red-400/50"
                     : "border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900/80 dark:hover:border-slate-500"

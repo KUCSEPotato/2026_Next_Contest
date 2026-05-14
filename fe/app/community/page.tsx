@@ -272,7 +272,7 @@ export default function CommunityPage() {
                 <button
                   key={block.title}
                   onClick={() => router.push(block.path)}
-                  className={`rounded-2xl border p-5 shadow-sm transition hover:border-orange-300 hover:shadow-md ${
+                  className={`rounded-2xl border p-5 text-left shadow-sm transition hover:border-orange-300 hover:shadow-md ${
                     isActive ? "border-orange-200 bg-orange-50" : "border-gray-200 bg-white"
                   }`}
                 >
