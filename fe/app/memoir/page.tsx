@@ -1158,14 +1158,25 @@ function MemoirContent() {
                   aria-label={`완료한 프로젝트 ${memoirList.length}개`}
                 >
                   {memoirList.map(({ project: completedProject }) => (
-                    <div
+                    <Link
                       key={`garden-rose-${completedProject.id}`}
+                      href={`/memoir?projectId=${completedProject.id}`}
+                      title={`${completedProject.title} 회고 보기`}
                       style={{
+                        display: "inline-flex",
+                        textDecoration: "none",
+                        cursor: "pointer",
                         transition: "transform .18s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = "translateY(-4px) scale(1.06)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = "translateY(0) scale(1)";
                       }}
                     >
                       <ProgressBloom progress={100} size="xs" showLabel={false} />
-                    </div>
+                    </Link>
                   ))}
                 </div>
               )}
