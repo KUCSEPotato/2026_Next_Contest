@@ -658,7 +658,7 @@ export default function CoinsPage() {
 
             <section className="mb-8">
               <div className="mb-4">
-                <h2 className="text-xl font-black text-slate-950 dark:text-slate-50">월정액 요금제</h2>
+                <h2 className="text-xl font-black text-slate-950 dark:text-slate-50">월 구독 플랜</h2>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   Plus와 Pro는 현재 30일 이용권 형태로 제공됩니다.
                   {entitlement?.product_type === "SUBSCRIPTION" && entitlement.next_renewal_at
@@ -690,7 +690,7 @@ export default function CoinsPage() {
 
             <section className="mb-8">
               <div className="mb-4">
-                <h2 className="text-xl font-black text-slate-950 dark:text-slate-50">정액제 기간권</h2>
+                <h2 className="text-xl font-black text-slate-950 dark:text-slate-50">단기 이용권</h2>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   짧은 기간 동안 프로젝트 생성/지원 권한을 쓰는 패스입니다. 기간권은 자동 갱신되지 않습니다.
                 </p>
