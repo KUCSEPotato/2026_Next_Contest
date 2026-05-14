@@ -31,6 +31,9 @@ from app.services.economy import spend_coins
 router = APIRouter()
 
 _REACTION_STATS_ZERO: dict[str, int] = {"recommend": 0, "not_recommend": 0}
+_HOT_POST_MIN_RECOMMENDS = 1
+_HOT_POST_MIN_VIEWS = 10
+_HOT_POST_MIN_COMMENTS = 3
 
 
 def _serialize_post_file(file_record: CommunityPostFile, s3_service) -> dict:
@@ -99,6 +102,53 @@ def _comment_reaction_snapshot(db: Session, comment_id: int, user_id: int | None
         "reaction_stats": _merge_reaction_stats(reactions),
         "user_reaction": user_reaction,
     }
+
+
+def _has_hot_post_signal(post_data: dict) -> bool:
+    recommend_count = int((post_data.get("reaction_stats") or {}).get("recommend") or 0)
+    view_count = int(post_data.get("view_count") or 0)
+    comment_count = int(post_data.get("comment_count") or 0)
+
+    return (
+        recommend_count >= _HOT_POST_MIN_RECOMMENDS
+        or view_count >= _HOT_POST_MIN_VIEWS
+        or comment_count >= _HOT_POST_MIN_COMMENTS
+    )
+
+
+def _notify_hot_post_once(db: Session, post_data: dict, source: str) -> None:
+    if not _has_hot_post_signal(post_data):
+        return
+
+    post_id = post_data.get("id")
+    author_id = post_data.get("author_id")
+    if not post_id or not author_id:
+        return
+
+    existing_notifications = (
+        db.query(Notification)
+        .filter(
+            Notification.user_id == author_id,
+            Notification.type == "hot_post",
+        )
+        .all()
+    )
+    if any(int((notification.data or {}).get("post_id") or 0) == int(post_id) for notification in existing_notifications):
+        return
+
+    db.add(
+        Notification(
+            user_id=author_id,
+            type="hot_post",
+            title="작성한 글이 불꽃글에 올랐어요",
+            body=f"'{post_data.get('title') or '작성한 글'}' 글이 모닥불 불꽃글에 올라갔습니다.",
+            data={
+                "post_id": post_id,
+                "url": f"/community/{post_id}",
+                "source": source,
+            },
+        )
+    )
 
 
 def _serialize_comment(db: Session, comment: CommunityPostComment, current_user_id: int | None = None) -> dict:
@@ -334,6 +384,10 @@ async def list_posts(
         paginated_result = result[(page - 1) * page_size : page * page_size]
     else:
         paginated_result = result
+
+    if page == 1 and paginated_result and sort_by in ["views", "recommend", "trending", "hot"]:
+        _notify_hot_post_once(db, paginated_result[0], source=sort_by)
+        db.commit()
 
     return success_response(
         data={

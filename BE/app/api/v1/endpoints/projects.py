@@ -1280,6 +1280,7 @@ async def revert_project_to_idea(
     
     # 원본 Idea 복원 (있으면)
     idea_reverted = False
+    reverted_idea: Idea | None = None
     if project.idea_id is not None:
         idea = db.get(Idea, project.idea_id)
         if idea is not None and idea.deleted_at is None:
@@ -1287,6 +1288,7 @@ async def revert_project_to_idea(
             idea.converted_to_project_id = None
             idea.is_discarded = True
             idea_reverted = True
+            reverted_idea = idea
 
     if project.idea_id is not None:
         reward_project_recycled(db, project)
@@ -1294,6 +1296,20 @@ async def revert_project_to_idea(
     
     # 프로젝트 soft delete
     project.deleted_at = datetime.now(timezone.utc)
+    if reverted_idea is not None:
+        db.add(
+            Notification(
+                user_id=current_user_id,
+                type="idea_sent_to_yard",
+                title="아이디어가 생각의 뜰로 이동했어요",
+                body=f"'{reverted_idea.title}' 아이디어가 생각의 뜰에 놓였습니다.",
+                data={
+                    "idea_id": reverted_idea.id,
+                    "project_id": project.id,
+                    "url": f"/ideas/pickup/{reverted_idea.id}",
+                },
+            )
+        )
     db.commit()
     
     return success_response(
