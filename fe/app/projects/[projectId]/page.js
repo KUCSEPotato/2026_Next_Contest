@@ -98,6 +98,18 @@ const isProEntitlement = (entitlement) =>
     String(entitlement?.plan || entitlement?.product_code || "").toUpperCase()
   );
 
+function formatBoostedUntil(value) {
+  if (!value) return "";
+
+  return new Date(value).toLocaleString("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -834,7 +846,7 @@ export default function ProjectDetailPage() {
 
               {isBoosted && (
                 <p className="mt-3 text-sm font-semibold text-amber-700">
-                  거름 주기 적용 중 · {new Date(project.boosted_until).toLocaleDateString("ko-KR")}까지 상단 노출
+                  거름 주기 적용 중 · {formatBoostedUntil(project.boosted_until)}까지 상단 노출
                 </p>
               )}
             </>
