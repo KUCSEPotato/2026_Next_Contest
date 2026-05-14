@@ -364,7 +364,7 @@ export async function boostProjectApi(projectId) {
     }
   );
 
-  return handleResponse(res, "프로젝트 상단 노출에 실패했습니다.");
+  return handleResponse(res, "거름 주기에 실패했습니다.");
 }
 
 export async function getProjectApplicationsApi(projectId) {
