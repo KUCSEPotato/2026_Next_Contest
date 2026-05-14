@@ -60,7 +60,7 @@ OPENAPI_TAGS = [
     },
     {
         "name": "coins",
-        "description": "코인 잔액, 수동 구매 요청 생성 및 구매 요청 조회 API입니다.",
+        "description": "물방울 잔액, 수동 구매 요청 생성 및 구매 요청 조회 API입니다.",
     },
     {
         "name": "payments",

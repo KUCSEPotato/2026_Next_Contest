@@ -262,8 +262,8 @@ async def confirm_payment(
             db,
             user_id=payment.user_id,
             notification_type="system",
-            title="코인 충전이 완료되었습니다.",
-            body=f"{payment.coin_amount}코인이 충전되었습니다.",
+            title="물방울 충전이 완료되었습니다.",
+            body=f"물방울 {payment.coin_amount}방울이 충전되었습니다.",
             data={
                 "notification_kind": "coin.payment_done",
                 "payment_id": payment.id,

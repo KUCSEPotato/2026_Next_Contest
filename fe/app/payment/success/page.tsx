@@ -10,6 +10,10 @@ type ConfirmState =
   | { status: "success"; message: string; coinBalance?: number; productCode?: string }
   | { status: "error"; message: string };
 
+function formatWaterdrops(amount: number) {
+  return `물방울 ${Number(amount || 0).toLocaleString("ko-KR")}방울`;
+}
+
 function PaymentSuccessContent() {
   const searchParams = useSearchParams();
   const calledRef = useRef(false);
@@ -45,7 +49,7 @@ function PaymentSuccessContent() {
           status: "success",
           message: isEntitlementPayment
             ? `${data.order_name || "이용권"} 권한이 활성화되었습니다.`
-            : `${data.coin_amount?.toLocaleString("ko-KR") || 0}코인이 충전되었습니다.`,
+            : `${formatWaterdrops(data.coin_amount)}이 충전되었습니다.`,
           coinBalance: data.coin_balance,
           productCode: data.product_code,
         });
@@ -71,7 +75,7 @@ function PaymentSuccessContent() {
         <p className="mt-4 whitespace-pre-line text-sm leading-6 text-slate-600">
           {state.message}
           {state.status === "success" && state.coinBalance !== undefined
-            ? `\n현재 잔액: ${state.coinBalance.toLocaleString("ko-KR")}코인`
+            ? `\n현재 잔액: ${formatWaterdrops(state.coinBalance)}`
             : ""}
           {state.status === "success" && state.productCode
             ? `\n상품 코드: ${state.productCode}`

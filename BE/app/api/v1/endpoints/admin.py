@@ -299,7 +299,7 @@ def _notify_coin_adjustment(
     is_grant = action == "grant"
     action_label = "지급" if is_grant else "환수"
     signed_amount = amount if is_grant else -amount
-    body = f"관리자에 의해 코인 {amount}개가 {action_label}되었습니다."
+    body = f"관리자에 의해 물방울 {amount}방울이 {action_label}되었습니다."
     if reason:
         body = f"{body}\n사유: {reason}"
 
@@ -307,7 +307,7 @@ def _notify_coin_adjustment(
         Notification(
             user_id=user_id,
             type="system",
-            title=f"코인이 {action_label}되었습니다",
+            title=f"물방울이 {action_label}되었습니다",
             body=body,
             data={
                 "notification_kind": f"admin_coin_{action}",
@@ -457,7 +457,7 @@ async def list_users_for_admin(
     )
 
 
-@router.post("/users/{user_id}/coins", summary="관리자 코인 지급", description="관리자가 특정 사용자에게 코인을 지급합니다.")
+@router.post("/users/{user_id}/coins", summary="관리자 물방울 지급", description="관리자가 특정 사용자에게 물방울을 지급합니다.")
 async def grant_user_coins_for_admin(
     user_id: int,
     payload: AdminCoinGrantRequest,
@@ -718,7 +718,7 @@ async def create_notice_for_admin(
     )
 
 
-@router.post("/users/{user_id}/coins/revoke", summary="관리자 코인 환수", description="관리자가 특정 사용자로부터 코인을 환수합니다.")
+@router.post("/users/{user_id}/coins/revoke", summary="관리자 물방울 환수", description="관리자가 특정 사용자로부터 물방울을 환수합니다.")
 async def revoke_user_coins_for_admin(
     user_id: int,
     payload: AdminCoinRevokeRequest,
@@ -962,7 +962,7 @@ async def update_payment_event_for_admin(
     return success_response(data={"id": event.id, "processed_at": event.processed_at})
 
 
-@router.get("/coin-purchase-requests", summary="관리자 코인 구매 요청 목록", description="수동 코인 구매 요청을 최신순으로 조회합니다.")
+@router.get("/coin-purchase-requests", summary="관리자 물방울 구매 요청 목록", description="수동 물방울 구매 요청을 최신순으로 조회합니다.")
 async def list_coin_purchase_requests_for_admin(
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
@@ -1001,7 +1001,7 @@ async def list_coin_purchase_requests_for_admin(
     )
 
 
-@router.patch("/coin-purchase-requests/{request_id}", summary="관리자 코인 구매 요청 처리", description="수동 코인 구매 요청을 승인하거나 거절합니다.")
+@router.patch("/coin-purchase-requests/{request_id}", summary="관리자 물방울 구매 요청 처리", description="수동 물방울 구매 요청을 승인하거나 거절합니다.")
 async def update_coin_purchase_request_for_admin(
     request_id: int,
     payload: AdminCoinPurchaseRequestUpdate,
@@ -1056,9 +1056,9 @@ async def update_coin_purchase_request_for_admin(
                 source_id=request.id,
                 note=admin_note or f"Coin purchase request #{request.id} approved",
             )
-            body = f"구매 요청하신 코인 {request.coin_amount}개가 지급되었습니다."
+            body = f"구매 요청하신 물방울 {request.coin_amount}방울이 지급되었습니다."
             notification_type = "coin_purchase_approved"
-            notification_title = "코인 구매 요청이 승인되었습니다"
+            notification_title = "물방울 구매 요청이 승인되었습니다"
             notification_data = {
                 "notification_kind": notification_type,
                 "request_id": request.id,
@@ -1093,9 +1093,9 @@ async def update_coin_purchase_request_for_admin(
                 "reason": admin_note,
             }
         else:
-            body = f"코인 {request.coin_amount}개 구매 요청이 거절되었습니다."
+            body = f"물방울 {request.coin_amount}방울 구매 요청이 거절되었습니다."
             notification_type = "coin_purchase_rejected"
-            notification_title = "코인 구매 요청이 거절되었습니다"
+            notification_title = "물방울 구매 요청이 거절되었습니다"
             notification_data = {
                 "notification_kind": notification_type,
                 "request_id": request.id,
