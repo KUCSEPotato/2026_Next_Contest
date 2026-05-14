@@ -58,7 +58,9 @@ services:
       AWS_S3_BUCKET: ${AWS_S3_BUCKET}
       AWS_S3_REGION: ${AWS_S3_REGION:-ap-northeast-2}
       MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-50}
+
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      
       TOSS_SECRET_KEY: ${TOSS_SECRET_KEY}
       TOSS_API_BASE_URL: ${TOSS_API_BASE_URL:-https://api.tosspayments.com}
       TOSS_SUCCESS_REDIRECT_URL: ${TOSS_SUCCESS_REDIRECT_URL}
@@ -83,6 +85,8 @@ services:
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=1d"
+      - "--storage.tsdb.retention.size=512MB"
     ports:
       - "${PROMETHEUS_PORT:-9090}:9090"
     volumes:
