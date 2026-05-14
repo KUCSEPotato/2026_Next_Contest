@@ -20,6 +20,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Devory",
   description: "아이디어가 팀이 되고, 팀이 프로젝트로 자라는 곳",
+  icons: {
+    icon: "/logo_colored.svg",
+  },
 };
 
 const themeInitScript = `
