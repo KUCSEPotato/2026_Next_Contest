@@ -8,7 +8,7 @@ import { confirmWaterdropSpend } from "../../../lib/waterdrops";
 import { useDialog, useToast } from "../../../components/AppFeedback";
 
 const CATEGORIES = [
-  "IT/소프트웨어",
+  "IT/SW",
   "경영/경제",
   "디자인/UI·UX",
   "AI/데이터",
@@ -27,7 +27,7 @@ export default function NewIdeaPage() {
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [description, setDescription] = useState("");
-  const [domain, setDomain] = useState("IT/소프트웨어");
+  const [domain, setDomain] = useState("IT/SW");
   const [difficulty, setDifficulty] = useState("intermediate");
   const [requiredMembers, setRequiredMembers] = useState(3);
   const [expectedPeriod, setExpectedPeriod] = useState("");

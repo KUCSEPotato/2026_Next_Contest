@@ -144,7 +144,7 @@ const filteredProjects = MOCK_PROJECTS.filter((p) => {
 
 ```ts
 const CATEGORIES = [
-  { label: 'IT/소프트웨어', emoji: '💻' },
+  { label: 'IT/SW', emoji: '💻' },
   { label: '경영/경제', emoji: '📊' },
   { label: '디자인/UI·UX', emoji: '🎨' },
   // ... 총 9개

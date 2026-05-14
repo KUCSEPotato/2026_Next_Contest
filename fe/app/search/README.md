@@ -58,7 +58,7 @@
 │ (데스크탑)   │                                          │
 │              │ "OOO" 검색 결과 N개                      │
 │ [분야]       │ ┌──────────┐ ┌──────────┐               │
-│ IT/소프트웨어 │ │ 카드     │ │ 카드     │               │
+│ IT/SW       │ │ 카드     │ │ 카드     │               │
 │ 경영/경제    │ │ - 카테고리│ │          │               │
 │ ...          │ │ - 제목   │ │          │               │
 │              │ │ - 설명   │ │          │               │
@@ -102,7 +102,7 @@ fe/
 ```ts
 // page.tsx 상단
 const CATEGORIES = [
-  'IT/소프트웨어', '경영/경제', '디자인/UI·UX',
+  'IT/SW', '경영/경제', '디자인/UI·UX',
   'AI/데이터', '교육/학습', '금융/핀테크',
   '커머스/쇼핑', '소셜/커뮤니티', '헬스케어',
 ]
@@ -324,7 +324,7 @@ const MOCK_PROJECTS: Project[] = [ ... ]  // ← 전체 삭제
 ```ts
 // 요청 파라미터 (모두 선택)
 q: string           // 키워드 검색 (제목, 설명, 기술스택)
-category: string    // 분야 (콤마로 복수 선택 가능) 예: "AI/데이터,IT/소프트웨어"
+category: string    // 분야 (콤마로 복수 선택 가능) 예: "AI/데이터,IT/SW"
 stack: string       // 기술스택 (콤마로 복수 선택 가능) 예: "Python,React"
 difficulty: string  // 난이도 (콤마로 복수 선택 가능) 예: "beginner,intermediate"
 duration: string    // 기간 예: "1-3months"
