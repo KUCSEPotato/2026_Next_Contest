@@ -428,6 +428,14 @@ export default function PostDetailPage() {
 
   const isOwn = currentUser?.id === post.author_id;
   const isAdminPost = post.author?.role === "admin";
+  const mediaFiles = files.filter((file) => {
+    const type = file.file_type || "";
+    return type.startsWith("image/") || type.startsWith("video/");
+  });
+  const attachmentFiles = files.filter((file) => {
+    const type = file.file_type || "";
+    return !type.startsWith("image/") && !type.startsWith("video/");
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
@@ -544,6 +552,66 @@ export default function PostDetailPage() {
                 {post.content}
               </p>
               {files.length > 0 && (
+                <div className="mt-4 space-y-3">
+                  {mediaFiles.length > 0 && (
+                    <div
+                      className={`grid gap-2 ${
+                        mediaFiles.length === 1 ? "grid-cols-1" : "grid-cols-2"
+                      }`}
+                    >
+                      {mediaFiles.map((file) => {
+                        const isImage = file.file_type.startsWith("image/");
+
+                        return (
+                          <div
+                            key={`media-${file.id}`}
+                            className="overflow-hidden rounded-xl border border-gray-100 bg-gray-100"
+                          >
+                            {isImage ? (
+                              <img
+                                src={file.s3_url}
+                                alt={file.filename}
+                                className="max-h-[520px] w-full bg-gray-50 object-contain"
+                              />
+                            ) : (
+                              <video
+                                src={file.s3_url}
+                                controls
+                                className="max-h-[520px] w-full bg-black object-contain"
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {attachmentFiles.length > 0 && (
+                    <div className="space-y-2">
+                      {attachmentFiles.map((file) => (
+                        <a
+                          key={`attachment-${file.id}`}
+                          href={file.s3_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:text-red-500"
+                        >
+                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-lg">
+                            ?뱞
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate">{file.filename}</span>
+                            <span className="mt-1 block text-xs text-gray-400">
+                              {(file.file_size / 1024 / 1024).toFixed(2)}MB
+                            </span>
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {false && (
                 <div
                   className={`mt-4 grid gap-2 ${
                     files.length === 1 ? "grid-cols-1" : "grid-cols-2"
