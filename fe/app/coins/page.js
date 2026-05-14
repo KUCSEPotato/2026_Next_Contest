@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   createCoinPurchaseRequestApi,
   getCoinPackagesApi,
-  getMyCoinBalanceApi,
   getMyCoinPurchaseRequestsApi,
   getMyEntitlementApi,
   getPaymentProductsApi,
@@ -42,6 +41,30 @@ const DEFAULT_COIN_PACKAGES = [
   { id: "drop", coin_amount: 1, price_krw: 300, label: "한 방울" },
   { id: "cup", coin_amount: 10, price_krw: 2000, label: "한 잔" },
   { id: "bottle", coin_amount: 100, price_krw: 15000, label: "한 병" },
+];
+
+const STORE_SECTIONS = [
+  {
+    key: "plans",
+    emoji: "📋",
+    title: "요금제 설명",
+    english: "Plan Guide",
+    description: "무료 요금제, 월 구독 플랜, 단기 이용권을 한 번에 살펴보세요.",
+  },
+  {
+    key: "waterdrops",
+    emoji: "💧",
+    title: "물방울 충전",
+    english: "Waterdrop Refill",
+    description: "아이디어 열람 등에 사용할 물방울을 필요한 만큼 충전해요.",
+  },
+  {
+    key: "history",
+    emoji: "🧾",
+    title: "이용 내역",
+    english: "Usage Ledger",
+    description: "내 구매 요청과 물방울 사용 내역을 확인할 수 있어요.",
+  },
 ];
 
 function normalizeCoinPackages(packages = []) {
@@ -290,46 +313,6 @@ function PlanCard({ eyebrow, product, isCurrent, onError, onManualPurchase, manu
   );
 }
 
-function WaterdropMascot({ className = "h-28 w-28" }) {
-  return (
-    <svg
-      viewBox="0 0 96 96"
-      className="h-24 w-24"
-      aria-hidden
-      style={{ animation: "floatWaterdrop 3s ease-in-out infinite" }}
-    >
-      <defs>
-        <linearGradient id="wdHeroGrad" x1="20" y1="4" x2="76" y2="92" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#bae6fd" />
-          <stop offset="55%" stopColor="#38bdf8" />
-          <stop offset="100%" stopColor="#0284c7" />
-        </linearGradient>
-      </defs>
-      <ellipse cx="48" cy="90" rx="26" ry="5.5" fill="#bae6fd" opacity="0.4" />
-      <path
-        d="M48 4C35 21 20 40 20 59c0 20 13 33 28 33s28-13 28-33C76 40 61 21 48 4Z"
-        fill="url(#wdHeroGrad)"
-      />
-      <ellipse cx="36" cy="30" rx="10" ry="16" fill="white" opacity="0.28" transform="rotate(-18 36 30)" />
-      <ellipse cx="59" cy="52" rx="3.5" ry="6" fill="white" opacity="0.14" transform="rotate(-10 59 52)" />
-      <path
-        d="M26 23c-5 10-7 20-7 29 0 11 4 20 13 26"
-        stroke="white"
-        strokeWidth="4"
-        strokeLinecap="round"
-        opacity="0.18"
-        fill="none"
-      />
-      <style jsx>{`
-        @keyframes floatWaterdrop {
-          0%, 100% { transform: translateY(0) scale(1); }
-          50% { transform: translateY(-8px) scale(1.03); }
-        }
-      `}</style>
-    </svg>
-  );
-}
-
 // ── 패키지별 일러스트 ─────────────────────────────────────────────────────────
 
 function PackageIllustration({ type }) {
@@ -395,83 +378,124 @@ function PackageIllustration({ type }) {
   );
 }
 
-// ── 이용 내역 팝업 ────────────────────────────────────────────────────────────
+function StoreSectionCard({ section, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-2xl border p-5 text-left shadow-sm transition hover:border-sky-300 hover:shadow-md ${
+        active
+          ? "border-sky-300 bg-sky-50/70 dark:border-sky-400/60 dark:bg-sky-500/10"
+          : "border-gray-200 bg-white hover:border-sky-200 dark:border-slate-700 dark:bg-slate-900/80 dark:hover:border-sky-500/40"
+      }`}
+    >
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-2xl dark:bg-sky-500/10">
+            {section.emoji}
+          </span>
+          <div>
+            <p className={`text-base font-bold ${active ? "text-sky-700 dark:text-sky-300" : "text-gray-900 dark:text-slate-100"}`}>
+              {section.title}
+            </p>
+            <p className="text-[11px] font-semibold text-gray-400 dark:text-slate-500">
+              {section.english}
+            </p>
+          </div>
+        </div>
 
-function HistoryModal({ onClose }) {
+        {active && (
+          <span className="rounded-full bg-sky-600 px-2 py-0.5 text-[10px] font-semibold text-white dark:bg-sky-500/20 dark:text-sky-200 dark:ring-1 dark:ring-sky-400/30">
+            현재
+          </span>
+        )}
+      </div>
+
+      <p className="whitespace-pre-line text-sm leading-relaxed text-gray-500 dark:text-slate-400">
+        {section.description}
+      </p>
+    </button>
+  );
+}
+
+// ── 이용 내역 ────────────────────────────────────────────────────────────────
+
+function HistorySection() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const loadTransactions = useCallback(() => {
+    setLoading(true);
     getMyTransactionsApi()
       .then((res) => setTransactions(res.data?.transactions || []))
-      .catch(() => {})
+      .catch(() => setTransactions([]))
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    queueMicrotask(loadTransactions);
+  }, [loadTransactions]);
+
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-
-      <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl dark:border dark:border-slate-700 dark:bg-slate-900">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-bold text-gray-900 dark:text-slate-50">이용 내역</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 transition hover:text-gray-600 dark:text-slate-500 dark:hover:text-slate-300"
-          >
-            ✕
-          </button>
-        </div>
-
-        {loading ? (
-          <p className="py-8 text-center text-sm text-gray-400 dark:text-slate-500">불러오는 중…</p>
-        ) : transactions.length === 0 ? (
-          <p className="py-8 text-center text-sm text-gray-400 dark:text-slate-500">이용 내역이 없습니다.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="bg-gray-50 text-xs font-semibold uppercase text-gray-500 dark:bg-slate-800 dark:text-slate-400">
-                <tr>
-                  <th className="px-3 py-2">일시</th>
-                  <th className="px-3 py-2">구분</th>
-                  <th className="px-3 py-2">변동</th>
-                  <th className="px-3 py-2">잔액</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
-                {transactions.map((t) => (
-                  <tr key={t.id} className="transition hover:bg-gray-50 dark:hover:bg-slate-800/50">
-                    <td className="px-3 py-2.5 text-xs text-gray-500 dark:text-slate-400">
-                      {formatDate(t.created_at)}
-                    </td>
-                    <td className="px-3 py-2.5 text-gray-700 dark:text-slate-300">
-                      {t.note || t.event_type || (t.direction === "earned" ? "충전" : "사용")}
-                    </td>
-                    <td
-                      className={`px-3 py-2.5 font-semibold ${
-                        t.amount > 0
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : "text-rose-500 dark:text-rose-400"
-                      }`}
-                    >
-                      {t.amount > 0 ? `+${t.amount}` : t.amount}방울
-                    </td>
-                    <td className="px-3 py-2.5 text-gray-600 dark:text-slate-300">
-                      {t.balance_after}방울
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-base font-bold text-gray-900 dark:text-slate-50">이용 내역</h2>
+        <button
+          type="button"
+          onClick={loadTransactions}
+          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-bold text-gray-600 transition hover:bg-gray-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+        >
+          새로고침
+        </button>
       </div>
-    </div>
+
+      {loading ? (
+        <p className="rounded-xl bg-gray-50 p-5 text-sm text-gray-400 dark:bg-slate-800 dark:text-slate-500">
+          불러오는 중…
+        </p>
+      ) : transactions.length === 0 ? (
+        <p className="rounded-xl bg-gray-50 p-5 text-sm text-gray-400 dark:bg-slate-800 dark:text-slate-500">
+          이용 내역이 없습니다.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="bg-gray-50 text-xs font-semibold uppercase text-gray-500 dark:bg-slate-800 dark:text-slate-400">
+              <tr>
+                <th className="px-3 py-2">일시</th>
+                <th className="px-3 py-2">구분</th>
+                <th className="px-3 py-2">변동</th>
+                <th className="px-3 py-2">잔액</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+              {transactions.map((t) => (
+                <tr key={t.id} className="transition hover:bg-gray-50 dark:hover:bg-slate-800/50">
+                  <td className="px-3 py-2.5 text-xs text-gray-500 dark:text-slate-400">
+                    {formatDate(t.created_at)}
+                  </td>
+                  <td className="px-3 py-2.5 text-gray-700 dark:text-slate-300">
+                    {t.note || t.event_type || (t.direction === "earned" ? "충전" : "사용")}
+                  </td>
+                  <td
+                    className={`px-3 py-2.5 font-semibold ${
+                      t.amount > 0
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-rose-500 dark:text-rose-400"
+                    }`}
+                  >
+                    {t.amount > 0 ? `+${t.amount}` : t.amount}방울
+                  </td>
+                  <td className="px-3 py-2.5 text-gray-600 dark:text-slate-300">
+                    {t.balance_after}방울
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -481,14 +505,13 @@ export default function CoinsPage() {
   const router = useRouter();
   const toast = useToast();
   const { confirm, prompt } = useDialog();
-  const [balance, setBalance] = useState(0);
+  const [activeSection, setActiveSection] = useState("plans");
   const [packages, setPackages] = useState([]);
   const [paymentProducts, setPaymentProducts] = useState([]);
   const [entitlement, setEntitlement] = useState(null);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingPackage, setProcessingPackage] = useState("");
-  const [showHistory, setShowHistory] = useState(false);
 
   const pendingRequests = useMemo(
     () => requests.filter((r) => r.status === "pending"),
@@ -526,14 +549,12 @@ export default function CoinsPage() {
   const loadCoins = useCallback(async () => {
     try {
       setLoading(true);
-      const [balanceResult, packagesResult, requestsResult, productsResult, entitlementResult] = await Promise.all([
-        getMyCoinBalanceApi(),
+      const [packagesResult, requestsResult, productsResult, entitlementResult] = await Promise.all([
         getCoinPackagesApi(),
         getMyCoinPurchaseRequestsApi(),
         getPaymentProductsApi(),
         getMyEntitlementApi(),
       ]);
-      setBalance(balanceResult.data?.waterdrop_balance ?? balanceResult.data?.coin_balance ?? 0);
       setPackages(normalizeCoinPackages(packagesResult.data || []));
       setRequests(requestsResult.data || []);
       setPaymentProducts(productsResult.data || []);
@@ -632,7 +653,7 @@ export default function CoinsPage() {
     <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-slate-950 dark:text-slate-100">
       <TopActionButtons />
 
-      <main className="mx-auto max-w-4xl px-4 pb-16">
+      <main className="mx-auto max-w-6xl px-4 pb-16">
         {/* ── 히어로 ── */}
         <section className="pb-10 pt-6 text-center">
           <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center">
@@ -648,37 +669,17 @@ export default function CoinsPage() {
             <br />
             영양 가득한 물이에요.
           </p>
+        </section>
 
-          {/* 잔액 + 이용 내역 */}
-          <div className="flex flex-col items-center justify-center gap-3">
-            <div className="flex w-full max-w-xs items-center justify-center gap-2.5 rounded-2xl border border-sky-100 bg-sky-50 px-6 py-4 shadow-sm dark:border-sky-500/20 dark:bg-sky-500/10">
-              <svg viewBox="0 0 20 20" fill="none" className="h-5 w-5" aria-hidden>
-                <defs>
-                  <linearGradient id="balGrad" x1="4" y1="2" x2="16" y2="18" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stopColor="#bae6fd" />
-                    <stop offset="100%" stopColor="#0ea5e9" />
-                  </linearGradient>
-                </defs>
-                <path d="M10 2C7.5 5.5 5 9 5 12c0 3 1.8 5 5 5s5-2 5-5c0-3-2.5-6.5-5-10Z" fill="url(#balGrad)" />
-                <ellipse cx="7.8" cy="8" rx="2" ry="3.2" fill="white" opacity="0.35" transform="rotate(-18 7.8 8)" />
-              </svg>
-
-              <div className="text-center">
-                <p className="text-[11px] font-semibold text-sky-500 dark:text-sky-300">현재 잔액</p>
-                <p className="text-2xl font-black text-gray-900 dark:text-slate-50">
-                  {formatWaterdrops(balance)}
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowHistory(true)}
-              className="text-sm font-semibold text-gray-500 underline-offset-4 transition hover:text-sky-600 hover:underline dark:text-slate-400 dark:hover:text-sky-300"
-            >
-              이용 내역 조회
-            </button>
-          </div>
+        <section className="mx-auto mb-8 grid max-w-5xl grid-cols-1 gap-4 text-left sm:grid-cols-3">
+          {STORE_SECTIONS.map((section) => (
+            <StoreSectionCard
+              key={section.key}
+              section={section}
+              active={activeSection === section.key}
+              onClick={() => setActiveSection(section.key)}
+            />
+          ))}
         </section>
 
         {/* ── 컨텐츠 ── */}
@@ -694,6 +695,8 @@ export default function CoinsPage() {
               </div>
             )}
 
+            {activeSection === "plans" && (
+              <>
             <section className="mb-8">
               <div className="mb-4">
                 <h2 className="text-xl font-black text-slate-950 dark:text-slate-50">무료 요금제</h2>
@@ -775,7 +778,10 @@ export default function CoinsPage() {
                 )}
               </div>
             </section>
+              </>
+            )}
 
+            {activeSection === "waterdrops" && (
             <section className="mb-8">
               <div className="mb-4">
                 <h2 className="text-xl font-black text-slate-950 dark:text-slate-50">물방울 충전</h2>
@@ -824,7 +830,10 @@ export default function CoinsPage() {
                 ))}
               </div>
             </section>
+            )}
 
+            {activeSection === "history" && (
+              <div className="space-y-6">
             {/* 구매 요청 내역 */}
             <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
               <div className="mb-4 flex items-center justify-between gap-3">
@@ -887,11 +896,12 @@ export default function CoinsPage() {
                 </div>
               )}
             </section>
+                <HistorySection />
+              </div>
+            )}
           </>
         )}
       </main>
-
-      {showHistory && <HistoryModal onClose={() => setShowHistory(false)} />}
     </div>
   );
 }
