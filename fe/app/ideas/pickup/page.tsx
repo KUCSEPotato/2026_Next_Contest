@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -1117,24 +1117,19 @@ function IdeaViewModal({
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={onCancel} />
-
         <div className="relative w-full max-w-sm rounded-3xl border border-emerald-100 bg-white p-7 shadow-2xl shadow-emerald-200/40 dark:border-emerald-800/60 dark:bg-slate-900 dark:shadow-slate-950/60">
           <div className="mx-auto mb-4 h-14 w-14">
             <SeedIcon />
           </div>
-
           <h2 className="mb-1 text-center text-base font-bold text-slate-800 dark:text-slate-50">
             아이디어를 열람할까요?
           </h2>
-
           <p className="mb-1 line-clamp-1 text-center text-sm font-semibold text-slate-700 dark:text-slate-200">
             &ldquo;{idea.title}&rdquo;
           </p>
-
           <p className="mb-5 text-center text-xs text-slate-400 dark:text-slate-400">
             무료 열람 플랜이라 물방울 차감 없이 확인할 수 있어요.
           </p>
-
           <div className="flex gap-2">
             <button
               onClick={onCancel}
@@ -1143,7 +1138,6 @@ function IdeaViewModal({
             >
               취소
             </button>
-
             <button
               onClick={onConfirm}
               disabled={isLoading}
@@ -1176,56 +1170,39 @@ function IdeaViewModal({
 
         <p className="mb-5 text-center text-xs text-slate-400 dark:text-slate-400">
           {isFreeView ? (
-            <>
-              오늘은 <span className="font-semibold text-sky-600">무료</span>로 열람할 수 있어요.
-            </>
+            <>오늘은 <span className="font-semibold text-sky-600">무료</span>로 열람할 수 있어요.</>
           ) : (
             <>
               이 아이디어를 열람하면{" "}
-              <span className="font-semibold text-sky-600">물방울 {coinCost}방울</span>이
-              사용됩니다.
+              <span className="font-semibold text-sky-600">물방울 {coinCost}방울</span>이 사용됩니다.
             </>
           )}
         </p>
 
-        <div className="mb-5 grid grid-cols-3 overflow-hidden rounded-2xl border border-amber-100 bg-amber-50 text-center dark:border-amber-800/70 dark:bg-amber-950/40">
+        <div className={`mb-5 overflow-hidden rounded-2xl border border-amber-100 bg-amber-50 text-center dark:border-amber-800/70 dark:bg-amber-950/40 ${isFreeView ? "grid grid-cols-2" : "grid grid-cols-3"}`}>
           <div className="px-3 py-3">
-            <p className="text-[11px] font-semibold text-amber-700/70 dark:text-amber-200/70">
-              현재 물방울
-            </p>
+            <p className="text-[11px] font-semibold text-amber-700/70 dark:text-amber-200/70">현재 물방울</p>
             <p className="mt-1 text-base font-black text-amber-800 dark:text-amber-100">
               {coinBalance === null ? "-" : coinBalance.toLocaleString("ko-KR")}
             </p>
           </div>
-          <div className="border-x border-amber-100 bg-white/70 px-3 py-3 dark:border-amber-800/70 dark:bg-slate-900/55">
-            <p className="text-[11px] font-semibold text-amber-700/70 dark:text-amber-200/70">
-              {isFreeView ? "무료 사용권" : "사용 물방울"}
-            </p>
+          <div className={`${isFreeView ? "border-l border-amber-100 bg-white/70 dark:border-amber-800/70 dark:bg-slate-900/55" : "border-x border-amber-100 bg-white/70 dark:border-amber-800/70 dark:bg-slate-900/55"} px-3 py-3`}>
+            <p className="text-[11px] font-semibold text-amber-700/70 dark:text-amber-200/70">{isFreeView ? "이번 열람" : "사용 물방울"}</p>
             <p className={`mt-1 text-base font-black ${isFreeView ? "text-sky-600 dark:text-sky-300" : "text-red-600 dark:text-red-300"}`}>
               {isFreeView ? "0" : `-${coinCost.toLocaleString("ko-KR")}`}
             </p>
           </div>
-          <div className="px-3 py-3">
-            <p className="text-[11px] font-semibold text-amber-700/70 dark:text-amber-200/70">
-              {isFreeView ? "남은 무료" : "사용 후"}
-            </p>
-            <p className={`mt-1 text-base font-black ${isInsufficient ? "text-red-600 dark:text-red-300" : "text-amber-800 dark:text-amber-100"}`}>
-              {isFreeView
-                ? freeRemaining === null
-                  ? "-"
-                  : freeRemaining.toLocaleString("ko-KR")
-                : remainingBalance === null
-                  ? "-"
-                  : remainingBalance.toLocaleString("ko-KR")}
-            </p>
-          </div>
+          {!isFreeView && (
+            <div className="px-3 py-3">
+              <p className="text-[11px] font-semibold text-amber-700/70 dark:text-amber-200/70">사용 후</p>
+              <p className={`mt-1 text-base font-black ${isInsufficient ? "text-red-600 dark:text-red-300" : "text-amber-800 dark:text-amber-100"}`}>
+                {remainingBalance === null ? "-" : remainingBalance.toLocaleString("ko-KR")}
+              </p>
+            </div>
+          )}
         </div>
 
-        {isFreeView ? (
-          <p className="mb-4 rounded-2xl border border-sky-100 bg-sky-50 px-3 py-2 text-center text-xs font-semibold text-sky-700 dark:border-sky-800/70 dark:bg-sky-950/50 dark:text-sky-200">
-            {costLabel}
-          </p>
-        ) : isInsufficient ? (
+        {!isFreeView && isInsufficient ? (
           <p className="mb-4 rounded-2xl border border-red-100 bg-red-50 px-3 py-2 text-center text-xs font-semibold text-red-700 dark:border-red-800/70 dark:bg-red-950/50 dark:text-red-200">
             물방울이 부족합니다. 상점에서 물방울을 충전한 뒤 다시 열람해주세요.
           </p>
