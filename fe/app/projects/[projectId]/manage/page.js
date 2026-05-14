@@ -20,6 +20,7 @@ import {
   createProjectReviewApi,
   getProjectReviewsApi,
 } from "../../../../lib/api";
+import { useDialog } from "../../../../components/AppFeedback";
 
 const unwrapResponseData = (result, fallback = null) =>
   result?.data?.data ?? result?.data ?? fallback;
@@ -55,6 +56,7 @@ const TODO_STAGES = [
 export default function ProjectManagePage() {
   const params = useParams();
   const router = useRouter();
+  const { confirm } = useDialog();
   const projectId = params.projectId;
 
   const [project, setProject] = useState(null);
@@ -283,7 +285,13 @@ export default function ProjectManagePage() {
       return;
     }
 
-    if (!confirm("팀 결성을 완료하고 프로젝트를 시작할까요?")) {
+    const ok = await confirm({
+      title: "팀 결성을 완료할까요?",
+      message: "팀 결성을 완료하면 프로젝트가 시작되고 팀 채팅방을 사용할 수 있어요.",
+      confirmText: "완료하기",
+      cancelText: "취소",
+    });
+    if (!ok) {
       return;
     }
 
@@ -486,7 +494,14 @@ export default function ProjectManagePage() {
 
     if (!canCompleteProject) return;
 
-    if (!confirm("프로젝트를 완료 처리할까요? 완료 후 회고록을 작성할 수 있습니다.")) {
+    const ok = await confirm({
+      title: "프로젝트를 완료하시겠습니까?",
+      message: "완료 후에는 팀원 평가와 회고록 작성을 진행할 수 있어요.",
+      confirmText: "완료하기",
+      cancelText: "취소",
+      tone: "danger",
+    });
+    if (!ok) {
       return;
     }
 

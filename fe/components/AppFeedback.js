@@ -135,9 +135,9 @@ export function AppFeedbackProvider({ children }) {
 
     window.alert = (message) => {
       const text = String(message ?? "");
-      const type = /실패|오류|에러|불가|못했습니다|확인해주세요/.test(text)
+      const type = /실패|오류|에러|불가|못했습니다|못했어요|확인해주세요|입력해주세요/.test(text)
         ? "error"
-        : /완료|성공|되었습니다|저장/.test(text)
+        : /완료|성공|되었습니다|됐습니다|저장|등록되었습니다|삭제되었습니다/.test(text)
           ? "success"
           : "info";
 

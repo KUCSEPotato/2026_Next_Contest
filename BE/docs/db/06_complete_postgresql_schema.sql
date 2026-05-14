@@ -43,3 +43,4 @@
 \ir 30_create_toss_payments.sql
 \ir 31_create_payment_products_and_entitlements.sql
 \ir 32_extend_manual_purchase_requests.sql
+\ir 33_allow_negative_coin_transactions.sql

@@ -266,6 +266,29 @@ function ordinalKo(n: number) {
   return `${n}번째`;
 }
 
+function getGardenLevel(count: number) {
+  return {
+    emoji: "🌷",
+    title: "나의 회고",
+    desc: "완료한 프로젝트와 회고 기록을 한눈에 모아볼 수 있어요.",
+  };
+}
+
+function collectTopChips(items: MemoirOverviewItem[]) {
+  const counts = new Map<string, number>();
+
+  items.forEach((item) => {
+    item.growth?.chips?.forEach((chip) => {
+      counts.set(chip, (counts.get(chip) || 0) + 1);
+    });
+  });
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([chip]) => chip);
+}
+
 /* ────────────────────────────────────────────────────────────
    장미 SVG
 ──────────────────────────────────────────────────────────── */
@@ -925,46 +948,222 @@ function MemoirContent() {
   }
 
   if (!requestedProjectId) {
+    const completedCount = memoirList.length;
+    const gardenLevel = getGardenLevel(completedCount);
+    const topChips = collectTopChips(memoirList);
+    const recentProject = memoirList[0]?.project;
+    const totalHours = memoirList.reduce(
+      (sum, item) => sum + daysBetween(item.project.created_at) * 6,
+      0
+    );
+
     return (
-      <div style={{ minHeight: "100vh", background: "var(--memoir-page-bg)", color: "var(--memoir-text)", fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", padding: "40px 24px" }}>
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "var(--memoir-page-bg)",
+          color: "var(--memoir-text)",
+          fontFamily:
+            "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          padding: "40px 24px",
+        }}
+      >
         <div style={{ width: "100%", maxWidth: 1024, margin: "0 auto" }}>
-          <section style={{ background: "var(--memoir-card-bg)", border: "1px solid var(--memoir-border)", borderRadius: 18, padding: "32px 36px", boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)" }}>
-            <p style={{ color: "var(--memoir-rose-text)", fontSize: 22, fontWeight: 900, margin: 0 }}>
-              나의 회고
-            </p>
-            <p style={{ margin: "12px 0 0", color: "var(--memoir-muted)", fontSize: 15 }}>
-              지금까지 완료한 프로젝트의 정원을 한눈에 모아봅니다.
-            </p>
-            {memoirList.length > 0 ? (
+          <section
+            style={{
+              position: "relative",
+              overflow: "hidden",
+              background:
+                "linear-gradient(135deg, var(--memoir-card-bg) 0%, var(--memoir-rose-soft-bg) 100%)",
+              border: "1px solid var(--memoir-border)",
+              borderRadius: 24,
+              padding: "36px 40px",
+              boxShadow: "0 10px 30px rgba(15, 23, 42, 0.06)",
+            }}
+          >
+            <div
+              style={{
+                position: "absolute",
+                right: -24,
+                bottom: -48,
+                opacity: 0.12,
+                transform: "scale(2.1)",
+              }}
+            >
+              <RoseSVG />
+            </div>
+
+            <div style={{ position: "relative", zIndex: 1 }}>
               <div
                 style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 6,
-                  marginTop: 18,
-                  maxWidth: "100%",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  background: "var(--memoir-card-bg)",
+                  border: "1px solid var(--memoir-rose-border)",
+                  color: "var(--memoir-rose-text)",
+                  borderRadius: 999,
+                  padding: "7px 14px",
+                  fontSize: 13,
+                  fontWeight: 900,
+                  marginBottom: 16,
                 }}
-                aria-label={`완료한 프로젝트 ${memoirList.length}개`}
               >
-                {memoirList.map(({ project: completedProject }) => (
-                  <ProgressBloom
-                    key={`garden-rose-${completedProject.id}`}
-                    progress={100}
-                    size="xs"
-                    showLabel={false}
-                  />
+                <span>{gardenLevel.emoji}</span>
+                <span>{gardenLevel.title}</span>
+              </div>
+
+              <h1
+                style={{
+                  color: "var(--memoir-rose-text)",
+                  fontSize: 30,
+                  fontWeight: 950,
+                  margin: 0,
+                  letterSpacing: "-0.03em",
+                }}
+              >
+                나의 개발 정원
+              </h1>
+
+              <p
+                style={{
+                  margin: "12px 0 0",
+                  color: "var(--memoir-muted)",
+                  fontSize: 15,
+                  lineHeight: 1.8,
+                }}
+              >
+                지금까지 완성한 프로젝트와 회고 기록이 꽃처럼 쌓이고 있어요.
+                <br />
+                {gardenLevel.desc}
+              </p>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                  gap: 12,
+                  marginTop: 26,
+                }}
+              >
+                {[
+                  { label: "완료 프로젝트", value: `${completedCount}개` },
+                  { label: "누적 성장 시간", value: `${totalHours}시간` },
+                  {
+                    label: "최근 개화",
+                    value: recentProject ? recentProject.title : "기록 없음",
+                  },
+                ].map(({ label, value }) => (
+                  <div
+                    key={label}
+                    style={{
+                      background: "rgba(255,255,255,0.72)",
+                      border: "1px solid var(--memoir-border)",
+                      borderRadius: 16,
+                      padding: "16px 18px",
+                      minHeight: 86,
+                      backdropFilter: "blur(6px)",
+                    }}
+                  >
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 12,
+                        color: "var(--memoir-muted)",
+                        fontWeight: 800,
+                      }}
+                    >
+                      {label}
+                    </p>
+                    <p
+                      style={{
+                        margin: "8px 0 0",
+                        fontSize: label === "최근 개화" ? 17 : 26,
+                        color: "var(--memoir-text)",
+                        fontWeight: 950,
+                        lineHeight: 1.25,
+                      }}
+                    >
+                      {value}
+                    </p>
+                  </div>
                 ))}
               </div>
-            ) : null}
+
+              {memoirList.length > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    gap: 10,
+                    marginTop: 26,
+                  }}
+                  aria-label={`완료한 프로젝트 ${memoirList.length}개`}
+                >
+                  {memoirList.map(({ project: completedProject }) => (
+                    <div
+                      key={`garden-rose-${completedProject.id}`}
+                      style={{
+                        transition: "transform .18s ease",
+                      }}
+                    >
+                      <ProgressBloom progress={100} size="xs" showLabel={false} />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {topChips.length > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    marginTop: 20,
+                  }}
+                >
+                  {topChips.map((chip) => (
+                    <span
+                      key={chip}
+                      style={{
+                        background: "var(--memoir-card-bg)",
+                        color: "var(--memoir-rose-text)",
+                        border: "1px solid var(--memoir-rose-border)",
+                        borderRadius: 999,
+                        padding: "6px 12px",
+                        fontSize: 12,
+                        fontWeight: 800,
+                      }}
+                    >
+                      #{chip}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </section>
 
           {memoirList.length === 0 ? (
-            <section style={{ marginTop: 20, background: "var(--memoir-card-bg)", border: "1px solid var(--memoir-border)", borderRadius: 16, padding: 28, color: "var(--memoir-muted)" }}>
+            <section
+              style={{
+                marginTop: 20,
+                background: "var(--memoir-card-bg)",
+                border: "1px solid var(--memoir-border)",
+                borderRadius: 18,
+                padding: 32,
+                color: "var(--memoir-muted)",
+                textAlign: "center",
+                lineHeight: 1.8,
+              }}
+            >
               아직 완료한 프로젝트 회고가 없습니다.
+              <br />
+              프로젝트를 완성하면 이곳에 첫 번째 꽃이 피어납니다.
             </section>
           ) : (
-            <div style={{ marginTop: 20, display: "grid", gap: 16 }}>
-              {memoirList.map(({ project: completedProject, growth: itemGrowth }) => {
+            <div style={{ marginTop: 22, display: "grid", gap: 16 }}>
+              {memoirList.map(({ project: completedProject, growth: itemGrowth }, index) => {
                 const summaryText =
                   toMemoirPreview(itemGrowth?.aiMemoir) ||
                   toMemoirPreview(itemGrowth?.good) ||
@@ -972,42 +1171,208 @@ function MemoirContent() {
                   toMemoirPreview(itemGrowth?.nextActions) ||
                   "아직 작성된 회고 내용이 없습니다.";
 
+                const chips = itemGrowth?.chips?.slice(0, 4) || [];
+                const hasMemoir = Boolean(
+                  itemGrowth?.aiMemoir ||
+                    itemGrowth?.good ||
+                    itemGrowth?.lessons ||
+                    itemGrowth?.nextActions
+                );
+
                 return (
-                  <article
+                  <Link
                     key={completedProject.id}
-                    style={{ background: "var(--memoir-card-bg)", border: "1px solid var(--memoir-border)", borderRadius: 16, padding: 24, boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)" }}
+                    href={`/memoir?projectId=${completedProject.id}`}
+                    style={{
+                      textDecoration: "none",
+                      color: "inherit",
+                      display: "block",
+                    }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start" }}>
-                      <div>
-                        <span style={{ display: "inline-block", background: "var(--memoir-rose-bg)", color: "var(--memoir-rose-text)", borderRadius: 999, padding: "5px 10px", fontSize: 12, fontWeight: 800 }}>
-                          completed
-                        </span>
-                        <h2 style={{ margin: "12px 0 0", fontSize: 18, fontWeight: 800 }}>
-                          {completedProject.title}
-                        </h2>
-                        <p style={{ margin: "8px 0 0", color: "var(--memoir-muted)", lineHeight: 1.7 }}>
-                          {summaryText}
-                        </p>
-                      </div>
-
-                      <Link
-                        href={`/memoir?projectId=${completedProject.id}`}
-                        style={{ flexShrink: 0, borderRadius: 12, background: "#e60012", color: "#fff", padding: "10px 14px", fontSize: 14, fontWeight: 800, textDecoration: "none" }}
+                    <article
+                      style={{
+                        position: "relative",
+                        overflow: "hidden",
+                        background:
+                          index === 0
+                            ? "linear-gradient(135deg, var(--memoir-card-bg) 0%, var(--memoir-rose-bg) 100%)"
+                            : "var(--memoir-card-bg)",
+                        border: "1px solid var(--memoir-border)",
+                        borderRadius: 20,
+                        padding: 24,
+                        boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
+                        transition:
+                          "transform .18s ease, box-shadow .18s ease, border-color .18s ease",
+                        cursor: "pointer",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = "translateY(-3px)";
+                        e.currentTarget.style.boxShadow =
+                          "0 14px 28px rgba(15, 23, 42, 0.08)";
+                        e.currentTarget.style.borderColor =
+                          "var(--memoir-rose-border)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow =
+                          "0 2px 8px rgba(15, 23, 42, 0.04)";
+                        e.currentTarget.style.borderColor =
+                          "var(--memoir-border)";
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 18,
+                          alignItems: "flex-start",
+                        }}
                       >
-                        회고 보기
-                      </Link>
-                    </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              flexWrap: "wrap",
+                              gap: 8,
+                              alignItems: "center",
+                              marginBottom: 12,
+                            }}
+                          >
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 5,
+                                background: "var(--memoir-rose-bg)",
+                                color: "var(--memoir-rose-text)",
+                                borderRadius: 999,
+                                padding: "5px 10px",
+                                fontSize: 12,
+                                fontWeight: 900,
+                              }}
+                            >
+                              🌹 completed
+                            </span>
 
-                    {itemGrowth?.chips?.length ? (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16 }}>
-                        {itemGrowth.chips.map((chip) => (
-                          <span key={chip} style={{ background: "var(--memoir-page-bg)", color: "var(--memoir-muted)", border: "1px solid var(--memoir-border)", borderRadius: 999, padding: "5px 10px", fontSize: 12, fontWeight: 700 }}>
-                            {chip}
-                          </span>
-                        ))}
+                            {index === 0 && (
+                              <span
+                                style={{
+                                  background: "var(--memoir-blue-bg)",
+                                  color: "var(--memoir-blue-text)",
+                                  border: "1px solid var(--memoir-blue-border)",
+                                  borderRadius: 999,
+                                  padding: "5px 10px",
+                                  fontSize: 12,
+                                  fontWeight: 900,
+                                }}
+                              >
+                                최근 개화
+                              </span>
+                            )}
+
+                            <span
+                              style={{
+                                background: hasMemoir
+                                  ? "rgba(234, 179, 8, 0.12)"
+                                  : "var(--memoir-page-bg)",
+                                color: hasMemoir
+                                  ? "#92400e"
+                                  : "var(--memoir-muted)",
+                                border: hasMemoir
+                                  ? "1px solid rgba(234, 179, 8, 0.28)"
+                                  : "1px solid var(--memoir-border)",
+                                borderRadius: 999,
+                                padding: "5px 10px",
+                                fontSize: 12,
+                                fontWeight: 800,
+                              }}
+                            >
+                              {hasMemoir ? "AI 회고 완료" : "회고 작성 전"}
+                            </span>
+                          </div>
+
+                          <h2
+                            style={{
+                              margin: 0,
+                              fontSize: 20,
+                              fontWeight: 950,
+                              letterSpacing: "-0.02em",
+                              color: "var(--memoir-text)",
+                            }}
+                          >
+                            {completedProject.title}
+                          </h2>
+
+                          <p
+                            style={{
+                              margin: "8px 0 0",
+                              color: "var(--memoir-muted)",
+                              fontSize: 13,
+                              fontWeight: 700,
+                            }}
+                          >
+                            {toDateLabel(completedProject.created_at)} 시작 ·{" "}
+                            {daysBetween(completedProject.created_at)}일간의 여정
+                          </p>
+
+                          <p
+                            style={{
+                              margin: "12px 0 0",
+                              color: "var(--memoir-muted)",
+                              lineHeight: 1.75,
+                              fontSize: 14,
+                            }}
+                          >
+                            {summaryText}
+                          </p>
+
+                          {chips.length > 0 && (
+                            <div
+                              style={{
+                                display: "flex",
+                                flexWrap: "wrap",
+                                gap: 8,
+                                marginTop: 16,
+                              }}
+                            >
+                              {chips.map((chip) => (
+                                <span
+                                  key={chip}
+                                  style={{
+                                    background: "var(--memoir-page-bg)",
+                                    color: "var(--memoir-muted)",
+                                    border: "1px solid var(--memoir-border)",
+                                    borderRadius: 999,
+                                    padding: "5px 10px",
+                                    fontSize: 12,
+                                    fontWeight: 800,
+                                  }}
+                                >
+                                  {chip}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div
+                          style={{
+                            flexShrink: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            color: "var(--memoir-rose-text)",
+                            fontSize: 14,
+                            fontWeight: 900,
+                            paddingTop: 6,
+                          }}
+                        >
+                          회고 읽기
+                          <span style={{ fontSize: 18 }}>→</span>
+                        </div>
                       </div>
-                    ) : null}
-                  </article>
+                    </article>
+                  </Link>
                 );
               })}
             </div>
