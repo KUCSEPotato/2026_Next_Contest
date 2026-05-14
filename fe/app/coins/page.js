@@ -410,7 +410,7 @@ function StoreSectionCard({ section, active, onClick }) {
         )}
       </div>
 
-      <p className="whitespace-pre-line text-sm leading-relaxed text-gray-500 dark:text-slate-400">
+      <p className="whitespace-pre-line text-center text-sm leading-relaxed text-gray-500 dark:text-slate-400">
         {section.description}
       </p>
     </button>
