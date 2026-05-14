@@ -465,6 +465,18 @@ export default function ProjectDetailPage() {
   };
 
   const handleBoostProject = async () => {
+    if (isBoosted) {
+      const shouldBoostAgain = await confirm({
+        title: "이미 거름 주기 적용 중입니다",
+        message:
+          "이 프로젝트에는 이미 거름을 주었어요. 다시 거름을 주면 이전 거름 주기 효과는 사라집니다. 다시 거름을 주시겠어요?",
+        confirmText: "거름 주기",
+        cancelText: "취소",
+      });
+
+      if (!shouldBoostAgain) return;
+    }
+
     try {
       setIsBoosting(true);
       const entitlementResult = await getMyEntitlementApi();
