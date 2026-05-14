@@ -6,6 +6,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.api.v1.response import success_response
+from app.core.timezone import as_kst
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
 from app.models import CommunityPost
@@ -446,7 +447,7 @@ async def list_users_for_admin(
                 "current_plan_code": plan.product_code,
                 "current_plan_name": plan.name,
                 "current_plan_type": plan.product_type,
-                "current_plan_expires_at": plan.expires_at,
+                "current_plan_expires_at": as_kst(plan.expires_at),
                 "created_at": u.created_at,
                 "deleted_at": u.deleted_at,
             }
@@ -569,7 +570,7 @@ async def update_user_status(
             "current_plan_code": effective_plan.product_code,
             "current_plan_name": effective_plan.name,
             "current_plan_type": effective_plan.product_type,
-            "current_plan_expires_at": effective_plan.expires_at,
+            "current_plan_expires_at": as_kst(effective_plan.expires_at),
         }
     )
 

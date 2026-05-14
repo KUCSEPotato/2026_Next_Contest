@@ -33,10 +33,12 @@ import {
 function formatEntitlementDate(value) {
   if (!value) return "제한 없음";
 
-  return new Date(value).toLocaleDateString("ko-KR", {
+  return new Date(value).toLocaleString("ko-KR", {
     year: "numeric",
     month: "long",
     day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -588,12 +590,8 @@ export default function MyPage() {
 
               <div className="mt-3 space-y-2 text-sm font-semibold text-slate-700">
                 <p>
-                  남은 기간:{" "}
-                  {entitlement?.days_remaining === null ||
-                  entitlement?.days_remaining === undefined
-                    ? "제한 없음"
-                    : `${entitlement.days_remaining}일`}{" "}
-                  · 만료일: {formatEntitlementDate(entitlement?.expires_at)}
+                  만료일:{" "}
+                  {formatEntitlementDate(entitlement?.expires_at)}
                 </p>
                 {entitlement?.product_type === "SUBSCRIPTION" && (
                   <p>

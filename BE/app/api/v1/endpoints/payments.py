@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.api.v1.response import success_response
+from app.core.timezone import as_kst
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
 from app.models import Payment
@@ -238,7 +239,7 @@ async def confirm_payment(
             user_id=payment.user_id,
             notification_type="system",
             title="이용권이 활성화되었습니다.",
-            body=f"{product.name} 권한이 {entitlement.expires_at.date().isoformat()}까지 활성화되었습니다.",
+            body=f"{product.name} 권한이 {as_kst(entitlement.expires_at).strftime('%Y-%m-%d %H:%M')}까지 활성화되었습니다.",
             data={
                 "notification_kind": "payment.entitlement_done",
                 "payment_id": payment.id,

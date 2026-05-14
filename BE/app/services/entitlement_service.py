@@ -1,11 +1,13 @@
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.timezone import as_kst
+from app.core.timezone import now_kst
 from app.models import Payment
 from app.models import PaymentProduct
 from app.models import UserEntitlement
@@ -50,7 +52,7 @@ FREE_LIMITS = {
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return now_kst()
 
 
 def seed_payment_products(db: Session) -> None:
@@ -267,7 +269,7 @@ def _today_count(
     query = db.query(func.count(UserUsageLog.id)).filter(
         UserUsageLog.user_id == user_id,
         UserUsageLog.usage_type == usage_type,
-        UserUsageLog.usage_date == date.today(),
+        UserUsageLog.usage_date == _now().date(),
     )
     if entitlement_id is None:
         query = query.filter(UserUsageLog.entitlement_id.is_(None))
@@ -358,7 +360,7 @@ def record_usage(
         usage_type=usage_type,
         target_type=target_type,
         target_id=target_id,
-        usage_date=date.today(),
+        usage_date=_now().date(),
     )
     db.add(log)
     if entitlement is not None:
@@ -431,16 +433,20 @@ def serialize_effective_plan(db: Session, user_id: int) -> dict[str, Any]:
     project_boost_limit = int(product.project_boost_total_limit or 0)
     project_boost_used = int(entitlement.project_boost_used if entitlement else 0)
     days_remaining = None
+    minutes_remaining = None
     if entitlement and entitlement.expires_at:
         remaining = entitlement.expires_at - _now()
-        days_remaining = max(remaining.days + (1 if remaining.seconds or remaining.microseconds else 0), 0)
+        remaining_seconds = max(int(remaining.total_seconds()), 0)
+        minutes_remaining = (remaining_seconds + 59) // 60
+        days_remaining = (remaining_seconds + 86399) // 86400
     return {
         "plan": product.product_code,
         "product_type": product.product_type,
         "name": product.name,
-        "expires_at": entitlement.expires_at if entitlement else None,
+        "expires_at": as_kst(entitlement.expires_at) if entitlement else None,
         "days_remaining": days_remaining,
-        "next_renewal_at": entitlement.next_renewal_at if entitlement else None,
+        "minutes_remaining": minutes_remaining,
+        "next_renewal_at": as_kst(entitlement.next_renewal_at) if entitlement else None,
         "auto_renew_available": product.auto_renew_available,
         "auto_renew_enabled": entitlement.auto_renew_enabled if entitlement else False,
         "renewal_status": entitlement.renewal_status if entitlement else "NONE",

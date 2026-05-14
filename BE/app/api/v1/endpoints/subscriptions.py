@@ -4,6 +4,8 @@ from fastapi import APIRouter, Body, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.response import success_response
+from app.core.timezone import as_kst
+from app.core.timezone import now_kst
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
 from app.models import PaymentEvent
@@ -48,7 +50,7 @@ async def create_checkout(
     if db.get(SubscriptionPlan, plan_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plan not found")
 
-    now = datetime.now(timezone.utc)
+    now = now_kst()
     subscription = UserSubscription(
         user_id=current_user_id,
         plan_id=plan_id,
@@ -119,8 +121,8 @@ async def get_my_subscription(
             "id": subscription.id,
             "plan_id": subscription.plan_id,
             "status": subscription.status,
-            "current_period_start": subscription.current_period_start,
-            "current_period_end": subscription.current_period_end,
+            "current_period_start": as_kst(subscription.current_period_start),
+            "current_period_end": as_kst(subscription.current_period_end),
             "cancel_at_period_end": subscription.cancel_at_period_end,
         }
     )
