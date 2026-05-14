@@ -271,10 +271,11 @@ def _notify_admin_takedown(
     db.add(
         Notification(
             user_id=user_id,
-            type="admin_takedown",
+            type="system",
             title=f"{target_label} '{target_title}'이 내려졌습니다",
             body=_takedown_body(target_label, target_title, reason),
             data={
+                "notification_kind": "admin_takedown",
                 "target_type": target_type,
                 "target_id": target_id,
                 "target_title": target_title,
@@ -303,10 +304,11 @@ def _notify_coin_adjustment(
     db.add(
         Notification(
             user_id=user_id,
-            type=f"admin_coin_{action}",
+            type="system",
             title=f"코인이 {action_label}되었습니다",
             body=body,
             data={
+                "notification_kind": f"admin_coin_{action}",
                 "amount": signed_amount,
                 "balance_after": balance_after,
                 "reason": reason,
