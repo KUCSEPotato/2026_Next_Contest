@@ -47,8 +47,8 @@ const STORE_SECTIONS = [
   {
     key: "plans",
     emoji: "📋",
-    title: "요금제 설명",
-    english: "Plan Guide",
+    title: "이용 플랜",
+    english: "Subscription/Usage Plan",
     description: "무료 요금제, 월 구독 플랜, 단기 이용권을 한 번에 살펴보세요.",
   },
   {
