@@ -96,7 +96,6 @@ export default function ChatRoomPage() {
   const [draggedTodoId, setDraggedTodoId] = useState(null);
   const [todoDropTarget, setTodoDropTarget] = useState(null);
   const [reorderingTodos, setReorderingTodos] = useState(false);
-  const draggedTodoIdRef = useRef(null);
   const pendingTodoScrollTopRef = useRef(null);
 
   const loadMessages = useCallback(async () => {
@@ -477,15 +476,13 @@ export default function ChatRoomPage() {
       return;
     }
 
-    draggedTodoIdRef.current = todoId;
     setDraggedTodoId(todoId);
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", String(todoId));
   };
 
   const handleTodoListDragOver = (event) => {
-    const activeDraggedTodoId = draggedTodoIdRef.current ?? draggedTodoId;
-    if (!activeDraggedTodoId || isTodoFinalized || editingTodoId) return;
+    if (!draggedTodoId || isTodoFinalized || editingTodoId) return;
 
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
@@ -513,16 +510,6 @@ export default function ChatRoomPage() {
     if (scrollDelta !== 0) {
       container.scrollTop += scrollDelta;
     }
-
-    const nextDropTarget = getTodoDropTargetFromPoint(event.clientY);
-    if (nextDropTarget) {
-      setTodoDropTarget((currentTarget) =>
-        currentTarget?.todoId === nextDropTarget.todoId &&
-        currentTarget?.position === nextDropTarget.position
-          ? currentTarget
-          : nextDropTarget
-      );
-    }
   };
 
   const restoreTodoScrollPosition = useCallback(() => {
@@ -535,25 +522,17 @@ export default function ChatRoomPage() {
   }, []);
 
   const handleTodoDragEnd = () => {
-    draggedTodoIdRef.current = null;
     setDraggedTodoId(null);
     setTodoDropTarget(null);
   };
 
   const handleTodoDragOver = (event, targetTodo) => {
-    const activeDraggedTodoId = draggedTodoIdRef.current ?? draggedTodoId;
-
-    if (activeDraggedTodoId) {
+    if (draggedTodoId) {
       event.preventDefault();
       event.dataTransfer.dropEffect = "move";
     }
 
-    if (
-      !activeDraggedTodoId ||
-      isSameTodoId(activeDraggedTodoId, targetTodo.id) ||
-      isTodoFinalized ||
-      editingTodoId
-    ) {
+    if (!draggedTodoId || draggedTodoId === targetTodo.id || isTodoFinalized || editingTodoId) {
       return;
     }
 
@@ -568,19 +547,17 @@ export default function ChatRoomPage() {
   };
 
   const handleTodoDrop = async (targetTodo, position) => {
-    const activeDraggedTodoId = draggedTodoIdRef.current ?? draggedTodoId;
-
-    if (!projectId || isTodoFinalized || editingTodoId || !activeDraggedTodoId) {
+    if (!projectId || isTodoFinalized || editingTodoId || !draggedTodoId) {
       handleTodoDragEnd();
       return;
     }
 
-    if (isSameTodoId(activeDraggedTodoId, targetTodo.id)) {
+    if (draggedTodoId === targetTodo.id) {
       handleTodoDragEnd();
       return;
     }
 
-    const draggedTodo = todos.find((todo) => isSameTodoId(todo.id, activeDraggedTodoId));
+    const draggedTodo = todos.find((todo) => todo.id === draggedTodoId);
     if (!draggedTodo) {
       handleTodoDragEnd();
       return;
@@ -589,9 +566,7 @@ export default function ChatRoomPage() {
     const currentTodos = groupTodosByStage(todos).flatMap((group) =>
       group.items.map(({ todo }) => todo)
     );
-    const fromIndex = currentTodos.findIndex((todo) =>
-      isSameTodoId(todo.id, activeDraggedTodoId)
-    );
+    const fromIndex = currentTodos.findIndex((todo) => todo.id === draggedTodoId);
 
     if (fromIndex < 0) {
       handleTodoDragEnd();
@@ -600,9 +575,7 @@ export default function ChatRoomPage() {
 
     const reorderedTodos = [...currentTodos];
     const [movedTodo] = reorderedTodos.splice(fromIndex, 1);
-    const targetIndex = reorderedTodos.findIndex((todo) =>
-      isSameTodoId(todo.id, targetTodo.id)
-    );
+    const targetIndex = reorderedTodos.findIndex((todo) => todo.id === targetTodo.id);
 
     if (targetIndex < 0) {
       handleTodoDragEnd();
@@ -612,7 +585,7 @@ export default function ChatRoomPage() {
     const insertIndex = position === "after" ? targetIndex + 1 : targetIndex;
     reorderedTodos.splice(insertIndex, 0, {
       ...movedTodo,
-      stage: normalizeTodoStage(targetTodo.stage),
+      stage: targetTodo.stage,
     });
 
     const normalizedTodos = reorderedTodos.map((todo, index) => ({
@@ -620,7 +593,7 @@ export default function ChatRoomPage() {
       priority: index + 1,
     }));
     const changedTodos = normalizedTodos.filter((nextTodo) => {
-      const prevTodo = currentTodos.find((todo) => isSameTodoId(todo.id, nextTodo.id));
+      const prevTodo = currentTodos.find((todo) => todo.id === nextTodo.id);
       return prevTodo?.priority !== nextTodo.priority || prevTodo?.stage !== nextTodo.stage;
     });
 
@@ -656,32 +629,6 @@ export default function ChatRoomPage() {
         });
       });
     }
-  };
-
-  const getTodoDropTargetFromPoint = (clientY) => {
-    const container = todoListRef.current;
-    if (!container) return null;
-
-    const activeDraggedTodoId = draggedTodoIdRef.current ?? draggedTodoId;
-    if (!activeDraggedTodoId) return null;
-
-    const todoCards = Array.from(container.querySelectorAll("[data-todo-id]")).filter(
-      (element) => !isSameTodoId(element.dataset.todoId, activeDraggedTodoId)
-    );
-
-    if (todoCards.length === 0) return null;
-
-    for (const card of todoCards) {
-      const rect = card.getBoundingClientRect();
-      if (clientY < rect.top + rect.height / 2) {
-        return { todoId: card.dataset.todoId, position: "before" };
-      }
-    }
-
-    return {
-      todoId: todoCards[todoCards.length - 1].dataset.todoId,
-      position: "after",
-    };
   };
 
   const toggleTodoDetail = (todoId) => {
@@ -954,16 +901,11 @@ export default function ChatRoomPage() {
               }
             }}
             onDrop={(event) => {
-              const nextDropTarget = todoDropTarget ?? getTodoDropTargetFromPoint(event.clientY);
-              const activeDraggedTodoId = draggedTodoIdRef.current ?? draggedTodoId;
-              if (!activeDraggedTodoId || !nextDropTarget) return;
-
+              if (!draggedTodoId || !todoDropTarget) return;
               event.preventDefault();
-              const targetTodo = todos.find((todo) =>
-                isSameTodoId(todo.id, nextDropTarget.todoId)
-              );
+              const targetTodo = todos.find((todo) => todo.id === todoDropTarget.todoId);
               if (targetTodo) {
-                handleTodoDrop(targetTodo, nextDropTarget.position);
+                handleTodoDrop(targetTodo, todoDropTarget.position);
               } else {
                 handleTodoDragEnd();
               }
@@ -1000,7 +942,6 @@ export default function ChatRoomPage() {
                     return (
                       <div
                         key={todo.id}
-                        data-todo-id={todo.id}
                         draggable={!isTodoFinalized && !isEditing && !reorderingTodos}
                         onDragStart={(event) => handleTodoDragStart(event, todo.id)}
                         onDragOver={(event) => handleTodoDragOver(event, todo)}
@@ -1167,32 +1108,12 @@ function groupTodosByStage(todos) {
     groupMap.get(stage).items.push({ todo, index });
   });
 
-  groupMap.forEach((group) => {
-    group.items.sort((a, b) => {
-      const priorityA = Number(a.todo?.priority);
-      const priorityB = Number(b.todo?.priority);
-
-      if (Number.isFinite(priorityA) && Number.isFinite(priorityB) && priorityA !== priorityB) {
-        return priorityA - priorityB;
-      }
-
-      if (Number.isFinite(priorityA) && !Number.isFinite(priorityB)) return -1;
-      if (!Number.isFinite(priorityA) && Number.isFinite(priorityB)) return 1;
-
-      return a.index - b.index;
-    });
-  });
-
   return [
     ...TODO_STAGES.map((stage) => groupMap.get(stage.value)).filter(
       (group) => group.items.length > 0
     ),
     ...extraGroups.filter((group) => group.items.length > 0),
   ];
-}
-
-function isSameTodoId(left, right) {
-  return String(left) === String(right);
 }
 
 function normalizeTodoStage(stage) {

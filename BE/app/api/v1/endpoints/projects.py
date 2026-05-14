@@ -75,7 +75,7 @@ router = APIRouter()
 
 TODO_FINALIZED_MARKER_TITLE = "__team_todo_finalized__"
 TODO_PRIORITY_MIN = 1
-TODO_PRIORITY_MAX = 5
+TODO_PRIORITY_MAX = 1000
 
 DIFFICULTY_ALIASES = {
     "easy": "beginner",
