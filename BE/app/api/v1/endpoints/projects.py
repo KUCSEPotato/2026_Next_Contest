@@ -1140,7 +1140,7 @@ async def update_project(
     preferred_members = payload_data.pop("preferred_members", None)
 
     if "max_members" in payload_data:
-        if project.status in {"in_progress", "started", "completed"}:
+        if project.status in {"in_progress", "completed"}:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="max_members cannot be changed after team formation",

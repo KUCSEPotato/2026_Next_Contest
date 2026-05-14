@@ -185,6 +185,38 @@ function daysBetween(start?: string | null) {
   return Math.max(1, Math.ceil((Date.now() - d.getTime()) / 86400000));
 }
 
+const DEFAULT_DAILY_HOURS = 6;
+
+function getDailyHoursStorageKey(projectId: number | string) {
+  return `memoir_daily_hours_${projectId}`;
+}
+
+function normalizeDailyHours(value: unknown): number | null {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Number(Math.min(parsed, 24).toFixed(1));
+}
+
+function getStoredDailyHours(projectId?: number | string | null) {
+  if (!projectId || typeof window === "undefined") return DEFAULT_DAILY_HOURS;
+
+  const stored = localStorage.getItem(getDailyHoursStorageKey(projectId));
+  return normalizeDailyHours(stored) ?? DEFAULT_DAILY_HOURS;
+}
+
+function saveStoredDailyHours(projectId: number | string, value: number) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(getDailyHoursStorageKey(projectId), String(value));
+}
+
+function getProjectInvestmentHours(project: ProjectData) {
+  return daysBetween(project.created_at) * getStoredDailyHours(project.id);
+}
+
+function formatHours(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
 function parseLessonsLearned(value?: string | null): {
   chips: string[];
   lessons: string;
@@ -654,6 +686,8 @@ function MemoirContent() {
   const [saving, setSaving]                 = useState(false);
   const [generatingMemoir, setGeneratingMemoir] = useState(false);
   const [error, setError]                   = useState("");
+  const [dailyHours, setDailyHours]         = useState(DEFAULT_DAILY_HOURS);
+  const [dailyHoursInput, setDailyHoursInput] = useState(String(DEFAULT_DAILY_HOURS));
 
   useEffect(() => {
     let ignore = false;
@@ -815,6 +849,14 @@ function MemoirContent() {
     return () => { ignore = true; };
   }, [requestedProjectId]);
 
+  useEffect(() => {
+    if (!project?.id) return;
+
+    const storedDailyHours = getStoredDailyHours(project.id);
+    setDailyHours(storedDailyHours);
+    setDailyHoursInput(String(storedDailyHours));
+  }, [project?.id]);
+
   const rating = useMemo<Rating>(() => ({
     avg_contribution:   average(reviews.map((r) => Number(r.contribution_score  || 0)).filter(Boolean)),
     avg_responsibility: average(reviews.map((r) => Number(r.responsibility_score || 0)).filter(Boolean)),
@@ -836,8 +878,22 @@ function MemoirContent() {
   const myTodoPercent = todoTotal ? Math.round((myTodoDone / todoTotal) * 100) : 0;
   const myContributionPercent = todoDone ? Math.round((myTodoDone / todoDone) * 100) : 0;
   const durationDays = daysBetween(project?.created_at);
-  const hours        = durationDays * 6;
+  const hours        = durationDays * dailyHours;
   const techStack    = project?.techStack?.length ? project.techStack : [project?.category || "프로젝트"];
+
+  function handleSaveDailyHours() {
+    if (!project) return;
+
+    const normalized = normalizeDailyHours(dailyHoursInput);
+    if (normalized === null) {
+      alert("하루 평균 참여 시간은 0보다 크고 24 이하인 숫자로 입력해주세요.");
+      return;
+    }
+
+    saveStoredDailyHours(project.id, normalized);
+    setDailyHours(normalized);
+    setDailyHoursInput(String(normalized));
+  }
 
   async function handleSaveGrowth(data: GrowthData) {
     if (!project) return;
@@ -953,7 +1009,7 @@ function MemoirContent() {
     const topChips = collectTopChips(memoirList);
     const recentProject = memoirList[0]?.project;
     const totalHours = memoirList.reduce(
-      (sum, item) => sum + daysBetween(item.project.created_at) * 6,
+      (sum, item) => sum + getProjectInvestmentHours(item.project),
       0
     );
 
@@ -1048,7 +1104,7 @@ function MemoirContent() {
               >
                 {[
                   { label: "완료 프로젝트", value: `${completedCount}개` },
-                  { label: "누적 성장 시간", value: `${totalHours}시간` },
+                  { label: "누적 성장 시간", value: `${formatHours(totalHours)}시간` },
                   {
                     label: "최근 개화",
                     value: recentProject ? recentProject.title : "기록 없음",
@@ -1312,7 +1368,8 @@ function MemoirContent() {
                             }}
                           >
                             {toDateLabel(completedProject.created_at)} 시작 ·{" "}
-                            {daysBetween(completedProject.created_at)}일간의 여정
+                            {daysBetween(completedProject.created_at)}일간의 여정 ·{" "}
+                            투자 {formatHours(getProjectInvestmentHours(completedProject))}시간
                           </p>
 
                           <p
@@ -1501,17 +1558,67 @@ function MemoirContent() {
           </div>
         </Section>
 
-        {/* 4. n시간 동안 수행했어요 */}
-        <Section emoji="⏱️" label="투자한 시간" headline={<>약 {hours}시간 동안 프로젝트를 수행했어요</>}>
+        {/* 4. 투자한 시간 */}
+        <Section emoji="⏱️" label="투자한 시간" headline={<>약 {formatHours(hours)}시간을 이 프로젝트에 투자했어요</>}>
           <p style={{ fontSize: 52, fontWeight: 900, color: "var(--memoir-rose-text)", lineHeight: 1, margin: 0 }}>
-            {hours}
+            {formatHours(hours)}
             <span style={{ fontSize: 18, color: "var(--memoir-rose-muted)", marginLeft: 6 }}>시간</span>
           </p>
-          <p style={{ fontSize: 13, color: "var(--memoir-rose-muted)", marginTop: 5 }}>{durationDays}일 × 하루 평균 6시간 기준</p>
+          <p style={{ fontSize: 13, color: "var(--memoir-rose-muted)", marginTop: 5 }}>
+            {durationDays}일 × 하루 평균 {formatHours(dailyHours)}시간 기준
+          </p>
+
+          <div style={{ marginTop: 18, background: "var(--memoir-rose-soft-bg)", border: "1px solid var(--memoir-rose-border)", borderRadius: 14, padding: 14 }}>
+            <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 800, color: "var(--memoir-rose-text)" }}>
+              하루 평균 참여 시간 설정
+            </p>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <input
+                type="number"
+                min="0.5"
+                max="24"
+                step="0.5"
+                value={dailyHoursInput}
+                onChange={(e) => setDailyHoursInput(e.target.value)}
+                style={{
+                  width: 120,
+                  border: "1px solid var(--memoir-rose-border)",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  fontSize: 14,
+                  fontWeight: 800,
+                  color: "var(--memoir-text)",
+                  background: "var(--memoir-card-bg)",
+                  outline: "none",
+                }}
+              />
+              <span style={{ fontSize: 13, color: "var(--memoir-rose-muted)", fontWeight: 700 }}>시간/일</span>
+              <button
+                type="button"
+                onClick={handleSaveDailyHours}
+                style={{
+                  border: "none",
+                  borderRadius: 10,
+                  background: "var(--memoir-rose-text)",
+                  color: "#fff",
+                  padding: "10px 14px",
+                  fontSize: 13,
+                  fontWeight: 900,
+                  cursor: "pointer",
+                }}
+              >
+                적용하기
+              </button>
+            </div>
+            <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--memoir-rose-muted)", lineHeight: 1.6 }}>
+              설정한 값은 이 프로젝트에 저장되고, 회고 목록의 누적 성장 시간에도 반영돼요.
+            </p>
+          </div>
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 16 }}>
             {[
               { val: `${durationDays}일`, label: "총 프로젝트 기간" },
-              { val: `${Math.ceil(durationDays / 7)}주`, label: "함께한 기간" },
+              { val: `${formatHours(dailyHours)}시간/일`, label: "하루 평균 참여" },
             ].map(({ val, label }) => (
               <div key={label} style={{ background: "var(--memoir-rose-bg)", border: "1px solid var(--memoir-rose-border)", borderRadius: 12, padding: 12, textAlign: "center" }}>
                 <p style={{ fontSize: 22, fontWeight: 700, color: "var(--memoir-rose-text)", margin: 0 }}>{val}</p>
