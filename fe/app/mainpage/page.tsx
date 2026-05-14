@@ -78,7 +78,7 @@ interface RecommendedProject {
 }
 
 const CATEGORIES = [
-  { label: "IT/소프트웨어", emoji: "💻" },
+  { label: "IT/SW", emoji: "💻" },
   { label: "경영/경제", emoji: "📊" },
   { label: "디자인/UI·UX", emoji: "🎨" },
   { label: "AI/데이터", emoji: "🤖" },
@@ -174,7 +174,7 @@ function normalizeProject(project: ApiProject): Project {
     title: project.title || "제목 없음",
     description: project.summary || project.description || "설명이 없습니다.",
     summary: project.summary,
-    category: project.category || "IT/소프트웨어",
+    category: project.category || "IT/SW",
     techStack: project.techStack || project.tech_stack || [],
     interests: project.interests || [],
     hashtags: project.hashtags || project.hashTags || project.hash_tags || project.tags || [],
