@@ -35,6 +35,49 @@ const CATEGORY_OPTIONS = [
   "헬스케어",
 ];
 
+const getOptionKey = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s._-]+/g, "");
+
+const toOptionArray = (value) => {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") return value.split(",");
+  return [];
+};
+
+const hasSelectableValue = (value) =>
+  toOptionArray(value).some((item) => String(item || "").trim());
+
+const normalizeSelectableValues = (value, options) => {
+  const optionByKey = new Map(options.map((option) => [getOptionKey(option), option]));
+  const seen = new Set();
+
+  return toOptionArray(value).reduce((items, item) => {
+    const trimmed = String(item || "").trim();
+    if (!trimmed) return items;
+
+    const canonical = optionByKey.get(getOptionKey(trimmed)) || trimmed;
+    const key = getOptionKey(canonical);
+    if (seen.has(key)) return items;
+
+    seen.add(key);
+    items.push(canonical);
+    return items;
+  }, []);
+};
+
+const toggleSelectableValue = (current, nextValue, options) => {
+  const normalized = normalizeSelectableValues(current, options);
+  const nextKey = getOptionKey(nextValue);
+  const isSelected = normalized.some((item) => getOptionKey(item) === nextKey);
+
+  return isSelected
+    ? normalized.filter((item) => getOptionKey(item) !== nextKey)
+    : [...normalized, nextValue];
+};
+
 const getProjectMemberUserId = (member) => member.user_id || member.id || member.user?.id;
 
 const getProjectMemberDisplayName = (member) => {
@@ -91,26 +134,32 @@ export default function ProjectDetailPage() {
   const inputClassName =
     "w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100";
 
-  const buildEditFormFromProject = (projectData) => ({
-    title: projectData.title || "",
-    summary: projectData.summary || "",
-    description: projectData.description || "",
-    difficulty: projectData.difficulty || "",
-    category: projectData.category || projectData.domain || "",
-    progress_percent: projectData.progress_percent ?? 0,
-    max_members:
-      projectData.max_members ??
-      projectData.maxMembers ??
-      projectData.recruitment_count ??
-      projectData.member_limit ??
-      "",
-    expected_period: projectData.expected_period || "",
-    preferred_members: projectData.preferred_members || "",
-    tech_stack: projectData.tech_stack || projectData.techStack || [],
-    interests: projectData.interests || [],
-    hashtags: (projectData.hashtags || projectData.hash_tags || []).join(", "),
-    is_public: projectData.is_public ?? true,
-  });
+  const buildEditFormFromProject = (projectData) => {
+    const techStackValue = hasSelectableValue(projectData.tech_stack)
+      ? projectData.tech_stack
+      : projectData.techStack;
+
+    return {
+      title: projectData.title || "",
+      summary: projectData.summary || "",
+      description: projectData.description || "",
+      difficulty: projectData.difficulty || "",
+      category: projectData.category || projectData.domain || "",
+      progress_percent: projectData.progress_percent ?? 0,
+      max_members:
+        projectData.max_members ??
+        projectData.maxMembers ??
+        projectData.recruitment_count ??
+        projectData.member_limit ??
+        "",
+      expected_period: projectData.expected_period || "",
+      preferred_members: projectData.preferred_members || "",
+      tech_stack: normalizeSelectableValues(techStackValue, SKILLS_LIST),
+      interests: normalizeSelectableValues(projectData.interests, INTERESTS_LIST),
+      hashtags: (projectData.hashtags || projectData.hash_tags || []).join(", "),
+      is_public: projectData.is_public ?? true,
+    };
+  };
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -179,26 +228,18 @@ export default function ProjectDetailPage() {
 
   const toggleEditTechStack = (skill) => {
     setEditForm((prev) => {
-      const current = Array.isArray(prev.tech_stack) ? prev.tech_stack : [];
-
       return {
         ...prev,
-        tech_stack: current.includes(skill)
-          ? current.filter((item) => item !== skill)
-          : [...current, skill],
+        tech_stack: toggleSelectableValue(prev.tech_stack, skill, SKILLS_LIST),
       };
     });
   };
 
   const toggleEditInterest = (interest) => {
     setEditForm((prev) => {
-      const current = Array.isArray(prev.interests) ? prev.interests : [];
-
       return {
         ...prev,
-        interests: current.includes(interest)
-          ? current.filter((item) => item !== interest)
-          : [...current, interest],
+        interests: toggleSelectableValue(prev.interests, interest, INTERESTS_LIST),
       };
     });
   };
@@ -236,8 +277,8 @@ export default function ProjectDetailPage() {
         progress_percent: Number(editForm.progress_percent),
         expected_period: editForm.expected_period.trim(),
         preferred_members: editForm.preferred_members.trim(),
-        tech_stack: Array.isArray(editForm.tech_stack) ? editForm.tech_stack : [],
-        interests: Array.isArray(editForm.interests) ? editForm.interests : [],
+        tech_stack: normalizeSelectableValues(editForm.tech_stack, SKILLS_LIST),
+        interests: normalizeSelectableValues(editForm.interests, INTERESTS_LIST),
         hashtags: editForm.hashtags
           .split(",")
           .map((item) => item.trim().replace(/^#/, ""))
@@ -571,7 +612,7 @@ export default function ProjectDetailPage() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   {SKILLS_LIST.map((skill) => {
                     const selected = Array.isArray(editForm.tech_stack)
-                      ? editForm.tech_stack.includes(skill)
+                      ? editForm.tech_stack.some((item) => getOptionKey(item) === getOptionKey(skill))
                       : false;
 
                     return (
@@ -617,7 +658,7 @@ export default function ProjectDetailPage() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   {INTERESTS_LIST.map((interest) => {
                     const selected = Array.isArray(editForm.interests)
-                      ? editForm.interests.includes(interest)
+                      ? editForm.interests.some((item) => getOptionKey(item) === getOptionKey(interest))
                       : false;
 
                     return (

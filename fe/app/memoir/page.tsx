@@ -239,6 +239,14 @@ function sortProjectsByRecent(projects: ProjectData[]): ProjectData[] {
   });
 }
 
+function sortProjectsByOldest(projects: ProjectData[]): ProjectData[] {
+  return [...projects].sort((a, b) => {
+    const timeDiff = getProjectRecentTime(a) - getProjectRecentTime(b);
+    if (timeDiff !== 0) return timeDiff;
+    return Number(a.id) - Number(b.id);
+  });
+}
+
 function ordinalKo(n: number) {
   return `${n}번째`;
 }
@@ -603,7 +611,7 @@ function MemoirContent() {
   const [growth, setGrowth]                 = useState<GrowthData | null>(null);
   const [memoirList, setMemoirList]         = useState<MemoirOverviewItem[]>([]);
   const [retrospectiveId, setRetrospectiveId] = useState<number | null>(null);
-  const [harvestCount, setHarvestCount]     = useState(1); // 몇 번째 수확
+  const [harvestCount, setHarvestCount]     = useState(1); // 몇 번째 개화
   const [loading, setLoading]               = useState(true);
   const [saving, setSaving]                 = useState(false);
   const [generatingMemoir, setGeneratingMemoir] = useState(false);
@@ -711,9 +719,9 @@ function MemoirContent() {
             getMyProjectsApi(),
           ]);
 
-        // 몇 번째 수확인지 계산 (completed 프로젝트 수)
+        // 몇 번째 개화인지 계산 (오래된 completed 프로젝트부터)
         if (myProjectsResult.status === "fulfilled") {
-          const completed = sortProjectsByRecent(
+          const completed = sortProjectsByOldest(
             (myProjectsResult.value.data || []).filter(
               (p: ProjectData) => p.status === "completed"
             )
@@ -1185,7 +1193,7 @@ function MemoirContent() {
           )}
         </Section>
 
-        {/* Footer — 장미 SVG + n번째 수확 */}
+        {/* Footer — 장미 SVG + n번째 개화 */}
         <div style={{ margin: "24px 0 0", textAlign: "center", padding: "28px 20px 24px", background: "#991b1b", borderRadius: 18, color: "#fdf0f0", border: "1px solid #7f1d1d" }}>
           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", marginBottom: 16 }}>
             <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: "50%", padding: 16, display: "inline-flex" }}>
@@ -1193,7 +1201,7 @@ function MemoirContent() {
             </div>
           </div>
           <p style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>
-            {ordinalKo(harvestCount)} 수확을 축하해요!
+            {ordinalKo(harvestCount)} 개화를 축하해요!
           </p>
           <p style={{ fontSize: 13, opacity: 0.85, lineHeight: 1.8, margin: 0 }}>
             씨앗을 심고 꾸준히 가꾼 당신,<br />이 개발일지는 영원히 남아있을 거예요.
