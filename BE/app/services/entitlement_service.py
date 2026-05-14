@@ -21,6 +21,25 @@ USAGE_PROJECT_DISCARD = "PROJECT_DISCARD"
 USAGE_COMMUNITY_WRITE = "COMMUNITY_WRITE"
 USAGE_PROJECT_BOOST = "PROJECT_BOOST"
 
+USAGE_LIMIT_MESSAGES = {
+    USAGE_IDEA_VIEW: {
+        "daily": "일일 아이디어 열람 횟수를 초과했습니다.",
+        "total": "아이디어 열람 가능 횟수를 초과했습니다.",
+    },
+    USAGE_PROJECT_CREATE: {
+        "daily": "일일 프로젝트 생성 횟수를 초과했습니다.",
+        "total": "프로젝트 생성 가능 횟수를 초과했습니다.",
+    },
+    USAGE_PROJECT_APPLY: {
+        "daily": "일일 프로젝트 지원 횟수를 초과했습니다.",
+        "total": "프로젝트 지원 가능 횟수를 초과했습니다.",
+    },
+    USAGE_COMMUNITY_WRITE: {
+        "daily": "일일 커뮤니티 작성 횟수를 초과했습니다.",
+        "total": "커뮤니티 작성 가능 횟수를 초과했습니다.",
+    },
+}
+
 PLAN_PRIORITY = {
     "PRO_MONTHLY": 60,
     "PLUS_MONTHLY": 50,
@@ -330,13 +349,21 @@ def check_usage_allowed(db: Session, user_id: int, usage_type: str) -> dict[str,
     if daily_limit is not None:
         daily_used = _today_count(db, user_id, usage_type, entitlement_id)
         if daily_used >= int(daily_limit):
-            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="일일 사용 한도를 초과했습니다.")
+            message = USAGE_LIMIT_MESSAGES.get(usage_type, {}).get(
+                "daily",
+                "일일 사용 한도를 초과했습니다.",
+            )
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=message)
 
     total_limit = limits.get("total")
     if total_limit is not None:
         total_used = _total_count(db, user_id, usage_type, entitlement_id)
         if total_used >= int(total_limit):
-            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="총 사용 한도를 초과했습니다.")
+            message = USAGE_LIMIT_MESSAGES.get(usage_type, {}).get(
+                "total",
+                "총 사용 한도를 초과했습니다.",
+            )
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=message)
 
     if daily_limit is None and total_limit is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="해당 기능을 사용할 권한이 없습니다.")

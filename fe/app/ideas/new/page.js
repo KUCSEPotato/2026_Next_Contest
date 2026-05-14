@@ -114,7 +114,11 @@ export default function NewIdeaPage() {
       }
     } catch (error) {
       console.error(error);
-      alert("아이디어 등록에 실패했습니다.");
+      const message =
+        error instanceof Error
+          ? error.message.replace(/^.*?:\s*/, "")
+          : "아이디어 등록에 실패했습니다.";
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
