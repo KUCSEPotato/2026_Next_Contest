@@ -98,6 +98,18 @@ const isProEntitlement = (entitlement) =>
     String(entitlement?.plan || entitlement?.product_code || "").toUpperCase()
   );
 
+function formatBoostedUntil(value) {
+  if (!value) return "";
+
+  return new Date(value).toLocaleString("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -111,6 +123,7 @@ export default function ProjectDetailPage() {
   const [message, setMessage] = useState("");
   const [isApplying, setIsApplying] = useState(false);
   const [myApplication, setMyApplication] = useState(null);
+  const [showApplicationForm, setShowApplicationForm] = useState(false);
 
   const [isEditing, setIsEditing] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -448,6 +461,7 @@ export default function ProjectDetailPage() {
       setMyApplication(result.data || { project_id: Number(projectId), status: "pending" });
       alert("프로젝트 지원이 완료되었습니다.");
       setMessage("");
+      setShowApplicationForm(false);
     } catch (error) {
       console.error(error);
       const errorMessage = String(error?.message || "");
@@ -463,6 +477,18 @@ export default function ProjectDetailPage() {
   };
 
   const handleBoostProject = async () => {
+    if (isBoosted) {
+      const shouldBoostAgain = await confirm({
+        title: "이미 거름 주기 적용 중입니다",
+        message:
+          "이 프로젝트에는 이미 거름을 주었어요. 다시 거름을 주면 이전 거름 주기 효과는 사라집니다. 다시 거름을 주시겠어요?",
+        confirmText: "거름 주기",
+        cancelText: "취소",
+      });
+
+      if (!shouldBoostAgain) return;
+    }
+
     try {
       setIsBoosting(true);
       const entitlementResult = await getMyEntitlementApi();
@@ -777,18 +803,16 @@ export default function ProjectDetailPage() {
                   )}
 
                   {isLeader && !isProjectCompleted && (
-                    <div className="flex flex-col gap-1">
-                      <button
-                        onClick={handleBoostProject}
-                        disabled={isBoosting}
-                        className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {isBoosting ? "거름 주는 중..." : "거름 주기"}
-                      </button>
-                      <p className="max-w-xs text-xs leading-5 text-slate-500">
+                    <button
+                      onClick={handleBoostProject}
+                      disabled={isBoosting}
+                      className="group relative inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isBoosting ? "거름 주는 중..." : "거름 주기"}
+                      <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 w-64 -translate-x-1/2 rounded-xl bg-slate-950 px-3 py-2 text-left text-xs font-medium leading-5 text-white opacity-0 shadow-lg transition group-hover:opacity-100">
                         거름을 주면 프로젝트가 일정 기간 동안 목록 상단에 노출됩니다.
-                      </p>
-                    </div>
+                      </span>
+                    </button>
                   )}
 
                   {isProjectMember && isTeamFormed && (
@@ -822,7 +846,7 @@ export default function ProjectDetailPage() {
 
               {isBoosted && (
                 <p className="mt-3 text-sm font-semibold text-amber-700">
-                  거름 주기 적용 중 · {new Date(project.boosted_until).toLocaleDateString("ko-KR")}까지 상단 노출
+                  거름 주기 적용 중 · {formatBoostedUntil(project.boosted_until)}까지 상단 노출
                 </p>
               )}
             </>
@@ -1011,19 +1035,12 @@ export default function ProjectDetailPage() {
                       팀장에게 보낼 간단한 소개와 참여 의지를 적어주세요.
                     </p>
 
-                    <textarea
-                      className={textareaClassName}
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      placeholder="예: React와 UI 구현을 맡아 참여하고 싶습니다."
-                    />
-
                     <button
-                      onClick={handleApply}
-                      disabled={isApplying}
-                      className="mt-4 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                      type="button"
+                      onClick={() => setShowApplicationForm(true)}
+                      className="mt-4 w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
                     >
-                      {isApplying ? "지원 중..." : "지원하기"}
+                      지원서 작성하기
                     </button>
                   </>
                 )}
@@ -1032,6 +1049,53 @@ export default function ProjectDetailPage() {
           </aside>
         </div>
       </div>
+
+      {showApplicationForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+            onClick={() => {
+              if (!isApplying) setShowApplicationForm(false);
+            }}
+          />
+
+          <div className="relative w-full max-w-2xl rounded-2xl bg-white p-7 shadow-2xl">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">지원서 작성하기</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                리더가 확인할 수 있도록 자기소개, 가능한 역할, 참여 의지를 적어주세요.
+              </p>
+            </div>
+
+            <textarea
+              className="mt-5 min-h-64 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm leading-6 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="예: 저는 React 기반 UI 구현 경험이 있고, 이번 프로젝트에서는 화면 설계와 프론트엔드 개발을 맡아 기여하고 싶습니다."
+            />
+
+            <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setShowApplicationForm(false)}
+                disabled={isApplying}
+                className="rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                취소
+              </button>
+
+              <button
+                type="button"
+                onClick={handleApply}
+                disabled={isApplying || !message.trim()}
+                className="rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+              >
+                {isApplying ? "지원 중..." : "지원하기"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showDiscardOptions && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

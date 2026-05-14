@@ -62,6 +62,7 @@ export default function ProjectManagePage() {
   const [project, setProject] = useState(null);
   const [profile, setProfile] = useState(null);
   const [applications, setApplications] = useState([]);
+  const [selectedApplication, setSelectedApplication] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
   const [isCompletingTeam, setIsCompletingTeam] = useState(false);
@@ -937,9 +938,6 @@ export default function ProjectManagePage() {
                             </p>
                           )}
 
-                          <p className="mt-4 whitespace-pre-line rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
-                            {application.message || "지원 메시지가 없습니다."}
-                          </p>
                         </div>
 
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
@@ -947,7 +945,15 @@ export default function ProjectManagePage() {
                         </span>
                       </div>
 
-                      <div className="mt-5 flex justify-end gap-2">
+                      <div className="mt-5 flex flex-wrap justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedApplication(application)}
+                          className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 font-semibold text-red-700 transition hover:bg-red-100"
+                        >
+                          지원서 보기
+                        </button>
+
                         <button
                           onClick={() => handleDecision(application.id, "rejected")}
                           disabled={
@@ -1182,6 +1188,40 @@ export default function ProjectManagePage() {
           )}
         </section>
       </div>
+      {selectedApplication && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+            onClick={() => setSelectedApplication(null)}
+          />
+
+          <div className="relative w-full max-w-2xl rounded-2xl bg-white p-7 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">지원서</h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  {selectedApplication.applicant?.nickname ||
+                    selectedApplication.applicant?.name ||
+                    `User #${selectedApplication.applicant_id}`}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedApplication(null)}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-500 transition hover:bg-slate-50"
+              >
+                닫기
+              </button>
+            </div>
+
+            <div className="mt-5 max-h-[55vh] overflow-auto whitespace-pre-line rounded-2xl bg-slate-50 p-5 text-sm leading-7 text-slate-700">
+              {selectedApplication.message || "작성된 지원서가 없습니다."}
+            </div>
+          </div>
+        </div>
+      )}
+
       {completionReviewModal}
     </main>
   );

@@ -520,12 +520,15 @@ export default function MyPage() {
   const planName = getPlanName(entitlement);
   const renewalStatus = getRenewalStatus(entitlement);
   const profileBio = String(profile?.bio || "").trim();
+  const bioLineCount = profileBio ? profileBio.split(/\r?\n/).length : 0;
+  const shouldShowBioToggle =
+    bioOverflows || bioLineCount > 2 || profileBio.length > 48;
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-6xl">
         <section className="mb-6 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
-          <div className="grid gap-6 p-6 lg:grid-cols-[1fr_1fr] lg:p-8">
+          <div className="grid items-start gap-6 p-6 lg:grid-cols-[1fr_1fr] lg:p-8">
             <div className="flex min-w-0 gap-5">
               <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-full bg-red-100 text-5xl font-black text-red-700 sm:h-32 sm:w-32">
                 {avatarUrl ? (
@@ -551,13 +554,13 @@ export default function MyPage() {
                   <div className="mt-3">
                     <p
                       ref={bioRef}
-                      className={`whitespace-pre-line text-lg font-semibold leading-relaxed text-slate-800 ${
+                      className={`whitespace-pre-line text-base font-semibold leading-7 text-slate-800 ${
                         isBioExpanded ? "" : "line-clamp-2"
                       }`}
                     >
                       {profileBio}
                     </p>
-                    {bioOverflows && (
+                    {shouldShowBioToggle && (
                       <button
                         type="button"
                         onClick={() => setIsBioExpanded((current) => !current)}
@@ -572,13 +575,10 @@ export default function MyPage() {
                     아직 자기소개가 없습니다.
                   </p>
                 )}
-                <p className="hidden">
-                  {profile?.bio || "Devory로 돈 벌 게임"}
-                </p>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-red-100 bg-red-50/80 px-5 py-4">
+            <div className="self-start rounded-2xl border border-red-100 bg-red-50/80 px-5 py-4">
               <div className="flex flex-wrap items-center gap-3">
                 <p className="text-lg font-black text-red-800">현재 플랜: {planName}</p>
                 <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-sky-800">

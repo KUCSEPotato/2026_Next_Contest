@@ -107,6 +107,8 @@ export default function PostDetailPage() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const postReactBusy = useRef(false);
   const commentReactBusy = useRef(new Set<number>());
+  const commentSubmitBusy = useRef(false);
+  const replySubmitBusy = useRef(new Set<number>());
 
   useEffect(() => {
     Promise.resolve().then(() => {
@@ -276,34 +278,44 @@ export default function PostDetailPage() {
   };
 
   const handleAddComment = async () => {
-    if (!commentText.trim() || !currentUser) return;
+    const content = commentText.trim();
+    if (!content || !currentUser || commentSubmitBusy.current) return;
+
+    commentSubmitBusy.current = true;
     setSubmittingComment(true);
     try {
       const newComment = await createComment(pid, {
-        content: commentText.trim(),
+        content,
         parent_comment_id: null,
         is_anonymous: commentAnonymous,
       });
-      setComments((prev) => [...prev, {
-        ...newComment,
-        replies: [],
-        reply_count: newComment.reply_count ?? 0,
-        reaction_stats: newComment.reaction_stats ?? { ...EMPTY_REACTION_STATS },
-        user_reaction: newComment.user_reaction ?? null,
-        updated_at: newComment.updated_at ?? newComment.created_at,
-      }]);
+      setComments((prev) => {
+        if (prev.some((comment) => comment.id === newComment.id)) return prev;
+
+        return [...prev, {
+          ...newComment,
+          replies: [],
+          reply_count: newComment.reply_count ?? 0,
+          reaction_stats: newComment.reaction_stats ?? { ...EMPTY_REACTION_STATS },
+          user_reaction: newComment.user_reaction ?? null,
+          updated_at: newComment.updated_at ?? newComment.created_at,
+        }];
+      });
       setCommentText("");
       setCommentAnonymous(false);
       setPost((p) => p ? { ...p, comment_count: p.comment_count + 1 } : p);
     } catch (e: unknown) {
       alert(getErrorMessage(e, "댓글 작성에 실패했어요."));
     } finally {
+      commentSubmitBusy.current = false;
       setSubmittingComment(false);
     }
   };
 
   const handleAddReply = async (parentId: number, content: string, isAnonymous: boolean) => {
-    if (!currentUser) return;
+    if (!currentUser || replySubmitBusy.current.has(parentId)) return;
+
+    replySubmitBusy.current.add(parentId);
     try {
       const newReply = await createComment(pid, {
         content,
@@ -325,7 +337,9 @@ export default function PostDetailPage() {
         }))
       );
       setPost((p) => p ? { ...p, comment_count: p.comment_count + 1 } : p);
+      replySubmitBusy.current.delete(parentId);
     } catch (e: unknown) {
+      replySubmitBusy.current.delete(parentId);
       alert(getErrorMessage(e, "답글 작성에 실패했어요."));
     }
   };
@@ -748,7 +762,11 @@ export default function PostDetailPage() {
                 <input
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleAddComment()}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter" || e.shiftKey) return;
+                    e.preventDefault();
+                    handleAddComment();
+                  }}
                   placeholder="댓글을 입력하세요..."
                   className="flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-900 placeholder:text-gray-400 focus:border-red-400 focus:outline-none"
                 />
