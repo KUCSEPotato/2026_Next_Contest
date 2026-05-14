@@ -7,10 +7,10 @@ import { createPost, uploadPostFile } from "../_lib/api";
 import MediaPreview, { MediaItem } from "../_components/MediaPreview";
 
 const CATEGORIES = [
-  { label: "?쇰컲", value: "general" },
-  { label: "吏덈Ц", value: "question" },
-  { label: "?꾩씠?붿뼱", value: "idea" },
-  { label: "?묒뾽 怨듭쑀", value: "showcase" },
+  { label: "일반", value: "general" },
+  { label: "질문", value: "question" },
+  { label: "아이디어", value: "idea" },
+  { label: "작업 공유", value: "showcase" },
 ];
 
 const MAX_FILES = 10;
@@ -77,7 +77,7 @@ export default function NewPostPage() {
         const raw = localStorage.getItem("user");
         if (raw) setCurrentUser(JSON.parse(raw) as User);
       } catch (e) {
-        console.error("?좎? ?뺣낫 ?뚯떛 ?ㅽ뙣", e);
+        console.error("유저 정보 파싱 실패", e);
         localStorage.removeItem("user");
       }
     });
@@ -85,11 +85,11 @@ export default function NewPostPage() {
 
   const handleSubmit = async () => {
     if (!title.trim()) {
-      setError("제목을 입력해주세요.");
+        setError("제목을 입력해주세요.");
       return;
     }
     if (!content.trim()) {
-      setError("내용을 입력해주세요.");
+        setError("내용을 입력해주세요.");
       return;
     }
 
@@ -168,30 +168,30 @@ export default function NewPostPage() {
           </div>
         )}
 
-        {/* 湲 ?묒꽦 ?곸뿭 */}
+        {/* 글 작성 영역 */}
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="?쒕ぉ"
+            placeholder="제목"
             className="mb-3 w-full border-b border-gray-100 bg-white pb-3 text-base font-semibold text-gray-900 outline-none placeholder:text-gray-300"
           />
           <textarea
             autoFocus
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="臾댁뒯 ?앷컖???섍퀬 怨꾩떊媛??"
+            placeholder="무슨 생각을 하고 계신가요?"
             rows={10}
             className="w-full resize-none bg-white text-sm leading-relaxed text-gray-800 outline-none placeholder:text-gray-300"
           />
 
-          {/* 誘몃뵒??誘몃━蹂닿린 */}
+          {/* 미디어 미리보기 */}
           <MediaPreview media={media} onRemove={handleRemoveMedia} />
         </div>
 
-        {/* 移댄뀒怨좊━ */}
+        {/* 카테고리 */}
         <div className="mt-3 rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
-          <p className="mb-2 text-xs font-medium text-gray-500">移댄뀒怨좊━</p>
+          <p className="mb-2 text-xs font-medium text-gray-500">카테고리</p>
           <div className="flex flex-wrap gap-2">
             {CATEGORIES.map((cat) => (
               <button
@@ -209,18 +209,19 @@ export default function NewPostPage() {
           </div>
         </div>
 
-        {/* ?뚯씪 泥⑤? ?대컮 */}
+        {/* 파일 첨부 영역 */}
         <div className="mt-3 rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium text-gray-500">
-              ?뚯씪 泥⑤?
+              파일 첨부
               <span className="ml-1.5 text-gray-300">
-              ({media.length}/{MAX_FILES}) 쨌 理쒕? {MAX_FILE_SIZE_MB}MB 쨌 PDF/臾몄꽌 媛??              </span>
+                ({media.length}/{MAX_FILES}) · 최대 {MAX_FILE_SIZE_MB}MB · PDF/문서 가능
+              </span>
             </p>
           </div>
 
           <div className="mt-2 flex gap-2">
-            {/* ?ъ쭊 */}
+            {/* 사진 */}
             <input
               ref={imageRef}
               type="file"
@@ -234,10 +235,10 @@ export default function NewPostPage() {
               disabled={submitting || media.length >= MAX_FILES}
               className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600 transition hover:border-red-300 hover:text-red-500 disabled:opacity-40"
             >
-              ?벜 ?ъ쭊
+              사진 추가
             </button>
 
-            {/* ?숈쁺??*/}
+            {/* 동영상 */}
             <input
               ref={videoRef}
               type="file"
@@ -251,9 +252,10 @@ export default function NewPostPage() {
               disabled={submitting || media.length >= MAX_FILES}
               className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600 transition hover:border-red-300 hover:text-red-500 disabled:opacity-40"
             >
-              ?렏 ?숈쁺??            </button>
+              동영상 추가
+            </button>
 
-            {/* ?쇰컲 ?뚯씪 */}
+            {/* 일반 파일 */}
             <input
               ref={fileRef}
               type="file"
@@ -267,7 +269,7 @@ export default function NewPostPage() {
               disabled={submitting || media.length >= MAX_FILES}
               className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600 transition hover:border-red-300 hover:text-red-500 disabled:opacity-40"
             >
-              ?뱨 ?뚯씪
+              파일 추가
             </button>
           </div>
         </div>

@@ -96,6 +96,7 @@ export default function ChatRoomPage() {
   const [draggedTodoId, setDraggedTodoId] = useState(null);
   const [todoDropTarget, setTodoDropTarget] = useState(null);
   const [reorderingTodos, setReorderingTodos] = useState(false);
+  const pendingTodoScrollTopRef = useRef(null);
 
   const loadMessages = useCallback(async () => {
     try {
@@ -505,6 +506,15 @@ export default function ChatRoomPage() {
     }
   };
 
+  const restoreTodoScrollPosition = useCallback(() => {
+    const container = todoListRef.current;
+    const pendingScrollTop = pendingTodoScrollTopRef.current;
+    if (!container || pendingScrollTop === null) return;
+
+    container.scrollTop = pendingScrollTop;
+    pendingTodoScrollTopRef.current = null;
+  }, []);
+
   const handleTodoDragEnd = () => {
     setDraggedTodoId(null);
     setTodoDropTarget(null);
@@ -586,6 +596,7 @@ export default function ChatRoomPage() {
 
     try {
       setReorderingTodos(true);
+      pendingTodoScrollTopRef.current = todoListRef.current?.scrollTop ?? null;
       await Promise.all(
         changedTodos.map((todo) =>
           updateTodoApi(projectId, todo.id, {
@@ -595,12 +606,22 @@ export default function ChatRoomPage() {
         )
       );
       await loadProjectTodos();
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          restoreTodoScrollPosition();
+        });
+      });
     } catch (error) {
       console.error(error);
       setTodos(currentTodos);
       alert("Todo 순서 변경에 실패했습니다.");
     } finally {
       setReorderingTodos(false);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          restoreTodoScrollPosition();
+        });
+      });
     }
   };
 
