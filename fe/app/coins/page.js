@@ -383,33 +383,37 @@ function StoreSectionCard({ section, active, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-2xl border p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+      className={`rounded-2xl border p-5 text-left shadow-sm transition hover:border-sky-300 hover:shadow-md ${
         active
-          ? "border-sky-300 bg-sky-50/70 ring-2 ring-sky-100 dark:border-sky-400/60 dark:bg-sky-500/10 dark:ring-sky-500/10"
+          ? "border-sky-300 bg-sky-50/70 dark:border-sky-400/60 dark:bg-sky-500/10"
           : "border-gray-200 bg-white hover:border-sky-200 dark:border-slate-700 dark:bg-slate-900/80 dark:hover:border-sky-500/40"
       }`}
     >
-      <div className="flex items-start gap-4">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-2xl dark:bg-sky-500/10">
-          {section.emoji}
-        </span>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-black text-slate-950 dark:text-slate-50">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-2xl dark:bg-sky-500/10">
+            {section.emoji}
+          </span>
+          <div>
+            <p className={`text-base font-bold ${active ? "text-sky-700 dark:text-sky-300" : "text-gray-900 dark:text-slate-100"}`}>
               {section.title}
-            </h2>
-            {active && (
-              <span className="rounded-full bg-sky-600 px-2.5 py-1 text-[11px] font-bold text-white">
-                현재
-              </span>
-            )}
+            </p>
+            <p className="text-[11px] font-semibold text-gray-400 dark:text-slate-500">
+              {section.english}
+            </p>
           </div>
-          <p className="mt-0.5 text-xs font-bold text-slate-400">{section.english}</p>
-          <p className="mt-4 text-center text-sm leading-6 text-slate-500 dark:text-slate-400 sm:text-left">
-            {section.description}
-          </p>
         </div>
+
+        {active && (
+          <span className="rounded-full bg-sky-600 px-2 py-0.5 text-[10px] font-semibold text-white dark:bg-sky-500/20 dark:text-sky-200 dark:ring-1 dark:ring-sky-400/30">
+            현재
+          </span>
+        )}
       </div>
+
+      <p className="whitespace-pre-line text-sm leading-relaxed text-gray-500 dark:text-slate-400">
+        {section.description}
+      </p>
     </button>
   );
 }
@@ -649,7 +653,7 @@ export default function CoinsPage() {
     <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-slate-950 dark:text-slate-100">
       <TopActionButtons />
 
-      <main className="mx-auto max-w-4xl px-4 pb-16">
+      <main className="mx-auto max-w-6xl px-4 pb-16">
         {/* ── 히어로 ── */}
         <section className="pb-10 pt-6 text-center">
           <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center">
@@ -667,7 +671,7 @@ export default function CoinsPage() {
           </p>
         </section>
 
-        <section className="mb-8 grid gap-4 md:grid-cols-3">
+        <section className="mx-auto mb-8 grid max-w-5xl grid-cols-1 gap-4 text-left sm:grid-cols-3">
           {STORE_SECTIONS.map((section) => (
             <StoreSectionCard
               key={section.key}
