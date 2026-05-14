@@ -19,6 +19,15 @@ COIN_PACKAGES = [
 ]
 
 
+ADDITIONAL_COIN_PACKAGES = [
+    {"id": "bottle", "coin_amount": 100, "price_krw": 15000, "label": "한 병"},
+]
+
+
+def _coin_packages() -> list[dict]:
+    return [*COIN_PACKAGES, *ADDITIONAL_COIN_PACKAGES]
+
+
 class CoinPurchaseRequestCreate(BaseModel):
     package_id: str | None = Field(default=None, min_length=1, max_length=50)
     product_code: str | None = Field(default=None, min_length=1, max_length=50)
@@ -26,7 +35,7 @@ class CoinPurchaseRequestCreate(BaseModel):
 
 
 def _get_package(package_id: str) -> dict:
-    for package in COIN_PACKAGES:
+    for package in _coin_packages():
         if package["id"] == package_id:
             return package
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid coin package")
@@ -46,7 +55,7 @@ async def get_my_coin_balance(
 
 @router.get("/packages", summary="물방울 패키지 목록", description="수동 결제 요청에 사용할 물방울 패키지를 조회합니다.")
 async def list_coin_packages() -> dict:
-    return success_response(data=COIN_PACKAGES)
+    return success_response(data=_coin_packages())
 
 
 @router.get(
