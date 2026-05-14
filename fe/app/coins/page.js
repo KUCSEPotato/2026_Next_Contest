@@ -199,7 +199,7 @@ function getIdeaViewText(product) {
 
 function getProjectBoostText(product) {
   if (product?.benefits?.project_boost_total_limit) {
-    return `기간 내 ${product.benefits.project_boost_total_limit}회`;
+    return `일정 기간 프로젝트 목록 상단 노출, 기간 내 ${product.benefits.project_boost_total_limit}회`;
   }
   if (product?.product_code === "PLUS_MONTHLY") {
     return "없음";
@@ -239,7 +239,7 @@ function ProductBenefits({ product }) {
           <li>지원자 노출: 목록 상단 노출</li>
         )}
         {projectBoostText && (
-          <li>프로젝트 상단 노출: {projectBoostText}</li>
+          <li>거름 주기: {projectBoostText}</li>
         )}
       </BenefitGroup>
 
@@ -277,7 +277,6 @@ function PlanCard({ eyebrow, product, isCurrent, onError, onManualPurchase, manu
           </span>
         )}
       </div>
-
       <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">{children}</p>
 
       <ProductBenefits product={product} />
