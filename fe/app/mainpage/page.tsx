@@ -28,6 +28,8 @@ interface Project {
   openRecruitmentCount: number;
   openRecruitmentRequiredCount: number;
   openRecruitmentPosition?: string | null;
+  boostedUntil?: string | null;
+  boostScore: number;
   createdAt: string;
 }
 
@@ -60,6 +62,10 @@ interface ApiProject {
   open_recruitment_required_count?: number;
   openRecruitmentPosition?: string | null;
   open_recruitment_position?: string | null;
+  boosted_until?: string | null;
+  boostedUntil?: string | null;
+  boost_score?: number;
+  boostScore?: number;
   created_at?: string;
   createdAt?: string;
   status?: string;
@@ -182,11 +188,35 @@ function normalizeProject(project: ApiProject): Project {
       project.openRecruitmentRequiredCount ?? project.open_recruitment_required_count ?? 0,
     openRecruitmentPosition:
       project.openRecruitmentPosition ?? project.open_recruitment_position ?? null,
+    boostedUntil: project.boostedUntil ?? project.boosted_until ?? null,
+    boostScore: project.boostScore ?? project.boost_score ?? 0,
     status: project.status || "planning",
     difficulty: project.difficulty ?? "beginner",
     isUrgent: false,
     createdAt: project.createdAt ?? project.created_at ?? "",
   };
+}
+
+function getActiveBoostTime(project: Project, now: number) {
+  if (!project.boostedUntil) return 0;
+
+  const boostedUntil = new Date(project.boostedUntil).getTime();
+  return Number.isFinite(boostedUntil) && boostedUntil > now ? boostedUntil : 0;
+}
+
+function compareActiveBoost(a: Project, b: Project, now: number) {
+  const aBoostTime = getActiveBoostTime(a, now);
+  const bBoostTime = getActiveBoostTime(b, now);
+  const aBoosted = aBoostTime > 0;
+  const bBoosted = bBoostTime > 0;
+
+  if (aBoosted !== bBoosted) return aBoosted ? -1 : 1;
+  if (!aBoosted || !bBoosted) return 0;
+
+  const scoreDiff = b.boostScore - a.boostScore;
+  if (scoreDiff !== 0) return scoreDiff;
+
+  return bBoostTime - aBoostTime;
 }
 
 function isProjectRecruiting(project: Project) {
@@ -217,6 +247,13 @@ export default function MainPage() {
   const [recommendedProjectIds, setRecommendedProjectIds] = useState<number[]>([]);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [nowTime, setNowTime] = useState(() => Date.now());
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNowTime(Date.now()), 60_000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     async function loadProjects() {
@@ -346,6 +383,9 @@ export default function MainPage() {
         );
       })
       .sort((a, b) => {
+        const boostOrder = compareActiveBoost(a, b, nowTime);
+        if (boostOrder !== 0) return boostOrder;
+
         if (sortBy === "competition") {
           return b.competitionRatio - a.competitionRatio;
         }
@@ -365,6 +405,7 @@ export default function MainPage() {
   }, [
     memberMax,
     memberMin,
+    nowTime,
     projects,
     recommendedProjectIds,
     searchQuery,
@@ -692,6 +733,7 @@ export default function MainPage() {
                 <ProjectCard
                   key={project.id}
                   project={project}
+                  nowTime={nowTime}
                   onClick={() => handleProjectClick(project)}
                 />
               ))}
@@ -908,15 +950,18 @@ function ServiceIcon({ type, active: _active }: { type: string; active?: boolean
 
 function ProjectCard({
   project,
+  nowTime,
   onClick,
 }: {
   project: Project;
+  nowTime: number;
   onClick: () => void;
 }) {
   const isAlmostFull =
     project.maxMembers > 0 && project.currentMembers >= project.maxMembers;
 
   const isRecruiting = isProjectRecruiting(project);
+  const isBoosted = getActiveBoostTime(project, nowTime) > 0;
 
   const competitionRate =
     isRecruiting && project.remainingSeats > 0
@@ -937,6 +982,12 @@ function ProjectCard({
           {project.isUrgent && (
             <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-500 dark:bg-red-500/10 dark:text-red-200 dark:ring-1 dark:ring-red-400/25">
               🔥 마감 임박
+            </span>
+          )}
+
+          {isBoosted && (
+            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-1 dark:ring-amber-400/25">
+              상단 노출
             </span>
           )}
         </div>

@@ -65,6 +65,7 @@ from app.services.entitlement_service import USAGE_PROJECT_BOOST
 from app.services.entitlement_service import USAGE_PROJECT_DISCARD
 from app.services.entitlement_service import check_usage_allowed
 from app.services.entitlement_service import record_usage
+from app.services.entitlement_service import serialize_effective_plan
 from app.core.realtime import project_todo_channel
 from app.core.realtime import chat_room_channel
 from app.core.realtime import realtime_hub
@@ -714,10 +715,12 @@ async def list_projects(
     total = query.count()
     now = datetime.now(timezone.utc)
     boosted_rank = case((Project.boosted_until > now, 1), else_=0)
+    active_boost_score = case((Project.boosted_until > now, Project.boost_score), else_=0)
     projects = (
         query.order_by(
             boosted_rank.desc(),
-            Project.boost_score.desc(),
+            active_boost_score.desc(),
+            Project.boosted_until.desc(),
             Project.created_at.desc(),
         )
         .offset((page - 1) * size)
@@ -790,6 +793,8 @@ async def list_projects(
             "boosted_until": p.boosted_until.isoformat() if p.boosted_until else None,
             "boost_score": p.boost_score,
             "created_at": p.created_at.isoformat() if p.created_at else None,
+            "ended_at": p.ended_at.isoformat() if p.ended_at else None,
+            "completed_at": p.completed_at.isoformat() if p.completed_at else None,
         })
     
     return success_response(
@@ -877,6 +882,9 @@ async def get_project(project_id: int, db: Session = Depends(get_db)) -> dict:
             "leader_id": project.leader_id,
             "boosted_until": project.boosted_until.isoformat() if project.boosted_until else None,
             "boost_score": project.boost_score,
+            "created_at": project.created_at.isoformat() if project.created_at else None,
+            "ended_at": project.ended_at.isoformat() if project.ended_at else None,
+            "completed_at": project.completed_at.isoformat() if project.completed_at else None,
             "currentMembers": len(members),
             "maxMembers": project.max_members,
             "max_members": project.max_members,
@@ -908,11 +916,13 @@ async def boost_project(
     project.boost_score = int(project.boost_score or 0) + 1
     db.commit()
     db.refresh(project)
+    entitlement = serialize_effective_plan(db, current_user_id)
     return success_response(
         data={
             "id": project.id,
             "boosted_until": project.boosted_until,
             "boost_score": project.boost_score,
+            "project_boost_remaining": entitlement.get("benefits", {}).get("project_boost_remaining", 0),
         }
     )
 

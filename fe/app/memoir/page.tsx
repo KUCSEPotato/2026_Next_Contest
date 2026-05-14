@@ -47,6 +47,7 @@ interface ProjectData {
   progress_percent?: number;
   created_at?: string | null;
   updated_at?: string | null;
+  ended_at?: string | null;
   completed_at?: string | null;
   techStack?: string[];
   currentMembers?: number;
@@ -225,26 +226,40 @@ function toMemoirPreview(value?: string | null) {
 }
 
 /* ── 서수 (1번째, 2번째…) ── */
-function getProjectRecentTime(project: ProjectData): number {
-  const value = project.completed_at || project.updated_at || project.created_at;
+function getProjectCompletionTime(project: ProjectData): number | null {
+  const value = project.completed_at || project.ended_at;
   const time = value ? new Date(value).getTime() : NaN;
-  return Number.isNaN(time) ? 0 : time;
+  return Number.isNaN(time) ? null : time;
+}
+
+function compareProjectsByCompletionDesc(a: ProjectData, b: ProjectData) {
+  const aTime = getProjectCompletionTime(a);
+  const bTime = getProjectCompletionTime(b);
+
+  if (aTime === null && bTime === null) return Number(b.id) - Number(a.id);
+  if (aTime === null) return 1;
+  if (bTime === null) return -1;
+  if (aTime !== bTime) return bTime - aTime;
+  return Number(b.id) - Number(a.id);
+}
+
+function compareProjectsByCompletionAsc(a: ProjectData, b: ProjectData) {
+  const aTime = getProjectCompletionTime(a);
+  const bTime = getProjectCompletionTime(b);
+
+  if (aTime === null && bTime === null) return Number(a.id) - Number(b.id);
+  if (aTime === null) return 1;
+  if (bTime === null) return -1;
+  if (aTime !== bTime) return aTime - bTime;
+  return Number(a.id) - Number(b.id);
 }
 
 function sortProjectsByRecent(projects: ProjectData[]): ProjectData[] {
-  return [...projects].sort((a, b) => {
-    const timeDiff = getProjectRecentTime(b) - getProjectRecentTime(a);
-    if (timeDiff !== 0) return timeDiff;
-    return Number(b.id) - Number(a.id);
-  });
+  return [...projects].sort(compareProjectsByCompletionDesc);
 }
 
 function sortProjectsByOldest(projects: ProjectData[]): ProjectData[] {
-  return [...projects].sort((a, b) => {
-    const timeDiff = getProjectRecentTime(a) - getProjectRecentTime(b);
-    if (timeDiff !== 0) return timeDiff;
-    return Number(a.id) - Number(b.id);
-  });
+  return [...projects].sort(compareProjectsByCompletionAsc);
 }
 
 function ordinalKo(n: number) {
@@ -686,8 +701,8 @@ function MemoirContent() {
 
           if (ignore) return;
           setMemoirList(
-            [...overviewItems].sort(
-              (a, b) => getProjectRecentTime(b.project) - getProjectRecentTime(a.project)
+            [...overviewItems].sort((a, b) =>
+              compareProjectsByCompletionDesc(a.project, b.project)
             )
           );
           setProject(null);

@@ -111,6 +111,7 @@ export default function ProjectDetailPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isBoosting, setIsBoosting] = useState(false);
   const [showDiscardOptions, setShowDiscardOptions] = useState(false);
+  const [nowTime, setNowTime] = useState(() => Date.now());
 
   const [editForm, setEditForm] = useState({
     title: "",
@@ -166,6 +167,12 @@ export default function ProjectDetailPage() {
   }, [projectId]);
 
   useEffect(() => {
+    const intervalId = window.setInterval(() => setNowTime(Date.now()), 60_000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
     async function fetchProject() {
       try {
         const [projectResult, profileResult, applicationsResult] = await Promise.allSettled([
@@ -217,7 +224,10 @@ export default function ProjectDetailPage() {
       ));
   const hasApplied = Boolean(myApplication);
   const acceptedMemberCount = project?.members?.length || 1;
-  const isBoosted = Boolean(project?.boosted_until);
+  const boostedUntilTime = project?.boosted_until
+    ? new Date(project.boosted_until).getTime()
+    : 0;
+  const isBoosted = Number.isFinite(boostedUntilTime) && boostedUntilTime > nowTime;
 
   const handleEditChange = (field, value) => {
     setEditForm((prev) => ({
@@ -452,7 +462,12 @@ export default function ProjectDetailPage() {
         boosted_until: result.data?.boosted_until || prev?.boosted_until,
         boost_score: result.data?.boost_score ?? prev?.boost_score,
       }));
-      toast.success("프로젝트 상단 노출이 적용되었습니다.");
+      const remaining = result.data?.project_boost_remaining;
+      toast.success(
+        typeof remaining === "number"
+          ? `프로젝트 상단 노출이 적용되었습니다. 남은 횟수: ${remaining}회`
+          : "프로젝트 상단 노출이 적용되었습니다."
+      );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "프로젝트 상단 노출에 실패했습니다.");
     } finally {
