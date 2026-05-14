@@ -1,6 +1,17 @@
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
+
+
+DifficultyValue = Literal[
+    "beginner",
+    "intermediate",
+    "advanced",
+    "easy",
+    "normal",
+    "hard",
+]
 
 
 # ============================================
@@ -10,7 +21,7 @@ class CommonProjectRequest(BaseModel):
     """프로젝트와 재모집이 공통으로 사용하는 필드."""
     title: str = Field(min_length=1, max_length=200)
     description: str = Field(min_length=1)
-    difficulty: str
+    difficulty: DifficultyValue
     summary: str | None = None
     category: str | None = None
 
@@ -19,7 +30,7 @@ class CommonProjectUpdateRequest(BaseModel):
     """프로젝트와 재모집 업데이트 시 공통으로 사용하는 필드."""
     title: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = Field(default=None, min_length=1)
-    difficulty: str | None = None
+    difficulty: DifficultyValue | None = None
     summary: str | None = None
     category: str | None = None
 
@@ -115,7 +126,7 @@ class RecruitmentCreateRequest(CommonProjectRequest):
     position_name: str = Field(min_length=1, max_length=100)
     required_count: int = Field(default=1, ge=1, le=20)
     category: str | None = None
-    difficulty: str = Field(default="normal", pattern="^(easy|normal|hard)$")
+    difficulty: DifficultyValue = "normal"
     summary: str | None = Field(default=None, max_length=500)
     deadline: date | None = None
     status: str = "open"
@@ -125,7 +136,7 @@ class RecruitmentUpdateRequest(CommonProjectUpdateRequest):
     position_name: str | None = Field(default=None, min_length=1, max_length=100)
     required_count: int | None = Field(default=None, ge=1, le=20)
     category: str | None = None
-    difficulty: str | None = Field(default=None, pattern="^(easy|normal|hard)$")
+    difficulty: DifficultyValue | None = None
     summary: str | None = None
     deadline: date | None = None
     status: str | None = None

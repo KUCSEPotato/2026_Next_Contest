@@ -62,6 +62,7 @@ from app.services.economy import reward_project_recycled
 from app.services.economy import reward_project_started
 from app.services.entitlement_service import USAGE_PROJECT_APPLY
 from app.services.entitlement_service import USAGE_PROJECT_BOOST
+from app.services.entitlement_service import USAGE_PROJECT_CREATE
 from app.services.entitlement_service import USAGE_PROJECT_DISCARD
 from app.services.entitlement_service import check_usage_allowed
 from app.services.entitlement_service import record_usage
@@ -73,6 +74,15 @@ from app.core.realtime import realtime_hub
 router = APIRouter()
 
 TODO_FINALIZED_MARKER_TITLE = "__team_todo_finalized__"
+TODO_PRIORITY_MIN = 1
+TODO_PRIORITY_MAX = 5
+
+DIFFICULTY_ALIASES = {
+    "easy": "beginner",
+    "normal": "intermediate",
+    "hard": "advanced",
+}
+VALID_DIFFICULTIES = {"beginner", "intermediate", "advanced"}
 
 
 IDEA_DESCRIPTION_SECTION_LABELS = (
@@ -171,6 +181,21 @@ def _calculate_days_left(deadline: date | None) -> int | None:
         return None
     days = (deadline - date.today()).days
     return max(0, days)
+
+
+def _clamp_todo_priority(value: int) -> int:
+    return max(TODO_PRIORITY_MIN, min(TODO_PRIORITY_MAX, int(value)))
+
+
+def _normalize_difficulty(value: str) -> str:
+    normalized = value.strip().lower()
+    mapped = DIFFICULTY_ALIASES.get(normalized, normalized)
+    if mapped not in VALID_DIFFICULTIES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="difficulty must be one of beginner/intermediate/advanced",
+        )
+    return mapped
 
 
 def _is_urgent(deadline: date | None) -> bool:
@@ -652,6 +677,7 @@ async def create_project(
     - Authorization 헤더를 설정하고 ProjectCreateRequest body를 전달합니다.
     - 생성 성공 시 프로젝트와 리더 멤버 매핑이 함께 생성됩니다.
     """
+    check_usage_allowed(db, current_user_id, USAGE_PROJECT_CREATE)
     project = Project(
         idea_id=payload.idea_id,
         leader_id=current_user_id,
@@ -659,7 +685,7 @@ async def create_project(
         summary=payload.summary,
         description=payload.description,
         category=payload.category,
-        difficulty=payload.difficulty,
+        difficulty=_normalize_difficulty(payload.difficulty),
         status=payload.status,
         progress_percent=payload.progress_percent,
         max_members=payload.max_members,
@@ -671,6 +697,7 @@ async def create_project(
 
     _sync_project_interests(db, project.id, payload.interests)
     db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
+    record_usage(db, current_user_id, USAGE_PROJECT_CREATE, target_type="project", target_id=project.id)
     spend_coins(
         db,
         user_id=current_user_id,
@@ -1139,6 +1166,9 @@ async def update_project(
     expected_period = payload_data.pop("expected_period", None)
     preferred_members = payload_data.pop("preferred_members", None)
 
+    if "difficulty" in payload_data:
+        payload_data["difficulty"] = _normalize_difficulty(payload_data["difficulty"])
+
     if "max_members" in payload_data:
         if project.status in {"in_progress", "completed"}:
             raise HTTPException(
@@ -1461,7 +1491,7 @@ async def create_recruitment(
         position_name=payload.position_name,
         required_count=payload.required_count,
         category=payload.category,
-        difficulty=payload.difficulty,
+        difficulty=_normalize_difficulty(payload.difficulty),
         summary=payload.summary,
         status=payload.status,
         deadline=payload.deadline,
@@ -1495,6 +1525,8 @@ async def update_recruitment(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recruitment not found")
 
     for field, value in payload.model_dump(exclude_none=True).items():
+        if field == "difficulty":
+            value = _normalize_difficulty(value)
         setattr(recruitment, field, value)
 
     db.commit()
@@ -1652,7 +1684,7 @@ async def create_todo(
         description=payload.description,
         stage=payload.stage,
         status=payload.status,
-        priority=payload.priority,
+        priority=_clamp_todo_priority(payload.priority),
         due_date=payload.due_date,
     )
     db.add(todo)
@@ -1749,7 +1781,10 @@ async def update_todo(
 
     for field in ("title", "description", "stage", "status", "priority", "due_date"):
         if field in update_data:
-            setattr(todo, field, update_data[field])
+            value = update_data[field]
+            if field == "priority":
+                value = _clamp_todo_priority(value)
+            setattr(todo, field, value)
 
     if "assignee_id" in update_data or "assignee_ids" in update_data:
         _validate_todo_assignees(db, project_id, assignee_ids)
@@ -1830,7 +1865,7 @@ async def generate_project_todos_with_ai(
             description=description,
             stage=stage,
             status="todo",
-            priority=max_priority + index,
+            priority=_clamp_todo_priority(max_priority + index),
         )
         db.add(todo)
         db.flush()
@@ -1969,7 +2004,11 @@ async def project_todos_websocket(
         await websocket.close(code=1008)
         return
 
-    _ensure_project_member(db, project_id, current_user_id)
+    try:
+        _ensure_project_member(db, project_id, current_user_id)
+    except HTTPException:
+        await websocket.close(code=1008)
+        return
 
     channel = project_todo_channel(project_id)
     await realtime_hub.connect(channel, websocket)
