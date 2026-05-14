@@ -26,6 +26,9 @@ interface Idea {
   domain?: string;
   difficulty?: string;
   created_at?: string;
+  has_view_access?: boolean;
+  viewed_at?: string;
+  view_access_expires_at?: string;
 }
 
 interface IdeaListItem {
@@ -43,6 +46,9 @@ interface IdeaListItem {
   category?: string;
   difficulty?: string;
   created_at?: string;
+  has_view_access?: boolean;
+  viewed_at?: string;
+  view_access_expires_at?: string;
 }
 
 const CATEGORIES = [
@@ -60,6 +66,8 @@ const CATEGORIES = [
 
 const IDEA_VIEW_COIN_COST = 1;
 const IDEAS_PER_PAGE = 12;
+const IDEA_VIEW_ACCESS_TTL_MS = 24 * 60 * 60 * 1000;
+const IDEA_VIEW_ACCESS_STORAGE_KEY = "devory_viewed_ideas";
 
 const SERVICE_BLOCKS = [
   {
@@ -88,6 +96,55 @@ const SERVICE_BLOCKS = [
   },
 ];
 
+function getIdeaViewAccessStorageKey() {
+  if (typeof window === "undefined") return IDEA_VIEW_ACCESS_STORAGE_KEY;
+
+  const userId = window.localStorage.getItem("user_id");
+  return userId
+    ? `${IDEA_VIEW_ACCESS_STORAGE_KEY}:${userId}`
+    : IDEA_VIEW_ACCESS_STORAGE_KEY;
+}
+
+function getIdeaViewAccessMap(): Record<string, number> {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const raw = window.localStorage.getItem(getIdeaViewAccessStorageKey());
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function pruneIdeaViewAccessMap(accessMap: Record<string, number>) {
+  const now = Date.now();
+
+  return Object.fromEntries(
+    Object.entries(accessMap).filter(([, viewedAt]) => {
+      const viewedTime = Number(viewedAt);
+      return Number.isFinite(viewedTime) && now - viewedTime < IDEA_VIEW_ACCESS_TTL_MS;
+    })
+  );
+}
+
+function hasRecentIdeaViewAccess(ideaId: number) {
+  const accessMap = pruneIdeaViewAccessMap(getIdeaViewAccessMap());
+  const viewedAt = Number(accessMap[String(ideaId)] || 0);
+  return Date.now() - viewedAt < IDEA_VIEW_ACCESS_TTL_MS;
+}
+
+function rememberIdeaViewAccess(ideaId: number) {
+  if (typeof window === "undefined") return;
+
+  const accessMap = pruneIdeaViewAccessMap(getIdeaViewAccessMap());
+  accessMap[String(ideaId)] = Date.now();
+
+  try {
+    window.localStorage.setItem(getIdeaViewAccessStorageKey(), JSON.stringify(accessMap));
+  } catch {}
+}
+
 export default function InspirationWellPage() {
   const router = useRouter();
 
@@ -104,6 +161,7 @@ export default function InspirationWellPage() {
   const [pickingUp, setPickingUp] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [seedBursts, setSeedBursts] = useState<{ id: number; x: number; y: number }[]>([]);
+  const [recentlyViewedIdeaIds, setRecentlyViewedIdeaIds] = useState<number[]>([]);
   const seedBurstRef = useRef(0);
 
   const triggerSeedBurst = (e: React.MouseEvent) => {
@@ -132,22 +190,32 @@ export default function InspirationWellPage() {
         ]);
         const raw: IdeaListItem[] = result.data || [];
 
+        const normalizedIdeas = raw.map((item) => ({
+          id: item.id,
+          title: item.title || "제목 없음",
+          summary: item.summary || item.description || "설명이 없습니다.",
+          hashtags: item.hashtags || item.tech_stack || [],
+          like_count: item.like_count ?? 0,
+          bookmark_count: item.bookmark_count ?? 0,
+          is_liked: Boolean(item.is_liked),
+          is_bookmarked: Boolean(item.is_bookmarked),
+          domain: item.domain || item.category || "IT/소프트웨어",
+          difficulty: item.difficulty,
+          created_at: item.created_at,
+          has_view_access: Boolean(item.has_view_access),
+          viewed_at: item.viewed_at,
+          view_access_expires_at: item.view_access_expires_at,
+        }));
+
         setCoinBalance(coinResult?.data?.waterdrop_balance ?? coinResult?.data?.coin_balance ?? null);
-        setIdeas(
-          raw.map((item) => ({
-            id: item.id,
-            title: item.title || "제목 없음",
-            summary: item.summary || item.description || "설명이 없습니다.",
-            hashtags: item.hashtags || item.tech_stack || [],
-            like_count: item.like_count ?? 0,
-            bookmark_count: item.bookmark_count ?? 0,
-            is_liked: Boolean(item.is_liked),
-            is_bookmarked: Boolean(item.is_bookmarked),
-            domain: item.domain || item.category || "IT/소프트웨어",
-            difficulty: item.difficulty,
-            created_at: item.created_at,
-          }))
-        );
+        setIdeas(normalizedIdeas);
+        setRecentlyViewedIdeaIds((prev) => {
+          const merged = new Set(prev);
+          normalizedIdeas
+            .filter((idea) => idea.has_view_access)
+            .forEach((idea) => merged.add(idea.id));
+          return [...merged];
+        });
       } catch {
         setIdeas([]);
       } finally {
@@ -156,6 +224,15 @@ export default function InspirationWellPage() {
     }
 
     load();
+  }, []);
+
+  useEffect(() => {
+    const syncRecentViewAccess = () => {
+      const accessMap = pruneIdeaViewAccessMap(getIdeaViewAccessMap());
+      setRecentlyViewedIdeaIds(Object.keys(accessMap).map(Number).filter(Number.isFinite));
+    };
+
+    syncRecentViewAccess();
   }, []);
 
   const filtered = ideas.filter((idea) => {
@@ -193,6 +270,11 @@ export default function InspirationWellPage() {
   };
 
   const handleIdeaClick = (idea: Idea) => {
+    if (idea.has_view_access || hasRecentIdeaViewAccess(idea.id)) {
+      router.push(`/ideas/pickup/${idea.id}`);
+      return;
+    }
+
     setCoinModal({ open: true, idea });
   };
 
@@ -268,9 +350,22 @@ export default function InspirationWellPage() {
 
     try {
       setPickingUp(true);
-      await viewIdeaApi(id);
+      const result = await viewIdeaApi(id);
+      const data = result?.data || {};
+      rememberIdeaViewAccess(id);
+      setRecentlyViewedIdeaIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+      updateIdeaReaction(id, (current) => ({
+        ...current,
+        has_view_access: true,
+        viewed_at: data.viewed_at || current.viewed_at,
+        view_access_expires_at: data.view_access_expires_at || current.view_access_expires_at,
+      }));
       setCoinModal({ open: false, idea: null });
-      setCoinBalance((prev) => (prev === null ? prev : Math.max(0, prev - IDEA_VIEW_COIN_COST)));
+      if (typeof data.waterdrop_balance === "number" || typeof data.coin_balance === "number") {
+        setCoinBalance(data.waterdrop_balance ?? data.coin_balance);
+      } else if (!data.already_viewed) {
+        setCoinBalance((prev) => (prev === null ? prev : Math.max(0, prev - IDEA_VIEW_COIN_COST)));
+      }
       router.push(`/ideas/pickup/${id}`);
     } catch (error) {
       alert(error instanceof Error ? error.message : "아이디어를 열람하지 못했습니다.");
@@ -474,6 +569,7 @@ export default function InspirationWellPage() {
                     triggerSeedBurst(e);
                     handleIdeaClick(idea);
                   }}
+                  canReopen={Boolean(idea.has_view_access) || recentlyViewedIdeaIds.includes(idea.id)}
                   onToggleLike={handleToggleLike}
                   onToggleBookmark={handleToggleBookmark}
                 />
@@ -690,12 +786,14 @@ function IdeaCard({
   idea,
   index,
   onClick,
+  canReopen,
   onToggleLike,
   onToggleBookmark,
 }: {
   idea: Idea;
   index: number;
   onClick: (e: React.MouseEvent) => void;
+  canReopen: boolean;
   onToggleLike: (idea: Idea) => void;
   onToggleBookmark: (idea: Idea) => void;
 }) {
@@ -776,8 +874,12 @@ function IdeaCard({
           </button>
         </div>
 
-        <span className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1 text-[11px] font-semibold text-white shadow-sm shadow-emerald-200 transition group-hover:bg-emerald-700 dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-600 dark:shadow-none dark:group-hover:bg-slate-700">
-          살펴보기
+        <span className={`shrink-0 rounded-lg px-3 py-1 text-[11px] font-semibold shadow-sm transition dark:text-slate-100 dark:ring-1 dark:ring-slate-600 dark:shadow-none ${
+          canReopen
+            ? "bg-sky-600 text-white shadow-sky-200 group-hover:bg-sky-700 dark:bg-sky-900/70 dark:group-hover:bg-sky-800"
+            : "bg-emerald-600 text-white shadow-emerald-200 group-hover:bg-emerald-700 dark:bg-slate-800 dark:group-hover:bg-slate-700"
+        }`}>
+          {canReopen ? "다시 보기" : "살펴보기"}
         </span>
       </div>
     </article>
