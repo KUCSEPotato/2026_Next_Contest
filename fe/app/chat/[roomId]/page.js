@@ -470,9 +470,15 @@ export default function ChatRoomPage() {
     }
   };
 
-  const handleTodoDragStart = (todoId) => {
-    if (isTodoFinalized || editingTodoId) return;
+  const handleTodoDragStart = (event, todoId) => {
+    if (isTodoFinalized || editingTodoId) {
+      event.preventDefault();
+      return;
+    }
+
     setDraggedTodoId(todoId);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", String(todoId));
   };
 
   const handleTodoListDragOver = (event) => {
@@ -937,16 +943,18 @@ export default function ChatRoomPage() {
                       <div
                         key={todo.id}
                         draggable={!isTodoFinalized && !isEditing && !reorderingTodos}
-                        onDragStart={(event) => {
-                          event.dataTransfer.effectAllowed = "move";
-                          event.dataTransfer.setData("text/plain", String(todo.id));
-                          handleTodoDragStart(todo.id);
-                        }}
+                        onDragStart={(event) => handleTodoDragStart(event, todo.id)}
                         onDragOver={(event) => handleTodoDragOver(event, todo)}
                         onDrop={(event) => {
                           event.preventDefault();
                           event.stopPropagation();
-                          handleTodoDrop(todo, todoDropTarget?.position || "before");
+
+                          const rect = event.currentTarget.getBoundingClientRect();
+
+                          const position =
+                            event.clientY < rect.top + rect.height / 2 ? "before" : "after";
+
+                          handleTodoDrop(todo, position);
                         }}
                         onDragEnd={handleTodoDragEnd}
                         className={`relative rounded-xl border px-3 py-2 transition ${
@@ -1035,6 +1043,7 @@ export default function ChatRoomPage() {
                           <div className="mt-2 flex items-center justify-between gap-2 pl-6">
                             {description ? (
                               <button
+                                onMouseDown={(e) => e.stopPropagation()}
                                 onClick={() => toggleTodoDetail(todo.id)}
                                 className="text-xs font-semibold text-slate-400 hover:text-red-600"
                               >
@@ -1047,6 +1056,7 @@ export default function ChatRoomPage() {
                             {!isTodoFinalized && (
                             <div className="flex gap-1">
                               <button
+                                onMouseDown={(e) => e.stopPropagation()}
                                 onClick={() => startEditingTodo(todo)}
                                 className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 hover:border-red-300 hover:text-red-600"
                               >
@@ -1054,6 +1064,7 @@ export default function ChatRoomPage() {
                               </button>
 
                               <button
+                                onMouseDown={(e) => e.stopPropagation()}
                                 onClick={() => handleDeleteTodo(todo)}
                                 className="rounded-lg border border-red-100 px-2 py-1 text-xs font-semibold text-red-500 hover:border-red-300 hover:bg-red-50"
                               >
