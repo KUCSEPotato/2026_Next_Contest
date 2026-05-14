@@ -1,7 +1,7 @@
 """Community Forum API Endpoints"""
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status, Header, File, UploadFile
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -240,6 +240,7 @@ async def create_post(
 @router.get("", summary="게시물 목록 조회", description="커뮤니티 게시물 목록을 조회합니다.")
 async def list_posts(
     category: str | None = None,
+    q: str | None = None,
     page: int = 1,
     page_size: int = 20,
     sort_by: str = "newest",
@@ -262,6 +263,15 @@ async def list_posts(
         query = query.filter(CommunityPost.category == category)
     elif exclude_admin_categories:
         query = query.filter(CommunityPost.category.notin_(("announcement", "event")))
+
+    if q and q.strip():
+        keyword = f"%{q.strip()}%"
+        query = query.filter(
+            or_(
+                CommunityPost.title.ilike(keyword),
+                CommunityPost.content.ilike(keyword),
+            )
+        )
 
     # sort_by에 따른 초기 정렬 설정 (핀 된 글은 항상 먼저)
     if sort_by == "views":

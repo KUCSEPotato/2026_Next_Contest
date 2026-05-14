@@ -24,6 +24,7 @@ async function handleResponse<T>(res: Response): Promise<T> {
 
 export async function getPosts(params?: {
   category?: string;
+  q?: string;
   page?: number;
   page_size?: number;
   sort_by?: string;
@@ -31,6 +32,7 @@ export async function getPosts(params?: {
 }): Promise<{ posts: PostSummary[]; total: number; page: number; total_pages: number }> {
   const qs = new URLSearchParams();
   if (params?.category) qs.set("category", params.category);
+  if (params?.q) qs.set("q", params.q);
   if (params?.page) qs.set("page", String(params.page));
   if (params?.page_size) qs.set("page_size", String(params.page_size));
   if (params?.sort_by) qs.set("sort_by", params.sort_by);
