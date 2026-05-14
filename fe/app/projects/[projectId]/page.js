@@ -779,18 +779,22 @@ export default function ProjectDetailPage() {
                   )}
 
                   {isLeader && !isProjectCompleted && (
-                    <div className="flex flex-col gap-1">
-                      <button
-                        onClick={handleBoostProject}
-                        disabled={isBoosting}
-                        className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    <button
+                      onClick={handleBoostProject}
+                      disabled={isBoosting}
+                      className="group relative inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isBoosting ? "거름 주는 중..." : "거름 주기"}
+                      <span
+                        aria-label="거름 주기 설명"
+                        className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-amber-300 bg-white text-[10px] font-black text-amber-700"
                       >
-                        {isBoosting ? "거름 주는 중..." : "거름 주기"}
-                      </button>
-                      <p className="max-w-xs text-xs leading-5 text-slate-500">
+                        ?
+                      </span>
+                      <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 w-64 -translate-x-1/2 rounded-xl bg-slate-950 px-3 py-2 text-left text-xs font-medium leading-5 text-white opacity-0 shadow-lg transition group-hover:opacity-100">
                         거름을 주면 프로젝트가 일정 기간 동안 목록 상단에 노출됩니다.
-                      </p>
-                    </div>
+                      </span>
+                    </button>
                   )}
 
                   {isProjectMember && isTeamFormed && (
@@ -1038,22 +1042,11 @@ export default function ProjectDetailPage() {
           />
 
           <div className="relative w-full max-w-2xl rounded-2xl bg-white p-7 shadow-2xl">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">지원서 작성하기</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-500">
-                  리더가 확인할 수 있도록 자기소개, 가능한 역할, 참여 의지를 적어주세요.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowApplicationForm(false)}
-                disabled={isApplying}
-                className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                닫기
-              </button>
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">지원서 작성하기</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                리더가 확인할 수 있도록 자기소개, 가능한 역할, 참여 의지를 적어주세요.
+              </p>
             </div>
 
             <textarea
