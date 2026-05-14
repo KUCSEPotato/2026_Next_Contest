@@ -58,6 +58,10 @@ BEGIN
             'project_update',
             'review_received',
             'subscription_event',
+            'coin_purchase_approved',
+            'coin_purchase_rejected',
+            'entitlement_purchase_approved',
+            'entitlement_purchase_rejected',
             'system'
         );
     END IF;
