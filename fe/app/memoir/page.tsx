@@ -1103,13 +1103,18 @@ function MemoirContent() {
                 }}
               >
                 {[
-                  { label: "완료 프로젝트", value: `${completedCount}개` },
-                  { label: "누적 성장 시간", value: `${formatHours(totalHours)}시간` },
-                  {
-                    label: "최근 개화",
-                    value: recentProject ? recentProject.title : "기록 없음",
-                  },
-                ].map(({ label, value }) => (
+                    { label: "완료 프로젝트", value: `${completedCount}개` },
+                    {
+                      label: "누적 성장 시간",
+                      value: `${totalHours}시간`,
+                      tooltip:
+                        "각 프로젝트에서 입력한 하루 평균 참여 시간 × 프로젝트 진행 일수를 모두 합산한 값이에요.",
+                    },
+                    {
+                      label: "최근 개화",
+                      value: recentProject ? recentProject.title : "기록 없음",
+                    },
+                  ].map(({ label, value }) => (
                   <div
                     key={label}
                     style={{
