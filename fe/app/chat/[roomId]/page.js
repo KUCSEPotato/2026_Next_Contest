@@ -603,14 +603,12 @@ export default function ChatRoomPage() {
     try {
       setReorderingTodos(true);
       pendingTodoScrollTopRef.current = todoListRef.current?.scrollTop ?? null;
-      await Promise.all(
-        changedTodos.map((todo) =>
-          updateTodoApi(projectId, todo.id, {
-            priority: todo.priority,
-            stage: todo.stage,
-          })
-        )
-      );
+      for (const todo of changedTodos) {
+        await updateTodoApi(projectId, todo.id, {
+          priority: todo.priority,
+          stage: todo.stage,
+        });
+      }
       await loadProjectTodos();
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
