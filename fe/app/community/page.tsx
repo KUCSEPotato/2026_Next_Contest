@@ -113,6 +113,7 @@ export default function CommunityPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
+  const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -144,6 +145,7 @@ export default function CommunityPage() {
     try {
       const res = await getPosts({
         category: selectedCategory,
+        q: searchQuery.trim() || undefined,
         page,
         page_size: POSTS_PER_PAGE,
         exclude_admin_categories: !selectedCategory,
@@ -156,7 +158,7 @@ export default function CommunityPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedCategory, page]);
+  }, [selectedCategory, searchQuery, page]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -343,6 +345,15 @@ export default function CommunityPage() {
                   글쓰기
                 </button>
               </div>
+              <input
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="제목이나 내용으로 검색해보세요"
+                className="mb-4 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-orange-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-orange-400/60"
+              />
               <div className="flex flex-wrap gap-2">
                 {CATEGORIES.map((cat) => (
                   <button
@@ -367,9 +378,15 @@ export default function CommunityPage() {
             ) : posts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <p className="mb-3 text-3xl">📭</p>
-                <p className="mb-1 text-sm font-medium text-gray-600">게시물이 없어요</p>
-                <p className="text-xs text-gray-400">모닥불의 첫 이야기를 남겨보세요</p>
-                {isLoggedIn && (
+                <p className="mb-1 text-sm font-medium text-gray-600">
+                  {searchQuery.trim() ? "검색 결과가 없어요" : "게시물이 없어요"}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {searchQuery.trim()
+                    ? "다른 키워드로 다시 검색해보세요."
+                    : "모닥불의 첫 이야기를 남겨보세요"}
+                </p>
+                {isLoggedIn && !searchQuery.trim() && (
                   <button
                     onClick={() => router.push("/community/new")}
                     className="mt-4 rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-700 dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-600 dark:hover:bg-slate-700"
@@ -381,7 +398,9 @@ export default function CommunityPage() {
             ) : (
               <section className="mb-10">
                 <div className="mb-4 flex items-center justify-between">
-                  <span className="text-base font-bold text-gray-900">전체 게시글</span>
+                  <span className="text-base font-bold text-gray-900">
+                    {searchQuery.trim() ? `"${searchQuery.trim()}" 검색 결과` : "전체 게시글"}
+                  </span>
                   <span className="text-xs text-gray-400">{posts.length}개의 글</span>
                 </div>
                 <div className="grid grid-cols-1 gap-4">
