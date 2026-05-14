@@ -26,6 +26,7 @@ import {
   getChatRoomsApi,
   createChatRoomApi,
   getMyEntitlementApi,
+  getMyCoinBalanceApi,
 } from "../../lib/api";
 
 function formatEntitlementDate(value) {
@@ -36,6 +37,10 @@ function formatEntitlementDate(value) {
     month: "long",
     day: "numeric",
   });
+}
+
+function formatWaterdrops(value) {
+  return `${Number(value || 0).toLocaleString("ko-KR")}방울`;
 }
 
 export default function MyPage() {
@@ -53,6 +58,7 @@ export default function MyPage() {
   const [reviews, setReviews] = useState([]);
   const [oauthLinks, setOauthLinks] = useState(null);
   const [entitlement, setEntitlement] = useState(null);
+  const [waterdropBalance, setWaterdropBalance] = useState(0);
   const [projectStatusFilter, setProjectStatusFilter] = useState("all");
   const [projectRoleFilter, setProjectRoleFilter] = useState("all");
   const [projectSortOrder, setProjectSortOrder] = useState("latest");
@@ -139,6 +145,7 @@ export default function MyPage() {
           applicationsResult,
           oauthLinksResult,
           entitlementResult,
+          balanceResult,
         ] =
           await Promise.allSettled([
             getMyReputationApi(),
@@ -147,6 +154,7 @@ export default function MyPage() {
             getMyApplicationsApi(),
             getOAuthLinksApi(),
             getMyEntitlementApi(),
+            getMyCoinBalanceApi(),
           ]);
 
         setReputation(
@@ -186,6 +194,11 @@ export default function MyPage() {
           entitlementResult.status === "fulfilled"
             ? entitlementResult.value.data
             : null
+        );
+        setWaterdropBalance(
+          balanceResult.status === "fulfilled"
+            ? balanceResult.value.data?.waterdrop_balance ?? balanceResult.value.data?.coin_balance ?? 0
+            : 0
         );
 
         const reviewsData = await loadReceivedReviews(profileData.id, statsData);
@@ -458,27 +471,27 @@ export default function MyPage() {
       <div className="mx-auto w-full max-w-5xl">
         <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
           <div className="flex items-center justify-between gap-6">
-            <div className="flex items-center gap-6">
-              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-red-100 text-3xl font-bold text-red-600">
-                {avatarUrl ? (
-                  <img
-                    src={avatarUrl}
-                    alt={`${profile?.nickname || "사용자"} 프로필 이미지`}
-                    className="h-full w-full object-cover"
-                    onError={() => {
-                      console.error("프로필 이미지 로드 실패:", avatarUrl);
-                      setAvatarLoadFailed(true);
-                    }}
-                  />
-                ) : (
-                  avatarFallback
-                )}
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-4">
+                <h1 className="text-3xl font-bold text-slate-900">
+                  {profile?.nickname || "이름 없는 사용자"}
+                </h1>
+                <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-red-100 text-2xl font-bold text-red-600">
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt={`${profile?.nickname || "사용자"} 프로필 이미지`}
+                      className="h-full w-full object-cover"
+                      onError={() => {
+                        console.error("프로필 이미지 로드 실패:", avatarUrl);
+                        setAvatarLoadFailed(true);
+                      }}
+                    />
+                  ) : (
+                    avatarFallback
+                  )}
+                </div>
               </div>
-
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">
-                {profile?.nickname || "이름 없는 사용자"}
-              </h1>
               <p className="text-slate-500">{profile?.email}</p>
               <p className="mt-2 text-slate-700">
                 {profile?.bio || "아직 자기소개가 없습니다."}
@@ -498,6 +511,9 @@ export default function MyPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-bold text-red-700">
                       현재 플랜: {entitlement.name || entitlement.plan || "무료"}
+                    </span>
+                    <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-sky-700">
+                      현재 잔액: {formatWaterdrops(waterdropBalance)}
                     </span>
                     {entitlement.product_type !== "FREE" && (
                       <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-red-600">
@@ -547,7 +563,6 @@ export default function MyPage() {
                   </p>
                 </div>
               )}
-            </div>
             </div>
 
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-3">
