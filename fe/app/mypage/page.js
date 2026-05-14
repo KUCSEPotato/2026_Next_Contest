@@ -520,6 +520,9 @@ export default function MyPage() {
   const planName = getPlanName(entitlement);
   const renewalStatus = getRenewalStatus(entitlement);
   const profileBio = String(profile?.bio || "").trim();
+  const bioLineCount = profileBio ? profileBio.split(/\r?\n/).length : 0;
+  const shouldShowBioToggle =
+    bioOverflows || bioLineCount > 2 || profileBio.length > 48;
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
@@ -557,7 +560,7 @@ export default function MyPage() {
                     >
                       {profileBio}
                     </p>
-                    {bioOverflows && (
+                    {shouldShowBioToggle && (
                       <button
                         type="button"
                         onClick={() => setIsBioExpanded((current) => !current)}
@@ -572,9 +575,6 @@ export default function MyPage() {
                     아직 자기소개가 없습니다.
                   </p>
                 )}
-                <p className="hidden">
-                  {profile?.bio || "Devory로 돈 벌 게임"}
-                </p>
               </div>
             </div>
 
