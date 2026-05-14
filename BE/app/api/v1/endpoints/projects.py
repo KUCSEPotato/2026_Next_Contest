@@ -902,7 +902,7 @@ async def get_project(project_id: int, db: Session = Depends(get_db)) -> dict:
     )
 
 
-@router.post("/{project_id}/boost", summary="프로젝트 상단 노출", description="PRO 권한으로 프로젝트를 상단 노출합니다.")
+@router.post("/{project_id}/boost", summary="거름 주기", description="PRO 권한으로 프로젝트를 일정 기간 동안 상단 노출합니다.")
 async def boost_project(
     project_id: int,
     current_user_id: int = Depends(get_current_user_id),

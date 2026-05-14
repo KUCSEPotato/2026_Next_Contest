@@ -45,7 +45,7 @@ FREE_LIMITS = {
     USAGE_PROJECT_DISCARD: {"allowed": False, "message": "프로젝트 버리기는 유료 플랜 또는 기간권이 필요합니다."},
     USAGE_PROJECT_APPLY: {"daily": 1},
     USAGE_COMMUNITY_WRITE: {"daily": 1},
-    USAGE_PROJECT_BOOST: {"allowed": False, "message": "프로젝트 상단 노출은 PRO 플랜에서만 사용할 수 있습니다."},
+    USAGE_PROJECT_BOOST: {"allowed": False, "message": "'Devory Pro' 구독자만 프로젝트에 거름을 줄 수 있습니다."},
 }
 
 

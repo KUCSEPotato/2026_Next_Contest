@@ -513,7 +513,7 @@ export default function MyPage() {
                       현재 플랜: {entitlement.name || entitlement.plan || "무료"}
                     </span>
                     <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-sky-700">
-                      현재 잔액: {formatWaterdrops(waterdropBalance)}
+                      현재 잔여 물방울: {formatWaterdrops(waterdropBalance)}
                     </span>
                     {entitlement.product_type !== "FREE" && (
                       <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-red-600">
