@@ -77,6 +77,13 @@ TODO_FINALIZED_MARKER_TITLE = "__team_todo_finalized__"
 TODO_PRIORITY_MIN = 1
 TODO_PRIORITY_MAX = 5
 
+DIFFICULTY_ALIASES = {
+    "easy": "beginner",
+    "normal": "intermediate",
+    "hard": "advanced",
+}
+VALID_DIFFICULTIES = {"beginner", "intermediate", "advanced"}
+
 
 IDEA_DESCRIPTION_SECTION_LABELS = (
     "예상 진행 기간",
@@ -178,6 +185,17 @@ def _calculate_days_left(deadline: date | None) -> int | None:
 
 def _clamp_todo_priority(value: int) -> int:
     return max(TODO_PRIORITY_MIN, min(TODO_PRIORITY_MAX, int(value)))
+
+
+def _normalize_difficulty(value: str) -> str:
+    normalized = value.strip().lower()
+    mapped = DIFFICULTY_ALIASES.get(normalized, normalized)
+    if mapped not in VALID_DIFFICULTIES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="difficulty must be one of beginner/intermediate/advanced",
+        )
+    return mapped
 
 
 def _is_urgent(deadline: date | None) -> bool:
@@ -667,7 +685,7 @@ async def create_project(
         summary=payload.summary,
         description=payload.description,
         category=payload.category,
-        difficulty=payload.difficulty,
+        difficulty=_normalize_difficulty(payload.difficulty),
         status=payload.status,
         progress_percent=payload.progress_percent,
         max_members=payload.max_members,
@@ -1148,6 +1166,9 @@ async def update_project(
     expected_period = payload_data.pop("expected_period", None)
     preferred_members = payload_data.pop("preferred_members", None)
 
+    if "difficulty" in payload_data:
+        payload_data["difficulty"] = _normalize_difficulty(payload_data["difficulty"])
+
     if "max_members" in payload_data:
         if project.status in {"in_progress", "completed"}:
             raise HTTPException(
@@ -1470,7 +1491,7 @@ async def create_recruitment(
         position_name=payload.position_name,
         required_count=payload.required_count,
         category=payload.category,
-        difficulty=payload.difficulty,
+        difficulty=_normalize_difficulty(payload.difficulty),
         summary=payload.summary,
         status=payload.status,
         deadline=payload.deadline,
@@ -1504,6 +1525,8 @@ async def update_recruitment(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recruitment not found")
 
     for field, value in payload.model_dump(exclude_none=True).items():
+        if field == "difficulty":
+            value = _normalize_difficulty(value)
         setattr(recruitment, field, value)
 
     db.commit()
@@ -1981,7 +2004,11 @@ async def project_todos_websocket(
         await websocket.close(code=1008)
         return
 
-    _ensure_project_member(db, project_id, current_user_id)
+    try:
+        _ensure_project_member(db, project_id, current_user_id)
+    except HTTPException:
+        await websocket.close(code=1008)
+        return
 
     channel = project_todo_channel(project_id)
     await realtime_hub.connect(channel, websocket)

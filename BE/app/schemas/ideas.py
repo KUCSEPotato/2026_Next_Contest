@@ -1,10 +1,22 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+
+DifficultyValue = Literal[
+    "beginner",
+    "intermediate",
+    "advanced",
+    "easy",
+    "normal",
+    "hard",
+]
 
 
 class IdeaCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     description: str = Field(min_length=1)
-    difficulty: str
+    difficulty: DifficultyValue
     summary: str | None = None
     domain: str | None = None
     tech_stack: list[str] = Field(default_factory=list)
@@ -19,7 +31,7 @@ class IdeaCreateRequest(BaseModel):
 class IdeaUpdateRequest(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = Field(default=None, min_length=1)
-    difficulty: str | None = None
+    difficulty: DifficultyValue | None = None
     summary: str | None = None
     domain: str | None = None
     tech_stack: list[str] | None = None
