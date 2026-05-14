@@ -121,6 +121,7 @@ export default function AdminPage() {
   const [error, setError] = useState("");
   const [processingKey, setProcessingKey] = useState("");
   const [isAuthorized, setIsAuthorized] = useState(null);
+  const [previewReport, setPreviewReport] = useState(null);
 
   const openReports = useMemo(
     () => reports.filter((report) => report.status === "open"),
@@ -1077,24 +1078,32 @@ export default function AdminPage() {
                       </Td>
                       <Td><StatusBadge value={report.status} /></Td>
                       <Td>
-                        <select
-                          value={report.status}
-                          onChange={(e) => handleReportStatus(report, e.target.value)}
-                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
-                        >
-                          {REPORT_STATUSES.map((status) => (
-                            <option key={status} value={status}>{status}</option>
-                          ))}
-                        </select>
-                        {(report.target_post_id || report.target_comment_id || report.target_project_id || report.target_idea_id) && (
-                          <button
-                            onClick={() => handleTakedownReport(report)}
-                            disabled={processingKey === `report-takedown-${report.id}`}
-                            className="ml-2 rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                        <div className="flex flex-wrap items-center gap-2">
+                          <select
+                            value={report.status}
+                            onChange={(e) => handleReportStatus(report, e.target.value)}
+                            className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
                           >
-                            강제내리기
+                            {REPORT_STATUSES.map((status) => (
+                              <option key={status} value={status}>{status}</option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => setPreviewReport(report)}
+                            className="rounded-md border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                          >
+                            내용 확인하기
                           </button>
-                        )}
+                          {(report.target_post_id || report.target_comment_id || report.target_project_id || report.target_idea_id) && (
+                            <button
+                              onClick={() => handleTakedownReport(report)}
+                              disabled={processingKey === `report-takedown-${report.id}`}
+                              className="rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                            >
+                              강제내리기
+                            </button>
+                          )}
+                        </div>
                       </Td>
                     </tr>
                   ))}
@@ -1622,6 +1631,10 @@ export default function AdminPage() {
           </div>
         </section>
       </div>
+      <ReportPreviewModal
+        report={previewReport}
+        onClose={() => setPreviewReport(null)}
+      />
     </main>
   );
 }
@@ -1680,5 +1693,110 @@ function StatusBadge({ value }) {
     <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${tone}`}>
       {normalized}
     </span>
+  );
+}
+
+function ReportPreviewModal({ report, onClose }) {
+  if (!report) return null;
+
+  const preview = report.target_preview || { type: report.target_scope || "unknown" };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 px-4 py-8">
+      <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-3">
+          <div>
+            <p className="text-xs font-semibold uppercase text-slate-500">
+              report #{report.id} · {report.target_scope || preview.type}
+            </p>
+            <h2 className="mt-1 text-lg font-bold text-slate-900">
+              {report.target_title || "신고 대상"}
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-md border border-slate-300 px-3 py-1 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            닫기
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-4">
+          <div className="rounded-lg bg-slate-50 p-3 text-sm">
+            <p className="font-semibold text-slate-800">신고 사유</p>
+            <p className="mt-1 whitespace-pre-wrap text-slate-700">{report.reason || "-"}</p>
+          </div>
+
+          <ReportPreviewBody report={report} preview={preview} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReportPreviewBody({ report, preview }) {
+  if (preview.type === "comment") {
+    return (
+      <div className="space-y-2 text-sm text-slate-700">
+        <p><strong>게시글</strong>: {preview.post_title || (preview.post_id ? `#${preview.post_id}` : "-")}</p>
+        <p><strong>작성자</strong>: {preview.author_name || "-"}</p>
+        <p><strong>작성일</strong>: {formatDate(preview.created_at)}</p>
+        <div className="rounded-lg border border-slate-200 p-3 whitespace-pre-wrap">
+          {preview.content || report.target_excerpt || "댓글 내용을 찾을 수 없습니다."}
+        </div>
+      </div>
+    );
+  }
+
+  if (preview.type === "post") {
+    return (
+      <div className="space-y-2 text-sm text-slate-700">
+        <p><strong>제목</strong>: {preview.title || report.target_title || "-"}</p>
+        <p><strong>작성자</strong>: {preview.author_name || "-"}</p>
+        <p><strong>작성일</strong>: {formatDate(preview.created_at)}</p>
+        <div className="rounded-lg border border-slate-200 p-3 whitespace-pre-wrap">
+          {preview.content || report.target_excerpt || "게시글 내용을 찾을 수 없습니다."}
+        </div>
+      </div>
+    );
+  }
+
+  if (preview.type === "review") {
+    return (
+      <div className="space-y-2 text-sm text-slate-700">
+        <p><strong>프로젝트</strong>: {preview.project_title || "-"}</p>
+        <p><strong>평가자</strong>: {preview.reviewer_name || "-"}</p>
+        <p><strong>피평가자</strong>: {preview.reviewee_name || "-"}</p>
+        <p>
+          <strong>점수</strong>: 협업 {preview.teamwork_score ?? "-"} / 기여 {preview.contribution_score ?? "-"} / 책임 {preview.responsibility_score ?? "-"}
+        </p>
+        <p><strong>작성일</strong>: {formatDate(preview.created_at)}</p>
+        <div className="rounded-lg border border-slate-200 p-3 whitespace-pre-wrap">
+          {preview.comment || report.target_excerpt || "평가 코멘트를 찾을 수 없습니다."}
+        </div>
+      </div>
+    );
+  }
+
+  if (preview.type === "adoption_request") {
+    return (
+      <div className="space-y-2 text-sm text-slate-700">
+        <p><strong>프로젝트</strong>: {preview.project_title || "-"}</p>
+        <p><strong>요청자</strong>: {preview.requester_name || "-"}</p>
+        <p><strong>상태</strong>: {preview.status || "-"}</p>
+        <div className="rounded-lg border border-slate-200 p-3 whitespace-pre-wrap">
+          {preview.message || report.target_excerpt || "요청 메시지가 없습니다."}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 text-sm text-slate-700">
+      <p>이 대상은 상세 미리보기 항목이 제한됩니다.</p>
+      <div className="rounded-lg border border-slate-200 p-3 whitespace-pre-wrap">
+        {report.target_excerpt || "표시할 상세 내용이 없습니다."}
+      </div>
+    </div>
   );
 }

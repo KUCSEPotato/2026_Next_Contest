@@ -76,6 +76,7 @@ def _report_target_meta(db: Session, report: Report) -> dict:
     if report.target_review_id is not None:
         review = db.get(Review, report.target_review_id)
         project = db.get(Project, review.project_id) if review else None
+        reviewer = db.get(User, review.reviewer_id) if review else None
         reviewee = db.get(User, review.reviewee_id) if review else None
         target_name = reviewee.nickname if reviewee else (f"사용자 #{review.reviewee_id}" if review else f"#{report.target_review_id}")
         return {
@@ -83,6 +84,18 @@ def _report_target_meta(db: Session, report: Report) -> dict:
             "target_excerpt": _excerpt(review.comment if review else None),
             "target_url": f"/users/{review.reviewee_id}" if review else None,
             "target_parent_title": project.title if project else None,
+            "target_preview": {
+                "type": "review",
+                "review_id": review.id if review else report.target_review_id,
+                "project_title": project.title if project else None,
+                "reviewer_name": reviewer.nickname if reviewer else (f"사용자 #{review.reviewer_id}" if review else None),
+                "reviewee_name": reviewee.nickname if reviewee else (f"사용자 #{review.reviewee_id}" if review else None),
+                "teamwork_score": review.teamwork_score if review else None,
+                "contribution_score": review.contribution_score if review else None,
+                "responsibility_score": review.responsibility_score if review else None,
+                "comment": review.comment if review else None,
+                "created_at": review.created_at.isoformat() if review and review.created_at else None,
+            },
         }
 
     if report.target_adoption_request_id is not None:
@@ -95,26 +108,53 @@ def _report_target_meta(db: Session, report: Report) -> dict:
             "target_excerpt": _excerpt(adoption_request.message if adoption_request else None),
             "target_url": f"/projects/{adoption_request.project_id}" if adoption_request else None,
             "target_parent_title": project.title if project else None,
+            "target_preview": {
+                "type": "adoption_request",
+                "adoption_request_id": adoption_request.id if adoption_request else report.target_adoption_request_id,
+                "project_title": project.title if project else None,
+                "requester_name": requester_name,
+                "status": adoption_request.status if adoption_request else None,
+                "message": adoption_request.message if adoption_request else None,
+            },
         }
 
     if report.target_comment_id is not None:
         comment = db.get(CommunityPostComment, report.target_comment_id)
         post = db.get(CommunityPost, comment.post_id) if comment else None
+        author = db.get(User, comment.author_id) if comment else None
         title = f"댓글: {_excerpt(comment.content, 40) or f'#{report.target_comment_id}'}" if comment else f"댓글 #{report.target_comment_id}"
         return {
             "target_title": title,
             "target_excerpt": _excerpt(comment.content if comment else None),
             "target_url": f"/community/{comment.post_id}" if comment else None,
             "target_parent_title": post.title if post else None,
+            "target_preview": {
+                "type": "comment",
+                "comment_id": comment.id if comment else report.target_comment_id,
+                "post_id": comment.post_id if comment else None,
+                "post_title": post.title if post else None,
+                "author_name": author.nickname if author else (f"사용자 #{comment.author_id}" if comment else None),
+                "content": comment.content if comment else None,
+                "created_at": comment.created_at.isoformat() if comment and comment.created_at else None,
+            },
         }
 
     if report.target_post_id is not None:
         post = db.get(CommunityPost, report.target_post_id)
+        author = db.get(User, post.author_id) if post else None
         return {
             "target_title": post.title if post else f"게시글 #{report.target_post_id}",
             "target_excerpt": _excerpt(post.content if post else None),
             "target_url": f"/community/{post.id}" if post else None,
             "target_parent_title": None,
+            "target_preview": {
+                "type": "post",
+                "post_id": post.id if post else report.target_post_id,
+                "title": post.title if post else None,
+                "author_name": author.nickname if author else (f"사용자 #{post.author_id}" if post else None),
+                "content": post.content if post else None,
+                "created_at": post.created_at.isoformat() if post and post.created_at else None,
+            },
         }
 
     if report.target_project_id is not None:
@@ -125,6 +165,13 @@ def _report_target_meta(db: Session, report: Report) -> dict:
             "target_excerpt": _excerpt(project_excerpt),
             "target_url": f"/projects/{project.id}" if project else None,
             "target_parent_title": None,
+            "target_preview": {
+                "type": "project",
+                "project_id": project.id if project else report.target_project_id,
+                "title": project.title if project else None,
+                "summary": project.summary if project else None,
+                "description": project.description if project else None,
+            },
         }
 
     if report.target_chat_room_id is not None:
@@ -137,6 +184,12 @@ def _report_target_meta(db: Session, report: Report) -> dict:
             "target_excerpt": "채팅방 신고",
             "target_url": f"/projects/{room.project_id}/chat" if room else None,
             "target_parent_title": project_title,
+            "target_preview": {
+                "type": "chat",
+                "room_id": room.id if room else report.target_chat_room_id,
+                "room_name": room_name,
+                "project_title": project_title,
+            },
         }
 
     if report.target_user_id is not None:
@@ -147,6 +200,12 @@ def _report_target_meta(db: Session, report: Report) -> dict:
             "target_excerpt": user.email if user else None,
             "target_url": f"/users/{user.id}" if user else None,
             "target_parent_title": None,
+            "target_preview": {
+                "type": "user",
+                "user_id": user.id if user else report.target_user_id,
+                "nickname": user.nickname if user else None,
+                "email": user.email if user else None,
+            },
         }
 
     return {
@@ -154,6 +213,9 @@ def _report_target_meta(db: Session, report: Report) -> dict:
         "target_excerpt": None,
         "target_url": None,
         "target_parent_title": None,
+        "target_preview": {
+            "type": "unknown",
+        },
     }
 
 
