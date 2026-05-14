@@ -158,6 +158,13 @@ export default function Navbar() {
 
   const isAuthenticated = authStatus === "authenticated" && token;
   const isDarkTheme = theme === "dark";
+  const navPillClass =
+    "inline-flex h-11 items-center justify-center rounded-lg px-4 text-sm font-bold transition";
+  const shopButtonClass = `${navPillClass} gap-2 border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-red-200 hover:bg-slate-50 hover:text-red-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-red-500/70 dark:hover:bg-slate-800 dark:hover:text-red-300`;
+  const themeButtonClass = isDarkTheme
+    ? `${navPillClass} order-last border border-slate-500 bg-slate-200 text-slate-800 hover:bg-slate-100 dark:border-slate-500 dark:bg-slate-200 dark:text-slate-800 dark:hover:bg-slate-100`
+    : `${navPillClass} order-last border border-slate-300 bg-slate-700 text-white hover:bg-slate-800`;
+  const authButtonClass = `${navPillClass} bg-red-600 text-white hover:bg-red-700`;
 
   return (
     <nav className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
@@ -178,7 +185,7 @@ export default function Navbar() {
             <>
               <button
                 onClick={() => router.push("/coins")}
-                className="inline-flex items-center gap-2 rounded-xl border border-sky-100 bg-sky-50 px-3.5 py-2 text-sm font-black text-sky-700 shadow-sm transition hover:border-sky-300 hover:bg-white hover:text-sky-700 dark:border-sky-800/60 dark:bg-sky-950/40 dark:text-sky-200 dark:hover:border-sky-500"
+                className={shopButtonClass}
                 aria-label="물방울 상점"
                 title="물방울 상점"
               >
@@ -239,7 +246,7 @@ export default function Navbar() {
           <button
             type="button"
             onClick={handleThemeToggle}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-slate-700 transition hover:border-red-200 hover:text-red-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-red-500 dark:hover:text-red-300"
+            className={themeButtonClass}
             aria-label={isDarkTheme ? "라이트 모드로 전환" : "다크 모드로 전환"}
             title={isDarkTheme ? "라이트 모드" : "다크 모드"}
           >
@@ -248,7 +255,7 @@ export default function Navbar() {
               
               <button
                 onClick={handleLogout}
-                className="rounded-lg bg-red-600 px-4 py-2 text-white transition hover:bg-red-700"
+                className={authButtonClass}
               >
                 로그아웃
               </button>
@@ -256,7 +263,7 @@ export default function Navbar() {
           ) : (
             <button
               onClick={() => router.push("/login")}
-              className="rounded-lg bg-red-600 px-4 py-2 text-white transition hover:bg-red-700"
+              className={authButtonClass}
             >
               로그인
             </button>
