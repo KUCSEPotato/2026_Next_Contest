@@ -382,18 +382,18 @@ function StoreSectionCard({ section, active, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-2xl border p-5 text-center shadow-sm transition hover:border-sky-300 hover:shadow-md ${
+      className={`rounded-2xl border p-5 text-left shadow-sm transition hover:border-sky-300 hover:shadow-md ${
         active
           ? "border-sky-300 bg-sky-50/70 dark:border-sky-400/60 dark:bg-sky-500/10"
           : "border-gray-200 bg-white hover:border-sky-200 dark:border-slate-700 dark:bg-slate-900/80 dark:hover:border-sky-500/40"
       }`}
     >
-      <div className="mb-3 flex flex-col items-center gap-3">
+      <div className="mb-3 flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-2xl dark:bg-sky-500/10">
             {section.emoji}
           </span>
-          <div className="text-center">
+          <div>
             <p className={`text-base font-bold ${active ? "text-sky-700 dark:text-sky-300" : "text-gray-900 dark:text-slate-100"}`}>
               {section.title}
             </p>

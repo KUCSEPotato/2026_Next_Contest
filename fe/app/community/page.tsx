@@ -294,7 +294,7 @@ export default function CommunityPage() {
                       </span>
                     )}
                   </div>
-                  <p className="whitespace-pre-line text-sm leading-relaxed text-gray-500">{block.description}</p>
+                  <p className="text-center whitespace-pre-line text-sm leading-relaxed text-gray-500">{block.description}</p>
                 </button>
               );
             })}

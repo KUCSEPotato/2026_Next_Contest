@@ -493,7 +493,7 @@ export default function MainPage() {
                   )}
                 </div>
 
-                <p className="text-sm leading-relaxed text-gray-500 whitespace-pre-line dark:text-slate-400">
+                <p className="text-center text-sm leading-relaxed text-gray-500 whitespace-pre-line dark:text-slate-400">
                   {block.description}
                 </p>
               </button>
