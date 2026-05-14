@@ -415,6 +415,9 @@ def serialize_effective_plan(db: Session, user_id: int) -> dict[str, Any]:
             "renewal_status": "NONE",
             "benefits": {
                 "idea_view_unlimited": False,
+                "idea_view_used": 0,
+                "idea_view_daily_limit": 0,
+                "idea_view_remaining": 0,
                 "project_create_daily_limit": 0,
                 "project_apply_daily_limit": 1,
                 "project_apply_unlimited": False,
@@ -444,6 +447,12 @@ def serialize_effective_plan(db: Session, user_id: int) -> dict[str, Any]:
         "benefits": {
             "idea_view_unlimited": product.product_code == "PRO_MONTHLY",
             "idea_view_daily_limit": product.idea_view_daily_limit,
+            "idea_view_used": entitlement.idea_view_used if entitlement else 0,
+            "idea_view_remaining": (
+                None
+                if product.product_code == "PRO_MONTHLY"
+                else max(int(product.idea_view_daily_limit or 0) - int(entitlement.idea_view_used if entitlement else 0), 0)
+            ),
             "project_create_daily_limit": product.project_create_daily_limit,
             "project_create_total_limit": product.project_create_total_limit,
             "project_create_used": entitlement.project_create_used if entitlement else 0,

@@ -10,7 +10,6 @@ import {
   loadCurrentUser,
   logoutSession,
   refreshAccessToken,
-  removeToken,
   updateStoredUser,
 } from "../lib/auth";
 import { getMyProfileApi } from "../lib/api";
@@ -27,6 +26,73 @@ function applyTheme(theme) {
   document.documentElement.classList.toggle("dark", isDark);
   document.documentElement.dataset.theme = theme;
   window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+}
+
+function ShopIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 32 32" className="h-7 w-7" fill="none">
+      <path
+        d="M8 14.5h16v10.2c0 .9-.7 1.6-1.6 1.6H9.6c-.9 0-1.6-.7-1.6-1.6V14.5Z"
+        fill="#ffffff"
+        stroke="#334155"
+        strokeWidth="1.6"
+      />
+      <path
+        d="M7.2 7.2h17.6l1.6 6.1H5.6l1.6-6.1Z"
+        fill="#fee2e2"
+        stroke="#334155"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path d="M6 13.3h5.2v1.2a2.6 2.6 0 0 1-5.2 0v-1.2Z" fill="#ef4444" />
+      <path d="M11.2 13.3h4.8v1.2a2.4 2.4 0 0 1-4.8 0v-1.2Z" fill="#ffffff" />
+      <path d="M16 13.3h4.8v1.2a2.4 2.4 0 0 1-4.8 0v-1.2Z" fill="#ef4444" />
+      <path d="M20.8 13.3H26v1.2a2.6 2.6 0 0 1-5.2 0v-1.2Z" fill="#ffffff" />
+      <path
+        d="M6 13.3h20M11.2 13.3v1.2M16 13.3v1.2M20.8 13.3v1.2"
+        stroke="#334155"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+      <path
+        d="M13 26.3v-6.1c0-.6.5-1.1 1.1-1.1h3.8c.6 0 1.1.5 1.1 1.1v6.1"
+        fill="#dbeafe"
+        stroke="#334155"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M9.8 7.2h12.4"
+        stroke="#ef4444"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function ThemeIcon({ isDarkTheme }) {
+  if (isDarkTheme) {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 32 32" className="h-7 w-7" fill="none">
+        <circle cx="16" cy="16" r="6.2" fill="#facc15" stroke="#92400e" strokeWidth="1.5" />
+        <path d="M16 4.5v3M16 24.5v3M4.5 16h3M24.5 16h3M7.9 7.9l2.1 2.1M22 22l2.1 2.1M24.1 7.9 22 10M10 22l-2.1 2.1" stroke="#92400e" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg aria-hidden="true" viewBox="0 0 32 32" className="h-7 w-7" fill="none">
+      <path
+        d="M22.8 21.7A9.2 9.2 0 0 1 10.3 9.2 8.5 8.5 0 1 0 22.8 21.7Z"
+        fill="#475569"
+        stroke="#1e293b"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <circle cx="20.8" cy="10.1" r="1.2" fill="#94a3b8" />
+      <circle cx="24.2" cy="15.4" r="0.9" fill="#94a3b8" />
+    </svg>
+  );
 }
 
 export default function Navbar() {
@@ -122,6 +188,7 @@ export default function Navbar() {
 
         if (hasChanged) {
           updateStoredUser(latestUser);
+          setUser(latestUser);
         } else {
           setUser(storedUser);
         }
@@ -158,12 +225,13 @@ export default function Navbar() {
 
   const isAuthenticated = authStatus === "authenticated" && token;
   const isDarkTheme = theme === "dark";
+
   const navPillClass =
     "inline-flex h-11 items-center justify-center rounded-lg px-4 text-sm font-bold transition";
-  const shopButtonClass = `${navPillClass} gap-2 border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-red-200 hover:bg-slate-50 hover:text-red-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-red-500/70 dark:hover:bg-slate-800 dark:hover:text-red-300`;
-  const themeButtonClass = isDarkTheme
-    ? `${navPillClass} order-last border border-slate-500 bg-slate-200 text-slate-800 hover:bg-slate-100 dark:border-slate-500 dark:bg-slate-200 dark:text-slate-800 dark:hover:bg-slate-100`
-    : `${navPillClass} order-last border border-slate-300 bg-slate-700 text-white hover:bg-slate-800`;
+
+  const iconButtonClass =
+    "inline-flex h-11 w-11 items-center justify-center rounded-xl bg-transparent transition hover:bg-slate-100 active:scale-95 dark:hover:bg-slate-800";
+
   const authButtonClass = `${navPillClass} bg-red-600 text-white hover:bg-red-700`;
 
   return (
@@ -184,43 +252,20 @@ export default function Navbar() {
           {isAuthenticated && (
             <>
               <button
-                onClick={() => router.push("/coins")}
-                className={shopButtonClass}
-                aria-label="물방울 상점"
-                title="물방울 상점"
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  className="h-5 w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M6 8h12l-1 12H7L6 8Z" />
-                  <path d="M9 8a3 3 0 0 1 6 0" />
-                  <path d="M9.5 13h5" />
-                  <path d="M10 16h4" />
-                </svg>
-                <span>상점</span>
-              </button>
-              <button
                 onClick={() => router.push("/mypage")}
-                className="text-slate-700 transition hover:text-red-600"
+                className="text-slate-700 transition hover:text-red-600 dark:text-slate-200 dark:hover:text-red-400"
               >
                 마이페이지
               </button>
+
+              <button
+                onClick={() => router.push("/memoir?view=list")}
+                className="text-slate-700 transition hover:text-red-600 dark:text-slate-200 dark:hover:text-red-400"
+              >
+                나의 회고
+              </button>
             </>
           )}
-
-          <button
-            onClick={() => router.push("/memoir?view=list")}
-            className="text-slate-700 transition hover:text-red-600 dark:text-slate-200 dark:hover:text-red-400"
-          >
-            나의 회고
-          </button>
 
           {user?.role === "admin" && (
             <button
@@ -231,46 +276,50 @@ export default function Navbar() {
             </button>
           )}
 
-
+          {isAuthenticated && (
+            <span className="hidden max-w-[180px] truncate text-slate-500 dark:text-slate-400 sm:inline">
+              {user?.nickname || user?.email || "로그인됨"}
+            </span>
+          )}
 
           {authStatus === "checking" ? (
             <span className="rounded-lg border border-slate-200 px-4 py-2 text-slate-500 dark:border-slate-700 dark:text-slate-400">
               로그인 확인 중
             </span>
-          ) : isAuthenticated ? (
-            <>
-              <span className="hidden max-w-[180px] truncate text-slate-500 dark:text-slate-400 sm:inline">
-                {user?.nickname || user?.email || "로그인됨"}
-              </span>
-              
-          <button
-            type="button"
-            onClick={handleThemeToggle}
-            className={themeButtonClass}
-            aria-label={isDarkTheme ? "라이트 모드로 전환" : "다크 모드로 전환"}
-            title={isDarkTheme ? "라이트 모드" : "다크 모드"}
-          >
-            {isDarkTheme ? "라이트" : "다크"}
-          </button>
-              
-              <button
-                onClick={handleLogout}
-                className={authButtonClass}
-              >
-                로그아웃
-              </button>
-            </>
           ) : (
-            <button
-              onClick={() => router.push("/login")}
-              className={authButtonClass}
-            >
-              로그인
-            </button>
+            <>
+              {isAuthenticated && (
+                <button
+                  onClick={() => router.push("/coins")}
+                  className={iconButtonClass}
+                  aria-label="상점"
+                  title="상점"
+                >
+                  <ShopIcon />
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleThemeToggle}
+                className={iconButtonClass}
+                aria-label={isDarkTheme ? "라이트 모드로 전환" : "다크 모드로 전환"}
+                title={isDarkTheme ? "라이트 모드" : "다크 모드"}
+              >
+                <ThemeIcon isDarkTheme={isDarkTheme} />
+              </button>
+
+              {isAuthenticated ? (
+                <button onClick={handleLogout} className={authButtonClass}>
+                  로그아웃
+                </button>
+              ) : (
+                <button onClick={() => router.push("/login")} className={authButtonClass}>
+                  로그인
+                </button>
+              )}
+            </>
           )}
-
-
-
         </div>
       </div>
     </nav>

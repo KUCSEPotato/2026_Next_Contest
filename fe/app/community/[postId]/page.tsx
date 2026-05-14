@@ -42,6 +42,18 @@ const CATEGORIES = [
   { label: "작업 공유", value: "showcase" },
 ];
 
+const CATEGORY_LABELS: Record<string, string> = {
+  general: "일반",
+  question: "질문",
+  idea: "아이디어",
+  showcase: "작업 공유",
+};
+
+function getCategoryLabel(category?: string | null) {
+  if (!category) return "";
+  return CATEGORY_LABELS[category] || category;
+}
+
 const REACTIONS: {
   type: ReactionType;
   Icon: typeof ThumbUpIcon;
@@ -428,7 +440,7 @@ export default function PostDetailPage() {
                   {post.category && (
                     <>
                       <span>·</span>
-                      <span>{post.category}</span>
+                      <span>{getCategoryLabel(post.category)}</span>
                     </>
                   )}
                   <span>· 조회 {post.view_count}</span>

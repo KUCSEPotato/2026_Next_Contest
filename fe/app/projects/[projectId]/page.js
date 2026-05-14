@@ -24,7 +24,7 @@ const DIFFICULTY_OPTIONS = [
 ];
 
 const CATEGORY_OPTIONS = [
-  "IT/소프트웨어",
+  "IT/SW",
   "경영/경제",
   "디자인/UI·UX",
   "AI/데이터",

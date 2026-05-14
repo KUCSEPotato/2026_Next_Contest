@@ -1,10 +1,11 @@
-"use client";
+﻿"use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   bookmarkIdeaApi,
   getIdeasApi,
+  getMyEntitlementApi,
   getMyCoinBalanceApi,
   likeIdeaApi,
   unbookmarkIdeaApi,
@@ -53,7 +54,7 @@ interface IdeaListItem {
 
 const CATEGORIES = [
   { label: "전체", emoji: "✨" },
-  { label: "IT/소프트웨어", emoji: "💻" },
+  { label: "IT/SW", emoji: "💻" },
   { label: "경영/경제", emoji: "📊" },
   { label: "디자인/UI·UX", emoji: "🎨" },
   { label: "AI/데이터", emoji: "🤖" },
@@ -68,6 +69,7 @@ const IDEA_VIEW_COIN_COST = 1;
 const IDEAS_PER_PAGE = 12;
 const IDEA_VIEW_ACCESS_TTL_MS = 24 * 60 * 60 * 1000;
 const IDEA_VIEW_ACCESS_STORAGE_KEY = "devory_viewed_ideas";
+const IDEA_VIEW_DEFAULT_COST = 1;
 
 const SERVICE_BLOCKS = [
   {
@@ -145,6 +147,32 @@ function rememberIdeaViewAccess(ideaId: number) {
   } catch {}
 }
 
+function getIdeaViewAllowance(entitlement: any) {
+  const planCode = entitlement?.plan || entitlement?.product_code || "FREE";
+  const benefits = entitlement?.benefits || {};
+
+  if (planCode === "PRO_MONTHLY") {
+    return {
+      cost: 0,
+      freeRemaining: null,
+      label: "무제한 무료",
+    };
+  }
+
+  const dailyLimit = Number(benefits.idea_view_daily_limit || 0);
+  const used = Number(benefits.idea_view_used || 0);
+  const remaining = dailyLimit > 0 ? Math.max(dailyLimit - used, 0) : 0;
+
+  return {
+    cost: remaining > 0 ? 0 : IDEA_VIEW_DEFAULT_COST,
+    freeRemaining: remaining,
+    label:
+      remaining > 0
+        ? `오늘 무료 ${remaining}회 남음`
+        : `이후 ${IDEA_VIEW_DEFAULT_COST}물방울`,
+  };
+}
+
 export default function InspirationWellPage() {
   const router = useRouter();
 
@@ -154,6 +182,7 @@ export default function InspirationWellPage() {
   const [collectionFilter, setCollectionFilter] = useState<"all" | "liked" | "bookmarked">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [coinBalance, setCoinBalance] = useState<number | null>(null);
+  const [entitlement, setEntitlement] = useState<any>(null);
   const [coinModal, setCoinModal] = useState<{ open: boolean; idea: Idea | null }>({
     open: false,
     idea: null,
@@ -182,10 +211,13 @@ export default function InspirationWellPage() {
       try {
         setLoading(true);
 
-        const [result, coinResult] = await Promise.all([
+        const [result, coinResult, entitlementResult] = await Promise.all([
           getIdeasApi({ page: 1, size: 50, discarded: true }),
           getToken()
             ? getMyCoinBalanceApi().catch(() => null)
+            : Promise.resolve(null),
+          getToken()
+            ? getMyEntitlementApi().catch(() => null)
             : Promise.resolve(null),
         ]);
         const raw: IdeaListItem[] = result.data || [];
@@ -199,7 +231,7 @@ export default function InspirationWellPage() {
           bookmark_count: item.bookmark_count ?? 0,
           is_liked: Boolean(item.is_liked),
           is_bookmarked: Boolean(item.is_bookmarked),
-          domain: item.domain || item.category || "IT/소프트웨어",
+          domain: item.domain || item.category || "IT/SW",
           difficulty: item.difficulty,
           created_at: item.created_at,
           has_view_access: Boolean(item.has_view_access),
@@ -208,6 +240,7 @@ export default function InspirationWellPage() {
         }));
 
         setCoinBalance(coinResult?.data?.waterdrop_balance ?? coinResult?.data?.coin_balance ?? null);
+        setEntitlement(entitlementResult?.data || null);
         setIdeas(normalizedIdeas);
         setRecentlyViewedIdeaIds((prev) => {
           const merged = new Set(prev);
@@ -264,6 +297,7 @@ export default function InspirationWellPage() {
     (safeCurrentPage - 1) * IDEAS_PER_PAGE,
     safeCurrentPage * IDEAS_PER_PAGE
   );
+  const ideaViewAllowance = useMemo(() => getIdeaViewAllowance(entitlement), [entitlement]);
 
   const handleServiceClick = (path: string) => {
     router.push(path);
@@ -363,8 +397,13 @@ export default function InspirationWellPage() {
       setCoinModal({ open: false, idea: null });
       if (typeof data.waterdrop_balance === "number" || typeof data.coin_balance === "number") {
         setCoinBalance(data.waterdrop_balance ?? data.coin_balance);
-      } else if (!data.already_viewed) {
+      } else if (data.waterdrop_spent) {
         setCoinBalance((prev) => (prev === null ? prev : Math.max(0, prev - IDEA_VIEW_COIN_COST)));
+      }
+      if (data.free_view_used && getToken()) {
+        getMyEntitlementApi()
+          .then((nextEntitlement) => setEntitlement(nextEntitlement.data || null))
+          .catch(() => {});
       }
       router.push(`/ideas/pickup/${id}`);
     } catch (error) {
@@ -602,10 +641,12 @@ export default function InspirationWellPage() {
       </main>
 
       {coinModal.open && coinModal.idea && (
-        <CoinModal
+        <IdeaViewModal
           idea={coinModal.idea}
           coinBalance={coinBalance}
-          coinCost={IDEA_VIEW_COIN_COST}
+          coinCost={ideaViewAllowance.cost}
+          freeRemaining={ideaViewAllowance.freeRemaining}
+          costLabel={ideaViewAllowance.label}
           onConfirm={handleConfirmView}
           onCancel={() => setCoinModal({ open: false, idea: null })}
           isLoading={pickingUp}
@@ -1041,6 +1082,161 @@ function CoinModal({
             className="flex-1 rounded-2xl bg-emerald-600 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-200 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-600 dark:shadow-none dark:hover:bg-slate-700 dark:disabled:bg-slate-700"
           >
             {isLoading ? "여는 중..." : isInsufficient ? "물방울 부족" : "열람하기"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IdeaViewModal({
+  idea,
+  coinBalance,
+  coinCost,
+  freeRemaining,
+  costLabel,
+  onConfirm,
+  onCancel,
+  isLoading,
+}: {
+  idea: Idea;
+  coinBalance: number | null;
+  coinCost: number;
+  freeRemaining: number | null;
+  costLabel: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isLoading: boolean;
+}) {
+  const remainingBalance = coinBalance === null ? null : coinBalance - coinCost;
+  const isInsufficient = coinBalance !== null && coinBalance < coinCost;
+  const isFreeView = coinCost === 0;
+  const hideBalanceBlock = coinCost === 0 && freeRemaining === null;
+  const showFreeAllowance = freeRemaining !== null && freeRemaining > 0;
+
+  if (hideBalanceBlock) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={onCancel} />
+        <div className="relative w-full max-w-sm rounded-3xl border border-emerald-100 bg-white p-7 shadow-2xl shadow-emerald-200/40 dark:border-emerald-800/60 dark:bg-slate-900 dark:shadow-slate-950/60">
+          <div className="mx-auto mb-4 h-14 w-14">
+            <SeedIcon />
+          </div>
+          <h2 className="mb-1 text-center text-base font-bold text-slate-800 dark:text-slate-50">
+            아이디어를 열람할까요?
+          </h2>
+          <p className="mb-1 line-clamp-1 text-center text-sm font-semibold text-slate-700 dark:text-slate-200">
+            &ldquo;{idea.title}&rdquo;
+          </p>
+          <p className="mb-5 text-center text-xs text-slate-400 dark:text-slate-400">
+            무료 열람 플랜이라 물방울 차감 없이 확인할 수 있어요.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={onCancel}
+              disabled={isLoading}
+              className="flex-1 rounded-2xl border border-slate-200 py-3 text-sm font-medium text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              취소
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={isLoading}
+              className="flex-1 rounded-2xl bg-emerald-600 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-200 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-600 dark:shadow-none dark:hover:bg-slate-700 dark:disabled:bg-slate-700"
+            >
+              {isLoading ? "여는 중..." : "열람하기"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={onCancel} />
+
+      <div className="relative w-full max-w-sm rounded-3xl border border-emerald-100 bg-white p-7 shadow-2xl shadow-emerald-200/40 dark:border-emerald-800/60 dark:bg-slate-900 dark:shadow-slate-950/60">
+        <div className="mx-auto mb-4 h-14 w-14">
+          <SeedIcon />
+        </div>
+
+        <h2 className="mb-1 text-center text-base font-bold text-slate-800 dark:text-slate-50">
+          아이디어를 열람할까요?
+        </h2>
+
+        <p className="mb-1 line-clamp-1 text-center text-sm font-semibold text-slate-700 dark:text-slate-200">
+          &ldquo;{idea.title}&rdquo;
+        </p>
+
+        <p className="mb-5 text-center text-xs text-slate-400 dark:text-slate-400">
+          {isFreeView ? (
+            <>오늘은 <span className="font-semibold text-sky-600">무료</span>로 열람할 수 있어요.</>
+          ) : (
+            <>
+              이 아이디어를 열람하면{" "}
+              <span className="font-semibold text-sky-600">물방울 {coinCost}방울</span>이 사용됩니다.
+            </>
+          )}
+        </p>
+
+        <div
+          className={`mb-5 overflow-hidden rounded-2xl border border-amber-100 bg-amber-50 text-center dark:border-amber-800/70 dark:bg-amber-950/40 ${
+            showFreeAllowance ? "grid grid-cols-2" : "grid grid-cols-3"
+          }`}
+        >
+          <div className="px-3 py-3">
+            <p className="text-[11px] font-semibold text-amber-700/70 dark:text-amber-200/70">현재 물방울</p>
+            <p className="mt-1 text-base font-black text-amber-800 dark:text-amber-100">
+              {coinBalance === null ? "-" : coinBalance.toLocaleString("ko-KR")}
+            </p>
+          </div>
+          {showFreeAllowance ? (
+            <div className="px-3 py-3">
+              <p className="text-[11px] font-semibold text-amber-700/70 dark:text-amber-200/70">남은 무료</p>
+              <p className="mt-1 text-base font-black text-amber-800 dark:text-amber-100">
+                {freeRemaining.toLocaleString("ko-KR")}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="border-x border-amber-100 bg-white/70 px-3 py-3 dark:border-amber-800/70 dark:bg-slate-900/55">
+                <p className="text-[11px] font-semibold text-amber-700/70 dark:text-amber-200/70">{isFreeView ? "이번 열람" : "사용 물방울"}</p>
+                <p className={`mt-1 text-base font-black ${isFreeView ? "text-sky-600 dark:text-sky-300" : "text-red-600 dark:text-red-300"}`}>
+                  {isFreeView ? "0" : `-${coinCost.toLocaleString("ko-KR")}`}
+                </p>
+              </div>
+              <div className="px-3 py-3">
+                <p className="text-[11px] font-semibold text-amber-700/70 dark:text-amber-200/70">사용 후</p>
+                <p className={`mt-1 text-base font-black ${isInsufficient ? "text-red-600 dark:text-red-300" : "text-amber-800 dark:text-amber-100"}`}>
+                  {remainingBalance === null ? "-" : remainingBalance.toLocaleString("ko-KR")}
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+
+        {!isFreeView && isInsufficient ? (
+          <p className="mb-4 rounded-2xl border border-red-100 bg-red-50 px-3 py-2 text-center text-xs font-semibold text-red-700 dark:border-red-800/70 dark:bg-red-950/50 dark:text-red-200">
+            물방울이 부족합니다. 상점에서 물방울을 충전한 뒤 다시 열람해주세요.
+          </p>
+        ) : null}
+
+        <div className="flex gap-2">
+          <button
+            onClick={onCancel}
+            disabled={isLoading}
+            className="flex-1 rounded-2xl border border-slate-200 py-3 text-sm font-medium text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            취소
+          </button>
+
+          <button
+            onClick={onConfirm}
+            disabled={isLoading || isInsufficient}
+            className="flex-1 rounded-2xl bg-emerald-600 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-200 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-600 dark:shadow-none dark:hover:bg-slate-700 dark:disabled:bg-slate-700"
+          >
+            {isLoading ? "여는 중..." : isInsufficient ? "물방울 부족" : isFreeView ? "무료로 열람" : "열람하기"}
           </button>
         </div>
       </div>

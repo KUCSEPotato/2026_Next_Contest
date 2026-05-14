@@ -38,7 +38,7 @@ const MOCK_PROJECTS: Project[] = [
     id: 2,
     title: '개발자 포트폴리오 생성기',
     description: 'GitHub 프로필을 분석해 자동으로 포트폴리오를 만들어주는 서비스',
-    category: 'IT/소프트웨어',
+    category: 'IT/SW',
     techStack: ['Next.js', 'TypeScript'],
     currentMembers: 1,
     maxMembers: 3,
@@ -103,7 +103,7 @@ const MOCK_PROJECTS: Project[] = [
 
 // ─── 필터 옵션 ─────────────────────────────────────────────────
 const CATEGORIES = [
-  'IT/소프트웨어', '경영/경제', '디자인/UI·UX',
+  'IT/SW', '경영/경제', '디자인/UI·UX',
   'AI/데이터', '교육/학습', '금융/핀테크',
   '커머스/쇼핑', '소셜/커뮤니티', '헬스케어',
 ]
