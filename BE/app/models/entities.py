@@ -8,6 +8,7 @@ from sqlalchemy import (
     Boolean,
     Date,
     DateTime,
+    Enum,
     ForeignKey,
     Integer,
     Numeric,
@@ -557,7 +558,20 @@ class Notification(Base):
 
     id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    type: Mapped[str] = mapped_column(String(50), nullable=False)
+    type: Mapped[str] = mapped_column(
+        Enum(
+            "application_received",
+            "application_decided",
+            "invite_received",
+            "invite_decided",
+            "project_update",
+            "review_received",
+            "subscription_event",
+            "system",
+            name="notification_type",
+        ),
+        nullable=False,
+    )
     title: Mapped[str] = mapped_column(String(150), nullable=False)
     body: Mapped[str | None] = mapped_column(Text)
     data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)

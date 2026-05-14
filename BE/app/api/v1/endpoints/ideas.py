@@ -28,6 +28,7 @@ from app.schemas import IdeaUpdateRequest
 from app.schemas import ProjectCreateRequest
 from app.services.economy import spend_coins
 from app.services.entitlement_service import USAGE_IDEA_VIEW
+from app.services.entitlement_service import USAGE_PROJECT_CREATE
 from app.services.entitlement_service import check_usage_allowed
 from app.services.entitlement_service import get_effective_plan
 from app.services.entitlement_service import record_usage
@@ -249,6 +250,7 @@ def _create_project_from_idea(
     current_user_id: int,
     interests: list[str] | None = None,
 ) -> Project:
+    check_usage_allowed(db, current_user_id, USAGE_PROJECT_CREATE)
     project = Project(
         idea_id=idea.id,
         leader_id=current_user_id,
@@ -268,6 +270,7 @@ def _create_project_from_idea(
     _sync_project_skills_from_idea(db, project.id, list(idea.tech_stack or []))
     _sync_project_interests_from_names(db, project.id, interests or [])
     idea.converted_to_project_id = project.id
+    record_usage(db, current_user_id, USAGE_PROJECT_CREATE, target_type="project", target_id=project.id)
     spend_coins(
         db,
         user_id=current_user_id,
