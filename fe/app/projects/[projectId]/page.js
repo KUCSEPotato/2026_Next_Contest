@@ -785,12 +785,6 @@ export default function ProjectDetailPage() {
                       className="group relative inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {isBoosting ? "거름 주는 중..." : "거름 주기"}
-                      <span
-                        aria-label="거름 주기"
-                        className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-amber-300 bg-white text-[10px] font-black text-amber-700"
-                      >
-                        ?
-                      </span>
                       <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 w-64 -translate-x-1/2 rounded-xl bg-slate-950 px-3 py-2 text-left text-xs font-medium leading-5 text-white opacity-0 shadow-lg transition group-hover:opacity-100">
                         거름을 주면 프로젝트가 일정 기간 동안 목록 상단에 노출됩니다.
                       </span>
