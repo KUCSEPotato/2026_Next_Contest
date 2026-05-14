@@ -1037,8 +1037,11 @@ async def update_coin_purchase_request_for_admin(
             notification_type = "entitlement_purchase_approved"
             notification_title = "이용권 구매 요청이 승인되었습니다"
             notification_data = {
+                "notification_kind": notification_type,
                 "request_id": request.id,
+                "request_type": request.request_type,
                 "product_code": product.product_code,
+                "product_name": product.name,
                 "entitlement_id": entitlement.id,
                 "expires_at": entitlement.expires_at.isoformat(),
                 "price_krw": request.price_krw,
@@ -1057,7 +1060,9 @@ async def update_coin_purchase_request_for_admin(
             notification_type = "coin_purchase_approved"
             notification_title = "코인 구매 요청이 승인되었습니다"
             notification_data = {
+                "notification_kind": notification_type,
                 "request_id": request.id,
+                "request_type": request.request_type,
                 "coin_amount": request.coin_amount,
                 "price_krw": request.price_krw,
                 "balance_after": balance_after,
@@ -1067,7 +1072,7 @@ async def update_coin_purchase_request_for_admin(
         db.add(
             Notification(
                 user_id=request.user_id,
-                type=notification_type,
+                type="system",
                 title=notification_title,
                 body=body,
                 data=notification_data,
@@ -1079,8 +1084,11 @@ async def update_coin_purchase_request_for_admin(
             notification_type = "entitlement_purchase_rejected"
             notification_title = "이용권 구매 요청이 거절되었습니다"
             notification_data = {
+                "notification_kind": notification_type,
                 "request_id": request.id,
+                "request_type": request.request_type,
                 "product_code": request.product_code,
+                "product_name": request.product_name,
                 "price_krw": request.price_krw,
                 "reason": admin_note,
             }
@@ -1089,7 +1097,9 @@ async def update_coin_purchase_request_for_admin(
             notification_type = "coin_purchase_rejected"
             notification_title = "코인 구매 요청이 거절되었습니다"
             notification_data = {
+                "notification_kind": notification_type,
                 "request_id": request.id,
+                "request_type": request.request_type,
                 "coin_amount": request.coin_amount,
                 "price_krw": request.price_krw,
                 "reason": admin_note,
@@ -1099,7 +1109,7 @@ async def update_coin_purchase_request_for_admin(
         db.add(
             Notification(
                 user_id=request.user_id,
-                type=notification_type,
+                type="system",
                 title=notification_title,
                 body=body,
                 data=notification_data,
