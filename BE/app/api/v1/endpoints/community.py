@@ -26,7 +26,6 @@ from app.schemas import (
 )
 from app.services.s3_upload import get_s3_service
 from app.services.s3_upload import resolve_avatar_url
-from app.services.economy import spend_coins
 
 router = APIRouter()
 
@@ -209,16 +208,6 @@ async def create_post(
     )
     db.add(post)
     db.flush()
-    if payload.category not in ("announcement", "event"):
-        spend_coins(
-            db,
-            user_id=current_user_id,
-            amount=1,
-            event_type="waterdrop.community.write",
-            source_type="community_post",
-            source_id=post.id,
-            note=f"Community post waterdrop for {post.title}",
-        )
     db.commit()
     db.refresh(post)
 

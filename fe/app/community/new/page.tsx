@@ -1,18 +1,16 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { User } from "../_types";
 import { createPost, uploadPostFile } from "../_lib/api";
 import MediaPreview, { MediaItem } from "../_components/MediaPreview";
-import { useDialog, useToast } from "../../../components/AppFeedback";
-import { confirmWaterdropSpend } from "../../../lib/waterdrops";
 
 const CATEGORIES = [
-  { label: "일반", value: "general" },
-  { label: "질문", value: "question" },
-  { label: "아이디어", value: "idea" },
-  { label: "작업 공유", value: "showcase" },
+  { label: "?쇰컲", value: "general" },
+  { label: "吏덈Ц", value: "question" },
+  { label: "?꾩씠?붿뼱", value: "idea" },
+  { label: "?묒뾽 怨듭쑀", value: "showcase" },
 ];
 
 const MAX_FILES = 10;
@@ -23,8 +21,6 @@ const getErrorMessage = (error: unknown, fallback: string) =>
 
 export default function NewPostPage() {
   const router = useRouter();
-  const toast = useToast();
-  const { confirmCoinSpend } = useDialog();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -35,26 +31,6 @@ export default function NewPostPage() {
   const imageRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    Promise.resolve().then(() => {
-      const token = localStorage.getItem("access_token");
-      if (!token) {
-        router.replace("/login");
-        return;
-      }
-
-      try {
-        const raw = localStorage.getItem("user");
-        if (raw) setCurrentUser(JSON.parse(raw) as User);
-      } catch (e) {
-        console.error("유저 정보 파싱 실패", e);
-        localStorage.removeItem("user");
-      }
-    });
-  }, [router]);
-
-  // ── 파일 선택 ──────────────────────────────────────────────────────────────
   const handleFileSelect = (
     e: React.ChangeEvent<HTMLInputElement>,
     type: "image" | "video" | "file"
@@ -84,30 +60,45 @@ export default function NewPostPage() {
 
   const handleRemoveMedia = (i: number) => {
     setMedia((prev) => {
-      URL.revokeObjectURL(prev[i].url); // 메모리 해제
+      URL.revokeObjectURL(prev[i].url);
       return prev.filter((_, idx) => idx !== i);
     });
   };
 
-  // ── 제출 ───────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        router.replace("/login");
+        return;
+      }
+
+      try {
+        const raw = localStorage.getItem("user");
+        if (raw) setCurrentUser(JSON.parse(raw) as User);
+      } catch (e) {
+        console.error("?좎? ?뺣낫 ?뚯떛 ?ㅽ뙣", e);
+        localStorage.removeItem("user");
+      }
+    });
+  }, [router]);
+
   const handleSubmit = async () => {
-    if (!content.trim()) { setError("내용을 입력해주세요."); return; }
+    if (!title.trim()) {
+      setError("제목을 입력해주세요.");
+      return;
+    }
+    if (!content.trim()) {
+      setError("내용을 입력해주세요.");
+      return;
+    }
+
     setSubmitting(true);
     setError("");
 
     try {
-      const canSpend = await confirmWaterdropSpend({
-        confirmCoinSpend,
-        toast,
-        actionLabel: "모닥불 글쓰기",
-        message: "모닥불에 새 이야기를 올리면 물방울 1방울이 사용됩니다.",
-        tone: "campfire",
-        icon: "campfire",
-      });
-      if (!canSpend) return;
-
       const post = await createPost({
-        title: title.trim() || content.trim().slice(0, 50),
+        title: title.trim(),
         content: content.trim(),
         category: category || undefined,
       });
@@ -115,7 +106,7 @@ export default function NewPostPage() {
       let failedUploadCount = 0;
       for (let i = 0; i < media.length; i += 1) {
         setMedia((prev) =>
-          prev.map((m, idx) => idx === i ? { ...m, uploading: true } : m)
+          prev.map((m, idx) => (idx === i ? { ...m, uploading: true } : m))
         );
 
         try {
@@ -129,7 +120,7 @@ export default function NewPostPage() {
           failedUploadCount += 1;
           console.error("파일 업로드 실패", uploadError);
           setMedia((prev) =>
-            prev.map((m, idx) => idx === i ? { ...m, uploading: false } : m)
+            prev.map((m, idx) => (idx === i ? { ...m, uploading: false } : m))
           );
         }
       }
@@ -164,7 +155,7 @@ export default function NewPostPage() {
           <h1 className="text-base font-bold text-gray-900">새 게시물</h1>
           <button
             onClick={handleSubmit}
-            disabled={submitting || !content.trim()}
+            disabled={submitting || !title.trim() || !content.trim()}
             className="rounded-xl bg-red-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-40"
           >
             {submitting ? "게시 중..." : "게시하기"}
@@ -177,30 +168,30 @@ export default function NewPostPage() {
           </div>
         )}
 
-        {/* 글 작성 영역 */}
+        {/* 湲 ?묒꽦 ?곸뿭 */}
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="제목 (선택사항)"
+            placeholder="?쒕ぉ"
             className="mb-3 w-full border-b border-gray-100 bg-white pb-3 text-base font-semibold text-gray-900 outline-none placeholder:text-gray-300"
           />
           <textarea
             autoFocus
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="무슨 생각을 하고 계신가요?"
+            placeholder="臾댁뒯 ?앷컖???섍퀬 怨꾩떊媛??"
             rows={10}
             className="w-full resize-none bg-white text-sm leading-relaxed text-gray-800 outline-none placeholder:text-gray-300"
           />
 
-          {/* 미디어 미리보기 */}
+          {/* 誘몃뵒??誘몃━蹂닿린 */}
           <MediaPreview media={media} onRemove={handleRemoveMedia} />
         </div>
 
-        {/* 카테고리 */}
+        {/* 移댄뀒怨좊━ */}
         <div className="mt-3 rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
-          <p className="mb-2 text-xs font-medium text-gray-500">카테고리</p>
+          <p className="mb-2 text-xs font-medium text-gray-500">移댄뀒怨좊━</p>
           <div className="flex flex-wrap gap-2">
             {CATEGORIES.map((cat) => (
               <button
@@ -218,19 +209,18 @@ export default function NewPostPage() {
           </div>
         </div>
 
-        {/* 파일 첨부 툴바 */}
+        {/* ?뚯씪 泥⑤? ?대컮 */}
         <div className="mt-3 rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium text-gray-500">
-              파일 첨부
+              ?뚯씪 泥⑤?
               <span className="ml-1.5 text-gray-300">
-              ({media.length}/{MAX_FILES}) · 최대 {MAX_FILE_SIZE_MB}MB · PDF/문서 가능
-              </span>
+              ({media.length}/{MAX_FILES}) 쨌 理쒕? {MAX_FILE_SIZE_MB}MB 쨌 PDF/臾몄꽌 媛??              </span>
             </p>
           </div>
 
           <div className="mt-2 flex gap-2">
-            {/* 사진 */}
+            {/* ?ъ쭊 */}
             <input
               ref={imageRef}
               type="file"
@@ -244,10 +234,10 @@ export default function NewPostPage() {
               disabled={submitting || media.length >= MAX_FILES}
               className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600 transition hover:border-red-300 hover:text-red-500 disabled:opacity-40"
             >
-              📷 사진
+              ?벜 ?ъ쭊
             </button>
 
-            {/* 동영상 */}
+            {/* ?숈쁺??*/}
             <input
               ref={videoRef}
               type="file"
@@ -261,10 +251,9 @@ export default function NewPostPage() {
               disabled={submitting || media.length >= MAX_FILES}
               className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600 transition hover:border-red-300 hover:text-red-500 disabled:opacity-40"
             >
-              🎥 동영상
-            </button>
+              ?렏 ?숈쁺??            </button>
 
-            {/* 일반 파일 */}
+            {/* ?쇰컲 ?뚯씪 */}
             <input
               ref={fileRef}
               type="file"
@@ -278,7 +267,7 @@ export default function NewPostPage() {
               disabled={submitting || media.length >= MAX_FILES}
               className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600 transition hover:border-red-300 hover:text-red-500 disabled:opacity-40"
             >
-              📎 파일
+              ?뱨 ?뚯씪
             </button>
           </div>
         </div>
@@ -287,3 +276,10 @@ export default function NewPostPage() {
     </div>
   );
 }
+
+
+
+
+
+
+
