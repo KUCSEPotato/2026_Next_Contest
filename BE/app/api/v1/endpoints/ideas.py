@@ -37,6 +37,24 @@ from app.services.s3_upload import get_s3_service
 router = APIRouter()
 IDEA_VIEW_ACCESS_TTL = timedelta(days=1)
 
+DIFFICULTY_ALIASES = {
+    "easy": "beginner",
+    "normal": "intermediate",
+    "hard": "advanced",
+}
+VALID_DIFFICULTIES = {"beginner", "intermediate", "advanced"}
+
+
+def _normalize_difficulty(value: str) -> str:
+    normalized = value.strip().lower()
+    mapped = DIFFICULTY_ALIASES.get(normalized, normalized)
+    if mapped not in VALID_DIFFICULTIES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="difficulty must be one of beginner/intermediate/advanced",
+        )
+    return mapped
+
 
 def _get_optional_user_id(authorization: str | None) -> int | None:
     if not authorization or not authorization.lower().startswith("bearer "):
@@ -309,7 +327,7 @@ async def create_idea(
         domain=payload.domain,
         tech_stack=payload.tech_stack,
         hashtags=payload.hashtags,
-        difficulty=payload.difficulty,
+        difficulty=_normalize_difficulty(payload.difficulty),
         required_members=payload.required_members,
         is_open=payload.is_open,
     )
@@ -686,6 +704,8 @@ async def update_idea(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only author can update")
 
     for field, value in payload.model_dump(exclude_none=True).items():
+        if field == "difficulty":
+            value = _normalize_difficulty(value)
         setattr(idea, field, value)
     db.commit()
     db.refresh(idea)
@@ -860,7 +880,7 @@ async def convert_idea_to_project(
         summary=payload.summary,
         description=_strip_idea_description_sections(payload.description),
         category=payload.category,
-        difficulty=payload.difficulty,
+        difficulty=_normalize_difficulty(payload.difficulty),
         status=payload.status,
         progress_percent=payload.progress_percent,
         max_members=payload.max_members,
