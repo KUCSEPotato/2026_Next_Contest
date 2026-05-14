@@ -82,7 +82,7 @@ const getErrorMessage = (error: unknown, fallback: string) =>
 export default function PostDetailPage() {
   const router = useRouter();
   const toast = useToast();
-  const { prompt } = useDialog();
+  const { prompt, confirm } = useDialog();
   const { postId } = useParams<{ postId: string }>();
   const pid = Number(postId);
 
@@ -230,12 +230,19 @@ export default function PostDetailPage() {
   };
 
   const handleDeletePost = async () => {
-    if (!confirm("게시물을 삭제할까요?")) return;
+    const ok = await confirm({
+      title: "게시물을 삭제할까요?",
+      message: "삭제한 게시물은 다시 복구하기 어려워요.",
+      confirmText: "삭제하기",
+      cancelText: "취소",
+      tone: "danger",
+    });
+    if (!ok) return;
     try {
       await deletePost(pid);
       router.push("/community");
     } catch (e: unknown) {
-      alert(getErrorMessage(e, "삭제에 실패했어요."));
+      toast.error(getErrorMessage(e, "삭제에 실패했어요."));
     }
   };
 
@@ -380,13 +387,20 @@ export default function PostDetailPage() {
   };
 
   const handleDeleteComment = async (commentId: number) => {
-    if (!confirm("댓글을 삭제할까요?")) return;
+    const ok = await confirm({
+      title: "댓글을 삭제할까요?",
+      message: "삭제한 댓글은 다시 복구하기 어려워요.",
+      confirmText: "삭제하기",
+      cancelText: "취소",
+      tone: "danger",
+    });
+    if (!ok) return;
     try {
       await deleteComment(pid, commentId);
       setComments((prev) => removeCommentFromTree(prev, commentId));
       setPost((p) => p ? { ...p, comment_count: Math.max(0, p.comment_count - 1) } : p);
     } catch (e: unknown) {
-      alert(getErrorMessage(e, "삭제에 실패했어요."));
+      toast.error(getErrorMessage(e, "삭제에 실패했어요."));
     }
   };
 

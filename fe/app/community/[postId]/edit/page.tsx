@@ -11,6 +11,7 @@ import {
   uploadPostFile,
 } from "../../_lib/api";
 import MediaPreview, { MediaItem } from "../../_components/MediaPreview";
+import { useDialog } from "../../../../components/AppFeedback";
 
 const CATEGORIES = [
   { label: "일반", value: "general" },
@@ -33,6 +34,7 @@ const getMediaType = (file: File): MediaItem["type"] => {
 
 export default function EditPostPage() {
   const router = useRouter();
+  const { confirm } = useDialog();
   const { postId } = useParams<{ postId: string }>();
   const pid = Number(postId);
 
@@ -126,7 +128,14 @@ export default function EditPostPage() {
   };
 
   const handleDeleteExistingFile = async (fileId: number) => {
-    if (!confirm("첨부 파일을 삭제할까요?")) return;
+    const ok = await confirm({
+      title: "첨부 파일을 삭제할까요?",
+      message: "삭제한 첨부 파일은 다시 복구하기 어려워요.",
+      confirmText: "삭제하기",
+      cancelText: "취소",
+      tone: "danger",
+    });
+    if (!ok) return;
 
     try {
       await deletePostFile(pid, fileId);
