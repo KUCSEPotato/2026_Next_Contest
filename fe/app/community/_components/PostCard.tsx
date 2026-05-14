@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PostSummary, User, ReactionType } from "../_types";
+import { PostFile, PostSummary, User, ReactionType } from "../_types";
 import { timeAgo } from "../_lib/utils";
 import Avatar from "./Avatar";
 import { ThumbDownIcon, ThumbUpIcon } from "./ReactionThumbIcons";
@@ -59,6 +59,56 @@ function AttachmentIndicator({ count }: { count: number }) {
   );
 }
 
+function isImageFile(file: PostFile) {
+  return file.file_type.startsWith("image/");
+}
+
+function isVideoFile(file: PostFile) {
+  return file.file_type.startsWith("video/");
+}
+
+function isMediaFile(file: PostFile) {
+  return isImageFile(file) || isVideoFile(file);
+}
+
+function MediaAttachmentPreview({ mediaFiles }: { mediaFiles: PostFile[] }) {
+  if (!mediaFiles.length) return null;
+
+  const firstMedia = mediaFiles[0];
+  const remainingCount = mediaFiles.length - 1;
+
+  return (
+    <div className="grid w-full grid-cols-2 gap-2 sm:w-48 md:w-56">
+      <div
+        className={`overflow-hidden rounded-xl border border-gray-100 bg-gray-50 ${
+          remainingCount > 0 ? "h-24" : "col-span-2 h-28 sm:h-32"
+        }`}
+      >
+        {isImageFile(firstMedia) ? (
+          <img
+            src={firstMedia.s3_url}
+            alt={firstMedia.filename}
+            className="h-full w-full object-contain"
+          />
+        ) : (
+          <video
+            src={firstMedia.s3_url}
+            muted
+            playsInline
+            className="h-full w-full object-contain"
+          />
+        )}
+      </div>
+
+      {remainingCount > 0 && (
+        <div className="flex h-24 items-center justify-center rounded-xl border border-gray-100 bg-gray-100 text-lg font-bold text-gray-500">
+          +{remainingCount}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PostCard({
   post,
   currentUser,
@@ -82,7 +132,8 @@ export default function PostCard({
 
   const isOwn = currentUser?.id === post.author_id;
   const goToDetail = () => router.push(`/community/${post.id}`);
-  const attachmentCount = post.files?.length ?? 0;
+  const mediaFiles = post.files?.filter(isMediaFile) ?? [];
+  const fileAttachmentCount = post.files?.filter((file) => !isMediaFile(file)).length ?? 0;
 
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
@@ -142,7 +193,11 @@ export default function PostCard({
       </div>
 
       {/* Content — 클릭 시 상세 이동 */}
-      <div className="cursor-pointer" onClick={goToDetail}>
+      <div
+        className="flex cursor-pointer flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+        onClick={goToDetail}
+      >
+        <div className="min-w-0 flex-1">
         {post.title && (
           <p className="mb-1 text-sm font-semibold text-gray-900 line-clamp-1">
             {post.title}
@@ -158,7 +213,12 @@ export default function PostCard({
               {post.category}
             </span>
           )}
-          <AttachmentIndicator count={attachmentCount} />
+          <AttachmentIndicator count={fileAttachmentCount} />
+        </div>
+        </div>
+
+        <div className="shrink-0 self-stretch sm:self-start">
+          <MediaAttachmentPreview mediaFiles={mediaFiles} />
         </div>
       </div>
 
