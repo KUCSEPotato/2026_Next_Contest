@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -85,7 +87,42 @@ OPENAPI_TAGS = [
 ]
 
 
-def create_app() -> FastAPI:
+def _allowed_origins() -> list[str]:
+    configured_origins = [
+        settings.frontend_origin,
+        settings.frontend_url,
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://3.37.87.121:3000",
+        "https://devory.kr",
+        "https://www.devory.kr",
+    ]
+    allowed_origins = []
+    for value in configured_origins:
+        if not value:
+            continue
+        for origin in value.split(","):
+            origin = origin.strip()
+            if origin and origin not in allowed_origins:
+                allowed_origins.append(origin)
+    return allowed_origins
+
+
+def _with_cors(app: FastAPI) -> FastAPI:
+    allowed_origins = _allowed_origins()
+    if not allowed_origins:
+        return app
+
+    return CORSMiddleware(
+        app,
+        allow_origins=allowed_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+
+def create_app() -> Callable:
     Base.metadata.create_all(bind=engine)
 
     app = FastAPI(
@@ -111,33 +148,6 @@ def create_app() -> FastAPI:
 
     app.include_router(api_router, prefix="/api/v1")
 
-    configured_origins = [
-        settings.frontend_origin,
-        settings.frontend_url,
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://3.37.87.121:3000",
-        "https://devory.kr",
-        "https://www.devory.kr",
-    ]
-    allowed_origins = []
-    for value in configured_origins:
-        if not value:
-            continue
-        for origin in value.split(","):
-            origin = origin.strip()
-            if origin and origin not in allowed_origins:
-                allowed_origins.append(origin)
-
-    if allowed_origins:
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=allowed_origins,
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
-
     # Expose Prometheus metrics at /metrics for runtime monitoring.
     if Instrumentator is not None:
         Instrumentator(
@@ -146,7 +156,7 @@ def create_app() -> FastAPI:
             excluded_handlers=["/metrics", "/docs", "/redoc", "/openapi.json"],
         ).instrument(app).expose(app, include_in_schema=False, should_gzip=True)
 
-    return app
+    return _with_cors(app)
 
 
 app = create_app()

@@ -561,26 +561,7 @@ class Notification(Base):
 
     id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    type: Mapped[str] = mapped_column(
-        Enum(
-            "application_received",
-            "application_decided",
-            "invite_received",
-            "invite_decided",
-            "project_update",
-            "review_received",
-            "subscription_event",
-            "coin_purchase_approved",
-            "coin_purchase_rejected",
-            "entitlement_purchase_approved",
-            "entitlement_purchase_rejected",
-            "hot_post",
-            "project.stale_reminder",
-            "system",
-            name="notification_type",
-        ),
-        nullable=False,
-    )
+    type: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str] = mapped_column(String(150), nullable=False)
     body: Mapped[str | None] = mapped_column(Text)
     data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
