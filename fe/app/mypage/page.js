@@ -86,6 +86,7 @@ export default function MyPage() {
   const toast = useToast();
   const { confirm } = useDialog();
   const projectHistoryRef = useRef(null);
+  const bioRef = useRef(null);
 
   const [profile, setProfile] = useState(null);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
@@ -105,6 +106,8 @@ export default function MyPage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [showReviews, setShowReviews] = useState(false);
+  const [isBioExpanded, setIsBioExpanded] = useState(false);
+  const [bioOverflows, setBioOverflows] = useState(false);
   const [isStartingGithubLink, setIsStartingGithubLink] = useState(false);
   const [openingChatProjectId, setOpeningChatProjectId] = useState(null);
 
@@ -223,6 +226,25 @@ export default function MyPage() {
     });
   }, [loading]);
 
+  useEffect(() => {
+    if (isBioExpanded) return;
+
+    const measureBio = () => {
+      const bioElement = bioRef.current;
+      if (!bioElement) return;
+
+      setBioOverflows(bioElement.scrollHeight > bioElement.clientHeight + 1);
+    };
+
+    const frameId = requestAnimationFrame(measureBio);
+    window.addEventListener("resize", measureBio);
+
+    return () => {
+      cancelAnimationFrame(frameId);
+      window.removeEventListener("resize", measureBio);
+    };
+  }, [profile?.bio, isBioExpanded]);
+
   const handleAvatarUpload = async (e) => {
     const file = e.target.files?.[0];
 
@@ -268,6 +290,7 @@ export default function MyPage() {
         interests: prev?.interests,
       }));
       updateStoredUser(result.data);
+      setIsBioExpanded(false);
       setIsEditingProfile(false);
     } catch (error) {
       console.error(error);
@@ -471,6 +494,7 @@ export default function MyPage() {
   const avatarFallback = profile?.nickname?.[0] || "D";
   const planName = getPlanName(entitlement);
   const renewalStatus = getRenewalStatus(entitlement);
+  const profileBio = String(profile?.bio || "").trim();
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
@@ -498,7 +522,32 @@ export default function MyPage() {
                 <p className="mt-3 truncate text-lg font-medium text-slate-600">
                   {profile?.email}
                 </p>
-                <p className="mt-3 line-clamp-2 text-lg font-semibold text-slate-800">
+                {profileBio ? (
+                  <div className="mt-3">
+                    <p
+                      ref={bioRef}
+                      className={`whitespace-pre-line text-lg font-semibold leading-relaxed text-slate-800 ${
+                        isBioExpanded ? "" : "line-clamp-2"
+                      }`}
+                    >
+                      {profileBio}
+                    </p>
+                    {bioOverflows && (
+                      <button
+                        type="button"
+                        onClick={() => setIsBioExpanded((current) => !current)}
+                        className="mt-1 text-sm font-bold text-red-700 transition hover:text-red-800"
+                      >
+                        {isBioExpanded ? "접기" : "더보기"}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-lg font-semibold text-slate-400">
+                    아직 자기소개가 없습니다.
+                  </p>
+                )}
+                <p className="hidden">
                   {profile?.bio || "Devory로 돈 벌 게임"}
                 </p>
               </div>
@@ -508,7 +557,7 @@ export default function MyPage() {
               <div className="flex flex-wrap items-center gap-3">
                 <p className="text-lg font-black text-red-800">현재 플랜: {planName}</p>
                 <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-sky-800">
-                  현재 잔액: {formatWaterdrops(waterdropBalance)}
+                  남은 물방울: {formatWaterdrops(waterdropBalance)}
                 </span>
               </div>
 
@@ -532,7 +581,7 @@ export default function MyPage() {
             </div>
           </div>
 
-          <div className="grid gap-4 border-t border-slate-100 px-6 pb-6 lg:grid-cols-[1fr_auto] lg:items-end lg:px-8">
+          <div className="grid gap-4 px-6 pb-6 lg:grid-cols-[1fr_auto] lg:items-end lg:px-8">
             <div className="grid gap-3 md:grid-cols-2">
               <ProfileOptionPreview title="기술 스택" items={profile?.skills} tone="red" />
               <ProfileOptionPreview title="관심 분야" items={profile?.interests} tone="slate" />
