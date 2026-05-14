@@ -1129,7 +1129,7 @@ function IdeaViewModal({
             &ldquo;{idea.title}&rdquo;
           </p>
           <p className="mb-5 text-center text-xs text-slate-400 dark:text-slate-400">
-            무료 열람 플랜이라 물방울 차감 없이 확인할 수 있어요.
+            Devory Pro 플랜 사용자는 물방울 차감 없이 확인할 수 있어요.
           </p>
           <div className="flex gap-2">
             <button
