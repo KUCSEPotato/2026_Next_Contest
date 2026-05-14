@@ -74,6 +74,8 @@ from app.core.realtime import realtime_hub
 router = APIRouter()
 
 TODO_FINALIZED_MARKER_TITLE = "__team_todo_finalized__"
+TODO_PRIORITY_MIN = 1
+TODO_PRIORITY_MAX = 5
 
 
 IDEA_DESCRIPTION_SECTION_LABELS = (
@@ -172,6 +174,10 @@ def _calculate_days_left(deadline: date | None) -> int | None:
         return None
     days = (deadline - date.today()).days
     return max(0, days)
+
+
+def _clamp_todo_priority(value: int) -> int:
+    return max(TODO_PRIORITY_MIN, min(TODO_PRIORITY_MAX, int(value)))
 
 
 def _is_urgent(deadline: date | None) -> bool:
@@ -1655,7 +1661,7 @@ async def create_todo(
         description=payload.description,
         stage=payload.stage,
         status=payload.status,
-        priority=payload.priority,
+        priority=_clamp_todo_priority(payload.priority),
         due_date=payload.due_date,
     )
     db.add(todo)
@@ -1752,7 +1758,10 @@ async def update_todo(
 
     for field in ("title", "description", "stage", "status", "priority", "due_date"):
         if field in update_data:
-            setattr(todo, field, update_data[field])
+            value = update_data[field]
+            if field == "priority":
+                value = _clamp_todo_priority(value)
+            setattr(todo, field, value)
 
     if "assignee_id" in update_data or "assignee_ids" in update_data:
         _validate_todo_assignees(db, project_id, assignee_ids)
@@ -1833,7 +1842,7 @@ async def generate_project_todos_with_ai(
             description=description,
             stage=stage,
             status="todo",
-            priority=max_priority + index,
+            priority=_clamp_todo_priority(max_priority + index),
         )
         db.add(todo)
         db.flush()
