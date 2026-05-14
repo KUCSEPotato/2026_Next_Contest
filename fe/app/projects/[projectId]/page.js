@@ -786,7 +786,7 @@ export default function ProjectDetailPage() {
                     >
                       {isBoosting ? "거름 주는 중..." : "거름 주기"}
                       <span
-                        aria-label="거름 주기 설명"
+                        aria-label="거름 주기"
                         className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-amber-300 bg-white text-[10px] font-black text-amber-700"
                       >
                         ?
