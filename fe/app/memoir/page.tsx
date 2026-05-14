@@ -267,11 +267,11 @@ function ordinalKo(n: number) {
 }
 
 function getGardenLevel(count: number) {
-  if (count >= 8) return { emoji: "🌹", title: "만개한 정원", desc: "꾸준한 완성 경험이 쌓인 단계예요." };
-  if (count >= 4) return { emoji: "🌷", title: "개화 단계", desc: "여러 프로젝트가 꽃처럼 피어나고 있어요." };
-  if (count >= 2) return { emoji: "🌿", title: "새싹 단계", desc: "성장의 흐름이 보이기 시작했어요." };
-  if (count >= 1) return { emoji: "🌱", title: "씨앗 단계", desc: "첫 번째 완성 경험이 자라났어요." };
-  return { emoji: "🪴", title: "빈 화분", desc: "첫 번째 프로젝트 개화를 기다리고 있어요." };
+  return {
+    emoji: "🌷",
+    title: "나의 회고",
+    desc: "완료한 프로젝트와 회고 기록을 한눈에 모아볼 수 있어요.",
+  };
 }
 
 function collectTopChips(items: MemoirOverviewItem[]) {
