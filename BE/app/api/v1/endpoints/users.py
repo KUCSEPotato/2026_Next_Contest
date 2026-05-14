@@ -394,7 +394,7 @@ async def get_my_projects(
     
     각 프로젝트에 can_discard 필드를 포함합니다.
     can_discard 조건:
-    - 팀 결성이 된 프로젝트 (status가 'started', 'in_progress', 'completed', 'recycled' 중 하나)
+    - 팀이 결성된 프로젝트 (status가 'planning'이 아닌 경우)
     - 또는 아이디어 생성 후 30일 이상 경과한 프로젝트
     
     Swagger 테스트 방법:
@@ -539,7 +539,7 @@ async def get_user_stats(user_id: int, db: Session = Depends(get_db)) -> dict:
             .filter(
                 ProjectMember.user_id == user_id,
                 ProjectMember.left_at.is_(None),
-                Project.status.in_(["in_progress", "started", "paused"]),
+                Project.status.in_(["in_progress", "paused"]),
                 Project.deleted_at.is_(None),
             )
             .all()
@@ -551,7 +551,7 @@ async def get_user_stats(user_id: int, db: Session = Depends(get_db)) -> dict:
             db.query(Project.id)
             .filter(
                 Project.leader_id == user_id,
-                Project.status.in_(["in_progress", "started", "paused"]),
+                Project.status.in_(["in_progress", "paused"]),
                 Project.deleted_at.is_(None),
             )
             .all()

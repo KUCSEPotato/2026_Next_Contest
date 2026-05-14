@@ -751,14 +751,14 @@ export default function CoinsPage() {
               <div className="mb-4">
                 <h2 className="text-xl font-black text-slate-950 dark:text-slate-50">단기 이용권</h2>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  짧은 기간 동안 프로젝트 생성/지원 권한을 쓰는 패스입니다. 기간권은 자동 갱신되지 않습니다.
+                  짧은 기간 동안 프로젝트 생성/지원 권한을 쓰는 플랜입니다. 단기 이용권은 자동 갱신되지 않습니다.
                 </p>
               </div>
               <div className="grid gap-4 md:grid-cols-3">
                 {passProducts.map((product) => (
                   <PlanCard
                     key={product.product_code}
-                    eyebrow={`${product.duration_days}일 기간권`}
+                    eyebrow={`${product.duration_days}일 이용권`}
                     product={product}
                     isCurrent={currentPlanCode === product.product_code}
                     onError={handlePaymentError}
@@ -770,7 +770,7 @@ export default function CoinsPage() {
                 ))}
                 {passProducts.length === 0 && (
                   <p className="rounded-2xl border border-gray-100 bg-white p-5 text-sm text-gray-400 shadow-sm dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-500">
-                    기간권 상품을 불러오지 못했습니다.
+                    단기 이용권 상품을 불러오지 못했습니다.
                   </p>
                 )}
               </div>
@@ -780,7 +780,7 @@ export default function CoinsPage() {
               <div className="mb-4">
                 <h2 className="text-xl font-black text-slate-950 dark:text-slate-50">물방울 충전</h2>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  FREE/PASS 사용자의 아이디어 열람 등에 사용할 물방울입니다.
+                  무료/단기 이용권 사용자의 아이디어 열람 등에 사용할 물방울입니다.
                 </p>
               </div>
               <div className="grid gap-4 md:grid-cols-3">
