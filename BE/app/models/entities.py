@@ -574,6 +574,8 @@ class Notification(Base):
             "coin_purchase_rejected",
             "entitlement_purchase_approved",
             "entitlement_purchase_rejected",
+            "hot_post",
+            "project.stale_reminder",
             "system",
             name="notification_type",
         ),

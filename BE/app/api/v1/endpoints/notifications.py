@@ -12,6 +12,10 @@ from app.models import Notification
 router = APIRouter()
 
 
+def _notification_data(value) -> dict:
+    return value if isinstance(value, dict) else {}
+
+
 @router.get("", summary="알림 목록", description="현재 사용자의 알림 목록을 최신순으로 조회합니다.")
 async def list_notifications(
     current_user_id: int = Depends(get_current_user_id),
@@ -31,22 +35,23 @@ async def list_notifications(
         .order_by(Notification.id.desc())
         .all()
     )
-    return success_response(
-        data=[
+    data = []
+    for notification in notifications:
+        notification_data = _notification_data(notification.data)
+        data.append(
             {
-                "id": n.id,
-                "type": n.type,
-                "title": n.title,
-                "body": n.body,
-                "data": n.data or {},
-                "project_id": (n.data or {}).get("project_id"),
-                "url": (n.data or {}).get("url"),
-                "is_read": n.is_read,
-                "created_at": n.created_at,
+                "id": notification.id,
+                "type": notification.type,
+                "title": notification.title,
+                "body": notification.body,
+                "data": notification_data,
+                "project_id": notification_data.get("project_id"),
+                "url": notification_data.get("url"),
+                "is_read": notification.is_read,
+                "created_at": notification.created_at,
             }
-            for n in notifications
-        ]
-    )
+        )
+    return success_response(data=data)
 
 
 @router.patch("/read-all", summary="알림 모두 읽음 처리", description="현재 사용자의 읽지 않은 알림을 모두 읽음 처리합니다.")
