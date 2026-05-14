@@ -13,8 +13,9 @@ import {
   createReportApi,
   boostProjectApi,
 } from "../../../lib/api";
-import { SKILLS_LIST } from "../../../lib/profileOptions";
+import { INTERESTS_LIST, SKILLS_LIST } from "../../../lib/profileOptions";
 import { useDialog, useToast } from "../../../components/AppFeedback";
+import { confirmWaterdropSpend } from "../../../lib/waterdrops";
 
 const DIFFICULTY_OPTIONS = [
   { value: "beginner", label: "입문" },
@@ -34,6 +35,49 @@ const CATEGORY_OPTIONS = [
   "헬스케어",
 ];
 
+const getOptionKey = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s._-]+/g, "");
+
+const toOptionArray = (value) => {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") return value.split(",");
+  return [];
+};
+
+const hasSelectableValue = (value) =>
+  toOptionArray(value).some((item) => String(item || "").trim());
+
+const normalizeSelectableValues = (value, options) => {
+  const optionByKey = new Map(options.map((option) => [getOptionKey(option), option]));
+  const seen = new Set();
+
+  return toOptionArray(value).reduce((items, item) => {
+    const trimmed = String(item || "").trim();
+    if (!trimmed) return items;
+
+    const canonical = optionByKey.get(getOptionKey(trimmed)) || trimmed;
+    const key = getOptionKey(canonical);
+    if (seen.has(key)) return items;
+
+    seen.add(key);
+    items.push(canonical);
+    return items;
+  }, []);
+};
+
+const toggleSelectableValue = (current, nextValue, options) => {
+  const normalized = normalizeSelectableValues(current, options);
+  const nextKey = getOptionKey(nextValue);
+  const isSelected = normalized.some((item) => getOptionKey(item) === nextKey);
+
+  return isSelected
+    ? normalized.filter((item) => getOptionKey(item) !== nextKey)
+    : [...normalized, nextValue];
+};
+
 const getProjectMemberUserId = (member) => member.user_id || member.id || member.user?.id;
 
 const getProjectMemberDisplayName = (member) => {
@@ -52,7 +96,7 @@ export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
   const toast = useToast();
-  const { prompt } = useDialog();
+  const { prompt, confirmCoinSpend } = useDialog();
   const projectId = params.projectId;
 
   const [project, setProject] = useState(null);
@@ -67,6 +111,7 @@ export default function ProjectDetailPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isBoosting, setIsBoosting] = useState(false);
   const [showDiscardOptions, setShowDiscardOptions] = useState(false);
+  const [nowTime, setNowTime] = useState(() => Date.now());
 
   const [editForm, setEditForm] = useState({
     title: "",
@@ -79,6 +124,7 @@ export default function ProjectDetailPage() {
     expected_period: "",
     preferred_members: "",
     tech_stack: [],
+    interests: [],
     hashtags: "",
     is_public: true,
   });
@@ -89,29 +135,42 @@ export default function ProjectDetailPage() {
   const inputClassName =
     "w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100";
 
-  const buildEditFormFromProject = (projectData) => ({
-    title: projectData.title || "",
-    summary: projectData.summary || "",
-    description: projectData.description || "",
-    difficulty: projectData.difficulty || "",
-    category: projectData.category || projectData.domain || "",
-    progress_percent: projectData.progress_percent ?? 0,
-    max_members:
-      projectData.max_members ??
-      projectData.maxMembers ??
-      projectData.recruitment_count ??
-      projectData.member_limit ??
-      "",
-    expected_period: projectData.expected_period || "",
-    preferred_members: projectData.preferred_members || "",
-    tech_stack: projectData.tech_stack || projectData.techStack || [],
-    hashtags: (projectData.hashtags || projectData.hash_tags || []).join(", "),
-    is_public: projectData.is_public ?? true,
-  });
+  const buildEditFormFromProject = (projectData) => {
+    const techStackValue = hasSelectableValue(projectData.tech_stack)
+      ? projectData.tech_stack
+      : projectData.techStack;
+
+    return {
+      title: projectData.title || "",
+      summary: projectData.summary || "",
+      description: projectData.description || "",
+      difficulty: projectData.difficulty || "",
+      category: projectData.category || projectData.domain || "",
+      progress_percent: projectData.progress_percent ?? 0,
+      max_members:
+        projectData.max_members ??
+        projectData.maxMembers ??
+        projectData.recruitment_count ??
+        projectData.member_limit ??
+        "",
+      expected_period: projectData.expected_period || "",
+      preferred_members: projectData.preferred_members || "",
+      tech_stack: normalizeSelectableValues(techStackValue, SKILLS_LIST),
+      interests: normalizeSelectableValues(projectData.interests, INTERESTS_LIST),
+      hashtags: (projectData.hashtags || projectData.hash_tags || []).join(", "),
+      is_public: projectData.is_public ?? true,
+    };
+  };
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [projectId]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNowTime(Date.now()), 60_000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     async function fetchProject() {
@@ -165,8 +224,10 @@ export default function ProjectDetailPage() {
       ));
   const hasApplied = Boolean(myApplication);
   const acceptedMemberCount = project?.members?.length || 1;
-  const isBoosted =
-    project?.boosted_until && new Date(project.boosted_until).getTime() > Date.now();
+  const boostedUntilTime = project?.boosted_until
+    ? new Date(project.boosted_until).getTime()
+    : 0;
+  const isBoosted = Number.isFinite(boostedUntilTime) && boostedUntilTime > nowTime;
 
   const handleEditChange = (field, value) => {
     setEditForm((prev) => ({
@@ -177,13 +238,18 @@ export default function ProjectDetailPage() {
 
   const toggleEditTechStack = (skill) => {
     setEditForm((prev) => {
-      const current = Array.isArray(prev.tech_stack) ? prev.tech_stack : [];
-
       return {
         ...prev,
-        tech_stack: current.includes(skill)
-          ? current.filter((item) => item !== skill)
-          : [...current, skill],
+        tech_stack: toggleSelectableValue(prev.tech_stack, skill, SKILLS_LIST),
+      };
+    });
+  };
+
+  const toggleEditInterest = (interest) => {
+    setEditForm((prev) => {
+      return {
+        ...prev,
+        interests: toggleSelectableValue(prev.interests, interest, INTERESTS_LIST),
       };
     });
   };
@@ -221,7 +287,8 @@ export default function ProjectDetailPage() {
         progress_percent: Number(editForm.progress_percent),
         expected_period: editForm.expected_period.trim(),
         preferred_members: editForm.preferred_members.trim(),
-        tech_stack: Array.isArray(editForm.tech_stack) ? editForm.tech_stack : [],
+        tech_stack: normalizeSelectableValues(editForm.tech_stack, SKILLS_LIST),
+        interests: normalizeSelectableValues(editForm.interests, INTERESTS_LIST),
         hashtags: editForm.hashtags
           .split(",")
           .map((item) => item.trim().replace(/^#/, ""))
@@ -361,6 +428,13 @@ export default function ProjectDetailPage() {
 
     try {
       setIsApplying(true);
+      const canSpend = await confirmWaterdropSpend({
+        confirmCoinSpend,
+        toast,
+        actionLabel: "프로젝트 지원",
+      });
+      if (!canSpend) return;
+
       const result = await applyProjectApi(projectId, message);
       setMyApplication(result.data || { project_id: Number(projectId), status: "pending" });
       alert("프로젝트 지원이 완료되었습니다.");
@@ -388,7 +462,12 @@ export default function ProjectDetailPage() {
         boosted_until: result.data?.boosted_until || prev?.boosted_until,
         boost_score: result.data?.boost_score ?? prev?.boost_score,
       }));
-      toast.success("프로젝트 상단 노출이 적용되었습니다.");
+      const remaining = result.data?.project_boost_remaining;
+      toast.success(
+        typeof remaining === "number"
+          ? `프로젝트 상단 노출이 적용되었습니다. 남은 횟수: ${remaining}회`
+          : "프로젝트 상단 노출이 적용되었습니다."
+      );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "프로젝트 상단 노출에 실패했습니다.");
     } finally {
@@ -548,7 +627,7 @@ export default function ProjectDetailPage() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   {SKILLS_LIST.map((skill) => {
                     const selected = Array.isArray(editForm.tech_stack)
-                      ? editForm.tech_stack.includes(skill)
+                      ? editForm.tech_stack.some((item) => getOptionKey(item) === getOptionKey(skill))
                       : false;
 
                     return (
@@ -582,6 +661,37 @@ export default function ProjectDetailPage() {
                 <p className="mt-1 text-xs text-slate-500">
                   쉼표로 구분해서 입력해주세요.
                 </p>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  추천 관심분야{" "}
+                  <span className="font-normal text-slate-400">
+                    ({Array.isArray(editForm.interests) ? editForm.interests.length : 0}개 선택)
+                  </span>
+                </label>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {INTERESTS_LIST.map((interest) => {
+                    const selected = Array.isArray(editForm.interests)
+                      ? editForm.interests.some((item) => getOptionKey(item) === getOptionKey(interest))
+                      : false;
+
+                    return (
+                      <button
+                        key={interest}
+                        type="button"
+                        onClick={() => toggleEditInterest(interest)}
+                        className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                          selected
+                            ? "border-red-600 bg-red-600 text-white shadow-sm"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:text-red-600"
+                        }`}
+                      >
+                        {interest}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="flex gap-3">
@@ -724,6 +834,7 @@ export default function ProjectDetailPage() {
             )}
 
             {((project.tech_stack || project.techStack || []).length > 0 ||
+              (project.interests || []).length > 0 ||
               (project.hashtags || []).length > 0) && (
               <div className="mt-6 space-y-3">
                 {(project.tech_stack || project.techStack || []).length > 0 && (
@@ -738,6 +849,24 @@ export default function ProjectDetailPage() {
                           className="rounded-full bg-red-50 px-3 py-1 text-sm font-semibold text-red-700"
                         >
                           {tech}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(project.interests || []).length > 0 && (
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      추천 관심분야
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {(project.interests || []).map((interest) => (
+                        <span
+                          key={interest}
+                          className="rounded-full bg-rose-50 px-3 py-1 text-sm font-semibold text-rose-700"
+                        >
+                          {interest}
                         </span>
                       ))}
                     </div>

@@ -513,6 +513,11 @@ export default function ProjectManagePage() {
       return;
     }
 
+    if (isProjectCompleted) {
+      alert("완료된 프로젝트는 재모집할 수 없습니다.");
+      return;
+    }
+
     if (!recruitmentPosition.trim()) {
       alert("재모집 포지션을 입력해주세요.");
       return;
@@ -850,7 +855,7 @@ export default function ProjectManagePage() {
                     onClick={() => router.push(`/memoir?projectId=${projectId}`)}
                     className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
                   >
-                    개발자의 텃밭일기
+                    개발일지
                   </button>
                 </div>
               )}

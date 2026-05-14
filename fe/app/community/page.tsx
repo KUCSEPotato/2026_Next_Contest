@@ -610,7 +610,7 @@ function ServiceIcon({ type, active }: { type: string; active?: boolean }) {
       <svg viewBox="0 0 48 48" className="h-7 w-7" aria-hidden>
         <path
           d="M24 40V20"
-          stroke="#16a34a"
+          stroke="#92400e"
           strokeWidth="4"
           strokeLinecap="round"
           opacity={muted}

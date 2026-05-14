@@ -2,7 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getIdeaApi, pickupIdeaApi } from "../../../../lib/api";
+import {
+  bookmarkIdeaApi,
+  getIdeaApi,
+  likeIdeaApi,
+  pickupIdeaApi,
+  unbookmarkIdeaApi,
+  unlikeIdeaApi,
+} from "../../../../lib/api";
+import { getToken } from "../../../../lib/auth";
 import { useDialog, useToast } from "../../../../components/AppFeedback";
 import { confirmWaterdropSpend } from "../../../../lib/waterdrops";
 
@@ -19,6 +27,10 @@ interface IdeaDetail {
   description?: string;
   difficulty?: string;
   domain?: string;
+  like_count?: number;
+  bookmark_count?: number;
+  is_liked?: boolean;
+  is_bookmarked?: boolean;
 }
 
 export default function PickupIdeaDetailPage() {
@@ -31,6 +43,7 @@ export default function PickupIdeaDetailPage() {
   const [idea, setIdea] = useState<IdeaDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPickingUp, setIsPickingUp] = useState(false);
+  const [reactionBusy, setReactionBusy] = useState<"like" | "bookmark" | null>(null);
 
   useEffect(() => {
     async function loadIdea() {
@@ -56,12 +69,6 @@ export default function PickupIdeaDetailPage() {
   const handlePickup = async () => {
     if (!idea) return;
 
-    const ok = window.confirm(
-      "이 아이디어를 내 프로젝트로 만들까요?\n\n생성 후에는 내가 리더인 새 프로젝트로 이동합니다."
-    );
-
-    if (!ok) return;
-
     try {
       setIsPickingUp(true);
       const canSpend = await confirmWaterdropSpend({
@@ -85,6 +92,66 @@ export default function PickupIdeaDetailPage() {
       alert(error instanceof Error ? error.message : "아이디어를 내 프로젝트로 만들지 못했습니다.");
     } finally {
       setIsPickingUp(false);
+    }
+  };
+
+  const handleToggleLike = async () => {
+    if (!idea || reactionBusy) return;
+    if (!getToken()) {
+      alert("로그인 후 좋아요를 누를 수 있어요.");
+      return;
+    }
+
+    const previous = idea;
+    const nextLiked = !idea.is_liked;
+    setIdea({
+      ...idea,
+      is_liked: nextLiked,
+      like_count: Math.max(0, Number(idea.like_count || 0) + (nextLiked ? 1 : -1)),
+    });
+
+    try {
+      setReactionBusy("like");
+      if (nextLiked) {
+        await likeIdeaApi(idea.id);
+      } else {
+        await unlikeIdeaApi(idea.id);
+      }
+    } catch (error) {
+      setIdea(previous);
+      alert(error instanceof Error ? error.message : "좋아요 처리에 실패했습니다.");
+    } finally {
+      setReactionBusy(null);
+    }
+  };
+
+  const handleToggleBookmark = async () => {
+    if (!idea || reactionBusy) return;
+    if (!getToken()) {
+      alert("로그인 후 북마크할 수 있어요.");
+      return;
+    }
+
+    const previous = idea;
+    const nextBookmarked = !idea.is_bookmarked;
+    setIdea({
+      ...idea,
+      is_bookmarked: nextBookmarked,
+      bookmark_count: Math.max(0, Number(idea.bookmark_count || 0) + (nextBookmarked ? 1 : -1)),
+    });
+
+    try {
+      setReactionBusy("bookmark");
+      if (nextBookmarked) {
+        await bookmarkIdeaApi(idea.id);
+      } else {
+        await unbookmarkIdeaApi(idea.id);
+      }
+    } catch (error) {
+      setIdea(previous);
+      alert(error instanceof Error ? error.message : "북마크 처리에 실패했습니다.");
+    } finally {
+      setReactionBusy(null);
     }
   };
 
@@ -141,6 +208,35 @@ export default function PickupIdeaDetailPage() {
           <p className="mt-4 text-lg leading-8 text-slate-600">
             {idea.summary || "한줄소개가 없습니다."}
           </p>
+
+          <div className="mt-6 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleToggleLike}
+              disabled={reactionBusy !== null}
+              className={`rounded-full border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                idea.is_liked
+                  ? "border-rose-200 bg-rose-50 text-rose-600"
+                  : "border-slate-200 bg-white text-slate-500 hover:border-rose-200 hover:text-rose-500"
+              }`}
+              aria-pressed={Boolean(idea.is_liked)}
+            >
+              좋아요 {Number(idea.like_count || 0)}
+            </button>
+            <button
+              type="button"
+              onClick={handleToggleBookmark}
+              disabled={reactionBusy !== null}
+              className={`rounded-full border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                idea.is_bookmarked
+                  ? "border-amber-200 bg-amber-50 text-amber-600"
+                  : "border-slate-200 bg-white text-slate-500 hover:border-amber-200 hover:text-amber-500"
+              }`}
+              aria-pressed={Boolean(idea.is_bookmarked)}
+            >
+              북마크 {Number(idea.bookmark_count || 0)}
+            </button>
+          </div>
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
