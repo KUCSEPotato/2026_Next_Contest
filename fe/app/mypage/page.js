@@ -33,10 +33,12 @@ import {
 function formatEntitlementDate(value) {
   if (!value) return "제한 없음";
 
-  return new Date(value).toLocaleDateString("ko-KR", {
+  return new Date(value).toLocaleString("ko-KR", {
     year: "numeric",
     month: "long",
     day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -65,7 +67,7 @@ function getBenefitSummary(entitlement) {
     ? `상단 노출 ${benefits.project_boost_remaining}회 남음`
     : "상단 노출 없음";
 
-  return `프로젝트 생성: ${createText} · 지원: ${applyText} · ${boostText}`;
+  return `프로젝트 생성: ${createText} | 프로젝트 지원: ${applyText} | ${boostText}`;
 }
 
 function getPlanName(entitlement) {
@@ -592,12 +594,11 @@ export default function MyPage() {
                   {entitlement?.days_remaining === null ||
                   entitlement?.days_remaining === undefined
                     ? "제한 없음"
-                    : `${entitlement.days_remaining}일`}{" "}
-                  · 만료일: {formatEntitlementDate(entitlement?.expires_at)}
+                    : `${entitlement.days_remaining}일`}
                 </p>
                 {entitlement?.product_type === "SUBSCRIPTION" && (
                   <p>
-                    다음 갱신일: {formatEntitlementDate(entitlement.next_renewal_at)} · 자동
+                    다음 갱신일: {formatEntitlementDate(entitlement.next_renewal_at)} | 자동
                     갱신: {renewalStatus}
                   </p>
                 )}

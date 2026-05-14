@@ -18,6 +18,8 @@ from app.api.v1.endpoints.llm import _parse_gemini_response
 from app.core.config import settings
 from app.core.realtime import project_todo_channel
 from app.core.realtime import realtime_hub
+from app.core.timezone import as_kst
+from app.core.timezone import now_kst
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user_id
 from app.dependencies.auth import get_current_user_id_from_token
@@ -740,7 +742,7 @@ async def list_projects(
         query = query.filter(Project.status == status_filter)
 
     total = query.count()
-    now = datetime.now(timezone.utc)
+    now = now_kst()
     boosted_rank = case((Project.boosted_until > now, 1), else_=0)
     active_boost_score = case((Project.boosted_until > now, Project.boost_score), else_=0)
     projects = (
@@ -817,7 +819,7 @@ async def list_projects(
             "openRecruitmentCount": 1 if open_recruitment else 0,
             "openRecruitmentRequiredCount": open_recruitment.required_count if open_recruitment else 0,
             "openRecruitmentPosition": open_recruitment.position_name if open_recruitment else None,
-            "boosted_until": p.boosted_until.isoformat() if p.boosted_until else None,
+            "boosted_until": as_kst(p.boosted_until).isoformat() if p.boosted_until else None,
             "boost_score": p.boost_score,
             "created_at": p.created_at.isoformat() if p.created_at else None,
             "ended_at": p.ended_at.isoformat() if p.ended_at else None,
@@ -907,7 +909,7 @@ async def get_project(project_id: int, db: Session = Depends(get_db)) -> dict:
             "domain": project.category,
             "progress_percent": float(project.progress_percent),
             "leader_id": project.leader_id,
-            "boosted_until": project.boosted_until.isoformat() if project.boosted_until else None,
+            "boosted_until": as_kst(project.boosted_until).isoformat() if project.boosted_until else None,
             "boost_score": project.boost_score,
             "created_at": project.created_at.isoformat() if project.created_at else None,
             "ended_at": project.ended_at.isoformat() if project.ended_at else None,
@@ -938,7 +940,7 @@ async def boost_project(
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
     record_usage(db, current_user_id, USAGE_PROJECT_BOOST, target_type="project", target_id=project.id)
-    now = datetime.now(timezone.utc)
+    now = now_kst()
     project.boosted_until = max(project.boosted_until or now, now) + timedelta(days=7)
     project.boost_score = int(project.boost_score or 0) + 1
     db.commit()
@@ -947,7 +949,7 @@ async def boost_project(
     return success_response(
         data={
             "id": project.id,
-            "boosted_until": project.boosted_until,
+            "boosted_until": as_kst(project.boosted_until),
             "boost_score": project.boost_score,
             "project_boost_remaining": entitlement.get("benefits", {}).get("project_boost_remaining", 0),
         }
