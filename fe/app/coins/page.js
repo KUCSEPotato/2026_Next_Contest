@@ -192,7 +192,7 @@ function getProjectApplyText(product) {
 }
 
 function getIdeaViewText(product) {
-  if (product?.product_code === "PRO_MONTHLY") return "무제한";
+  if (product?.product_code === "PRO_MONTHLY") return "무료";
   if (product?.benefits?.idea_view_daily_limit) return `일 ${product.benefits.idea_view_daily_limit}회 무료`;
   return "물방울 별도 사용";
 }
