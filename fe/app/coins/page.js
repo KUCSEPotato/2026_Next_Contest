@@ -592,21 +592,23 @@ export default function CoinsPage() {
             영양 가득한 물이에요.
           </p>
 
-          {/* 잔액 + 이용 내역 버튼 */}
-          <div className="flex items-center justify-center gap-3">
-            <div className="flex items-center gap-2.5 rounded-2xl border border-sky-100 bg-sky-50 px-5 py-3 shadow-sm dark:border-sky-500/20 dark:bg-sky-500/10">
+          {/* 잔액 + 이용 내역 */}
+          <div className="flex flex-col items-center justify-center gap-3">
+            <div className="flex w-full max-w-xs items-center justify-center gap-2.5 rounded-2xl border border-sky-100 bg-sky-50 px-6 py-4 shadow-sm dark:border-sky-500/20 dark:bg-sky-500/10">
               <svg viewBox="0 0 20 20" fill="none" className="h-5 w-5" aria-hidden>
                 <defs>
                   <linearGradient id="balGrad" x1="4" y1="2" x2="16" y2="18" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stopColor="#bae6fd" /><stop offset="100%" stopColor="#0ea5e9" />
+                    <stop offset="0%" stopColor="#bae6fd" />
+                    <stop offset="100%" stopColor="#0ea5e9" />
                   </linearGradient>
                 </defs>
                 <path d="M10 2C7.5 5.5 5 9 5 12c0 3 1.8 5 5 5s5-2 5-5c0-3-2.5-6.5-5-10Z" fill="url(#balGrad)" />
                 <ellipse cx="7.8" cy="8" rx="2" ry="3.2" fill="white" opacity="0.35" transform="rotate(-18 7.8 8)" />
               </svg>
-              <div className="text-left">
-                <p className="text-[10px] font-semibold text-sky-500 dark:text-sky-300">현재 잔액</p>
-                <p className="text-lg font-bold text-gray-900 dark:text-slate-50">
+
+              <div className="text-center">
+                <p className="text-[11px] font-semibold text-sky-500 dark:text-sky-300">현재 잔액</p>
+                <p className="text-2xl font-black text-gray-900 dark:text-slate-50">
                   {formatWaterdrops(balance)}
                 </p>
               </div>
@@ -615,7 +617,7 @@ export default function CoinsPage() {
             <button
               type="button"
               onClick={() => setShowHistory(true)}
-              className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-600 shadow-sm transition hover:border-sky-200 hover:text-sky-600 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:border-sky-500/40 dark:hover:text-sky-300"
+              className="text-sm font-semibold text-gray-500 underline-offset-4 transition hover:text-sky-600 hover:underline dark:text-slate-400 dark:hover:text-sky-300"
             >
               이용 내역 조회
             </button>
