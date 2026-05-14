@@ -30,38 +30,67 @@ function applyTheme(theme) {
 
 function ShopIcon() {
   return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      fill="none"
-    >
-      <defs>
-        <linearGradient id="shopDropGrad" x1="6" y1="3" x2="18" y2="21" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#bae6fd" />
-          <stop offset="100%" stopColor="#0ea5e9" />
-        </linearGradient>
-      </defs>
+    <svg aria-hidden="true" viewBox="0 0 32 32" className="h-7 w-7" fill="none">
       <path
-        d="M12 3.5C9.4 7.1 7 10.4 7 14c0 3.2 2.1 5.5 5 5.5s5-2.3 5-5.5c0-3.6-2.4-6.9-5-10.5Z"
-        fill="url(#shopDropGrad)"
+        d="M8 14.5h16v10.2c0 .9-.7 1.6-1.6 1.6H9.6c-.9 0-1.6-.7-1.6-1.6V14.5Z"
+        fill="#ffffff"
+        stroke="#334155"
+        strokeWidth="1.6"
       />
       <path
-        d="M9.3 10.2c-.6 1.1-.9 2.1-.9 3.2 0 1.4.5 2.4 1.6 3.1"
-        stroke="white"
+        d="M7.2 7.2h17.6l1.6 6.1H5.6l1.6-6.1Z"
+        fill="#fee2e2"
+        stroke="#334155"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path d="M6 13.3h5.2v1.2a2.6 2.6 0 0 1-5.2 0v-1.2Z" fill="#ef4444" />
+      <path d="M11.2 13.3h4.8v1.2a2.4 2.4 0 0 1-4.8 0v-1.2Z" fill="#ffffff" />
+      <path d="M16 13.3h4.8v1.2a2.4 2.4 0 0 1-4.8 0v-1.2Z" fill="#ef4444" />
+      <path d="M20.8 13.3H26v1.2a2.6 2.6 0 0 1-5.2 0v-1.2Z" fill="#ffffff" />
+      <path
+        d="M6 13.3h20M11.2 13.3v1.2M16 13.3v1.2M20.8 13.3v1.2"
+        stroke="#334155"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+      <path
+        d="M13 26.3v-6.1c0-.6.5-1.1 1.1-1.1h3.8c.6 0 1.1.5 1.1 1.1v6.1"
+        fill="#dbeafe"
+        stroke="#334155"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M9.8 7.2h12.4"
+        stroke="#ef4444"
         strokeWidth="1.7"
         strokeLinecap="round"
-        opacity="0.45"
       />
-      <ellipse
-        cx="10.4"
-        cy="8.8"
-        rx="1.4"
-        ry="2.1"
-        fill="white"
-        opacity="0.45"
-        transform="rotate(-18 10.4 8.8)"
+    </svg>
+  );
+}
+
+function ThemeIcon({ isDarkTheme }) {
+  if (isDarkTheme) {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 32 32" className="h-7 w-7" fill="none">
+        <circle cx="16" cy="16" r="6.2" fill="#facc15" stroke="#92400e" strokeWidth="1.5" />
+        <path d="M16 4.5v3M16 24.5v3M4.5 16h3M24.5 16h3M7.9 7.9l2.1 2.1M22 22l2.1 2.1M24.1 7.9 22 10M10 22l-2.1 2.1" stroke="#92400e" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg aria-hidden="true" viewBox="0 0 32 32" className="h-7 w-7" fill="none">
+      <path
+        d="M22.8 21.7A9.2 9.2 0 0 1 10.3 9.2 8.5 8.5 0 1 0 22.8 21.7Z"
+        fill="#475569"
+        stroke="#1e293b"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
       />
+      <circle cx="20.8" cy="10.1" r="1.2" fill="#94a3b8" />
+      <circle cx="24.2" cy="15.4" r="0.9" fill="#94a3b8" />
     </svg>
   );
 }
@@ -200,12 +229,8 @@ export default function Navbar() {
   const navPillClass =
     "inline-flex h-11 items-center justify-center rounded-lg px-4 text-sm font-bold transition";
 
-  const shopButtonClass =
-    `${navPillClass} gap-2 border border-sky-100 bg-sky-50 text-slate-800 shadow-sm hover:border-sky-200 hover:bg-sky-100 hover:text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-slate-100 dark:hover:border-sky-400/40 dark:hover:bg-sky-500/20`;
-
-  const themeButtonClass = isDarkTheme
-    ? `${navPillClass} border border-slate-500 bg-slate-200 text-slate-800 hover:bg-slate-100`
-    : `${navPillClass} border border-slate-300 bg-slate-700 text-white hover:bg-slate-800`;
+  const iconButtonClass =
+    "inline-flex h-11 w-11 items-center justify-center rounded-xl bg-transparent transition hover:bg-slate-100 active:scale-95 dark:hover:bg-slate-800";
 
   const authButtonClass = `${navPillClass} bg-red-600 text-white hover:bg-red-700`;
 
@@ -266,23 +291,22 @@ export default function Navbar() {
               {isAuthenticated && (
                 <button
                   onClick={() => router.push("/coins")}
-                  className={shopButtonClass}
-                  aria-label="물방울 상점"
-                  title="물방울 상점"
+                  className={iconButtonClass}
+                  aria-label="상점"
+                  title="상점"
                 >
                   <ShopIcon />
-                  <span>상점</span>
                 </button>
               )}
 
               <button
                 type="button"
                 onClick={handleThemeToggle}
-                className={themeButtonClass}
+                className={iconButtonClass}
                 aria-label={isDarkTheme ? "라이트 모드로 전환" : "다크 모드로 전환"}
                 title={isDarkTheme ? "라이트 모드" : "다크 모드"}
               >
-                {isDarkTheme ? "라이트" : "다크"}
+                <ThemeIcon isDarkTheme={isDarkTheme} />
               </button>
 
               {isAuthenticated ? (
