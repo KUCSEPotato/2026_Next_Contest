@@ -10,10 +10,10 @@ from app.models import User
 
 
 PROJECT_REWARD_POINTS = {
-    "registration": 10,
-    "started": 15,
-    "completed": 25,
-    "recycled": 8,
+    "registration": 0,
+    "started": 0,
+    "completed": 1,
+    "recycled": 0,
 }
 
 
