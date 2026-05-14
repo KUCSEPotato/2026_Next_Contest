@@ -45,3 +45,4 @@
 \ir 32_extend_manual_purchase_requests.sql
 \ir 33_allow_negative_coin_transactions.sql
 \ir 34_add_report_review_and_adoption_targets.sql
+\ir 35_expand_todo_priority_range.sql
