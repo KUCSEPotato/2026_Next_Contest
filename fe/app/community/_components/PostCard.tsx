@@ -37,11 +37,23 @@ const REACTIONS: {
   },
 ];
 
+const CATEGORY_LABELS: Record<string, string> = {
+  general: "일반",
+  question: "질문",
+  idea: "아이디어",
+  showcase: "작업 공유",
+};
+
+function getCategoryLabel(category?: string | null) {
+  if (!category) return "";
+  return CATEGORY_LABELS[category] || category;
+}
+
 function AttachmentIndicator({ count }: { count: number }) {
   if (count <= 0) return null;
 
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500">
+    <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-600 ring-1 ring-sky-100">
       <svg
         viewBox="0 0 24 24"
         aria-hidden="true"
@@ -210,9 +222,11 @@ export default function PostCard({
         <div className="flex flex-wrap items-center gap-2">
           {post.category && (
             <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500">
-              {post.category}
+              {getCategoryLabel(post.category)}
             </span>
           )}
+        </div>
+        <div className="mt-2">
           <AttachmentIndicator count={fileAttachmentCount} />
         </div>
         </div>

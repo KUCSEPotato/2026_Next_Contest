@@ -93,7 +93,7 @@ export default function ChatRoomPage() {
   const [editingTodoDescription, setEditingTodoDescription] = useState("");
   const [expandedTodoIds, setExpandedTodoIds] = useState([]);
   const [draggedTodoId, setDraggedTodoId] = useState(null);
-  const [dragOverTodoId, setDragOverTodoId] = useState(null);
+  const [todoDropTarget, setTodoDropTarget] = useState(null);
   const [reorderingTodos, setReorderingTodos] = useState(false);
 
   const loadMessages = useCallback(async () => {
@@ -464,10 +464,30 @@ export default function ChatRoomPage() {
 
   const handleTodoDragEnd = () => {
     setDraggedTodoId(null);
-    setDragOverTodoId(null);
+    setTodoDropTarget(null);
   };
 
-  const handleTodoDrop = async (targetTodo) => {
+  const handleTodoDragOver = (event, targetTodo) => {
+    if (draggedTodoId) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+    }
+
+    if (!draggedTodoId || draggedTodoId === targetTodo.id || isTodoFinalized || editingTodoId) {
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const position = event.clientY < rect.top + rect.height / 2 ? "before" : "after";
+
+    setTodoDropTarget((currentTarget) =>
+      currentTarget?.todoId === targetTodo.id && currentTarget?.position === position
+        ? currentTarget
+        : { todoId: targetTodo.id, position }
+    );
+  };
+
+  const handleTodoDrop = async (targetTodo, position) => {
     if (!projectId || isTodoFinalized || editingTodoId || !draggedTodoId) {
       handleTodoDragEnd();
       return;
@@ -488,16 +508,23 @@ export default function ChatRoomPage() {
       group.items.map(({ todo }) => todo)
     );
     const fromIndex = currentTodos.findIndex((todo) => todo.id === draggedTodoId);
-    const toIndex = currentTodos.findIndex((todo) => todo.id === targetTodo.id);
 
-    if (fromIndex < 0 || toIndex < 0) {
+    if (fromIndex < 0) {
       handleTodoDragEnd();
       return;
     }
 
     const reorderedTodos = [...currentTodos];
     const [movedTodo] = reorderedTodos.splice(fromIndex, 1);
-    reorderedTodos.splice(toIndex, 0, {
+    const targetIndex = reorderedTodos.findIndex((todo) => todo.id === targetTodo.id);
+
+    if (targetIndex < 0) {
+      handleTodoDragEnd();
+      return;
+    }
+
+    const insertIndex = position === "after" ? targetIndex + 1 : targetIndex;
+    reorderedTodos.splice(insertIndex, 0, {
       ...movedTodo,
       stage: targetTodo.stage,
     });
@@ -793,7 +820,25 @@ export default function ChatRoomPage() {
             </div>
           )}
 
-          <section className="flex-1 space-y-3 overflow-y-auto px-4 pb-4">
+          <section
+            className="flex-1 space-y-3 overflow-y-auto px-4 pb-4"
+            onDragOver={(event) => {
+              if (draggedTodoId) {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+              }
+            }}
+            onDrop={(event) => {
+              if (!draggedTodoId || !todoDropTarget) return;
+              event.preventDefault();
+              const targetTodo = todos.find((todo) => todo.id === todoDropTarget.todoId);
+              if (targetTodo) {
+                handleTodoDrop(targetTodo, todoDropTarget.position);
+              } else {
+                handleTodoDragEnd();
+              }
+            }}
+          >
             {!isTodoFinalized && todos.length > 1 && (
               <p className="pt-3 text-xs text-slate-400">
                 Todo 카드를 드래그해서 순서를 바꿀 수 있습니다.
@@ -831,35 +876,26 @@ export default function ChatRoomPage() {
                           event.dataTransfer.setData("text/plain", String(todo.id));
                           handleTodoDragStart(todo.id);
                         }}
-                        onDragEnter={() => {
-                          if (draggedTodoId && draggedTodoId !== todo.id) {
-                            setDragOverTodoId(todo.id);
-                          }
-                        }}
-                        onDragOver={(event) => {
-                          if (draggedTodoId && draggedTodoId !== todo.id) {
-                            event.preventDefault();
-                            event.dataTransfer.dropEffect = "move";
-                          }
-                        }}
-                        onDragLeave={() => {
-                          setDragOverTodoId((currentId) =>
-                            currentId === todo.id ? null : currentId
-                          );
-                        }}
+                        onDragOver={(event) => handleTodoDragOver(event, todo)}
                         onDrop={(event) => {
                           event.preventDefault();
-                          handleTodoDrop(todo);
+                          event.stopPropagation();
+                          handleTodoDrop(todo, todoDropTarget?.position || "before");
                         }}
                         onDragEnd={handleTodoDragEnd}
-                        className={`rounded-xl border px-3 py-2 transition ${
+                        className={`relative rounded-xl border px-3 py-2 transition ${
                           draggedTodoId === todo.id
                             ? "border-red-300 bg-red-50 opacity-60"
-                            : dragOverTodoId === todo.id
-                              ? "border-red-300 bg-red-50 shadow-sm"
-                              : "border-slate-200 hover:border-red-200 hover:bg-red-50"
+                            : "border-slate-200 hover:border-red-200 hover:bg-red-50"
                         } ${!isTodoFinalized && !isEditing ? "cursor-grab active:cursor-grabbing" : ""}`}
                       >
+                        {todoDropTarget?.todoId === todo.id && (
+                          <div
+                            className={`pointer-events-none absolute left-2 right-2 z-20 h-1 rounded-full bg-sky-500 shadow-[0_0_14px_rgba(14,165,233,0.9)] ${
+                              todoDropTarget.position === "before" ? "-top-2" : "-bottom-2"
+                            }`}
+                          />
+                        )}
                         <div className="flex gap-2">
                           <div className="min-w-0 flex-1">
                             {isEditing ? (
