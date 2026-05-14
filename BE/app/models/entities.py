@@ -8,6 +8,7 @@ from sqlalchemy import (
     Boolean,
     Date,
     DateTime,
+    Enum,
     ForeignKey,
     Integer,
     Numeric,
@@ -101,7 +102,7 @@ class Idea(Base):
     domain: Mapped[str | None] = mapped_column(String(50))
     tech_stack: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     hashtags: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
-    difficulty: Mapped[str] = mapped_column(String(20), nullable=False)
+    difficulty: Mapped[str] = mapped_column(Enum("beginner", "intermediate", "advanced", name="difficulty_level"), nullable=False)
     required_members: Mapped[int] = mapped_column(SmallInteger, default=1)
     is_open: Mapped[bool] = mapped_column(Boolean, default=True)
     is_discarded: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -139,8 +140,11 @@ class Project(Base):
     summary: Mapped[str | None] = mapped_column(Text)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     category: Mapped[str | None] = mapped_column(String(50))
-    difficulty: Mapped[str] = mapped_column(String(20), nullable=False)
-    status: Mapped[str] = mapped_column(String(20), default="planning")
+    difficulty: Mapped[str] = mapped_column(Enum("beginner", "intermediate", "advanced", name="difficulty_level"), nullable=False)
+    status: Mapped[str] = mapped_column(
+        Enum("planning", "in_progress", "paused", "completed", "archived", name="project_status"),
+        default="planning",
+    )
     progress_percent: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=0)
     is_public: Mapped[bool] = mapped_column(Boolean, default=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -206,10 +210,10 @@ class ProjectRecruitment(Base):
     position_name: Mapped[str] = mapped_column(String(100), nullable=False)
     required_count: Mapped[int] = mapped_column(SmallInteger, default=1)
     category: Mapped[str | None] = mapped_column(String(50))
-    difficulty: Mapped[str] = mapped_column(String(20), default="normal")
+    difficulty: Mapped[str | None] = mapped_column(Enum("beginner", "intermediate", "advanced", name="difficulty_level"))
     summary: Mapped[str | None] = mapped_column(Text)
     deadline: Mapped[date | None] = mapped_column(Date)
-    status: Mapped[str] = mapped_column(String(20), default="open")
+    status: Mapped[str] = mapped_column(Enum("open", "closed", "cancelled", name="recruitment_status"), default="open")
     description: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -223,7 +227,7 @@ class Application(Base):
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     applicant_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     message: Mapped[str | None] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(String(20), default="pending")
+    status: Mapped[str] = mapped_column(Enum("pending", "accepted", "rejected", "withdrawn", name="application_status"), default="pending")
     is_priority: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     decided_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -239,7 +243,7 @@ class Invitation(Base):
     inviter_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     invitee_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     message: Mapped[str | None] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(String(20), default="pending")
+    status: Mapped[str] = mapped_column(Enum("pending", "accepted", "rejected", "expired", name="invite_status"), default="pending")
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -254,7 +258,7 @@ class Todo(Base):
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     stage: Mapped[str] = mapped_column(String(30), default="planning")
-    status: Mapped[str] = mapped_column(String(20), default="todo")
+    status: Mapped[str] = mapped_column(Enum("todo", "in_progress", "blocked", "done", name="todo_status"), default="todo")
     priority: Mapped[int] = mapped_column(SmallInteger, default=3)
     due_date: Mapped[date | None] = mapped_column(Date)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -331,7 +335,7 @@ class AdoptionRequest(Base):
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     requester_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     message: Mapped[str | None] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(String(20), default="pending")
+    status: Mapped[str] = mapped_column(Enum("pending", "approved", "rejected", "cancelled", name="adoption_status"), default="pending")
     decided_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -369,7 +373,7 @@ class SubscriptionPlan(Base):
     code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     price_krw: Mapped[int] = mapped_column(Integer, nullable=False)
-    cycle: Mapped[str] = mapped_column(String(20), nullable=False)
+    cycle: Mapped[str] = mapped_column(Enum("monthly", "yearly", name="billing_cycle"), nullable=False)
     features: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
@@ -380,7 +384,7 @@ class UserSubscription(Base):
     id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     plan_id: Mapped[int] = mapped_column(ForeignKey("subscription_plans.id", ondelete="RESTRICT"), nullable=False)
-    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    status: Mapped[str] = mapped_column(Enum("active", "trialing", "past_due", "cancelled", "expired", name="subscription_status"), nullable=False)
     current_period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     current_period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -557,7 +561,20 @@ class Notification(Base):
 
     id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    type: Mapped[str] = mapped_column(String(50), nullable=False)
+    type: Mapped[str] = mapped_column(
+        Enum(
+            "application_received",
+            "application_decided",
+            "invite_received",
+            "invite_decided",
+            "project_update",
+            "review_received",
+            "subscription_event",
+            "system",
+            name="notification_type",
+        ),
+        nullable=False,
+    )
     title: Mapped[str] = mapped_column(String(150), nullable=False)
     body: Mapped[str | None] = mapped_column(Text)
     data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
@@ -593,7 +610,7 @@ class Report(Base):
     target_review_id: Mapped[int | None] = mapped_column(ForeignKey("reviews.id", ondelete="SET NULL"))
     target_adoption_request_id: Mapped[int | None] = mapped_column(ForeignKey("adoption_requests.id", ondelete="SET NULL"))
     reason: Mapped[str] = mapped_column(Text, nullable=False)
-    status: Mapped[str] = mapped_column(String(20), default="open")
+    status: Mapped[str] = mapped_column(Enum("open", "in_review", "resolved", "dismissed", name="report_status"), default="open")
     handled_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     handled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
