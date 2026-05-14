@@ -236,10 +236,11 @@ async def confirm_payment(
         notify_user(
             db,
             user_id=payment.user_id,
-            notification_type="payment.entitlement_done",
+            notification_type="system",
             title="이용권이 활성화되었습니다.",
             body=f"{product.name} 권한이 {entitlement.expires_at.date().isoformat()}까지 활성화되었습니다.",
             data={
+                "notification_kind": "payment.entitlement_done",
                 "payment_id": payment.id,
                 "order_id": payment.order_id,
                 "entitlement_id": entitlement.id,
@@ -259,10 +260,15 @@ async def confirm_payment(
         notify_user(
             db,
             user_id=payment.user_id,
-            notification_type="coin.payment_done",
+            notification_type="system",
             title="코인 충전이 완료되었습니다.",
             body=f"{payment.coin_amount}코인이 충전되었습니다.",
-            data={"payment_id": payment.id, "order_id": payment.order_id, "coin_amount": payment.coin_amount},
+            data={
+                "notification_kind": "coin.payment_done",
+                "payment_id": payment.id,
+                "order_id": payment.order_id,
+                "coin_amount": payment.coin_amount,
+            },
         )
     db.commit()
     db.refresh(payment)

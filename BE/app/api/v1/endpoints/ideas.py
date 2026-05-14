@@ -939,10 +939,11 @@ async def pickup_discarded_idea(
     db.add(
         Notification(
             user_id=idea.author_id,
-            type="idea_adopted",
+            type="system",
             title="생각의 뜰 아이디어가 프로젝트로 이어졌어요",
             body=f"'{idea.title}' 아이디어를 {picker.nickname if picker else '다른 사용자'}님이 프로젝트로 전환했습니다.",
             data={
+                "notification_kind": "idea_adopted",
                 "idea_id": idea.id,
                 "project_id": project.id,
                 "url": f"/projects/{project.id}",

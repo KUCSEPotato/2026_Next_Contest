@@ -37,7 +37,7 @@ const TABS = [
   { id: "projects", label: "프로젝트" },
 ];
 
-const REPORT_STATUSES = ["open", "reviewing", "resolved", "rejected"];
+const REPORT_STATUSES = ["open", "in_review", "resolved", "dismissed"];
 const USER_ROLES = ["user", "leader", "admin"];
 const USER_PLANS = [
   { value: "FREE", label: "무료" },
@@ -50,7 +50,7 @@ const USER_PLANS = [
 const COIN_REQUEST_STATUSES = {
   pending: "확인 대기",
   approved: "승인",
-  rejected: "거절",
+  dismissed: "반려",
 };
 const REPORT_SCOPES = [
   { value: "all", label: "전체" },
@@ -226,15 +226,16 @@ export default function AdminPage() {
   }
 
   async function buildReportResolutionPayload(report, status) {
-    const payload = { status };
-    if (!["resolved", "rejected"].includes(status)) {
+    const normalizedStatus = status === "reviewing" ? "in_review" : status === "rejected" ? "dismissed" : status;
+    const payload = { status: normalizedStatus };
+    if (!["resolved", "dismissed"].includes(normalizedStatus)) {
       return payload;
     }
 
     const resolutionType = await prompt({
       title: "신고 처리 종류",
       message: `${report.target_title || `신고 #${report.id}`}에 대한 처분 종류를 입력하세요.`,
-      defaultValue: status === "resolved" ? "조치 완료" : "신고 반려",
+      defaultValue: normalizedStatus === "resolved" ? "조치 완료" : "신고 반려",
       placeholder: "예: 강제 내리기, 경고, 신고 반려",
       confirmText: "다음",
       required: true,
@@ -245,14 +246,14 @@ export default function AdminPage() {
       title: "신고자 안내 메시지",
       message: "신고자에게 알림으로 전달할 간단한 메시지를 입력하세요.",
       defaultValue:
-        status === "resolved"
+        normalizedStatus === "resolved"
           ? "신고 내용을 확인했고 필요한 조치를 완료했습니다."
           : "신고 내용을 검토했지만 추가 조치 대상은 아니라고 판단했습니다.",
       placeholder: "처리 결과 안내 메시지",
       confirmText: "처리",
       required: true,
       multiline: true,
-      tone: status === "rejected" ? "danger" : "default",
+      tone: normalizedStatus === "dismissed" ? "danger" : "default",
     });
     if (message === null) return null;
 
@@ -270,17 +271,18 @@ export default function AdminPage() {
     try {
       setProcessingKey(`report-${report.id}`);
       await updateAdminReportApi(report.id, payload);
+      const nextStatus = payload.status;
       setReports((prev) =>
-        prev.map((item) => (item.id === report.id ? { ...item, status } : item))
+        prev.map((item) => (item.id === report.id ? { ...item, status: nextStatus } : item))
       );
       setOverview((prev) =>
         prev
           ? {
               ...prev,
               reports_open:
-                report.status === "open" && status !== "open"
+                report.status === "open" && nextStatus !== "open"
                   ? Math.max(0, prev.reports_open - 1)
-                  : report.status !== "open" && status === "open"
+                  : report.status !== "open" && nextStatus === "open"
                   ? (prev.reports_open || 0) + 1
                   : prev.reports_open,
             }
@@ -1683,9 +1685,9 @@ function Td({ children, className = "", ...props }) {
 function StatusBadge({ value }) {
   const normalized = String(value || "-");
   const tone =
-    ["open", "inactive", "deleted", "suspended", "withdrawn"].includes(normalized)
+    ["open", "inactive", "deleted", "suspended", "withdrawn", "dismissed"].includes(normalized)
       ? "bg-red-50 text-red-700"
-      : ["pending", "reviewing", "planning"].includes(normalized)
+      : ["pending", "reviewing", "in_review", "planning"].includes(normalized)
       ? "bg-amber-50 text-amber-700"
       : "bg-emerald-50 text-emerald-700";
 

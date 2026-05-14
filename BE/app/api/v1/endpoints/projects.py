@@ -1300,10 +1300,11 @@ async def revert_project_to_idea(
         db.add(
             Notification(
                 user_id=current_user_id,
-                type="idea_sent_to_yard",
+                type="system",
                 title="아이디어가 생각의 뜰로 이동했어요",
                 body=f"'{reverted_idea.title}' 아이디어가 생각의 뜰에 놓였습니다.",
                 data={
+                    "notification_kind": "idea_sent_to_yard",
                     "idea_id": reverted_idea.id,
                     "project_id": project.id,
                     "url": f"/ideas/pickup/{reverted_idea.id}",
@@ -1358,10 +1359,11 @@ async def update_project_status(
             db.add(
                 Notification(
                     user_id=member.user_id,
-                    type="project_completed_review_requested",
+                    type="system",
                     title="팀원 평가를 남겨주세요",
                     body=f"'{project.title}' 프로젝트가 완료되었습니다. 함께한 팀원들을 평가해주세요.",
                     data={
+                        "notification_kind": "project_completed_review_requested",
                         **_project_notification_data(project_id),
                         "project_id": project_id,
                         "action": "review_teammates",

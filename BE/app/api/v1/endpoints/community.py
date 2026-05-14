@@ -128,20 +128,24 @@ def _notify_hot_post_once(db: Session, post_data: dict, source: str) -> None:
         db.query(Notification)
         .filter(
             Notification.user_id == author_id,
-            Notification.type == "hot_post",
         )
         .all()
     )
-    if any(int((notification.data or {}).get("post_id") or 0) == int(post_id) for notification in existing_notifications):
+    if any(
+        (notification.type == "hot_post" or (notification.data or {}).get("notification_kind") == "hot_post")
+        and int((notification.data or {}).get("post_id") or 0) == int(post_id)
+        for notification in existing_notifications
+    ):
         return
 
     db.add(
         Notification(
             user_id=author_id,
-            type="hot_post",
+            type="system",
             title="작성한 글이 불꽃글에 올랐어요",
             body=f"'{post_data.get('title') or '작성한 글'}' 글이 모닥불 불꽃글에 올라갔습니다.",
             data={
+                "notification_kind": "hot_post",
                 "post_id": post_id,
                 "url": f"/community/{post_id}",
                 "source": source,
