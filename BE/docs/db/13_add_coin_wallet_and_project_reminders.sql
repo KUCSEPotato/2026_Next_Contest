@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS coin_transactions (
     source_id BIGINT,
     note TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT coin_transactions_amount_check CHECK (amount > 0)
+    CONSTRAINT coin_transactions_amount_check CHECK (amount <> 0)
 );
 
 CREATE INDEX IF NOT EXISTS idx_coin_transactions_user_id ON coin_transactions(user_id);
