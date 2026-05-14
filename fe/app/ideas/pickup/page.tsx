@@ -1179,7 +1179,7 @@ function IdeaViewModal({
           )}
         </p>
 
-        <div className={`mb-5 overflow-hidden rounded-2xl border border-amber-100 bg-amber-50 text-center dark:border-amber-800/70 dark:bg-amber-950/40 ${isFreeView ? "grid grid-cols-2" : "grid grid-cols-3"}`}>
+        <div className={`mb-5 overflow-hidden rounded-2xl border border-amber-100 bg-amber-50 text-center dark:border-amber-800/70 dark:bg-amber-950/40 ${isFreeView ? "grid grid-cols-3" : "grid grid-cols-3"}`}>
           <div className="px-3 py-3">
             <p className="text-[11px] font-semibold text-amber-700/70 dark:text-amber-200/70">현재 물방울</p>
             <p className="mt-1 text-base font-black text-amber-800 dark:text-amber-100">
@@ -1192,7 +1192,20 @@ function IdeaViewModal({
               {isFreeView ? "0" : `-${coinCost.toLocaleString("ko-KR")}`}
             </p>
           </div>
-          {!isFreeView && (
+          <div className={`${isFreeView ? "border-x border-amber-100 bg-white/70 dark:border-amber-800/70 dark:bg-slate-900/55" : "border-x border-amber-100 bg-white/70 dark:border-amber-800/70 dark:bg-slate-900/55"} px-3 py-3`}>
+            <p className="text-[11px] font-semibold text-amber-700/70 dark:text-amber-200/70">{isFreeView ? "이번 열람" : "사용 물방울"}</p>
+            <p className={`mt-1 text-base font-black ${isFreeView ? "text-sky-600 dark:text-sky-300" : "text-red-600 dark:text-red-300"}`}>
+              {isFreeView ? "0" : `-${coinCost.toLocaleString("ko-KR")}`}
+            </p>
+          </div>
+          {freeRemaining !== null ? (
+            <div className="px-3 py-3">
+              <p className="text-[11px] font-semibold text-amber-700/70 dark:text-amber-200/70">남은 무료</p>
+              <p className="mt-1 text-base font-black text-amber-800 dark:text-amber-100">
+                {freeRemaining.toLocaleString("ko-KR")}
+              </p>
+            </div>
+          ) : (
             <div className="px-3 py-3">
               <p className="text-[11px] font-semibold text-amber-700/70 dark:text-amber-200/70">사용 후</p>
               <p className={`mt-1 text-base font-black ${isInsufficient ? "text-red-600 dark:text-red-300" : "text-amber-800 dark:text-amber-100"}`}>
