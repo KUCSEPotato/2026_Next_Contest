@@ -1204,6 +1204,25 @@ function MemoirContent() {
               <span style={{ display: "inline-block", background: "rgba(155,28,28,0.1)", color: "var(--memoir-rose-text)", fontSize: 11, padding: "4px 10px", borderRadius: 20, marginTop: 12 }}>
                 ✨ AI가 정성껏 정리했어요
               </span>
+              <button
+                type="button"
+                onClick={() => setModalOpen(true)}
+                style={{
+                  display: "inline-block",
+                  background: "var(--memoir-card-bg)",
+                  color: "var(--memoir-rose-text)",
+                  border: "1px solid var(--memoir-rose-border)",
+                  borderRadius: 20,
+                  padding: "4px 10px",
+                  marginTop: 12,
+                  marginLeft: 8,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                ✏️ 수정하기
+              </button>
             </div>
           )}
         </Section>
