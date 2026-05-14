@@ -1111,6 +1111,51 @@ function IdeaViewModal({
   const remainingBalance = coinBalance === null ? null : coinBalance - coinCost;
   const isInsufficient = coinBalance !== null && coinBalance < coinCost;
   const isFreeView = coinCost === 0;
+  const hideBalanceBlock = coinCost === 0 && freeRemaining === null;
+
+  if (hideBalanceBlock) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={onCancel} />
+
+        <div className="relative w-full max-w-sm rounded-3xl border border-emerald-100 bg-white p-7 shadow-2xl shadow-emerald-200/40 dark:border-emerald-800/60 dark:bg-slate-900 dark:shadow-slate-950/60">
+          <div className="mx-auto mb-4 h-14 w-14">
+            <SeedIcon />
+          </div>
+
+          <h2 className="mb-1 text-center text-base font-bold text-slate-800 dark:text-slate-50">
+            아이디어를 열람할까요?
+          </h2>
+
+          <p className="mb-1 line-clamp-1 text-center text-sm font-semibold text-slate-700 dark:text-slate-200">
+            &ldquo;{idea.title}&rdquo;
+          </p>
+
+          <p className="mb-5 text-center text-xs text-slate-400 dark:text-slate-400">
+            무료 열람 플랜이라 물방울 차감 없이 확인할 수 있어요.
+          </p>
+
+          <div className="flex gap-2">
+            <button
+              onClick={onCancel}
+              disabled={isLoading}
+              className="flex-1 rounded-2xl border border-slate-200 py-3 text-sm font-medium text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              취소
+            </button>
+
+            <button
+              onClick={onConfirm}
+              disabled={isLoading}
+              className="flex-1 rounded-2xl bg-emerald-600 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-200 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-600 dark:shadow-none dark:hover:bg-slate-700 dark:disabled:bg-slate-700"
+            >
+              {isLoading ? "여는 중..." : "열람하기"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
