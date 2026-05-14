@@ -33,6 +33,18 @@ router = APIRouter()
 _REACTION_STATS_ZERO: dict[str, int] = {"recommend": 0, "not_recommend": 0}
 
 
+def _serialize_post_file(file_record: CommunityPostFile, s3_service) -> dict:
+    return {
+        "id": file_record.id,
+        "post_id": file_record.post_id,
+        "filename": file_record.filename,
+        "file_size": file_record.file_size,
+        "file_type": file_record.file_type,
+        "s3_url": s3_service.generate_presigned_get_url(file_record.s3_key),
+        "uploaded_at": file_record.created_at,
+    }
+
+
 def _get_avatar_url(user: User | None) -> str | None:
     if user is None:
         return None
@@ -911,15 +923,7 @@ async def upload_post_file(
     db.refresh(file_record)
 
     return success_response(
-        data={
-            "id": file_record.id,
-            "post_id": file_record.post_id,
-            "filename": file_record.filename,
-            "file_size": file_record.file_size,
-            "file_type": file_record.file_type,
-            "s3_url": file_record.s3_url,
-            "uploaded_at": file_record.created_at,
-        },
+        data=_serialize_post_file(file_record, s3_service),
     )
 
 
@@ -927,6 +931,7 @@ async def upload_post_file(
 async def list_post_files(
     post_id: int,
     db: Session = Depends(get_db),
+    s3_service=Depends(get_s3_service),
 ) -> dict:
     """게시물의 모든 첨부 파일 조회"""
     post = db.get(CommunityPost, post_id)
@@ -941,14 +946,7 @@ async def list_post_files(
     return success_response(
         data={
             "files": [
-                {
-                    "id": f.id,
-                    "filename": f.filename,
-                    "file_size": f.file_size,
-                    "file_type": f.file_type,
-                    "s3_url": f.s3_url,
-                    "uploaded_at": f.created_at,
-                }
+                _serialize_post_file(f, s3_service)
                 for f in files
             ]
         },

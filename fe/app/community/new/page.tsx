@@ -34,6 +34,7 @@ export default function NewPostPage() {
   const [error, setError] = useState("");
   const imageRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     Promise.resolve().then(() => {
@@ -54,7 +55,7 @@ export default function NewPostPage() {
   }, [router]);
 
   // ── 파일 선택 ──────────────────────────────────────────────────────────────
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: "image" | "video") => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: "image" | "video" | "file") => {
     const files = Array.from(e.target.files || []);
     e.target.value = "";
 
@@ -214,7 +215,7 @@ export default function NewPostPage() {
             <p className="text-xs font-medium text-gray-500">
               파일 첨부
               <span className="ml-1.5 text-gray-300">
-                ({media.length}/{MAX_FILES}) · 최대 {MAX_FILE_SIZE_MB}MB
+              ({media.length}/{MAX_FILES}) · 최대 {MAX_FILE_SIZE_MB}MB · PDF/문서 가능
               </span>
             </p>
           </div>
@@ -252,6 +253,23 @@ export default function NewPostPage() {
               className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600 transition hover:border-red-300 hover:text-red-500 disabled:opacity-40"
             >
               🎥 동영상
+            </button>
+
+            {/* 일반 파일 */}
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.zip,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,application/zip"
+              multiple
+              className="hidden"
+              onChange={(e) => handleFileSelect(e, "file")}
+            />
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={submitting || media.length >= MAX_FILES}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600 transition hover:border-red-300 hover:text-red-500 disabled:opacity-40"
+            >
+              📎 파일
             </button>
           </div>
         </div>
