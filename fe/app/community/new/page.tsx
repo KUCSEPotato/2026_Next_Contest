@@ -34,6 +34,7 @@ export default function NewPostPage() {
   const [error, setError] = useState("");
   const imageRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     Promise.resolve().then(() => {
@@ -54,7 +55,10 @@ export default function NewPostPage() {
   }, [router]);
 
   // ── 파일 선택 ──────────────────────────────────────────────────────────────
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: "image" | "video") => {
+  const handleFileSelect = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: "image" | "video" | "file"
+  ) => {
     const files = Array.from(e.target.files || []);
     e.target.value = "";
 
@@ -147,7 +151,13 @@ export default function NewPostPage() {
 
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
-          <div className="w-[68px]" aria-hidden="true" />
+          <button
+            onClick={() => router.push("/community")}
+            disabled={submitting}
+            className="rounded-xl border border-gray-200 bg-white px-4 py-1.5 text-sm font-medium text-gray-500 transition hover:bg-gray-50 disabled:opacity-40"
+          >
+            취소하기
+          </button>
           <h1 className="text-base font-bold text-gray-900">새 게시물</h1>
           <button
             onClick={handleSubmit}
@@ -249,6 +259,21 @@ export default function NewPostPage() {
               className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600 transition hover:border-red-300 hover:text-red-500 disabled:opacity-40"
             >
               🎥 동영상
+            </button>
+
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(e) => handleFileSelect(e, "file")}
+            />
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={submitting || media.length >= MAX_FILES}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600 transition hover:border-red-300 hover:text-red-500 disabled:opacity-40"
+            >
+              📎 파일
             </button>
           </div>
         </div>

@@ -75,6 +75,14 @@ export async function getPostFiles(postId: number): Promise<PostFile[]> {
   return data.files;
 }
 
+export async function deletePostFile(postId: number, fileId: number): Promise<void> {
+  const res = await authenticatedFetch(`${BASE}/${postId}/files/${fileId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  await handleResponse(res);
+}
+
 export async function updatePost(
   postId: number,
   payload: { title?: string; content?: string; category?: string }

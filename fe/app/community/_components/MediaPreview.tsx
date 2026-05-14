@@ -1,7 +1,7 @@
 "use client";
 
 export interface MediaItem {
-  type: "image" | "video";
+  type: "image" | "video" | "file";
   url: string;       // 로컬 object URL (미리보기용)
   file: File;        // 실제 파일 (업로드 시 사용)
   uploading?: boolean;
@@ -30,8 +30,18 @@ export default function MediaPreview({
         >
           {m.type === "image" ? (
             <img src={m.url} alt="" className="h-48 w-full object-cover" />
-          ) : (
+          ) : m.type === "video" ? (
             <video src={m.url} controls className="h-48 w-full object-cover" />
+          ) : (
+            <div className="flex h-28 flex-col items-center justify-center gap-2 px-4 text-center">
+              <span className="text-2xl">📎</span>
+              <span className="max-w-full truncate text-xs font-medium text-gray-700">
+                {m.file.name}
+              </span>
+              <span className="text-[11px] text-gray-400">
+                {(m.file.size / 1024 / 1024).toFixed(1)}MB
+              </span>
+            </div>
           )}
 
           {/* 업로드 중 오버레이 */}
