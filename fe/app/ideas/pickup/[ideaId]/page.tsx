@@ -69,12 +69,6 @@ export default function PickupIdeaDetailPage() {
   const handlePickup = async () => {
     if (!idea) return;
 
-    const ok = window.confirm(
-      "이 아이디어를 내 프로젝트로 만들까요?\n\n생성 후에는 내가 리더인 새 프로젝트로 이동합니다."
-    );
-
-    if (!ok) return;
-
     try {
       setIsPickingUp(true);
       const canSpend = await confirmWaterdropSpend({
