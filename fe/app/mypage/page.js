@@ -27,6 +27,7 @@ import {
   createChatRoomApi,
   getMyEntitlementApi,
   getMyCoinBalanceApi,
+  createReportApi,
 } from "../../lib/api";
 
 function formatEntitlementDate(value) {
@@ -43,11 +44,50 @@ function formatWaterdrops(value) {
   return `${Number(value || 0).toLocaleString("ko-KR")}방울`;
 }
 
+function getBenefitSummary(entitlement) {
+  const benefits = entitlement?.benefits || {};
+
+  const createText = benefits.project_create_daily_limit
+    ? `일 ${benefits.project_create_daily_limit}회`
+    : benefits.project_create_total_limit
+      ? `총 ${benefits.project_create_total_limit}회`
+      : "불가";
+
+  const applyText = benefits.project_apply_unlimited
+    ? "무제한"
+    : benefits.project_apply_daily_limit
+      ? `일 ${benefits.project_apply_daily_limit}회`
+      : benefits.project_apply_total_limit
+        ? `총 ${benefits.project_apply_total_limit}회`
+        : "일 1회";
+
+  const boostText = benefits.project_boost_remaining
+    ? `상단 노출 ${benefits.project_boost_remaining}회 남음`
+    : "상단 노출 없음";
+
+  return `프로젝트 생성: ${createText} · 지원: ${applyText} · ${boostText}`;
+}
+
+function getPlanName(entitlement) {
+  if (!entitlement) return "무료 플랜";
+  return entitlement.name || entitlement.plan || entitlement.product_code || "무료 플랜";
+}
+
+function getRenewalStatus(entitlement) {
+  if (!entitlement || entitlement.product_type !== "SUBSCRIPTION") return null;
+  if (entitlement.auto_renew_enabled) return "사용 중";
+  if (entitlement.renewal_status === "PENDING_BILLING_SETUP") {
+    return "결제수단 등록 필요";
+  }
+  return "꺼짐";
+}
+
 export default function MyPage() {
   const router = useRouter();
   const toast = useToast();
-  const { confirm } = useDialog();
+  const { confirm, prompt } = useDialog();
   const projectHistoryRef = useRef(null);
+  const bioRef = useRef(null);
 
   const [profile, setProfile] = useState(null);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
@@ -67,49 +107,14 @@ export default function MyPage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [showReviews, setShowReviews] = useState(false);
+  const [isBioExpanded, setIsBioExpanded] = useState(false);
+  const [bioOverflows, setBioOverflows] = useState(false);
   const [isStartingGithubLink, setIsStartingGithubLink] = useState(false);
   const [openingChatProjectId, setOpeningChatProjectId] = useState(null);
 
   const [editNickname, setEditNickname] = useState("");
   const [editBio, setEditBio] = useState("");
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-
-  const handleAvatarUpload = async (e) => {
-    const file = e.target.files?.[0];
-
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      alert("이미지 파일만 업로드할 수 있습니다.");
-      return;
-    }
-
-    try {
-      setIsUploadingAvatar(true);
-
-      const result = await uploadMyAvatarApi(file);
-      const avatarUrl = result.data.avatar_url;
-      console.log("업로드 결과:", result);
-      console.log("avatarUrl:", avatarUrl);
-
-      setAvatarLoadFailed(false);
-
-      setProfile((prev) => ({
-        ...prev,
-        avatar_url: avatarUrl,
-      }));
-
-      await reloadProfile();
-
-      alert("프로필 이미지가 업로드되었습니다.");
-    } catch (error) {
-      console.error(error);
-      alert("프로필 이미지 업로드에 실패했습니다.");
-    } finally {
-      setIsUploadingAvatar(false);
-      e.target.value = "";
-    }
-  };
 
   const inputClassName =
     "w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100";
@@ -124,6 +129,30 @@ export default function MyPage() {
     setEditBio(profileData.bio || "");
 
     return profileData;
+  }
+
+  async function handleReportReview(review) {
+    const reasonInput = await prompt({
+      title: "평가 신고",
+      message: "관리자가 확인할 수 있도록 신고 사유를 입력해주세요.",
+      placeholder: "예: 욕설, 허위 평가, 부적절한 표현",
+      confirmText: "신고하기",
+      required: true,
+      multiline: true,
+      tone: "danger",
+    });
+    if (reasonInput === null) return;
+
+    try {
+      await createReportApi({
+        target_type: "review",
+        target_id: Number(review.id),
+        reason: reasonInput.trim(),
+      });
+      toast.success("신고가 접수되었습니다.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "신고 접수에 실패했습니다.");
+    }
   }
 
   useEffect(() => {
@@ -146,22 +175,15 @@ export default function MyPage() {
           oauthLinksResult,
           entitlementResult,
           balanceResult,
-        ] =
-          await Promise.allSettled([
-            getMyReputationApi(),
-            getUserStatsApi(profileData.id),
-            getMyProjectsApi(),
-            getMyApplicationsApi(),
-            getOAuthLinksApi(),
-            getMyEntitlementApi(),
-            getMyCoinBalanceApi(),
-          ]);
-
-        setReputation(
-          reputationResult.status === "fulfilled"
-            ? reputationResult.value.data
-            : null
-        );
+        ] = await Promise.allSettled([
+          getMyReputationApi(),
+          getUserStatsApi(profileData.id),
+          getMyProjectsApi(),
+          getMyApplicationsApi(),
+          getOAuthLinksApi(),
+          getMyEntitlementApi(),
+          getMyCoinBalanceApi(),
+        ]);
 
         const statsData =
           statsResult.status === "fulfilled"
@@ -173,31 +195,21 @@ export default function MyPage() {
                 review_received: 0,
               };
 
+        setReputation(reputationResult.status === "fulfilled" ? reputationResult.value.data : null);
         setStats(statsData);
-
-        setProjects(
-          projectsResult.status === "fulfilled"
-            ? projectsResult.value.data || []
-            : []
-        );
+        setProjects(projectsResult.status === "fulfilled" ? projectsResult.value.data || [] : []);
         setAppliedProjects(
-          applicationsResult.status === "fulfilled"
-            ? applicationsResult.value.data || []
-            : []
+          applicationsResult.status === "fulfilled" ? applicationsResult.value.data || [] : []
         );
-        setOauthLinks(
-          oauthLinksResult.status === "fulfilled"
-            ? oauthLinksResult.value.data
-            : null
-        );
+        setOauthLinks(oauthLinksResult.status === "fulfilled" ? oauthLinksResult.value.data : null);
         setEntitlement(
-          entitlementResult.status === "fulfilled"
-            ? entitlementResult.value.data
-            : null
+          entitlementResult.status === "fulfilled" ? entitlementResult.value.data : null
         );
         setWaterdropBalance(
           balanceResult.status === "fulfilled"
-            ? balanceResult.value.data?.waterdrop_balance ?? balanceResult.value.data?.coin_balance ?? 0
+            ? balanceResult.value.data?.waterdrop_balance ??
+                balanceResult.value.data?.coin_balance ??
+                0
             : 0
         );
 
@@ -216,8 +228,7 @@ export default function MyPage() {
   }, [router]);
 
   useEffect(() => {
-    if (loading) return;
-    if (typeof window === "undefined") return;
+    if (loading || typeof window === "undefined") return;
 
     const params = new URLSearchParams(window.location.search);
     if (params.get("github_linked") !== "1") return;
@@ -227,8 +238,7 @@ export default function MyPage() {
   }, [loading, router, toast]);
 
   useEffect(() => {
-    if (loading) return;
-    if (typeof window === "undefined") return;
+    if (loading || typeof window === "undefined") return;
 
     const params = new URLSearchParams(window.location.search);
     if (params.get("section") !== "projects") return;
@@ -240,6 +250,53 @@ export default function MyPage() {
       });
     });
   }, [loading]);
+
+  useEffect(() => {
+    if (isBioExpanded) return;
+
+    const measureBio = () => {
+      const bioElement = bioRef.current;
+      if (!bioElement) return;
+
+      setBioOverflows(bioElement.scrollHeight > bioElement.clientHeight + 1);
+    };
+
+    const frameId = requestAnimationFrame(measureBio);
+    window.addEventListener("resize", measureBio);
+
+    return () => {
+      cancelAnimationFrame(frameId);
+      window.removeEventListener("resize", measureBio);
+    };
+  }, [profile?.bio, isBioExpanded]);
+
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("이미지 파일만 업로드할 수 있습니다.");
+      return;
+    }
+
+    try {
+      setIsUploadingAvatar(true);
+      const result = await uploadMyAvatarApi(file);
+      const avatarUrl = result.data.avatar_url;
+
+      setAvatarLoadFailed(false);
+      setProfile((prev) => ({ ...prev, avatar_url: avatarUrl }));
+      await reloadProfile();
+      alert("프로필 이미지가 업로드되었습니다.");
+    } catch (error) {
+      console.error(error);
+      alert("프로필 이미지 업로드에 실패했습니다.");
+    } finally {
+      setIsUploadingAvatar(false);
+      e.target.value = "";
+    }
+  };
 
   const handleUpdateProfile = async () => {
     try {
@@ -258,14 +315,12 @@ export default function MyPage() {
         interests: prev?.interests,
       }));
       updateStoredUser(result.data);
+      setIsBioExpanded(false);
       setIsEditingProfile(false);
     } catch (error) {
       console.error(error);
       const message = error?.message || "";
-      if (
-        message.includes("이미 존재하는 닉네임입니다") ||
-        message.includes("Nickname already exists")
-      ) {
+      if (message.includes("Nickname already exists")) {
         alert("이미 존재하는 닉네임입니다.");
         return;
       }
@@ -415,7 +470,7 @@ export default function MyPage() {
 
   const openTeamChat = async (project) => {
     if (!project.can_chat) {
-      alert("팀에 속한 프로젝트만 채팅방으로 이동할 수 있습니다.");
+      alert("팀에 합류한 프로젝트만 채팅방으로 이동할 수 있습니다.");
       return;
     }
 
@@ -460,114 +515,106 @@ export default function MyPage() {
     projectSortOrder
   );
   const rawAvatarUrl = profile?.avatar_url || profile?.avatarUrl || "";
-  const avatarUrl =
-    rawAvatarUrl && !avatarLoadFailed
-      ? getImageUrl(rawAvatarUrl)
-      : "";
+  const avatarUrl = rawAvatarUrl && !avatarLoadFailed ? getImageUrl(rawAvatarUrl) : "";
   const avatarFallback = profile?.nickname?.[0] || "D";
+  const planName = getPlanName(entitlement);
+  const renewalStatus = getRenewalStatus(entitlement);
+  const profileBio = String(profile?.bio || "").trim();
 
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-10">
-      <div className="mx-auto w-full max-w-5xl">
-        <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <div className="flex items-center justify-between gap-6">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-4">
-                <h1 className="text-3xl font-bold text-slate-900">
+    <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-6xl">
+        <section className="mb-6 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+          <div className="grid gap-6 p-6 lg:grid-cols-[1fr_1fr] lg:p-8">
+            <div className="flex min-w-0 gap-5">
+              <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-full bg-red-100 text-5xl font-black text-red-700 sm:h-32 sm:w-32">
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt={`${profile?.nickname || "사용자"} 프로필 이미지`}
+                    className="h-full w-full object-cover"
+                    onError={() => setAvatarLoadFailed(true)}
+                  />
+                ) : (
+                  avatarFallback
+                )}
+              </div>
+
+              <div className="min-w-0 pt-1">
+                <h1 className="truncate text-4xl font-black tracking-normal text-slate-950">
                   {profile?.nickname || "이름 없는 사용자"}
                 </h1>
-                <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-red-100 text-2xl font-bold text-red-600">
-                  {avatarUrl ? (
-                    <img
-                      src={avatarUrl}
-                      alt={`${profile?.nickname || "사용자"} 프로필 이미지`}
-                      className="h-full w-full object-cover"
-                      onError={() => {
-                        console.error("프로필 이미지 로드 실패:", avatarUrl);
-                        setAvatarLoadFailed(true);
-                      }}
-                    />
-                  ) : (
-                    avatarFallback
-                  )}
-                </div>
-              </div>
-              <p className="text-slate-500">{profile?.email}</p>
-              <p className="mt-2 text-slate-700">
-                {profile?.bio || "아직 자기소개가 없습니다."}
-              </p>
-              <ProfileOptionPreview
-                title="기술 스택"
-                items={profile?.skills}
-                tone="red"
-              />
-              <ProfileOptionPreview
-                title="관심 분야"
-                items={profile?.interests}
-                tone="slate"
-              />
-              {entitlement && (
-                <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-slate-700">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-bold text-red-700">
-                      현재 플랜: {entitlement.name || entitlement.plan || "무료"}
-                    </span>
-                    <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-sky-700">
-                      현재 잔여 물방울: {formatWaterdrops(waterdropBalance)}
-                    </span>
-                    {entitlement.product_type !== "FREE" && (
-                      <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-red-600">
-                        {entitlement.product_type === "SUBSCRIPTION" ? "30일 이용권" : "기간권"}
-                      </span>
+                <p className="mt-3 truncate text-lg font-medium text-slate-600">
+                  {profile?.email}
+                </p>
+                {profileBio ? (
+                  <div className="mt-3">
+                    <p
+                      ref={bioRef}
+                      className={`whitespace-pre-line text-lg font-semibold leading-relaxed text-slate-800 ${
+                        isBioExpanded ? "" : "line-clamp-2"
+                      }`}
+                    >
+                      {profileBio}
+                    </p>
+                    {bioOverflows && (
+                      <button
+                        type="button"
+                        onClick={() => setIsBioExpanded((current) => !current)}
+                        className="mt-1 text-sm font-bold text-red-700 transition hover:text-red-800"
+                      >
+                        {isBioExpanded ? "접기" : "더보기"}
+                      </button>
                     )}
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">
-                    남은 기간:{" "}
-                    {entitlement.days_remaining === null || entitlement.days_remaining === undefined
-                      ? "제한 없음"
-                      : `${entitlement.days_remaining}일`}
-                    {" · "}
-                    만료일: {formatEntitlementDate(entitlement.expires_at)}
+                ) : (
+                  <p className="mt-3 text-lg font-semibold text-slate-400">
+                    아직 자기소개가 없습니다.
                   </p>
-                  {entitlement.product_type === "SUBSCRIPTION" && (
-                    <p className="mt-1 text-xs text-slate-500">
-                      다음 갱신일: {formatEntitlementDate(entitlement.next_renewal_at)}
-                      {" · "}
-                      자동 갱신:{" "}
-                      {entitlement.auto_renew_enabled
-                        ? "사용 중"
-                        : entitlement.renewal_status === "PENDING_BILLING_SETUP"
-                          ? "결제수단 등록 필요"
-                          : "꺼짐"}
-                    </p>
-                  )}
-                  <p className="mt-2 text-xs text-slate-600">
-                    프로젝트 생성:{" "}
-                    {entitlement.benefits?.project_create_daily_limit
-                      ? `일 ${entitlement.benefits.project_create_daily_limit}회`
-                      : entitlement.benefits?.project_create_total_limit
-                        ? `총 ${entitlement.benefits.project_create_total_limit}회`
-                        : "불가"}
-                    {" · "}
-                    지원:{" "}
-                    {entitlement.benefits?.project_apply_unlimited
-                      ? "무제한"
-                      : entitlement.benefits?.project_apply_daily_limit
-                        ? `일 ${entitlement.benefits.project_apply_daily_limit}회`
-                        : entitlement.benefits?.project_apply_total_limit
-                          ? `총 ${entitlement.benefits.project_apply_total_limit}회`
-                          : "일 1회"}
-                    {entitlement.benefits?.project_boost_remaining
-                      ? ` · 상단 노출 ${entitlement.benefits.project_boost_remaining}회 남음`
-                      : ""}
-                  </p>
-                </div>
-              )}
+                )}
+                <p className="hidden">
+                  {profile?.bio || "Devory로 돈 벌 게임"}
+                </p>
+              </div>
             </div>
 
-            <div className="flex shrink-0 flex-wrap items-center justify-end gap-3">
+            <div className="rounded-2xl border border-red-100 bg-red-50/80 px-5 py-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-lg font-black text-red-800">현재 플랜: {planName}</p>
+                <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-sky-800">
+                  남은 물방울: {formatWaterdrops(waterdropBalance)}
+                </span>
+              </div>
+
+              <div className="mt-3 space-y-2 text-sm font-semibold text-slate-700">
+                <p>
+                  남은 기간:{" "}
+                  {entitlement?.days_remaining === null ||
+                  entitlement?.days_remaining === undefined
+                    ? "제한 없음"
+                    : `${entitlement.days_remaining}일`}{" "}
+                  · 만료일: {formatEntitlementDate(entitlement?.expires_at)}
+                </p>
+                {entitlement?.product_type === "SUBSCRIPTION" && (
+                  <p>
+                    다음 갱신일: {formatEntitlementDate(entitlement.next_renewal_at)} · 자동
+                    갱신: {renewalStatus}
+                  </p>
+                )}
+                <p>{getBenefitSummary(entitlement)}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 px-6 pb-6 lg:grid-cols-[1fr_auto] lg:items-end lg:px-8">
+            <div className="grid gap-3 md:grid-cols-2">
+              <ProfileOptionPreview title="기술 스택" items={profile?.skills} tone="red" />
+              <ProfileOptionPreview title="관심 분야" items={profile?.interests} tone="slate" />
+            </div>
+
+            <div className="flex flex-wrap justify-start gap-3 lg:justify-end">
               {oauthLinks?.github_linked ? (
-                <span className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600">
+                <span className="inline-flex h-12 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-5 text-sm font-bold text-slate-700">
                   <GithubIcon />
                   GitHub 연동됨
                 </span>
@@ -576,15 +623,16 @@ export default function MyPage() {
                   type="button"
                   onClick={handleStartGithubLink}
                   disabled={isStartingGithubLink}
-                  className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-12 items-center gap-2 rounded-xl bg-slate-950 px-5 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <GithubIcon />
                   {isStartingGithubLink ? "연동 중..." : "GitHub 연동"}
                 </button>
               )}
               <button
+                type="button"
                 onClick={() => setIsEditingProfile(true)}
-                className="rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
+                className="h-12 rounded-xl bg-red-600 px-6 text-sm font-bold text-white transition hover:bg-red-700"
               >
                 수정하기
               </button>
@@ -592,7 +640,7 @@ export default function MyPage() {
                 type="button"
                 onClick={handleWithdrawAccount}
                 disabled={isWithdrawing}
-                className="rounded-xl border border-red-200 bg-white px-5 py-3 font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="h-12 rounded-xl border border-red-200 bg-white px-6 text-sm font-bold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isWithdrawing ? "처리 중..." : "회원 탈퇴"}
               </button>
@@ -601,95 +649,95 @@ export default function MyPage() {
         </section>
 
         {isEditingProfile && (
-        <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex justify-end">
-            <button
-              onClick={() => {
-                setEditNickname(profile?.nickname || "");
-                setEditBio(profile?.bio || "");
-                setIsEditingProfile(false);
-              }}
-              className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
-            >
-              닫기
-            </button>
-          </div>
-          <h2 className="text-xl font-bold text-slate-900">프로필 수정</h2>
+          <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditNickname(profile?.nickname || "");
+                  setEditBio(profile?.bio || "");
+                  setIsEditingProfile(false);
+                }}
+                className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+              >
+                닫기
+              </button>
+            </div>
+            <h2 className="text-xl font-bold text-slate-900">프로필 수정</h2>
 
-          <div className="mt-4 space-y-4">
-            <input
-              value={editNickname}
-              onChange={(e) => setEditNickname(e.target.value)}
-              placeholder="닉네임"
-              className={inputClassName}
-            />
+            <div className="mt-4 space-y-4">
+              <input
+                value={editNickname}
+                onChange={(e) => setEditNickname(e.target.value)}
+                placeholder="닉네임"
+                className={inputClassName}
+              />
 
-            <div>
-              <p className="mb-2 text-sm font-semibold text-slate-700">
-                프로필 이미지
-              </p>
+              <div>
+                <p className="mb-2 text-sm font-semibold text-slate-700">프로필 이미지</p>
 
-              <div className="flex items-center gap-3 rounded-xl border border-slate-300 px-4 py-3">
-                <label className="cursor-pointer rounded-lg bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100">
-                  파일 선택
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleAvatarUpload}
-                    disabled={isUploadingAvatar}
-                    className="hidden"
-                  />
-                </label>
+                <div className="flex items-center gap-3 rounded-xl border border-slate-300 px-4 py-3">
+                  <label className="cursor-pointer rounded-lg bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100">
+                    파일 선택
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarUpload}
+                      disabled={isUploadingAvatar}
+                      className="hidden"
+                    />
+                  </label>
 
-                <span className="text-sm text-slate-500">
-                  {profile?.avatar_url
-                    ? "변경하시려면 파일을 선택하십시오."
-                    : "선택된 파일 없음"}
-                </span>
+                  <span className="text-sm text-slate-500">
+                    {profile?.avatar_url
+                      ? "변경하려면 파일을 선택하세요."
+                      : "선택된 파일 없음"}
+                  </span>
+                </div>
+
+                <p className="mt-2 text-xs text-slate-400">
+                  {isUploadingAvatar
+                    ? "이미지를 업로드하는 중입니다..."
+                    : "이미지 파일을 선택하면 자동으로 업로드됩니다."}
+                </p>
               </div>
 
-              <p className="mt-2 text-xs text-slate-400">
-                {isUploadingAvatar
-                  ? "이미지를 업로드하는 중입니다..."
-                  : "이미지 파일을 선택하면 자동으로 업로드됩니다."}
-              </p>
-            </div>
-
-            <textarea
-              value={editBio}
-              onChange={(e) => setEditBio(e.target.value)}
-              placeholder="자기소개"
-              className="min-h-32 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
-            />
-
-            <div className="grid gap-5 lg:grid-cols-2">
-              <ProfileOptionEditor
-                title="기술 스택"
-                options={SKILLS_LIST}
-                selectedItems={profile?.skills}
-                selectedClassName="border-red-600 bg-red-600 text-white shadow-sm"
-                onToggle={handleToggleSkill}
+              <textarea
+                value={editBio}
+                onChange={(e) => setEditBio(e.target.value)}
+                placeholder="자기소개"
+                className="min-h-32 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
               />
-              <ProfileOptionEditor
-                title="관심 분야"
-                options={INTERESTS_LIST}
-                selectedItems={profile?.interests}
-                selectedClassName="border-red-600 bg-red-50 text-red-600 shadow-sm"
-                onToggle={handleToggleInterest}
-              />
-            </div>
 
-            <button
-              onClick={handleUpdateProfile}
-              className="w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
-            >
-              프로필 저장
-            </button>
-          </div>
-        </section>
+              <div className="grid gap-5 lg:grid-cols-2">
+                <ProfileOptionEditor
+                  title="기술 스택"
+                  options={SKILLS_LIST}
+                  selectedItems={profile?.skills}
+                  selectedClassName="border-red-600 bg-red-600 text-white shadow-sm"
+                  onToggle={handleToggleSkill}
+                />
+                <ProfileOptionEditor
+                  title="관심 분야"
+                  options={INTERESTS_LIST}
+                  selectedItems={profile?.interests}
+                  selectedClassName="border-red-600 bg-red-50 text-red-600 shadow-sm"
+                  onToggle={handleToggleInterest}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleUpdateProfile}
+                className="w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
+              >
+                프로필 저장
+              </button>
+            </div>
+          </section>
         )}
 
-        <section className="mb-6 grid grid-cols-3 gap-4">
+        <section className="mb-6 grid gap-4 sm:grid-cols-3">
           <StatCard title="리드 프로젝트" value={stats?.lead_projects ?? 0} />
           <StatCard title="완료 프로젝트" value={stats?.completed_projects ?? 0} />
           <StatCard title="진행중인 프로젝트" value={stats?.in_progress_projects ?? 0} />
@@ -730,14 +778,23 @@ export default function MyPage() {
                       key={review.id}
                       className="mb-3 rounded-xl border border-slate-200 p-4"
                     >
-                      <p className="font-bold text-slate-900">
-                        {review.project?.title || "프로젝트"}
-                      </p>
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="font-bold text-slate-900">
+                          {review.project?.title || "프로젝트"}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => handleReportReview(review)}
+                          className="rounded-lg border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-500 transition hover:border-red-200 hover:text-red-600"
+                        >
+                          신고
+                        </button>
+                      </div>
 
                       <p className="mt-1 text-sm text-slate-400">
                         익명{" "}
                         {review.created_at
-                          ? `• ${new Date(review.created_at).toLocaleDateString()}`
+                          ? `· ${new Date(review.created_at).toLocaleDateString()}`
                           : ""}
                       </p>
 
@@ -806,7 +863,7 @@ export default function MyPage() {
                 className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 outline-none transition focus:border-red-500"
               >
                 <option value="latest">최신순</option>
-                <option value="progress">진행율순</option>
+                <option value="progress">진행률순</option>
               </select>
             </div>
           </div>
@@ -840,29 +897,33 @@ export default function MyPage() {
                         />
                         <div className="min-w-0">
                           <div className="mb-1 flex flex-wrap gap-1.5">
-                            <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                              isLeader
-                                ? "bg-red-600 text-white"
-                                : isApplied
-                                  ? "bg-red-100 text-red-600"
-                                  : "bg-slate-200 text-slate-600"
-                            }`}>
+                            <span
+                              className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                                isLeader
+                                  ? "bg-red-600 text-white"
+                                  : isApplied
+                                    ? "bg-red-100 text-red-600"
+                                    : "bg-slate-200 text-slate-600"
+                              }`}
+                            >
                               {isLeader ? "리더" : isApplied ? "지원 대기" : "팀원"}
                             </span>
                           </div>
 
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-bold text-slate-900">
-                              {project.title}
-                            </h3>
-                            <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${statusClassName}`}>
+                            <h3 className="font-bold text-slate-900">{project.title}</h3>
+                            <span
+                              className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${statusClassName}`}
+                            >
                               {formatProjectStatus(project.status)}
                             </span>
                           </div>
 
                           <p className="mt-1 text-sm text-slate-500">
-                            난이도 {project.difficulty || "미정"} · 진행률 {Math.round(project.progress_percent ?? 0)}%
-                            {isApplied && ` · 지원 상태 ${project.applicationStatus || "확인중"}`}
+                            난이도 {project.difficulty || "미정"} · 진행률{" "}
+                            {Math.round(project.progress_percent ?? 0)}%
+                            {isApplied &&
+                              ` · 지원 상태 ${project.applicationStatus || "확인중"}`}
                           </p>
                         </div>
                       </button>
@@ -896,7 +957,6 @@ export default function MyPage() {
                               진행 관리
                             </button>
                           )}
-
                         </div>
                       )}
                     </div>
@@ -909,7 +969,6 @@ export default function MyPage() {
           </div>
         </section>
       </div>
-
     </main>
   );
 }
@@ -925,26 +984,26 @@ function GithubIcon() {
 function ProfileOptionPreview({ title, items, tone }) {
   const values = (items || []).map(getProfileOptionName).filter(Boolean);
 
-  if (!values.length) return null;
-
   const className =
-    tone === "red"
-      ? "bg-red-50 text-red-700"
-      : "bg-slate-100 text-slate-700";
+    tone === "red" ? "bg-red-50 text-red-700" : "bg-slate-100 text-slate-700";
 
   return (
-    <div className="mt-3">
+    <div className="min-w-0">
       <p className="mb-2 text-xs font-bold text-slate-400">{title}</p>
-      <div className="flex flex-wrap gap-2">
-        {values.map((value) => (
-          <span
-            key={value}
-            className={`rounded-full px-3 py-1 text-xs font-semibold ${className}`}
-          >
-            {value}
-          </span>
-        ))}
-      </div>
+      {values.length ? (
+        <div className="flex flex-wrap gap-2">
+          {values.map((value) => (
+            <span
+              key={value}
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${className}`}
+            >
+              {value}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-slate-400">아직 등록된 항목이 없습니다.</p>
+      )}
     </div>
   );
 }
@@ -961,10 +1020,7 @@ function ProfileOptionEditor({
   return (
     <section className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
       <h3 className="text-sm font-bold text-slate-800">
-        {title}{" "}
-        <span className="font-normal text-slate-400">
-          ({selectedCount}개 선택)
-        </span>
+        {title} <span className="font-normal text-slate-400">({selectedCount}개 선택)</span>
       </h3>
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -1031,10 +1087,7 @@ function buildProjectHistory(projects, applications) {
       const hasOpenRecruitment =
         Number(application.open_recruitment_count ?? application.openRecruitmentCount ?? 0) > 0;
 
-      return (
-        status === "pending" &&
-        (projectStatus === "planning" || hasOpenRecruitment)
-      );
+      return status === "pending" && (projectStatus === "planning" || hasOpenRecruitment);
     })
     .map((application) => ({
       id: application.project_id,
@@ -1132,9 +1185,7 @@ function isProjectLeader(project, userId) {
 
 function getVisibleProjects(projects, statusFilter, roleFilter, userId, sortOrder) {
   return [...projects]
-    .filter((project) =>
-      statusFilter === "all" ? true : project.status === statusFilter
-    )
+    .filter((project) => (statusFilter === "all" ? true : project.status === statusFilter))
     .filter((project) => {
       if (roleFilter === "leader") return isProjectLeader(project, userId);
       if (roleFilter === "member") return !isProjectLeader(project, userId);
@@ -1154,18 +1205,9 @@ function getVisibleProjects(projects, statusFilter, roleFilter, userId, sortOrde
 
 function RatingSummary({ reputation }) {
   const items = [
-    {
-      label: "협업",
-      value: reputation?.avg_teamwork,
-    },
-    {
-      label: "기여",
-      value: reputation?.avg_contribution,
-    },
-    {
-      label: "책임",
-      value: reputation?.avg_responsibility,
-    },
+    { label: "협업", value: reputation?.avg_teamwork },
+    { label: "기여", value: reputation?.avg_contribution },
+    { label: "책임", value: reputation?.avg_responsibility },
   ];
 
   return (

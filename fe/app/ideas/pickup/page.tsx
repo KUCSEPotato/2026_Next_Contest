@@ -453,7 +453,7 @@ export default function InspirationWellPage() {
               <button
                 key={block.title}
                 onClick={() => handleServiceClick(block.path)}
-                className={`rounded-2xl border p-5 shadow-sm transition hover:border-emerald-300 hover:shadow-md ${
+                className={`rounded-2xl border p-5 text-left shadow-sm transition hover:border-emerald-300 hover:shadow-md ${
                   block.isActive
                     ? "border-emerald-200 bg-emerald-50/80 dark:border-emerald-500/70 dark:bg-emerald-950/55"
                     : "border-emerald-100 bg-white/75 dark:border-slate-700 dark:bg-slate-900/80"
@@ -483,7 +483,7 @@ export default function InspirationWellPage() {
                   )}
                 </div>
 
-                <p className="whitespace-pre-line text-sm leading-relaxed text-gray-500 dark:text-slate-300">
+                <p className="text-center whitespace-pre-line text-sm leading-relaxed text-gray-500 dark:text-slate-300">
                   {block.description}
                 </p>
               </button>

@@ -49,21 +49,21 @@ const STORE_SECTIONS = [
     emoji: "📋",
     title: "구독/이용 플랜",
     english: "Subscription/Usage Plan",
-    description: "무료 요금제, 월 구독 플랜, 단기 이용권을 한 번에 살펴보세요.",
+    description: "무료 요금제, 월 구독 플랜, 단기 이용권을\n한 번에 살펴보세요.",
   },
   {
     key: "waterdrops",
     emoji: "💧",
     title: "물방울 충전",
     english: "Waterdrop Refill",
-    description: "아이디어 열람 등에 사용할 물방울을 필요한 만큼 충전해요.",
+    description: "아이디어 열람 등에 사용할 물방울을\n필요한 만큼 충전해요.",
   },
   {
     key: "history",
     emoji: "🧾",
     title: "이용 내역",
     english: "Usage Ledger",
-    description: "내 구매 요청과 물방울 사용 내역을 확인할 수 있어요.",
+    description: "내 구매 요청과 물방울 사용 내역을\n확인할 수 있어요.",
   },
 ];
 
@@ -388,7 +388,7 @@ function StoreSectionCard({ section, active, onClick }) {
           : "border-gray-200 bg-white hover:border-sky-200 dark:border-slate-700 dark:bg-slate-900/80 dark:hover:border-sky-500/40"
       }`}
     >
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-2xl dark:bg-sky-500/10">
             {section.emoji}
@@ -410,7 +410,7 @@ function StoreSectionCard({ section, active, onClick }) {
         )}
       </div>
 
-      <p className="whitespace-pre-line text-sm leading-relaxed text-gray-500 dark:text-slate-400">
+      <p className="whitespace-pre-line text-center text-sm leading-relaxed text-gray-500 dark:text-slate-400">
         {section.description}
       </p>
     </button>
@@ -670,7 +670,7 @@ export default function CoinsPage() {
           </p>
         </section>
 
-        <section className="mx-auto mb-8 grid max-w-5xl grid-cols-1 gap-4 text-left sm:grid-cols-3">
+        <section className="mx-auto mb-8 grid max-w-5xl grid-cols-1 gap-4 sm:grid-cols-3">
           {STORE_SECTIONS.map((section) => (
             <StoreSectionCard
               key={section.key}

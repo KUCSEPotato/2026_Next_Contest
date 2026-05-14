@@ -44,3 +44,4 @@
 \ir 31_create_payment_products_and_entitlements.sql
 \ir 32_extend_manual_purchase_requests.sql
 \ir 33_allow_negative_coin_transactions.sql
+\ir 34_add_report_review_and_adoption_targets.sql
