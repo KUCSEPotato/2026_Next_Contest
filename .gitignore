@@ -9,6 +9,7 @@
 idea/
 신청/
 Project_Plan.md
+제출물/
 
 # FE
 
@@ -22,6 +23,7 @@ Personal/
 BE/.venv/
 BE/__pycache__/
 BE/.vscode/
+
 
 # pemkey
 pemkey/

@@ -51,12 +51,18 @@ export default function NotificationsPage() {
     });
   }
 
+  function getNotificationKind(notification) {
+    return notification.data?.notification_kind || notification.type || notification.notification_type;
+  }
+
   function getNotificationPath(notification) {
-    if (notification.type === "admin_takedown") {
+    const kind = getNotificationKind(notification);
+
+    if (kind === "admin_takedown") {
       return null;
     }
 
-    const type = notification.type || notification.notification_type;
+    const type = kind;
     const action = notification.action || notification.data?.action;
     const projectId =
       notification.project_id ||
@@ -136,7 +142,9 @@ export default function NotificationsPage() {
   }
 
   function getNotificationTitle(notification) {
-    if (notification.type !== "admin_takedown") {
+    const kind = getNotificationKind(notification);
+
+    if (kind !== "admin_takedown") {
       return notification.title;
     }
 
@@ -151,7 +159,9 @@ export default function NotificationsPage() {
   }
 
   function getNotificationBody(notification) {
-    if (notification.type !== "admin_takedown") {
+    const kind = getNotificationKind(notification);
+
+    if (kind !== "admin_takedown") {
       return notification.body;
     }
 
@@ -294,7 +304,7 @@ export default function NotificationsPage() {
                             </p>
                           )}
 
-                          {notification.type === "admin_takedown" &&
+                          {getNotificationKind(notification) === "admin_takedown" &&
                             notification.data?.target_title && (
                               <div className="mt-3 inline-flex rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-semibold text-red-700">
                                 내려진 항목: {getTakedownTargetLabel(notification.data?.target_type)} ·{" "}

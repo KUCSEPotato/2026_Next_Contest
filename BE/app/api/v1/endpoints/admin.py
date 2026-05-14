@@ -227,7 +227,7 @@ def _notify_report_result(
     resolution_type: str | None,
     message: str | None,
 ) -> None:
-    if status_value not in {"resolved", "rejected"}:
+    if status_value not in {"resolved", "dismissed"}:
         return
     status_label = "처리 완료" if status_value == "resolved" else "반려"
     resolution = resolution_type or ("조치 완료" if status_value == "resolved" else "조치 없음")
@@ -238,10 +238,11 @@ def _notify_report_result(
     db.add(
         Notification(
             user_id=report.reporter_id,
-            type="report_result",
+            type="system",
             title="신고 처리 결과 안내",
             body=body,
             data={
+                "notification_kind": "report_result",
                 "report_id": report.id,
                 "status": status_value,
                 "resolution_type": resolution,
@@ -346,10 +347,11 @@ def _notify_user_suspension(
     db.add(
         Notification(
             user_id=user_id,
-            type="admin_user_suspended",
+            type="system",
             title=title,
             body=body,
             data={
+                "notification_kind": "admin_user_suspended",
                 "suspended_until": suspended_until.isoformat() if suspended_until else None,
                 "reason": reason,
             },
@@ -361,10 +363,10 @@ def _notify_user_restored(db: Session, *, user_id: int) -> None:
     db.add(
         Notification(
             user_id=user_id,
-            type="admin_user_restored",
+            type="system",
             title="계정 이용이 복구되었습니다",
             body="관리자에 의해 계정 이용 제한이 해제되었습니다.",
-            data={},
+            data={"notification_kind": "admin_user_restored"},
         )
     )
 
@@ -893,7 +895,9 @@ async def process_report(
     previous_status = report.status
     if payload.get("status"):
         next_status = payload["status"]
-        if next_status not in {"open", "reviewing", "resolved", "rejected"}:
+        status_aliases = {"reviewing": "in_review", "rejected": "dismissed"}
+        next_status = status_aliases.get(next_status, next_status)
+        if next_status not in {"open", "in_review", "resolved", "dismissed"}:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid report status")
         report.status = next_status
     report.handled_by = current_user_id
