@@ -59,6 +59,8 @@ const REPORT_SCOPES = [
   { value: "post", label: "게시글" },
   { value: "comment", label: "댓글" },
   { value: "chat", label: "채팅" },
+  { value: "review", label: "평가" },
+  { value: "adoption_request", label: "팀장 넘겨주기" },
 ];
 
 function formatDate(value) {

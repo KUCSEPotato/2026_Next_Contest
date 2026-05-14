@@ -590,6 +590,8 @@ class Report(Base):
     target_post_id: Mapped[int | None] = mapped_column(ForeignKey("community_posts.id", ondelete="SET NULL"))
     target_comment_id: Mapped[int | None] = mapped_column(ForeignKey("community_post_comments.id", ondelete="SET NULL"))
     target_chat_room_id: Mapped[int | None] = mapped_column(ForeignKey("chat_rooms.id", ondelete="SET NULL"))
+    target_review_id: Mapped[int | None] = mapped_column(ForeignKey("reviews.id", ondelete="SET NULL"))
+    target_adoption_request_id: Mapped[int | None] = mapped_column(ForeignKey("adoption_requests.id", ondelete="SET NULL"))
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="open")
     handled_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))

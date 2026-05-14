@@ -18,6 +18,8 @@ from app.models import PaymentProduct
 from app.models import Project
 from app.models import Idea
 from app.models import Report
+from app.models import AdoptionRequest
+from app.models import Review
 from app.models import UserSubscription
 from app.models import User
 from app.services.economy import award_coins
@@ -71,6 +73,30 @@ def _excerpt(value: str | None, limit: int = 160) -> str | None:
 
 
 def _report_target_meta(db: Session, report: Report) -> dict:
+    if report.target_review_id is not None:
+        review = db.get(Review, report.target_review_id)
+        project = db.get(Project, review.project_id) if review else None
+        reviewee = db.get(User, review.reviewee_id) if review else None
+        target_name = reviewee.nickname if reviewee else (f"사용자 #{review.reviewee_id}" if review else f"#{report.target_review_id}")
+        return {
+            "target_title": f"평가: {target_name}",
+            "target_excerpt": _excerpt(review.comment if review else None),
+            "target_url": f"/users/{review.reviewee_id}" if review else None,
+            "target_parent_title": project.title if project else None,
+        }
+
+    if report.target_adoption_request_id is not None:
+        adoption_request = db.get(AdoptionRequest, report.target_adoption_request_id)
+        project = db.get(Project, adoption_request.project_id) if adoption_request else None
+        requester = db.get(User, adoption_request.requester_id) if adoption_request else None
+        requester_name = requester.nickname if requester else (f"사용자 #{adoption_request.requester_id}" if adoption_request else f"#{report.target_adoption_request_id}")
+        return {
+            "target_title": f"팀장 넘겨주기 요청: {requester_name}",
+            "target_excerpt": _excerpt(adoption_request.message if adoption_request else None),
+            "target_url": f"/projects/{adoption_request.project_id}" if adoption_request else None,
+            "target_parent_title": project.title if project else None,
+        }
+
     if report.target_comment_id is not None:
         comment = db.get(CommunityPostComment, report.target_comment_id)
         post = db.get(CommunityPost, comment.post_id) if comment else None
@@ -521,7 +547,7 @@ async def list_projects_for_admin(
 
 @router.get("/reports", summary="관리자 신고 목록", description="신고 목록을 조회해 모더레이션 대상을 확인합니다.")
 async def list_reports_for_admin(
-    scope: str | None = Query(default=None, description="user/project/post/comment/chat/all 중 하나"),
+    scope: str | None = Query(default=None, description="user/project/post/comment/chat/review/adoption_request/all 중 하나"),
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -545,6 +571,10 @@ async def list_reports_for_admin(
             query = query.filter(Report.target_comment_id.isnot(None))
         elif scope == "chat":
             query = query.filter(Report.target_chat_room_id.isnot(None))
+        elif scope == "review":
+            query = query.filter(Report.target_review_id.isnot(None))
+        elif scope == "adoption_request":
+            query = query.filter(Report.target_adoption_request_id.isnot(None))
         else:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid scope")
 
@@ -561,8 +591,14 @@ async def list_reports_for_admin(
                 "target_post_id": r.target_post_id,
                 "target_comment_id": r.target_comment_id,
                 "target_chat_room_id": r.target_chat_room_id,
+                "target_review_id": r.target_review_id,
+                "target_adoption_request_id": r.target_adoption_request_id,
                 "target_scope": (
-                    "chat"
+                    "adoption_request"
+                    if r.target_adoption_request_id is not None
+                    else "review"
+                    if r.target_review_id is not None
+                    else "chat"
                     if r.target_chat_room_id is not None
                     else "comment"
                     if r.target_comment_id is not None

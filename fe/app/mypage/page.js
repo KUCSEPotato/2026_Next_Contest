@@ -27,6 +27,7 @@ import {
   createChatRoomApi,
   getMyEntitlementApi,
   getMyCoinBalanceApi,
+  createReportApi,
 } from "../../lib/api";
 
 function formatEntitlementDate(value) {
@@ -84,7 +85,7 @@ function getRenewalStatus(entitlement) {
 export default function MyPage() {
   const router = useRouter();
   const toast = useToast();
-  const { confirm } = useDialog();
+  const { confirm, prompt } = useDialog();
   const projectHistoryRef = useRef(null);
   const bioRef = useRef(null);
 
@@ -128,6 +129,30 @@ export default function MyPage() {
     setEditBio(profileData.bio || "");
 
     return profileData;
+  }
+
+  async function handleReportReview(review) {
+    const reasonInput = await prompt({
+      title: "평가 신고",
+      message: "관리자가 확인할 수 있도록 신고 사유를 입력해주세요.",
+      placeholder: "예: 욕설, 허위 평가, 부적절한 표현",
+      confirmText: "신고하기",
+      required: true,
+      multiline: true,
+      tone: "danger",
+    });
+    if (reasonInput === null) return;
+
+    try {
+      await createReportApi({
+        target_type: "review",
+        target_id: Number(review.id),
+        reason: reasonInput.trim(),
+      });
+      toast.success("신고가 접수되었습니다.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "신고 접수에 실패했습니다.");
+    }
   }
 
   useEffect(() => {
@@ -749,10 +774,22 @@ export default function MyPage() {
                   const reviewMessage = getReviewMessage(review);
 
                   return (
-                    <div key={review.id} className="mb-3 rounded-xl border border-slate-200 p-4">
-                      <p className="font-bold text-slate-900">
-                        {review.project?.title || "프로젝트"}
-                      </p>
+                    <div
+                      key={review.id}
+                      className="mb-3 rounded-xl border border-slate-200 p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="font-bold text-slate-900">
+                          {review.project?.title || "프로젝트"}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => handleReportReview(review)}
+                          className="rounded-lg border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-500 transition hover:border-red-200 hover:text-red-600"
+                        >
+                          신고
+                        </button>
+                      </div>
 
                       <p className="mt-1 text-sm text-slate-400">
                         익명{" "}
