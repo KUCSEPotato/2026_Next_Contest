@@ -8,6 +8,7 @@ import PostCard from "./_components/PostCard";
 import LoginModal from "./_components/LoginModal";
 import { ThumbUpIcon } from "./_components/ReactionThumbIcons";
 import TopActionButtons from "../../components/TopActionButtons";
+import { useDialog, useToast } from "../../components/AppFeedback";
 
 const CATEGORIES = [
   { label: "전체", value: undefined },
@@ -103,6 +104,8 @@ function applyPostReaction(
 
 export default function CommunityPage() {
   const router = useRouter();
+  const toast = useToast();
+  const { confirm } = useDialog();
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -218,13 +221,20 @@ export default function CommunityPage() {
   };
 
   const handleDelete = async (postId: number) => {
-    if (!confirm("게시물을 삭제할까요?")) return;
+    const ok = await confirm({
+      title: "게시물을 삭제할까요?",
+      message: "삭제한 게시물은 다시 복구하기 어려워요.",
+      confirmText: "삭제하기",
+      cancelText: "취소",
+      tone: "danger",
+    });
+    if (!ok) return;
     try {
       await deletePost(postId);
       setPosts((prev) => prev.filter((p) => p.id !== postId));
     } catch (e) {
       console.error(e);
-      alert("삭제에 실패했어요.");
+      toast.error("삭제에 실패했어요.");
     }
   };
 

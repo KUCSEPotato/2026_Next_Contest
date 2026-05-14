@@ -62,7 +62,7 @@ export default function ChatRoomPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const toast = useToast();
-  const { prompt } = useDialog();
+  const { prompt, confirm } = useDialog();
   const roomId = params.roomId;
   const projectId = searchParams.get("projectId");
   const bottomRef = useRef(null);
@@ -322,13 +322,15 @@ export default function ChatRoomPage() {
       return;
     }
 
-    if (
-      !confirm(
-        selectedMessageIds.length > 0
-          ? `선택한 메시지 ${selectedMessageIds.length}개와 프로젝트 정보를 바탕으로 AI Todo를 생성할까요?`
-          : "선택한 메시지가 없습니다. 최근 채팅과 프로젝트 정보를 바탕으로 AI Todo를 생성할까요?"
-      )
-    ) {
+    const ok = await confirm({
+      title: "AI Todo를 생성할까요?",
+      message: selectedMessageIds.length > 0
+        ? `선택한 메시지 ${selectedMessageIds.length}개와 프로젝트 정보를 바탕으로 Todo를 만들어요.`
+        : "선택한 메시지가 없습니다. 최근 채팅과 프로젝트 정보를 바탕으로 Todo를 만들어요.",
+      confirmText: "생성하기",
+      cancelText: "취소",
+    });
+    if (!ok) {
       return;
     }
 
@@ -362,11 +364,13 @@ export default function ChatRoomPage() {
 
     if (isTodoFinalized) return;
 
-    if (
-      !confirm(
-        "확정하시겠습니까? 진행 관리 페이지에서 수정 가능합니다."
-      )
-    ) {
+    const ok = await confirm({
+      title: "Todo 체크리스트를 확정할까요?",
+      message: "확정 후에는 진행 관리 페이지에서 수정할 수 있어요.",
+      confirmText: "확정하기",
+      cancelText: "취소",
+    });
+    if (!ok) {
       return;
     }
 
@@ -440,7 +444,14 @@ export default function ChatRoomPage() {
       return;
     }
 
-    if (!confirm(`"${todo.title}" 항목을 삭제할까요?`)) {
+    const ok = await confirm({
+      title: "Todo를 삭제할까요?",
+      message: `"${todo.title}" 항목을 삭제합니다.`,
+      confirmText: "삭제하기",
+      cancelText: "취소",
+      tone: "danger",
+    });
+    if (!ok) {
       return;
     }
 
