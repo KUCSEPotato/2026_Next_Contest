@@ -604,10 +604,18 @@ export default function ChatRoomPage() {
       setReorderingTodos(true);
       pendingTodoScrollTopRef.current = todoListRef.current?.scrollTop ?? null;
       for (const todo of changedTodos) {
-        await updateTodoApi(projectId, todo.id, {
-          priority: todo.priority,
-          stage: todo.stage,
-        });
+        const prevTodo = currentTodos.find((item) => item.id === todo.id);
+        const payload = {};
+
+        if (prevTodo?.priority !== todo.priority) {
+          payload.priority = todo.priority;
+        }
+
+        if (prevTodo?.stage !== todo.stage) {
+          payload.stage = todo.stage;
+        }
+
+        await updateTodoApi(projectId, todo.id, payload);
       }
       await loadProjectTodos();
       requestAnimationFrame(() => {
