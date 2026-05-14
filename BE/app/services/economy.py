@@ -31,7 +31,7 @@ def award_coins(
     source_id: int | None = None,
     note: str | None = None,
 ) -> int:
-    if amount <= 0:
+    if amount < 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Coin amount must be positive")
 
     existing = (
@@ -50,6 +50,9 @@ def award_coins(
     user = db.get(User, user_id)
     if user is None or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if amount == 0:
+        return int(user.coin_balance or 0)
 
     user.coin_balance = int(user.coin_balance or 0) + amount
     transaction = CoinTransaction(

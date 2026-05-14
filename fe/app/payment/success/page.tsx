@@ -1,9 +1,8 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
-import { useDialog } from "../../../components/AppFeedback";
 import { confirmPaymentApi } from "../../../lib/api";
 
 type ConfirmState =
@@ -13,8 +12,6 @@ type ConfirmState =
 
 function PaymentSuccessContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const { confirm } = useDialog();
   const calledRef = useRef(false);
   const [state, setState] = useState<ConfirmState>({
     status: "loading",
@@ -53,15 +50,6 @@ function PaymentSuccessContent() {
           productCode: data.product_code,
         });
 
-        // 결제 완료 다이얼로그를 띄우고 사용자가 확인하면 메인으로 이동
-        await confirm({
-          title: "결제가 완료되었습니다",
-          message: isEntitlementPayment
-            ? "결제가 성공적으로 완료되어 이용권이 활성화되었습니다."
-            : "결제가 성공적으로 완료되었습니다.",
-          confirmText: "확인",
-        });
-        router.push(isEntitlementPayment ? "/mypage" : "/mainpage");
       } catch (error) {
         setState({
           status: "error",
@@ -94,10 +82,10 @@ function PaymentSuccessContent() {
             href="/coins"
             className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white hover:bg-slate-800"
           >
-            코인 페이지로
+            상점으로
           </Link>
           <Link
-            href="/"
+            href="/mainpage"
             className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
           >
             홈으로
@@ -115,3 +103,4 @@ export default function PaymentSuccessPage() {
     </Suspense>
   );
 }
+

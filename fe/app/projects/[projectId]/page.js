@@ -12,6 +12,7 @@ import {
   getMyApplicationsApi,
   createReportApi,
   boostProjectApi,
+  getMyEntitlementApi,
 } from "../../../lib/api";
 import { INTERESTS_LIST, SKILLS_LIST } from "../../../lib/profileOptions";
 import { useDialog, useToast } from "../../../components/AppFeedback";
@@ -91,6 +92,11 @@ const getProjectMemberDisplayName = (member) => {
     `User #${userId}`
   );
 };
+
+const isProEntitlement = (entitlement) =>
+  ["PRO_MONTHLY", "PRO"].includes(
+    String(entitlement?.plan || entitlement?.product_code || "").toUpperCase()
+  );
 
 export default function ProjectDetailPage() {
   const params = useParams();
@@ -459,6 +465,23 @@ export default function ProjectDetailPage() {
   const handleBoostProject = async () => {
     try {
       setIsBoosting(true);
+      const entitlementResult = await getMyEntitlementApi();
+
+      if (!isProEntitlement(entitlementResult.data)) {
+        setIsBoosting(false);
+        const shouldUpgrade = await confirm({
+          title: "Devory Pro 전용 기능",
+          message: "'Devory Pro' 구독자만 프로젝트에 거름을 줄 수 있습니다.",
+          confirmText: "플랜 업그레이드하러 가기",
+          cancelText: "닫기",
+        });
+
+        if (shouldUpgrade) {
+          router.push("/coins");
+        }
+        return;
+      }
+
       const result = await boostProjectApi(projectId);
       setProject((prev) => ({
         ...prev,
@@ -466,13 +489,14 @@ export default function ProjectDetailPage() {
         boost_score: result.data?.boost_score ?? prev?.boost_score,
       }));
       const remaining = result.data?.project_boost_remaining;
+      setNowTime(Date.now());
       toast.success(
         typeof remaining === "number"
-          ? `프로젝트 상단 노출이 적용되었습니다. 남은 횟수: ${remaining}회`
-          : "프로젝트 상단 노출이 적용되었습니다."
+          ? `프로젝트에 거름을 주었습니다. 일정 기간 동안 목록 상단에 노출됩니다. 남은 횟수: ${remaining}회`
+          : "프로젝트에 거름을 주었습니다. 일정 기간 동안 목록 상단에 노출됩니다."
       );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "프로젝트 상단 노출에 실패했습니다.");
+      toast.error(error instanceof Error ? error.message : "거름 주기에 실패했습니다.");
     } finally {
       setIsBoosting(false);
     }
@@ -753,13 +777,18 @@ export default function ProjectDetailPage() {
                   )}
 
                   {isLeader && !isProjectCompleted && (
-                    <button
-                      onClick={handleBoostProject}
-                      disabled={isBoosting}
-                      className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {isBoosting ? "노출 적용 중..." : "상단 노출"}
-                    </button>
+                    <div className="flex flex-col gap-1">
+                      <button
+                        onClick={handleBoostProject}
+                        disabled={isBoosting}
+                        className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {isBoosting ? "거름 주는 중..." : "거름 주기"}
+                      </button>
+                      <p className="max-w-xs text-xs leading-5 text-slate-500">
+                        거름을 주면 프로젝트가 일정 기간 동안 목록 상단에 노출됩니다.
+                      </p>
+                    </div>
                   )}
 
                   {isProjectMember && isTeamFormed && (
@@ -793,7 +822,7 @@ export default function ProjectDetailPage() {
 
               {isBoosted && (
                 <p className="mt-3 text-sm font-semibold text-amber-700">
-                  상단 노출 중 · {new Date(project.boosted_until).toLocaleDateString("ko-KR")}까지
+                  거름 주기 적용 중 · {new Date(project.boosted_until).toLocaleDateString("ko-KR")}까지 상단 노출
                 </p>
               )}
             </>

@@ -66,6 +66,7 @@ export default function ChatRoomPage() {
   const roomId = params.roomId;
   const projectId = searchParams.get("projectId");
   const bottomRef = useRef(null);
+  const todoListRef = useRef(null);
 
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -95,6 +96,7 @@ export default function ChatRoomPage() {
   const [draggedTodoId, setDraggedTodoId] = useState(null);
   const [todoDropTarget, setTodoDropTarget] = useState(null);
   const [reorderingTodos, setReorderingTodos] = useState(false);
+  const pendingTodoScrollTopRef = useRef(null);
 
   const loadMessages = useCallback(async () => {
     try {
@@ -473,6 +475,46 @@ export default function ChatRoomPage() {
     setDraggedTodoId(todoId);
   };
 
+  const handleTodoListDragOver = (event) => {
+    if (!draggedTodoId || isTodoFinalized || editingTodoId) return;
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+
+    const container = todoListRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const threshold = 64;
+    const maxSpeed = 28;
+
+    const distanceToTop = event.clientY - rect.top;
+    const distanceToBottom = rect.bottom - event.clientY;
+
+    let scrollDelta = 0;
+
+    if (distanceToTop < threshold) {
+      const intensity = Math.max(0, threshold - distanceToTop) / threshold;
+      scrollDelta = -Math.max(8, intensity * maxSpeed);
+    } else if (distanceToBottom < threshold) {
+      const intensity = Math.max(0, threshold - distanceToBottom) / threshold;
+      scrollDelta = Math.max(8, intensity * maxSpeed);
+    }
+
+    if (scrollDelta !== 0) {
+      container.scrollTop += scrollDelta;
+    }
+  };
+
+  const restoreTodoScrollPosition = useCallback(() => {
+    const container = todoListRef.current;
+    const pendingScrollTop = pendingTodoScrollTopRef.current;
+    if (!container || pendingScrollTop === null) return;
+
+    container.scrollTop = pendingScrollTop;
+    pendingTodoScrollTopRef.current = null;
+  }, []);
+
   const handleTodoDragEnd = () => {
     setDraggedTodoId(null);
     setTodoDropTarget(null);
@@ -554,6 +596,7 @@ export default function ChatRoomPage() {
 
     try {
       setReorderingTodos(true);
+      pendingTodoScrollTopRef.current = todoListRef.current?.scrollTop ?? null;
       await Promise.all(
         changedTodos.map((todo) =>
           updateTodoApi(projectId, todo.id, {
@@ -563,12 +606,22 @@ export default function ChatRoomPage() {
         )
       );
       await loadProjectTodos();
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          restoreTodoScrollPosition();
+        });
+      });
     } catch (error) {
       console.error(error);
       setTodos(currentTodos);
       alert("Todo 순서 변경에 실패했습니다.");
     } finally {
       setReorderingTodos(false);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          restoreTodoScrollPosition();
+        });
+      });
     }
   };
 
@@ -832,8 +885,10 @@ export default function ChatRoomPage() {
           )}
 
           <section
+            ref={todoListRef}
             className="flex-1 space-y-3 overflow-y-auto px-4 pb-4"
             onDragOver={(event) => {
+              handleTodoListDragOver(event);
               if (draggedTodoId) {
                 event.preventDefault();
                 event.dataTransfer.dropEffect = "move";
