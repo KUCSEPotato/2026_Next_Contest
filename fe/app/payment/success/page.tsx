@@ -85,7 +85,7 @@ function PaymentSuccessContent() {
             코인 페이지로
           </Link>
           <Link
-            href="/"
+            href="/mainpage"
             className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
           >
             홈으로

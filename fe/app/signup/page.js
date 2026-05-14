@@ -350,6 +350,9 @@ export default function SignupPage() {
             <p className="mt-2 text-sm text-slate-500">
               Devory에 오신 것을 환영해요.<br />AI가 나에게 딱 맞는 프로젝트를 추천해 드릴게요.
             </p>
+            <div className="mt-4 inline-flex items-center rounded-full border border-sky-100 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700">
+              무료 물방울 5방울이 지급되었어요
+            </div>
             <button
               onClick={handleViewRecommendations}
               className="mt-6 w-full rounded-xl bg-red-600 py-3 font-semibold text-white hover:bg-red-700 transition"
