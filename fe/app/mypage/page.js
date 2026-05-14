@@ -67,7 +67,7 @@ function getBenefitSummary(entitlement) {
     ? `상단 노출 ${benefits.project_boost_remaining}회 남음`
     : "상단 노출 없음";
 
-  return `프로젝트 생성: ${createText} · 프로젝트 지원: ${applyText} · ${boostText}`;
+  return `프로젝트 생성: ${createText} | 프로젝트 지원: ${applyText} | ${boostText}`;
 }
 
 function getPlanName(entitlement) {
@@ -598,7 +598,7 @@ export default function MyPage() {
                 </p>
                 {entitlement?.product_type === "SUBSCRIPTION" && (
                   <p>
-                    다음 갱신일: {formatEntitlementDate(entitlement.next_renewal_at)} · 자동
+                    다음 갱신일: {formatEntitlementDate(entitlement.next_renewal_at)} | 자동
                     갱신: {renewalStatus}
                   </p>
                 )}
