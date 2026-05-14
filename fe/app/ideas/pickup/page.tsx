@@ -54,7 +54,7 @@ interface IdeaListItem {
 
 const CATEGORIES = [
   { label: "전체", emoji: "✨" },
-  { label: "IT/소프트웨어", emoji: "💻" },
+  { label: "IT/SW", emoji: "💻" },
   { label: "경영/경제", emoji: "📊" },
   { label: "디자인/UI·UX", emoji: "🎨" },
   { label: "AI/데이터", emoji: "🤖" },
@@ -231,7 +231,7 @@ export default function InspirationWellPage() {
           bookmark_count: item.bookmark_count ?? 0,
           is_liked: Boolean(item.is_liked),
           is_bookmarked: Boolean(item.is_bookmarked),
-          domain: item.domain || item.category || "IT/소프트웨어",
+          domain: item.domain || item.category || "IT/SW",
           difficulty: item.difficulty,
           created_at: item.created_at,
           has_view_access: Boolean(item.has_view_access),
