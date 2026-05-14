@@ -1,0 +1,737 @@
+// Devory current database schema in dbdiagram.io DBML format.
+// Source: BE/docs/db/06_complete_postgresql_schema.sql + later migrations.
+
+Enum difficulty_level {
+  beginner
+  intermediate
+  advanced
+}
+
+enum project_status {
+  planning
+  in_progress
+  paused
+  completed
+  archived
+}
+
+enum application_status {
+  pending
+  accepted
+  rejected
+  withdrawn
+}
+
+enum invite_status {
+  pending
+  accepted
+  rejected
+  expired
+}
+
+enum todo_status {
+  todo
+  in_progress
+  blocked
+  done
+}
+
+enum recruitment_status {
+  open
+  closed
+  cancelled
+}
+
+enum adoption_status {
+  pending
+  approved
+  rejected
+  cancelled
+}
+
+enum subscription_status {
+  active
+  trialing
+  past_due
+  cancelled
+  expired
+}
+
+enum billing_cycle {
+  monthly
+  yearly
+}
+
+enum notification_type {
+  application_received
+  application_decided
+  invite_received
+  invite_decided
+  project_update
+  review_received
+  subscription_event
+  system
+}
+
+enum report_status {
+  open
+  in_review
+  resolved
+  dismissed
+}
+
+enum reaction_type {
+  recommend
+  not_recommend
+}
+
+enum post_category {
+  general
+  question
+  idea
+  showcase
+  event
+  announcement
+}
+
+Table users {
+  id bigint [pk, increment]
+  public_id uuid [unique, not null]
+  email varchar(255) [unique, not null]
+  password_hash text
+  github_id varchar(100) [unique]
+  google_id varchar(100) [unique]
+  nickname varchar(50) [unique, not null]
+  bio text
+  avatar_url text
+  avatar_s3_key varchar(500)
+  is_active boolean [not null, default: true]
+  is_verified boolean [not null, default: false]
+  role varchar(20) [not null, default: 'user']
+  coin_balance integer [not null, default: 0]
+  suspended_until timestamp
+  suspension_reason text
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+  deleted_at timestamp
+}
+
+Table skills {
+  id bigint [pk, increment]
+  name varchar(50) [unique, not null]
+  normalized_name varchar(50) [unique, not null]
+  created_at timestamp [not null, default: `now()`]
+}
+
+Table user_skills {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  skill_id bigint [not null]
+  proficiency smallint
+  created_at timestamp [not null, default: `now()`]
+}
+
+Table interests {
+  id bigint [pk, increment]
+  name varchar(50) [unique, not null]
+  normalized_name varchar(50) [unique, not null]
+  created_at timestamp [not null, default: `now()`]
+}
+
+Table user_interests {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  interest_id bigint [not null]
+  interest_level smallint
+  created_at timestamp [not null, default: `now()`]
+}
+
+Table ideas {
+  id bigint [pk, increment]
+  author_id bigint [not null]
+  title varchar(200) [not null]
+  summary text
+  description text [not null]
+  domain varchar(50)
+  tech_stack json [not null, default: '[]']
+  hashtags json [not null, default: '[]']
+  difficulty difficulty_level [not null]
+  required_members smallint [not null, default: 1]
+  is_open boolean [not null, default: true]
+  is_discarded boolean [not null, default: false]
+  converted_to_project_id bigint
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+  deleted_at timestamp
+}
+
+Table idea_bookmarks {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  idea_id bigint [not null]
+  created_at timestamp [not null, default: `now()`]
+}
+
+Table idea_likes {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  idea_id bigint [not null]
+  created_at timestamp [not null, default: `now()`]
+}
+
+Table projects {
+  id bigint [pk, increment]
+  idea_id bigint
+  leader_id bigint [not null]
+  title varchar(200) [not null]
+  summary text
+  description text [not null]
+  category varchar(50)
+  difficulty difficulty_level [not null]
+  status project_status [not null, default: 'planning']
+  progress_percent numeric(5,2) [not null, default: 0]
+  min_members smallint [not null, default: 1]
+  max_members smallint [not null, default: 10]
+  is_public boolean [not null, default: true]
+  boosted_until timestamp
+  boost_score integer [not null, default: 0]
+  started_at timestamp
+  completed_at timestamp
+  ended_at timestamp
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+  deleted_at timestamp
+}
+
+Table project_skills {
+  id bigint [pk, increment]
+  project_id bigint [not null]
+  skill_id bigint [not null]
+  required_level smallint
+  created_at timestamp [not null, default: `now()`]
+}
+
+Table project_interests {
+  id bigint [pk, increment]
+  project_id bigint [not null]
+  interest_id bigint [not null]
+  created_at timestamp [not null, default: `now()`]
+}
+
+Table project_members {
+  id bigint [pk, increment]
+  project_id bigint [not null]
+  user_id bigint [not null]
+  role_in_project varchar(50) [not null]
+  joined_at timestamp [not null, default: `now()`]
+  left_at timestamp
+  created_at timestamp [not null, default: `now()`]
+}
+
+Table project_milestones {
+  id bigint [pk, increment]
+  project_id bigint [not null]
+  title varchar(150) [not null]
+  description text
+  due_date date
+  is_done boolean [not null, default: false]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+Table project_recruitments {
+  id bigint [pk, increment]
+  project_id bigint [not null]
+  position_name varchar(100) [not null]
+  required_count smallint [not null, default: 1]
+  status recruitment_status [not null, default: 'open']
+  difficulty difficulty_level
+  category varchar(50)
+  summary text
+  deadline date
+  description text
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+Table applications {
+  id bigint [pk, increment]
+  project_id bigint [not null]
+  applicant_id bigint [not null]
+  message text
+  status application_status [not null, default: 'pending']
+  decided_by bigint
+  decided_at timestamp
+  is_priority boolean [not null, default: false]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+Table invitations {
+  id bigint [pk, increment]
+  project_id bigint [not null]
+  inviter_id bigint [not null]
+  invitee_id bigint [not null]
+  message text
+  status invite_status [not null, default: 'pending']
+  expires_at timestamp
+  decided_at timestamp
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+Table todos {
+  id bigint [pk, increment]
+  project_id bigint [not null]
+  assignee_id bigint
+  creator_id bigint [not null]
+  title varchar(200) [not null]
+  description text
+  stage varchar(30) [not null, default: 'planning']
+  status todo_status [not null, default: 'todo']
+  priority smallint [not null, default: 3]
+  due_date date
+  completed_at timestamp
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+Table todo_assignments {
+  id bigint [pk, increment]
+  todo_id bigint [not null]
+  user_id bigint [not null]
+  is_done boolean [not null, default: false]
+  done_at timestamp
+  created_at timestamp [not null, default: `now()`]
+}
+
+Table todo_templates {
+  id bigint [pk, increment]
+  template_key varchar(100) [unique, not null]
+  title varchar(200) [not null]
+  description text
+  stage varchar(30) [not null, default: 'planning']
+  priority smallint [not null, default: 3]
+  sort_order integer [not null, default: 0]
+  is_active boolean [not null, default: true]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+Table retrospectives {
+  id bigint [pk, increment]
+  project_id bigint [not null]
+  author_id bigint [not null]
+  title varchar(200) [not null]
+  what_went_well text
+  what_went_badly text
+  lessons_learned text
+  next_actions text
+  tech_stack jsonb [default: '[]']
+  domain varchar(100)
+  felt_point text
+  lacked_point text
+  ai_refined_felt text
+  ai_refined_lacked text
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+Table failure_stories {
+  id bigint [pk, increment]
+  project_id bigint [not null]
+  author_id bigint [not null]
+  title varchar(200) [not null]
+  problem_summary text [not null]
+  root_cause text
+  attempted_solutions text
+  lessons_learned text
+  is_public boolean [not null, default: true]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+Table adoption_requests {
+  id bigint [pk, increment]
+  project_id bigint [not null]
+  requester_id bigint [not null]
+  message text
+  status adoption_status [not null, default: 'pending']
+  decided_by bigint
+  decided_at timestamp
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+Table reviews {
+  id bigint [pk, increment]
+  project_id bigint [not null]
+  reviewer_id bigint [not null]
+  reviewee_id bigint [not null]
+  teamwork_score smallint [not null]
+  contribution_score smallint [not null]
+  responsibility_score smallint [not null]
+  comment text
+  created_at timestamp [not null, default: `now()`]
+}
+
+Table user_rating_aggregates {
+  user_id bigint [pk]
+  review_count integer [not null, default: 0]
+  avg_teamwork numeric(4,2) [not null, default: 0]
+  avg_contribution numeric(4,2) [not null, default: 0]
+  avg_responsibility numeric(4,2) [not null, default: 0]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+Table subscription_plans {
+  id bigint [pk, increment]
+  code varchar(50) [unique, not null]
+  name varchar(100) [not null]
+  price_krw integer [not null]
+  cycle billing_cycle [not null]
+  features jsonb [not null, default: '{}']
+  is_active boolean [not null, default: true]
+  created_at timestamp [not null, default: `now()`]
+}
+
+Table user_subscriptions {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  plan_id bigint [not null]
+  status subscription_status [not null]
+  current_period_start timestamp [not null]
+  current_period_end timestamp [not null]
+  cancel_at_period_end boolean [not null, default: false]
+  external_subscription_id varchar(100)
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+Table payments {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  order_id varchar(100) [unique, not null]
+  payment_key varchar(200) [unique]
+  product_id bigint
+  product_code varchar(50)
+  product_type varchar(30)
+  entitlement_id bigint
+  order_name varchar(255) [not null]
+  amount integer [not null]
+  coin_amount integer
+  currency varchar(10) [not null, default: 'KRW']
+  status varchar(30) [not null, default: 'READY']
+  method varchar(50)
+  provider varchar(30) [not null, default: 'TOSS']
+  toss_raw_response jsonb
+  requested_at timestamp [not null, default: `now()`]
+  approved_at timestamp
+  failed_at timestamp
+  canceled_at timestamp
+  failure_code varchar(100)
+  failure_message text
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+  deleted_at timestamp
+}
+
+Table payment_events {
+  id bigint [pk, increment]
+  user_subscription_id bigint
+  provider varchar(50) [not null]
+  provider_event_id varchar(150) [unique, not null]
+  event_type varchar(100) [not null]
+  payload jsonb [not null]
+  processed_at timestamp
+  created_at timestamp [not null, default: `now()`]
+}
+
+Table payment_products {
+  id bigint [pk, increment]
+  product_code varchar(50) [unique, not null]
+  product_type varchar(30) [not null]
+  name varchar(100) [not null]
+  price_krw integer [not null]
+  duration_days integer
+  billing_interval_days integer
+  auto_renew_available boolean [not null, default: false]
+  is_active boolean [not null, default: true]
+  idea_view_daily_limit integer
+  idea_view_total_limit integer
+  project_create_daily_limit integer
+  project_create_total_limit integer
+  project_discard_unlimited boolean [not null, default: false]
+  project_apply_daily_limit integer
+  project_apply_total_limit integer
+  project_apply_unlimited boolean [not null, default: false]
+  project_apply_priority boolean [not null, default: false]
+  community_write_daily_limit integer
+  community_write_unlimited boolean [not null, default: false]
+  community_comment_unlimited boolean [not null, default: true]
+  project_boost_total_limit integer
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+Table user_entitlements {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  product_id bigint [not null]
+  payment_id bigint
+  product_code varchar(50) [not null]
+  product_type varchar(30) [not null]
+  starts_at timestamp [not null, default: `now()`]
+  expires_at timestamp [not null]
+  next_renewal_at timestamp
+  status varchar(30) [not null, default: 'ACTIVE']
+  auto_renew_enabled boolean [not null, default: false]
+  renewal_status varchar(30) [not null, default: 'NONE']
+  project_create_used integer [not null, default: 0]
+  project_apply_used integer [not null, default: 0]
+  idea_view_used integer [not null, default: 0]
+  project_boost_used integer [not null, default: 0]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+Table user_usage_logs {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  entitlement_id bigint
+  usage_type varchar(50) [not null]
+  target_type varchar(50)
+  target_id bigint
+  used_at timestamp [not null, default: `now()`]
+  usage_date date [not null, default: `current_date()`]
+  created_at timestamp [not null, default: `now()`]
+}
+
+Table chat_rooms {
+  id bigint [pk, increment]
+  project_id bigint [not null]
+  name varchar(100)
+  is_active boolean [not null, default: true]
+  created_at timestamp [not null, default: `now()`]
+}
+
+Table chat_messages {
+  id bigint [pk, increment]
+  room_id bigint [not null]
+  sender_id bigint
+  message text [not null]
+  created_at timestamp [not null, default: `now()`]
+}
+
+Table chat_room_members {
+  id bigint [pk, increment]
+  room_id bigint [not null]
+  user_id bigint [not null]
+  joined_at timestamp [not null, default: `now()`]
+}
+
+Table notifications {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  type notification_type [not null]
+  title varchar(150) [not null]
+  body text
+  data jsonb [not null, default: '{}']
+  is_read boolean [not null, default: false]
+  created_at timestamp [not null, default: `now()`]
+  read_at timestamp
+}
+
+Table reports {
+  id bigint [pk, increment]
+  reporter_id bigint [not null]
+  target_user_id bigint
+  target_project_id bigint
+  target_post_id bigint
+  target_chat_room_id bigint
+  target_comment_id bigint
+  reason text [not null]
+  status report_status [not null, default: 'open']
+  handled_by bigint
+  handled_at timestamp
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+Table community_posts {
+  id bigint [pk, increment]
+  author_id bigint [not null]
+  title varchar(300) [not null]
+  content text [not null]
+  category post_category [not null, default: 'general']
+  is_pinned boolean [not null, default: false]
+  view_count bigint [not null, default: 0]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+  deleted_at timestamp
+}
+
+Table community_post_comments {
+  id bigint [pk, increment]
+  post_id bigint [not null]
+  author_id bigint [not null]
+  content text [not null]
+  parent_comment_id bigint
+  is_anonymous boolean [not null, default: false]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+  deleted_at timestamp
+}
+
+Table community_post_reactions {
+  id bigint [pk, increment]
+  post_id bigint [not null]
+  user_id bigint [not null]
+  reaction_type reaction_type [not null]
+  created_at timestamp [not null, default: `now()`]
+}
+
+Table community_comment_reactions {
+  id bigint [pk, increment]
+  comment_id bigint [not null]
+  user_id bigint [not null]
+  reaction_type reaction_type [not null]
+  created_at timestamp [not null, default: `now()`]
+}
+
+Table community_post_files {
+  id bigint [pk, increment]
+  post_id bigint [not null]
+  filename varchar(255) [not null]
+  file_size bigint [not null]
+  file_type varchar(50) [not null]
+  s3_key varchar(500) [not null]
+  s3_url text [not null]
+  uploaded_by bigint [not null]
+  created_at timestamp [not null, default: `now()`]
+  deleted_at timestamp
+}
+
+Table idea_files {
+  id bigint [pk, increment]
+  idea_id bigint [not null]
+  filename varchar(255) [not null]
+  file_size bigint [not null]
+  file_type varchar(50) [not null]
+  s3_key varchar(500) [not null]
+  s3_url text [not null]
+  uploaded_by bigint [not null]
+  created_at timestamp [not null, default: `now()`]
+  deleted_at timestamp
+}
+
+Table coin_transactions {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  amount integer [not null]
+  balance_after integer [not null]
+  event_type varchar(50) [not null]
+  source_type varchar(50)
+  source_id bigint
+  note text
+  created_at timestamp [not null, default: `now()`]
+}
+
+Table coin_purchase_requests {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  request_type varchar(30) [not null, default: 'COIN']
+  coin_amount integer [not null, default: 0]
+  price_krw integer [not null]
+  product_code varchar(50)
+  product_name varchar(100)
+  product_type varchar(30)
+  entitlement_days integer
+  status varchar(20) [not null, default: 'pending']
+  note text
+  admin_note text
+  handled_by bigint
+  handled_at timestamp
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+Ref: user_skills.user_id > users.id
+Ref: user_skills.skill_id > skills.id
+Ref: user_interests.user_id > users.id
+Ref: user_interests.interest_id > interests.id
+Ref: ideas.author_id > users.id
+Ref: idea_bookmarks.user_id > users.id
+Ref: idea_bookmarks.idea_id > ideas.id
+Ref: idea_likes.user_id > users.id
+Ref: idea_likes.idea_id > ideas.id
+Ref: projects.idea_id > ideas.id
+Ref: projects.leader_id > users.id
+Ref: project_skills.project_id > projects.id
+Ref: project_skills.skill_id > skills.id
+Ref: project_interests.project_id > projects.id
+Ref: project_interests.interest_id > interests.id
+Ref: project_members.project_id > projects.id
+Ref: project_members.user_id > users.id
+Ref: project_milestones.project_id > projects.id
+Ref: project_recruitments.project_id > projects.id
+Ref: applications.project_id > projects.id
+Ref: applications.applicant_id > users.id
+Ref: applications.decided_by > users.id
+Ref: invitations.project_id > projects.id
+Ref: invitations.inviter_id > users.id
+Ref: invitations.invitee_id > users.id
+Ref: todos.project_id > projects.id
+Ref: todos.assignee_id > users.id
+Ref: todos.creator_id > users.id
+Ref: todo_assignments.todo_id > todos.id
+Ref: todo_assignments.user_id > users.id
+Ref: retrospectives.project_id > projects.id
+Ref: retrospectives.author_id > users.id
+Ref: failure_stories.project_id > projects.id
+Ref: failure_stories.author_id > users.id
+Ref: adoption_requests.project_id > projects.id
+Ref: adoption_requests.requester_id > users.id
+Ref: adoption_requests.decided_by > users.id
+Ref: reviews.project_id > projects.id
+Ref: reviews.reviewer_id > users.id
+Ref: reviews.reviewee_id > users.id
+Ref: user_rating_aggregates.user_id > users.id
+Ref: user_subscriptions.user_id > users.id
+Ref: user_subscriptions.plan_id > subscription_plans.id
+Ref: payment_events.user_subscription_id > user_subscriptions.id
+Ref: payments.user_id > users.id
+Ref: payments.product_id > payment_products.id
+Ref: payments.entitlement_id > user_entitlements.id
+Ref: payment_products.id < user_entitlements.product_id
+Ref: user_entitlements.user_id > users.id
+Ref: user_entitlements.payment_id > payments.id
+Ref: user_usage_logs.user_id > users.id
+Ref: user_usage_logs.entitlement_id > user_entitlements.id
+Ref: chat_rooms.project_id > projects.id
+Ref: chat_messages.room_id > chat_rooms.id
+Ref: chat_messages.sender_id > users.id
+Ref: chat_room_members.room_id > chat_rooms.id
+Ref: chat_room_members.user_id > users.id
+Ref: notifications.user_id > users.id
+Ref: reports.reporter_id > users.id
+Ref: reports.target_user_id > users.id
+Ref: reports.target_project_id > projects.id
+Ref: reports.target_post_id > community_posts.id
+Ref: reports.target_chat_room_id > chat_rooms.id
+Ref: reports.target_comment_id > community_post_comments.id
+Ref: community_posts.author_id > users.id
+Ref: community_post_comments.post_id > community_posts.id
+Ref: community_post_comments.author_id > users.id
+Ref: community_post_comments.parent_comment_id > community_post_comments.id
+Ref: community_post_reactions.post_id > community_posts.id
+Ref: community_post_reactions.user_id > users.id
+Ref: community_comment_reactions.comment_id > community_post_comments.id
+Ref: community_comment_reactions.user_id > users.id
+Ref: community_post_files.post_id > community_posts.id
+Ref: community_post_files.uploaded_by > users.id
+Ref: idea_files.idea_id > ideas.id
+Ref: idea_files.uploaded_by > users.id
+Ref: coin_transactions.user_id > users.id
+Ref: coin_purchase_requests.user_id > users.id
+Ref: coin_purchase_requests.handled_by > users.id

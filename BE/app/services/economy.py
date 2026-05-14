@@ -202,21 +202,29 @@ def send_stale_project_notifications(db: Session, *, stale_days: int = 30) -> in
             db.query(Notification)
             .filter(
                 Notification.user_id == project.leader_id,
-                Notification.type == "project.stale_reminder",
             )
             .all()
         )
-        exists = any((notification.data or {}).get("project_id") == project.id for notification in existing_notifications)
+        exists = any(
+            ((notification.data or {}).get("notification_kind") == "project.stale_reminder" or notification.type == "project.stale_reminder")
+            and (notification.data or {}).get("project_id") == project.id
+            for notification in existing_notifications
+        )
         if exists:
             continue
 
         notify_user(
             db,
             user_id=project.leader_id,
-            notification_type="project.stale_reminder",
+            notification_type="system",
             title="30일 이상 진행되지 않은 프로젝트입니다.",
             body="생각의 뜰으로 흘려보내겠습니까? 프로젝트를 버리면 코인을 받을 수 있습니다.",
-            data={"project_id": project.id, "project_title": project.title, "stale_days": stale_days},
+            data={
+                "notification_kind": "project.stale_reminder",
+                "project_id": project.id,
+                "project_title": project.title,
+                "stale_days": stale_days,
+            },
         )
         created_count += 1
 

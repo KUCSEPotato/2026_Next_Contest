@@ -1,226 +1,234 @@
-# Devory / Next Contest
+# 🚀 Devory
 
-프로젝트 협업과 팀 기반 개발 경험을 관리하기 위한 백엔드 서비스입니다.
-FastAPI, PostgreSQL, Redis를 중심으로 인증, 프로젝트/팀 협업, 추천, 채팅, 알림, 구독 기능을 제공합니다.
+> **팀 협업을 위한 올인원 플랫폼**  
+> 아이디어에서 프로젝트 완성까지, 팀 기반 개발 경험을 한 곳에서 관리하세요.
 
-## 한눈에 보는 안내
+Devory는 팀 협업, 프로젝트 관리, 커뮤니티 피드백을 통합한 프로덕션급 플랫폼입니다.  
+강력한 백엔드 API와 실시간 기능으로 팀의 생산성을 극대화합니다.
 
-BE 하위에 분리된 운영 문서를 메인 README에서 바로 찾을 수 있도록 통합했습니다.
+---
 
-- API 프레임워크: FastAPI
-- 영속 데이터 저장소: PostgreSQL
-- 토큰 상태 저장소: Redis
-- API 문서: Swagger, ReDoc
-- 모니터링: Prometheus, Grafana (Docker Compose 포함)
+## ✨ 핵심 기능
 
-## 주요 기능
+### 🤝 팀 협업
+- **프로젝트 관리**: 아이디어 제시부터 프로젝트 실행, 완료까지 전 과정 관리
+- **멤버 매칭**: 기술, 관심사 기반으로 팀원 추천 및 협력
+- **실시간 채팅**: 팀 내 소통을 위한 직관적 메시징
+- **투두/마일스톤**: 프로젝트 진행 상황을 체계적으로 추적
 
-- 회원가입, 로그인, 로그아웃, 비밀번호 재설정
-- GitHub/Google OAuth 로그인 (Authorization Code Flow)
-- 기존 계정 OAuth 연결/해제
-- Access/Refresh 토큰 발급 및 revoke
-- 아이디어, 프로젝트, 지원/초대, 멤버 관리
-- 투두, 회고, 실패 경험, 리뷰/평점
-- 추천, 검색, 알림, 채팅, 구독, 관리자 기능
+### 💡 프로젝트 생명주기
+- **아이디어 공유**: 개인의 아이디어를 커뮤니티에 공개
+- **팀 모집**: 필요한 기술 스택과 역할에 맞는 팀원 모집
+- **협업 진행**: 투두, 회고, 리뷰를 통한 팀 협업
+- **경험 기록**: 실패 경험과 배운 점을 기록하고 공유
 
-## 기술 스택
+### 🌟 커뮤니티 & 추천
+- **피드 시스템**: 팀의 활동과 성과를 실시간으로 공유
+- **평점/리뷰**: 팀원의 협업 능력을 객관적으로 평가
+- **스마트 추천**: AI 기반 팀원 및 프로젝트 추천
+- **포인트 이코노미**: 활동 기반 코인 보상 시스템
 
-- Backend: FastAPI
-- ORM: SQLAlchemy
-- DB: PostgreSQL
-- Token Store: Redis
-- Validation: Pydantic
-- Container: Docker, Docker Compose
-- Monitoring: Prometheus, Grafana
+### 🔐 안전한 인증
+- **소셜 로그인**: GitHub, Google을 통한 한 번에 시작
+- **토큰 관리**: 안전한 Access/Refresh 토큰 시스템
+- **계정 연결**: 여러 OAuth 계정 통합 관리
 
-## 프로젝트 구조
+---
 
-```text
-.
-├── BE/
-│   ├── app/
-│   ├── docker/
-│   │   └── monitoring/
-│   ├── docs/
-│   ├── migrations/
-│   └── requirements.txt
-├── README.md
-└── idea/
+## 🛠️ 기술 스택
+
+| 영역 | 기술 |
+|------|------|
+| **Backend** | FastAPI + SQLAlchemy |
+| **Database** | PostgreSQL (주 저장소) |
+| **Real-time** | Redis (토큰/세션 저장) |
+| **Monitoring** | Prometheus + Grafana |
+| **Container** | Docker & Docker Compose |
+| **Authentication** | JWT + OAuth 2.0 |
+
+---
+
+## 📊 데이터베이스 아키텍처
+
+Devory의 확장 가능한 스키마 설계로 안정적인 팀 협업 환경을 제공합니다.
+
+![Database Schema](/IMG/[0514]DB.png)
+
+**주요 엔티티**:
+- **사용자 & 인증**: 계정 관리, 소셜 연동
+- **아이디어 & 프로젝트**: 생명주기 관리, 기술 스택 추적
+- **팀 협업**: 멤버, 투두, 회고, 리뷰
+- **커뮤니티**: 피드, 포스트, 반응
+- **결제 & 구독**: 유연한 플랜 시스템
+- **코인 이코노미**: 활동 기반 보상
+
+---
+
+## 🚀 빠른 시작
+
+### 로컬 개발 환경 (3분 셋업)
+
+**1단계: 저장소 클론**
+```bash
+git clone https://github.com/your-org/devory.git
+cd devory/BE
 ```
 
-## 핵심 문서
-
-- [BE/app/api/API_CATALOG.md](BE/app/api/API_CATALOG.md): API 동작 카탈로그
-- [BE/docs/SWAGGER_TEST_GUIDE.md](BE/docs/SWAGGER_TEST_GUIDE.md): Swagger 테스트 가이드
-- [BE/docs/db/README.md](BE/docs/db/README.md): DB 운영 원칙
-- [BE/docs/db/REDIS_GUIDE.md](BE/docs/db/REDIS_GUIDE.md): Redis 사용 가이드
-- [BE/docker/README.md](BE/docker/README.md): Docker 실행 가이드
-
-## 빠른 시작 (로컬)
-
-### 1) 환경 파일 준비
-
+**2단계: 환경 변수 설정**
 ```bash
-cd BE
 cp .env.example .env
 ```
 
-### 2) 의존성 설치
-
+**3단계: 서버 실행**
 ```bash
-cd BE
 pip install -r requirements.txt
-```
-
-### 3) 서버 실행
-
-```bash
-cd BE
 uvicorn app.main:app --reload
 ```
 
-### 4) 접속 주소
+**접근 주소**:
+- 🌐 API: http://localhost:8000
+- 📚 Swagger (대화형 API 문서): http://localhost:8000/docs
+- 📖 ReDoc: http://localhost:8000/redoc
 
-- API: http://127.0.0.1:8000
-- Swagger: http://127.0.0.1:8000/docs
-- ReDoc: http://127.0.0.1:8000/redoc
-- Metrics: http://127.0.0.1:8000/metrics
-
-## Docker 실행
-
-Compose는 기본적으로 PostgreSQL, Redis, API, Prometheus, Grafana를 함께 기동합니다.
-
-```bash
-cd BE
-cp .env.example .env
-cd docker
-docker compose up -d --build
-```
-
-상태/로그:
-
-```bash
-docker compose ps
-docker compose logs -f api
-docker compose logs -f db
-docker compose logs -f redis
-docker compose logs -f prometheus
-docker compose logs -f grafana
-```
-
-중지:
-
-```bash
-docker compose down
-```
-
-볼륨 포함 초기화:
-
-```bash
-docker compose down -v --remove-orphans
-```
-
-## 개발/배포 환경 분리 (Dev vs Prod)
-
-| 항목 | Dev (로컬/테스트) | Prod (배포) |
-|---|---|---|
-| 환경 파일 | `BE/.env.example` 기반 `BE/.env` | `BE/.env.production.example` 기반 실제 비밀값 |
-| DB 주소 | `postgresql+psycopg2://...@127.0.0.1:5432/...` 또는 `@db:5432` | 관리형 DB 엔드포인트(RDS/Cloud SQL 등) |
-| Redis 주소 | `redis://127.0.0.1:6379/0` 또는 `redis://redis:6379/0` | 운영 Redis 엔드포인트 |
-| JWT 시크릿 | 임시값 가능 | 강한 랜덤 시크릿 필수 |
-| OAuth Redirect URI | 로컬 프론트 callback (`127.0.0.1`) | 실제 서비스 도메인 callback |
-| 관측성 | Prometheus/Grafana 로컬 포트 확인용 | 내부망/보안그룹 기반 접근 제어 |
-| 로그/재시작 | 개발 편의 중심 | 장애 대응, 보존 정책, 알림 연동 |
-
-배포 전 체크리스트:
-
-1. `BE/.env.production.example`의 placeholder를 실제 운영값으로 교체
-2. GitHub/Google OAuth 콘솔의 Redirect URI와 운영 프론트 callback URL 일치 확인
-3. `JWT_SECRET_KEY`, DB/Redis 비밀번호, Grafana admin 계정 강한 값 적용
-4. `docker compose config`로 구성 검증 후 기동
-5. `/health`, `/metrics`, 로그인/로그아웃, token refresh, OAuth 로그인 플로우 점검
-
-배포 시 기본 실행:
+### Docker로 빠르게 시작
 
 ```bash
 cd BE/docker
-docker compose up -d --build
-docker compose ps
+docker compose up -d
 ```
 
-## 모니터링
+**서비스 주소**:
+- API: http://localhost:8000
+- 모니터링: http://localhost:9090 (Prometheus)
+- 대시보드: http://localhost:3001 (Grafana)
 
-- API Metrics: http://127.0.0.1:8000/metrics
-- Prometheus: http://127.0.0.1:9090
-- Grafana: http://127.0.0.1:3001
+---
 
-Prometheus scrape 설정은 [BE/docker/monitoring/prometheus.yml](BE/docker/monitoring/prometheus.yml)에서 관리합니다.
+## 📋 API 예시
 
-## 환경 변수 요약
+### 로그인
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "your-password"
+  }'
+```
 
-기본 값은 [BE/.env.example](BE/.env.example), 배포 예시는 [BE/.env.production.example](BE/.env.production.example)을 기준으로 사용합니다.
+**응답**:
+```json
+{
+  "access_token": "eyJ...",
+  "refresh_token": "eyJ...",
+  "token_type": "bearer"
+}
+```
 
-필수 항목:
+### 프로젝트 목록 조회
+```bash
+curl http://localhost:8000/api/v1/projects \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
 
-- DATABASE_URL
-- REDIS_URL
-- JWT_SECRET_KEY
-- GITHUB_OAUTH_CLIENT_ID
-- GITHUB_OAUTH_CLIENT_SECRET
-- GITHUB_OAUTH_REDIRECT_URI
-- GOOGLE_OAUTH_CLIENT_ID
-- GOOGLE_OAUTH_CLIENT_SECRET
-- GOOGLE_OAUTH_REDIRECT_URI
+더 많은 API 예시는 Swagger 문서(http://localhost:8000/docs)에서 직접 테스트할 수 있습니다.
 
-모니터링 관련(선택):
+---
 
-- PROMETHEUS_PORT (기본 9090)
-- GRAFANA_PORT (기본 3001)
-- GRAFANA_ADMIN_USER
-- GRAFANA_ADMIN_PASSWORD
+## 🔐 보안 & 프로덕션 체크리스트
 
-주의:
+### 환경 변수 설정
+| 환경 | 특징 | 참고 |
+|------|------|------|
+| **개발** | 로컬 테스트용 | `.env.example` 기본값 |
+| **운영** | 강한 보안 | `JWT_SECRET_KEY`, DB 비밀번호 반드시 변경 |
 
-- OAuth Redirect URI는 프론트엔드 callback URL과 정확히 일치해야 합니다.
-- 운영 환경에서는 JWT_SECRET_KEY를 강한 랜덤 값으로 반드시 교체해야 합니다.
+### 배포 전 필수 확인사항
+✅ GitHub/Google OAuth Redirect URI와 프론트엔드 callback URL 일치  
+✅ `JWT_SECRET_KEY`를 강한 랜덤 값으로 교체  
+✅ PostgreSQL, Redis 비밀번호 설정  
+✅ CORS, 방화벽 설정 완료  
+✅ Prometheus/Grafana 접근 제어 설정  
 
-## 인증/OAuth API 요약
+**상세 가이드**: [BE/docker/README.md](BE/docker/README.md)
 
-- 로그인/토큰: /api/v1/auth/login, /api/v1/auth/token/refresh, /api/v1/auth/logout
-- OAuth 로그인: /api/v1/auth/oauth/github, /api/v1/auth/oauth/google
-- OAuth 연결/해제:
-	- GET /api/v1/auth/oauth/links
-	- POST /api/v1/auth/oauth/link/github
-	- POST /api/v1/auth/oauth/link/google
-	- DELETE /api/v1/auth/oauth/unlink/github
-	- DELETE /api/v1/auth/oauth/unlink/google
+---
 
-상세 예시는 [BE/docs/SWAGGER_TEST_GUIDE.md](BE/docs/SWAGGER_TEST_GUIDE.md)를 참고하세요.
+## 📚 상세 문서
 
-## 현재 상태
+더 깊이 있는 정보가 필요하신가요? 다음 문서들을 확인하세요.
 
-- 인증: 이메일/닉네임 + 비밀번호, GitHub/Google OAuth 구현 완료
-- 토큰 정책: 로그아웃 시 access/refresh revoke 처리 + Redis 저장
-- 인프라: PostgreSQL/Redis/API Docker Compose 구성 완료
-- 모니터링: Prometheus/Grafana 및 /metrics 노출 반영 완료
+### 백엔드 개발자 가이드
+- [API 카탈로그](BE/app/api/API_CATALOG.md) - 전체 API 엔드포인트 목록
+- [Swagger 테스트 가이드](BE/docs/SWAGGER_TEST_GUIDE.md) - API 대화형 테스트 방법
+- [DB 스키마 & 마이그레이션](BE/docs/db/README.md) - 데이터베이스 운영 원칙
+- [Redis 가이드](BE/docs/db/REDIS_GUIDE.md) - 토큰/세션 관리
+- [Docker 배포 가이드](BE/docker/README.md) - 프로덕션 배포
 
-## 다음 개선 우선순위
+### 프론트엔드 개발자 가이드
+- [FE 문서](fe/README.md) - 프론트엔드 아키텍처 및 설정
 
-- OAuth state/PKCE 검증 로직 강화
-- 비밀번호 해시를 bcrypt/argon2로 전환
-- Alembic 기반 마이그레이션 체계 도입
-- 요청 추적 ID 및 구조화 로깅 도입
-- 핵심 인증/토큰 회귀 테스트 보강
+---
 
-- 로그인/토큰: /api/v1/auth/login, /api/v1/auth/token/refresh, /api/v1/auth/logout
-- OAuth 로그인: /api/v1/auth/oauth/github, /api/v1/auth/oauth/google
-- OAuth 연결/해제:
-	- GET /api/v1/auth/oauth/links
-	- POST /api/v1/auth/oauth/link/github
-	- POST /api/v1/auth/oauth/link/google
-	- DELETE /api/v1/auth/oauth/unlink/github
-	- DELETE /api/v1/auth/oauth/unlink/google
+## 💬 커뮤니티 & 지원
 
-- 백엔드 구현: [BE/app](BE/app)
-- DB 스키마: [BE/docs/db/01_postgresql_schema.sql](BE/docs/db/01_postgresql_schema.sql)
-- Docker 구성: [BE/docker](BE/docker)
+**문제를 발견했거나 개선 아이디어가 있으신가요?**
+
+- 🐛 [이슈 보고](../../issues) - 버그 신고
+- 💡 [기능 제안](../../discussions) - 새로운 아이디어 공유
+- 📧 이메일: contact@devory.kr
+
+---
+
+## 🤝 기여하기
+
+Devory는 오픈소스 커뮤니티의 기여를 환영합니다!
+
+### 기여 프로세스
+1. 저장소 Fork
+2. 기능 브랜치 생성 (`git checkout -b feature/amazing-feature`)
+3. 변경사항 커밋 (`git commit -m 'Add amazing feature'`)
+4. 브랜치 푸시 (`git push origin feature/amazing-feature`)
+5. Pull Request 생성
+
+### 개발 환경 셋업
+```bash
+# 1. 저장소 클론
+git clone https://github.com/your-org/devory.git
+cd devory
+
+# 2. 개발 환경 설정
+cd BE
+python -m venv .venv
+source .venv/bin/activate  # macOS/Linux
+# or: .venv\Scripts\activate  # Windows
+
+# 3. 의존성 설치
+pip install -r requirements.txt
+
+# 4. 마이그레이션 & 개발 서버 실행
+alembic upgrade head
+uvicorn app.main:app --reload
+```
+
+---
+
+## 📄 라이선스
+
+이 프로젝트는 **MIT License** 하에 공개됩니다.  
+[라이선스 전문](LICENSE) 확인하기
+
+---
+
+## ⭐ 별 주기
+
+이 프로젝트가 도움이 되었다면 ⭐ 별을 눌러주세요!  
+여러분의 관심이 팀을 계속 발전시키는 동력이 됩니다.
+
+---
+
+<div align="center">
+
+**Made with ❤️ by the Devory Team**
+
+</div>
