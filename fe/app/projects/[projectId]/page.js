@@ -96,7 +96,7 @@ export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
   const toast = useToast();
-  const { prompt, confirmCoinSpend } = useDialog();
+  const { prompt, confirm, confirmCoinSpend } = useDialog();
   const projectId = params.projectId;
 
   const [project, setProject] = useState(null);
@@ -366,10 +366,13 @@ export default function ProjectDetailPage() {
       return;
     }
 
-    const reallyDelete = window.confirm(
-      "정말 삭제하시겠습니까? 삭제한 프로젝트는 다시 이어가기 어렵습니다."
-    );
-
+    const reallyDelete = await confirm({
+      title: "프로젝트를 삭제할까요?",
+      message: "삭제한 프로젝트는 다시 이어가기 어려워요.",
+      confirmText: "삭제하기",
+      cancelText: "취소",
+      tone: "danger",
+    });
     if (!reallyDelete) return;
 
     try {
