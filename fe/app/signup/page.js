@@ -346,21 +346,49 @@ export default function SignupPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
+
             <h2 className="text-xl font-bold text-slate-900">회원가입이 완료되었습니다! 🎉</h2>
+
             <p className="mt-2 text-sm text-slate-500">
-              Devory에 오신 것을 환영해요.<br />AI가 나에게 딱 맞는 프로젝트를 추천해 드릴게요.
+              Devory에 오신 것을 환영해요.<br />
+              시작을 응원하는 무료 물방울을 지급해드렸어요.
             </p>
+
             <div className="mt-4 inline-flex items-center rounded-full border border-sky-100 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700">
               무료 물방울 5방울이 지급되었어요
             </div>
+
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left">
+              <h3 className="text-sm font-bold text-slate-800">물방울은 이렇게 사용돼요</h3>
+
+              <ul className="mt-3 space-y-2 text-xs leading-relaxed text-slate-600">
+                <li className="flex gap-2">
+                  <span className="shrink-0">💧</span>
+                  <span>프로젝트를 등록하거나, 열람하거나, 아이디어를 주울 때 물방울 1방울이 사용돼요.</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="shrink-0">🌱</span>
+                  <span>내가 버린 아이디어를 누군가 줍거나, 내가 프로젝트를 완료하면 물방울 1방울을 얻을 수 있어요.</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="shrink-0">📌</span>
+                  <span>요금제를 구독해도 위 활동에는 동일하게 물방울이 사용돼요.</span>
+                </li>
+              </ul>
+            </div>
+
             <button
               onClick={handleViewRecommendations}
               className="mt-6 w-full rounded-xl bg-red-600 py-3 font-semibold text-white hover:bg-red-700 transition"
             >
               🤖 AI 추천 프로젝트 보러 가기
             </button>
+
             <button
-              onClick={() => { setShowCompletionModal(false); router.push("/mainpage"); }}
+              onClick={() => {
+                setShowCompletionModal(false);
+                router.push("/mainpage");
+              }}
               className="mt-2 w-full rounded-xl py-2 text-sm text-slate-400 hover:text-slate-600 transition"
             >
               나중에 볼게요
