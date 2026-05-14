@@ -388,9 +388,9 @@ function StoreSectionCard({ section, active, onClick }) {
           : "border-gray-200 bg-white hover:border-sky-200 dark:border-slate-700 dark:bg-slate-900/80 dark:hover:border-sky-500/40"
       }`}
     >
-      <div className="mb-3 flex items-start justify-between gap-3">
+      <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-2xl dark:bg-sky-500/10">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-xl dark:bg-sky-500/10">
             {section.emoji}
           </span>
           <div>
@@ -410,7 +410,7 @@ function StoreSectionCard({ section, active, onClick }) {
         )}
       </div>
 
-      <p className="whitespace-pre-line text-center text-sm leading-relaxed text-gray-500 dark:text-slate-400">
+      <p className="text-center whitespace-pre-line text-sm leading-relaxed text-gray-500 dark:text-slate-400">
         {section.description}
       </p>
     </button>
@@ -663,22 +663,22 @@ export default function CoinsPage() {
             물방울 상점
           </h1>
 
-          <p className="mx-auto mb-6 max-w-md text-sm leading-7 text-gray-500 dark:text-slate-400 sm:text-base">
+          <p className="mx-auto mb-8 max-w-md text-sm leading-7 text-gray-500 dark:text-slate-400 sm:text-base">
             아이디어 씨앗을 무럭무럭 자라게 해줄
             <br />
             영양 가득한 물이에요.
           </p>
-        </section>
 
-        <section className="mx-auto mb-8 grid max-w-5xl grid-cols-1 gap-4 sm:grid-cols-3">
-          {STORE_SECTIONS.map((section) => (
-            <StoreSectionCard
-              key={section.key}
-              section={section}
-              active={activeSection === section.key}
-              onClick={() => setActiveSection(section.key)}
-            />
-          ))}
+          <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 text-left sm:grid-cols-3">
+            {STORE_SECTIONS.map((section) => (
+              <StoreSectionCard
+                key={section.key}
+                section={section}
+                active={activeSection === section.key}
+                onClick={() => setActiveSection(section.key)}
+              />
+            ))}
+          </div>
         </section>
 
         {/* ── 컨텐츠 ── */}
