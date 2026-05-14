@@ -451,7 +451,11 @@ async def list_ideas(
             "is_liked": idea.id in liked_idea_ids,
             "is_bookmarked": idea.id in bookmarked_idea_ids,
             **(
-                _idea_view_access_payload(*recent_view_transactions[idea.id])
+                _idea_view_access_payload(
+                    recent_view_transactions[idea.id][0],
+                    source=recent_view_transactions[idea.id][1],
+                    waterdrop_spent=recent_view_transactions[idea.id][2],
+                )
                 if idea.id in recent_view_transactions
                 else _idea_view_access_payload(None)
             ),
