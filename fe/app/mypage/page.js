@@ -590,8 +590,12 @@ export default function MyPage() {
 
               <div className="mt-3 space-y-2 text-sm font-semibold text-slate-700">
                 <p>
-                  만료일:{" "}
-                  {formatEntitlementDate(entitlement?.expires_at)}
+                  남은 기간:{" "}
+                  {entitlement?.days_remaining === null ||
+                  entitlement?.days_remaining === undefined
+                    ? "제한 없음"
+                    : `${entitlement.days_remaining}일`}{" "}
+                  · 만료일: {formatEntitlementDate(entitlement?.expires_at)}
                 </p>
                 {entitlement?.product_type === "SUBSCRIPTION" && (
                   <p>
