@@ -10,4 +10,4 @@ class UserProfileUpdateRequest(BaseModel):
 
 
 class OnboardingIdeaSelectionRequest(BaseModel):
-    idea_ids: list[int] = Field(min_length=1)
+    idea_ids: list[int] = Field(default_factory=list)

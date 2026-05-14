@@ -306,7 +306,7 @@ export default function SignupPage() {
       await authenticatedFetch(`${API_BASE}/api/v1/users/me/onboarding/ideas`, {
         method: "POST",
         headers,
-        body: JSON.stringify({}),
+        body: JSON.stringify({ idea_ids: [] }),
       });
 
       setStep(3);

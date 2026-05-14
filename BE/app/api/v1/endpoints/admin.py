@@ -22,7 +22,9 @@ from app.models import UserSubscription
 from app.models import User
 from app.services.economy import award_coins
 from app.services.economy import send_stale_project_notifications
+from app.services.entitlement_service import get_effective_plan
 from app.services.entitlement_service import grant_entitlement
+from app.services.entitlement_service import set_user_plan
 
 router = APIRouter()
 
@@ -331,8 +333,10 @@ async def list_users_for_admin(
         query = query.filter(User.is_active.is_(is_active))
 
     users = query.order_by(User.id.desc()).all()
-    return success_response(
-        data=[
+    rows = []
+    for u in users:
+        plan = get_effective_plan(db, u.id)
+        rows.append(
             {
                 "id": u.id,
                 "email": u.email,
@@ -347,11 +351,16 @@ async def list_users_for_admin(
                 "is_github_linked": bool(u.github_id),
                 "is_google_linked": bool(u.google_id),
                 "coin_balance": u.coin_balance,
+                "current_plan_code": plan.product_code,
+                "current_plan_name": plan.name,
+                "current_plan_type": plan.product_type,
+                "current_plan_expires_at": plan.expires_at,
                 "created_at": u.created_at,
                 "deleted_at": u.deleted_at,
             }
-            for u in users
-        ]
+        )
+    return success_response(
+        data=rows
     )
 
 
@@ -446,6 +455,17 @@ async def update_user_status(
         if role not in {"user", "leader", "admin"}:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role")
         user.role = role
+
+    current_plan = None
+    if "plan_code" in payload:
+        plan_code = payload.get("plan_code")
+        if plan_code is not None and not isinstance(plan_code, str):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid plan_code")
+        plan_code = plan_code.strip() if isinstance(plan_code, str) else None
+        if plan_code == "":
+            plan_code = None
+        current_plan = set_user_plan(db, user_id=user.id, product_code=plan_code)
+    effective_plan = current_plan or get_effective_plan(db, user.id)
     db.commit()
     return success_response(
         data={
@@ -454,6 +474,10 @@ async def update_user_status(
             "role": user.role,
             "suspended_until": user.suspended_until,
             "suspension_reason": user.suspension_reason,
+            "current_plan_code": effective_plan.product_code,
+            "current_plan_name": effective_plan.name,
+            "current_plan_type": effective_plan.product_type,
+            "current_plan_expires_at": effective_plan.expires_at,
         }
     )
 

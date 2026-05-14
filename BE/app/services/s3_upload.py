@@ -70,11 +70,11 @@ class S3FileUploadService:
                 detail=f"File size exceeds {settings.max_file_size_mb}MB limit",
             )
 
-        # Generate unique filename
-        unique_id = str(uuid4())[:8]
-        base_name = os.path.splitext(filename)[0]
-        ext = os.path.splitext(filename)[1]
-        s3_filename = f"{base_name}-{unique_id}{ext}"
+        # Use an ASCII-only object key. Original filenames may contain
+        # characters that clients normalize differently, which can break
+        # SigV4 presigned URL verification.
+        ext = Path(filename or "").suffix.lower()
+        s3_filename = f"{uuid4().hex}{ext}"
         s3_key = f"{folder}/{s3_filename}"
 
         try:

@@ -530,28 +530,36 @@ export default function PostDetailPage() {
                     return (
                       <div
                         key={file.id}
-                        className="overflow-hidden rounded-xl bg-gray-100"
+                        className="overflow-hidden rounded-xl border border-gray-100 bg-gray-100"
                       >
                         {isImage ? (
                           <img
                             src={file.s3_url}
                             alt={file.filename}
-                            className="h-48 w-full object-cover"
+                            className="max-h-[520px] w-full bg-gray-50 object-contain"
                           />
                         ) : isVideo ? (
                           <video
                             src={file.s3_url}
                             controls
-                            className="h-48 w-full object-cover"
+                            className="max-h-[520px] w-full bg-black object-contain"
                           />
                         ) : (
                           <a
                             href={file.s3_url}
                             target="_blank"
                             rel="noreferrer"
-                            className="block px-4 py-3 text-xs font-medium text-gray-600 hover:text-red-500"
+                            className="flex items-center gap-3 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:text-red-500"
                           >
-                            {file.filename}
+                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-lg">
+                              📄
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block truncate">{file.filename}</span>
+                              <span className="mt-1 block text-xs text-gray-400">
+                                {(file.file_size / 1024 / 1024).toFixed(2)}MB
+                              </span>
+                            </span>
                           </a>
                         )}
                       </div>

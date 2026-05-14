@@ -15,6 +15,7 @@ interface Project {
   summary?: string;
   category: string;
   techStack: string[];
+  interests: string[];
   hashtags: string[];
   currentMembers: number;
   maxMembers: number;
@@ -27,6 +28,8 @@ interface Project {
   openRecruitmentCount: number;
   openRecruitmentRequiredCount: number;
   openRecruitmentPosition?: string | null;
+  boostedUntil?: string | null;
+  boostScore: number;
   createdAt: string;
 }
 
@@ -38,6 +41,7 @@ interface ApiProject {
   category?: string;
   tech_stack?: string[];
   techStack?: string[];
+  interests?: string[];
   hashtags?: string[];
   hashTags?: string[];
   hash_tags?: string[];
@@ -58,6 +62,10 @@ interface ApiProject {
   open_recruitment_required_count?: number;
   openRecruitmentPosition?: string | null;
   open_recruitment_position?: string | null;
+  boosted_until?: string | null;
+  boostedUntil?: string | null;
+  boost_score?: number;
+  boostScore?: number;
   created_at?: string;
   createdAt?: string;
   status?: string;
@@ -168,6 +176,7 @@ function normalizeProject(project: ApiProject): Project {
     summary: project.summary,
     category: project.category || "IT/소프트웨어",
     techStack: project.techStack || project.tech_stack || [],
+    interests: project.interests || [],
     hashtags: project.hashtags || project.hashTags || project.hash_tags || project.tags || [],
     currentMembers: project.currentMembers ?? project.current_members ?? 0,
     maxMembers: project.maxMembers ?? project.max_members ?? 0,
@@ -179,11 +188,35 @@ function normalizeProject(project: ApiProject): Project {
       project.openRecruitmentRequiredCount ?? project.open_recruitment_required_count ?? 0,
     openRecruitmentPosition:
       project.openRecruitmentPosition ?? project.open_recruitment_position ?? null,
+    boostedUntil: project.boostedUntil ?? project.boosted_until ?? null,
+    boostScore: project.boostScore ?? project.boost_score ?? 0,
     status: project.status || "planning",
     difficulty: project.difficulty ?? "beginner",
     isUrgent: false,
     createdAt: project.createdAt ?? project.created_at ?? "",
   };
+}
+
+function getActiveBoostTime(project: Project, now: number) {
+  if (!project.boostedUntil) return 0;
+
+  const boostedUntil = new Date(project.boostedUntil).getTime();
+  return Number.isFinite(boostedUntil) && boostedUntil > now ? boostedUntil : 0;
+}
+
+function compareActiveBoost(a: Project, b: Project, now: number) {
+  const aBoostTime = getActiveBoostTime(a, now);
+  const bBoostTime = getActiveBoostTime(b, now);
+  const aBoosted = aBoostTime > 0;
+  const bBoosted = bBoostTime > 0;
+
+  if (aBoosted !== bBoosted) return aBoosted ? -1 : 1;
+  if (!aBoosted || !bBoosted) return 0;
+
+  const scoreDiff = b.boostScore - a.boostScore;
+  if (scoreDiff !== 0) return scoreDiff;
+
+  return bBoostTime - aBoostTime;
 }
 
 function isProjectRecruiting(project: Project) {
@@ -214,6 +247,13 @@ export default function MainPage() {
   const [recommendedProjectIds, setRecommendedProjectIds] = useState<number[]>([]);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [nowTime, setNowTime] = useState(() => Date.now());
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNowTime(Date.now()), 60_000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     async function loadProjects() {
@@ -343,6 +383,9 @@ export default function MainPage() {
         );
       })
       .sort((a, b) => {
+        const boostOrder = compareActiveBoost(a, b, nowTime);
+        if (boostOrder !== 0) return boostOrder;
+
         if (sortBy === "competition") {
           return b.competitionRatio - a.competitionRatio;
         }
@@ -362,6 +405,7 @@ export default function MainPage() {
   }, [
     memberMax,
     memberMin,
+    nowTime,
     projects,
     recommendedProjectIds,
     searchQuery,
@@ -689,6 +733,7 @@ export default function MainPage() {
                 <ProjectCard
                   key={project.id}
                   project={project}
+                  nowTime={nowTime}
                   onClick={() => handleProjectClick(project)}
                 />
               ))}
@@ -798,23 +843,25 @@ function SproutHeroIcon() {
       aria-hidden
       style={{ animation: "floatSprout 3s ease-in-out infinite" }}
     >
-      <defs>
-        <linearGradient id="sproutStem" x1="44" y1="78" x2="44" y2="34">
-          <stop offset="0%" stopColor="#92400e" />
-          <stop offset="100%" stopColor="#16a34a" />
-        </linearGradient>
-      </defs>
       <g transform="translate(-7 -5) scale(1.15)">
-        <path d="M48 82V38" stroke="url(#sproutStem)" strokeWidth="8" strokeLinecap="round" />
+        <ellipse cx="48" cy="84" rx="27" ry="7" fill="#92400e" opacity="0.22" />
         <path
           d="M45 41C23 39 15 24 15 11c19 0 33 9 36 29"
           fill="#22c55e"
+          transform="translate(-3 0)"
+        />
+        <path
+          d="M48 78V40"
+          stroke="#7c2d12"
+          strokeWidth="8"
+          strokeLinecap="round"
+          fill="none"
         />
         <path
           d="M51 45c23-2 34-16 34-33-20 0-35 10-38 32"
           fill="#16a34a"
+          transform="translate(2 -2)"
         />
-        <ellipse cx="48" cy="84" rx="27" ry="7" fill="#92400e" opacity="0.22" />
       </g>
       <style jsx>{`
         @keyframes floatSprout {
@@ -831,8 +878,8 @@ function SproutHeroIcon() {
   );
 }
 
-function ServiceIcon({ type, active }: { type: string; active?: boolean }) {
-  const color = active ? "#dc2626" : "#64748b";
+function ServiceIcon({ type, active: _active }: { type: string; active?: boolean }) {
+  void _active;
 
   if (type === "seed") {
     return (
@@ -878,7 +925,7 @@ function ServiceIcon({ type, active }: { type: string; active?: boolean }) {
       <svg viewBox="0 0 48 48" className="h-7 w-7" aria-hidden>
         <path
           d="M24 40V20"
-          stroke={color}
+          stroke="#92400e"
           strokeWidth="4"
           strokeLinecap="round"
         />
@@ -903,15 +950,18 @@ function ServiceIcon({ type, active }: { type: string; active?: boolean }) {
 
 function ProjectCard({
   project,
+  nowTime,
   onClick,
 }: {
   project: Project;
+  nowTime: number;
   onClick: () => void;
 }) {
   const isAlmostFull =
     project.maxMembers > 0 && project.currentMembers >= project.maxMembers;
 
   const isRecruiting = isProjectRecruiting(project);
+  const isBoosted = getActiveBoostTime(project, nowTime) > 0;
 
   const competitionRate =
     isRecruiting && project.remainingSeats > 0
@@ -932,6 +982,12 @@ function ProjectCard({
           {project.isUrgent && (
             <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-500 dark:bg-red-500/10 dark:text-red-200 dark:ring-1 dark:ring-red-400/25">
               🔥 마감 임박
+            </span>
+          )}
+
+          {isBoosted && (
+            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-1 dark:ring-amber-400/25">
+              상단 노출
             </span>
           )}
         </div>
@@ -955,7 +1011,7 @@ function ProjectCard({
 
       <div className="mb-3 flex flex-wrap gap-1">
         {project.techStack.length ? (
-          project.techStack.map((t) => (
+          project.techStack.slice(0, 4).map((t) => (
             <span
               key={t}
               className="rounded-md bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500 dark:bg-slate-800 dark:text-slate-300"
@@ -969,6 +1025,19 @@ function ProjectCard({
           </span>
         )}
       </div>
+
+      {project.interests.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-1">
+          {project.interests.slice(0, 4).map((interest) => (
+            <span
+              key={interest}
+              className="rounded-md bg-rose-50 px-2 py-0.5 text-[10px] font-medium text-rose-600 dark:bg-rose-500/10 dark:text-rose-200"
+            >
+              {interest}
+            </span>
+          ))}
+        </div>
+      )}
 
       {project.hashtags.length > 0 && (
         <div className="mb-3 flex flex-wrap gap-1">

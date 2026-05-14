@@ -100,6 +100,9 @@ export default function NewPostPage() {
         confirmCoinSpend,
         toast,
         actionLabel: "모닥불 글쓰기",
+        message: "모닥불에 새 이야기를 올리면 물방울 1방울이 사용됩니다.",
+        tone: "campfire",
+        icon: "campfire",
       });
       if (!canSpend) return;
 
@@ -221,7 +224,7 @@ export default function NewPostPage() {
             <p className="text-xs font-medium text-gray-500">
               파일 첨부
               <span className="ml-1.5 text-gray-300">
-                ({media.length}/{MAX_FILES}) · 최대 {MAX_FILE_SIZE_MB}MB
+              ({media.length}/{MAX_FILES}) · 최대 {MAX_FILE_SIZE_MB}MB · PDF/문서 가능
               </span>
             </p>
           </div>
@@ -261,9 +264,11 @@ export default function NewPostPage() {
               🎥 동영상
             </button>
 
+            {/* 일반 파일 */}
             <input
               ref={fileRef}
               type="file"
+              accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.zip,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,application/zip"
               multiple
               className="hidden"
               onChange={(e) => handleFileSelect(e, "file")}

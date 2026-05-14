@@ -34,6 +34,7 @@ class ProjectCreateRequest(CommonProjectRequest):
     max_members: int = Field(default=10, ge=1, le=100)
     min_members: int = Field(default=1, ge=1, le=100)
     is_public: bool = True
+    interests: list[str] = Field(default_factory=list)
 
 
 class ProjectUpdateRequest(CommonProjectUpdateRequest):
@@ -42,6 +43,7 @@ class ProjectUpdateRequest(CommonProjectUpdateRequest):
     max_members: int | None = Field(default=None, ge=1, le=100)
     min_members: int | None = Field(default=None, ge=1, le=100)
     tech_stack: list[str] | None = None
+    interests: list[str] | None = None
     hashtags: list[str] | None = None
     expected_period: str | None = None
     preferred_members: str | None = None

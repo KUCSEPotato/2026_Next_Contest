@@ -33,14 +33,18 @@ export default function MediaPreview({
           ) : m.type === "video" ? (
             <video src={m.url} controls className="h-48 w-full object-cover" />
           ) : (
-            <div className="flex h-28 flex-col items-center justify-center gap-2 px-4 text-center">
-              <span className="text-2xl">📎</span>
-              <span className="max-w-full truncate text-xs font-medium text-gray-700">
-                {m.file.name}
-              </span>
-              <span className="text-[11px] text-gray-400">
-                {(m.file.size / 1024 / 1024).toFixed(1)}MB
-              </span>
+            <div className="flex h-28 items-center gap-3 px-4 py-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-lg shadow-sm">
+                📄
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-gray-800">
+                  {m.file.name}
+                </p>
+                <p className="mt-1 text-xs text-gray-500">
+                  {(m.file.size / 1024 / 1024).toFixed(2)}MB
+                </p>
+              </div>
             </div>
           )}
 

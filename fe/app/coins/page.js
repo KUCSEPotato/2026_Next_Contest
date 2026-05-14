@@ -7,6 +7,8 @@ import {
   getCoinPackagesApi,
   getMyCoinBalanceApi,
   getMyCoinPurchaseRequestsApi,
+  getMyEntitlementApi,
+  getPaymentProductsApi,
 } from "../../lib/api";
 import { getToken } from "../../lib/auth";
 import { useDialog, useToast } from "../../components/AppFeedback";
@@ -64,6 +66,17 @@ function formatDate(value) {
   return date.toLocaleString("ko-KR", {
     year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function formatShortDate(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   });
 }
 
@@ -431,18 +444,46 @@ export default function CoinsPage() {
     () => requests.filter((r) => r.status === "pending"),
     [requests],
   );
+  const freeProduct = useMemo(
+    () =>
+      paymentProducts.find((product) => product.product_code === "FREE") || {
+        product_code: "FREE",
+        product_type: "FREE",
+        name: "무료",
+        price_krw: 0,
+        duration_days: null,
+        benefits: {
+          project_apply_daily_limit: 1,
+          community_write_daily_limit: 1,
+        },
+      },
+    [paymentProducts],
+  );
+  const subscriptionProducts = useMemo(
+    () => paymentProducts.filter((product) => product.product_type === "SUBSCRIPTION"),
+    [paymentProducts],
+  );
+  const passProducts = useMemo(
+    () => paymentProducts.filter((product) => product.product_type === "PASS"),
+    [paymentProducts],
+  );
+  const currentPlanCode = entitlement?.plan || entitlement?.product_code || "FREE";
 
   const loadCoins = useCallback(async () => {
     try {
       setLoading(true);
-      const [balanceResult, packagesResult, requestsResult] = await Promise.all([
+      const [balanceResult, packagesResult, requestsResult, productsResult, entitlementResult] = await Promise.all([
         getMyCoinBalanceApi(),
         getCoinPackagesApi(),
         getMyCoinPurchaseRequestsApi(),
+        getPaymentProductsApi(),
+        getMyEntitlementApi(),
       ]);
       setBalance(balanceResult.data?.waterdrop_balance ?? balanceResult.data?.coin_balance ?? 0);
       setPackages(normalizeCoinPackages(packagesResult.data || []));
       setRequests(requestsResult.data || []);
+      setPaymentProducts(productsResult.data || []);
+      setEntitlement(entitlementResult.data || null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "물방울 정보를 불러오지 못했습니다.");
     } finally {
@@ -457,6 +498,44 @@ export default function CoinsPage() {
     }
     queueMicrotask(loadCoins);
   }, [loadCoins, router]);
+
+  const handlePaymentError = useCallback((err) => {
+    toast.error(err instanceof Error ? err.message : "결제를 시작하지 못했습니다.");
+  }, [toast]);
+
+  async function handleRequestProductPurchase(product) {
+    const ok = await confirm({
+      title: "이용권 구매 요청",
+      message: `${product.name} 구매 요청을 만들까요?\n금액: ${formatKrw(product.price_krw)}\n\n관리자가 결제 확인 후 이용권을 활성화합니다.`,
+      confirmText: "요청하기",
+      cancelText: "돌아가기",
+    });
+    if (!ok) return;
+
+    const noteInput = await prompt({
+      title: "구매 요청 메모",
+      message: "입금자명이나 확인에 필요한 메모가 있으면 남겨주세요.",
+      placeholder: "예: 입금자명 홍길동",
+      confirmText: "제출",
+      cancelText: "건너뛰기",
+      multiline: true,
+    });
+    if (noteInput === null) return;
+
+    try {
+      setProcessingPackage(product.product_code);
+      const result = await createCoinPurchaseRequestApi({
+        product_code: product.product_code,
+        note: noteInput.trim() || undefined,
+      });
+      setRequests((prev) => [result.data, ...prev]);
+      toast.success("이용권 구매 요청을 보냈습니다. 관리자가 확인 후 활성화합니다.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "이용권 구매 요청에 실패했습니다.");
+    } finally {
+      setProcessingPackage("");
+    }
+  }
 
   async function handleRequestPurchase(pkg) {
     const ok = await confirm({
@@ -558,8 +637,90 @@ export default function CoinsPage() {
 
             <section className="mb-8">
               <div className="mb-4">
-                <h2 className="text-xl font-black text-slate-950">물방울 수동 충전</h2>
-                <p className="mt-1 text-sm text-slate-500">
+                <h2 className="text-xl font-black text-slate-950 dark:text-slate-50">무료 요금제</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  결제 없이 기본으로 제공되는 사용 범위입니다.
+                </p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <PlanCard
+                  eyebrow="기본 제공"
+                  product={freeProduct}
+                  isCurrent={currentPlanCode === "FREE"}
+                  onError={handlePaymentError}
+                  onManualPurchase={handleRequestProductPurchase}
+                  manualLoading={false}
+                >
+                  물방울을 별도 사용하면서 가볍게 둘러볼 수 있습니다.
+                </PlanCard>
+              </div>
+            </section>
+
+            <section className="mb-8">
+              <div className="mb-4">
+                <h2 className="text-xl font-black text-slate-950 dark:text-slate-50">월정액 요금제</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  Plus와 Pro는 현재 30일 이용권 형태로 제공됩니다.
+                  {entitlement?.product_type === "SUBSCRIPTION" && entitlement.next_renewal_at
+                    ? ` 다음 갱신 기준일은 ${formatShortDate(entitlement.next_renewal_at)}입니다.`
+                    : ""}
+                </p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                {subscriptionProducts.map((product) => (
+                  <PlanCard
+                    key={product.product_code}
+                    eyebrow="월정액 30일권"
+                    product={product}
+                    isCurrent={currentPlanCode === product.product_code}
+                    onError={handlePaymentError}
+                    onManualPurchase={handleRequestProductPurchase}
+                    manualLoading={processingPackage === product.product_code}
+                  >
+                    {product.duration_days}일 동안 월정액 권한이 유지됩니다.
+                  </PlanCard>
+                ))}
+                {subscriptionProducts.length === 0 && (
+                  <p className="rounded-2xl border border-gray-100 bg-white p-5 text-sm text-gray-400 shadow-sm dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-500">
+                    월정액 상품을 불러오지 못했습니다.
+                  </p>
+                )}
+              </div>
+            </section>
+
+            <section className="mb-8">
+              <div className="mb-4">
+                <h2 className="text-xl font-black text-slate-950 dark:text-slate-50">정액제 기간권</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  짧은 기간 동안 프로젝트 생성/지원 권한을 쓰는 패스입니다. 기간권은 자동 갱신되지 않습니다.
+                </p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                {passProducts.map((product) => (
+                  <PlanCard
+                    key={product.product_code}
+                    eyebrow={`${product.duration_days}일 기간권`}
+                    product={product}
+                    isCurrent={currentPlanCode === product.product_code}
+                    onError={handlePaymentError}
+                    onManualPurchase={handleRequestProductPurchase}
+                    manualLoading={processingPackage === product.product_code}
+                  >
+                    결제일부터 {product.duration_days}일 동안 활성화됩니다.
+                  </PlanCard>
+                ))}
+                {passProducts.length === 0 && (
+                  <p className="rounded-2xl border border-gray-100 bg-white p-5 text-sm text-gray-400 shadow-sm dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-500">
+                    기간권 상품을 불러오지 못했습니다.
+                  </p>
+                )}
+              </div>
+            </section>
+
+            <section className="mb-8">
+              <div className="mb-4">
+                <h2 className="text-xl font-black text-slate-950 dark:text-slate-50">물방울 충전</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   FREE/PASS 사용자의 아이디어 열람 등에 사용할 물방울입니다.
                 </p>
               </div>
@@ -628,7 +789,7 @@ export default function CoinsPage() {
                     <thead className="bg-gray-50 text-xs font-semibold uppercase text-gray-500 dark:bg-slate-800 dark:text-slate-400">
                       <tr>
                         <th className="px-4 py-3">ID</th>
-                        <th className="px-4 py-3">물방울</th>
+                        <th className="px-4 py-3">상품</th>
                         <th className="px-4 py-3">금액</th>
                         <th className="px-4 py-3">상태</th>
                         <th className="px-4 py-3">요청일</th>
@@ -642,7 +803,9 @@ export default function CoinsPage() {
                             #{request.id}
                           </td>
                           <td className="px-4 py-3 text-gray-700 dark:text-slate-300">
-                            {formatWaterdrops(request.coin_amount)}
+                            {request.request_type === "ENTITLEMENT"
+                              ? request.product_name || request.product_code
+                              : formatWaterdrops(request.coin_amount)}
                           </td>
                           <td className="px-4 py-3 text-gray-700 dark:text-slate-300">
                             {formatKrw(request.price_krw)}

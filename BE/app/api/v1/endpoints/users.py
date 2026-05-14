@@ -472,6 +472,8 @@ async def get_my_projects(
             "category": project.category,
             "progress_percent": _calculate_project_progress_percent(db, project.id),
             "created_at": project.created_at.isoformat() if project.created_at else None,
+            "ended_at": project.ended_at.isoformat() if project.ended_at else None,
+            "completed_at": project.completed_at.isoformat() if project.completed_at else None,
             "can_discard": can_discard,
             "can_chat": project.id in active_chat_project_ids,
             "is_leader": project.leader_id == current_user_id,

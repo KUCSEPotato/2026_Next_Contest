@@ -25,13 +25,33 @@ from app.schemas import (
     ReactionRequest,
 )
 from app.services.s3_upload import get_s3_service
-from app.services.entitlement_service import USAGE_COMMUNITY_WRITE
-from app.services.entitlement_service import check_usage_allowed
-from app.services.entitlement_service import record_usage
+from app.services.s3_upload import resolve_avatar_url
+from app.services.economy import spend_coins
 
 router = APIRouter()
 
 _REACTION_STATS_ZERO: dict[str, int] = {"recommend": 0, "not_recommend": 0}
+_HOT_POST_MIN_RECOMMENDS = 1
+_HOT_POST_MIN_VIEWS = 10
+_HOT_POST_MIN_COMMENTS = 3
+
+
+def _serialize_post_file(file_record: CommunityPostFile, s3_service) -> dict:
+    return {
+        "id": file_record.id,
+        "post_id": file_record.post_id,
+        "filename": file_record.filename,
+        "file_size": file_record.file_size,
+        "file_type": file_record.file_type,
+        "s3_url": s3_service.generate_presigned_get_url(file_record.s3_key),
+        "uploaded_at": file_record.created_at,
+    }
+
+
+def _get_avatar_url(user: User | None) -> str | None:
+    if user is None:
+        return None
+    return resolve_avatar_url(user.avatar_s3_key, user.avatar_url)
 
 
 def _merge_reaction_stats(rows: list[tuple[str, int]]) -> dict[str, int]:
@@ -84,6 +104,53 @@ def _comment_reaction_snapshot(db: Session, comment_id: int, user_id: int | None
     }
 
 
+def _has_hot_post_signal(post_data: dict) -> bool:
+    recommend_count = int((post_data.get("reaction_stats") or {}).get("recommend") or 0)
+    view_count = int(post_data.get("view_count") or 0)
+    comment_count = int(post_data.get("comment_count") or 0)
+
+    return (
+        recommend_count >= _HOT_POST_MIN_RECOMMENDS
+        or view_count >= _HOT_POST_MIN_VIEWS
+        or comment_count >= _HOT_POST_MIN_COMMENTS
+    )
+
+
+def _notify_hot_post_once(db: Session, post_data: dict, source: str) -> None:
+    if not _has_hot_post_signal(post_data):
+        return
+
+    post_id = post_data.get("id")
+    author_id = post_data.get("author_id")
+    if not post_id or not author_id:
+        return
+
+    existing_notifications = (
+        db.query(Notification)
+        .filter(
+            Notification.user_id == author_id,
+            Notification.type == "hot_post",
+        )
+        .all()
+    )
+    if any(int((notification.data or {}).get("post_id") or 0) == int(post_id) for notification in existing_notifications):
+        return
+
+    db.add(
+        Notification(
+            user_id=author_id,
+            type="hot_post",
+            title="작성한 글이 불꽃글에 올랐어요",
+            body=f"'{post_data.get('title') or '작성한 글'}' 글이 모닥불 불꽃글에 올라갔습니다.",
+            data={
+                "post_id": post_id,
+                "url": f"/community/{post_id}",
+                "source": source,
+            },
+        )
+    )
+
+
 def _serialize_comment(db: Session, comment: CommunityPostComment, current_user_id: int | None = None) -> dict:
     author = db.get(User, comment.author_id)
     reply_count = (
@@ -109,7 +176,7 @@ def _serialize_comment(db: Session, comment: CommunityPostComment, current_user_
             "author": {
                 "id": author.id if not anon else None,
                 "nickname": "익명" if anon else author.nickname,
-                "avatar_url": None if anon else author.avatar_url,
+                "avatar_url": None if anon else _get_avatar_url(author),
                 "role": None if anon else author.role,
             },
         "reaction_stats": snapshot["reaction_stats"],
@@ -134,8 +201,6 @@ async def create_post(
         user = db.get(User, current_user_id)
         if user is None or user.role != "admin":
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admin can create announcement or event posts")
-    else:
-        check_usage_allowed(db, current_user_id, USAGE_COMMUNITY_WRITE)
     post = CommunityPost(
         author_id=current_user_id,
         title=payload.title,
@@ -145,7 +210,15 @@ async def create_post(
     db.add(post)
     db.flush()
     if payload.category not in ("announcement", "event"):
-        record_usage(db, current_user_id, USAGE_COMMUNITY_WRITE, target_type="community_post", target_id=post.id)
+        spend_coins(
+            db,
+            user_id=current_user_id,
+            amount=1,
+            event_type="waterdrop.community.write",
+            source_type="community_post",
+            source_id=post.id,
+            note=f"Community post waterdrop for {post.title}",
+        )
     db.commit()
     db.refresh(post)
 
@@ -162,7 +235,7 @@ async def create_post(
             "author": {
                 "id": author.id,
                 "nickname": author.nickname,
-                "avatar_url": author.avatar_url,
+                "avatar_url": _get_avatar_url(author),
                 "role": author.role,
             },
             "created_at": post.created_at,
@@ -273,7 +346,7 @@ async def list_posts(
                 "author": {
                     "id": author.id,
                     "nickname": author.nickname,
-                    "avatar_url": author.avatar_url,
+                    "avatar_url": _get_avatar_url(author),
                     "role": author.role,
                 },
                 "comment_count": comment_count,
@@ -311,6 +384,10 @@ async def list_posts(
         paginated_result = result[(page - 1) * page_size : page * page_size]
     else:
         paginated_result = result
+
+    if page == 1 and paginated_result and sort_by in ["views", "recommend", "trending", "hot"]:
+        _notify_hot_post_once(db, paginated_result[0], source=sort_by)
+        db.commit()
 
     return success_response(
         data={
@@ -380,7 +457,7 @@ async def get_post(
             "author": {
                 "id": author.id,
                 "nickname": author.nickname,
-                "avatar_url": author.avatar_url,
+                "avatar_url": _get_avatar_url(author),
                 "role": author.role,
             },
             "comment_count": comment_count,
@@ -439,7 +516,7 @@ async def update_post(
             "author": {
                 "id": author.id,
                 "nickname": author.nickname,
-                "avatar_url": author.avatar_url,
+                "avatar_url": _get_avatar_url(author),
                 "role": author.role,
             },
             "comment_count": comment_count,
@@ -526,7 +603,7 @@ async def create_comment(
     author_info = {
         "id": author.id if not payload.is_anonymous else None,
         "nickname": "익명" if payload.is_anonymous else author.nickname,
-        "avatar_url": None if payload.is_anonymous else author.avatar_url,
+        "avatar_url": None if payload.is_anonymous else _get_avatar_url(author),
         "role": None if payload.is_anonymous else author.role,
     }
     
@@ -640,7 +717,7 @@ async def list_comments(
                 "author": {
                     "id": author.id if not comment.is_anonymous else None,
                     "nickname": "익명" if comment.is_anonymous else author.nickname,
-                    "avatar_url": None if comment.is_anonymous else author.avatar_url,
+                    "avatar_url": None if comment.is_anonymous else _get_avatar_url(author),
                     "role": None if comment.is_anonymous else author.role,
                 },
                 "reaction_stats": reaction_stats,
@@ -694,7 +771,7 @@ async def update_comment(
             "author": {
                 "id": author.id if not anon else None,
                 "nickname": "익명" if anon else author.nickname,
-                "avatar_url": None if anon else author.avatar_url,
+                "avatar_url": None if anon else _get_avatar_url(author),
                 "role": None if anon else author.role,
             },
         },
@@ -900,15 +977,7 @@ async def upload_post_file(
     db.refresh(file_record)
 
     return success_response(
-        data={
-            "id": file_record.id,
-            "post_id": file_record.post_id,
-            "filename": file_record.filename,
-            "file_size": file_record.file_size,
-            "file_type": file_record.file_type,
-            "s3_url": file_record.s3_url,
-            "uploaded_at": file_record.created_at,
-        },
+        data=_serialize_post_file(file_record, s3_service),
     )
 
 
@@ -916,6 +985,7 @@ async def upload_post_file(
 async def list_post_files(
     post_id: int,
     db: Session = Depends(get_db),
+    s3_service=Depends(get_s3_service),
 ) -> dict:
     """게시물의 모든 첨부 파일 조회"""
     post = db.get(CommunityPost, post_id)
@@ -930,14 +1000,7 @@ async def list_post_files(
     return success_response(
         data={
             "files": [
-                {
-                    "id": f.id,
-                    "filename": f.filename,
-                    "file_size": f.file_size,
-                    "file_type": f.file_type,
-                    "s3_url": f.s3_url,
-                    "uploaded_at": f.created_at,
-                }
+                _serialize_post_file(f, s3_service)
                 for f in files
             ]
         },

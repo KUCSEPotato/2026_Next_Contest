@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status, File, UploadFile
 from sqlalchemy import func
@@ -14,21 +14,22 @@ from app.models import IdeaBookmark
 from app.models import CoinTransaction
 from app.models import IdeaFile
 from app.models import IdeaLike
+from app.models import Interest
 from app.models import Notification
 from app.models import Project
+from app.models import ProjectInterest
 from app.models import ProjectMember
 from app.models import ProjectSkill
 from app.models import Skill
-from app.models import UserUsageLog
+from app.models import User
 from app.schemas import IdeaCreateRequest
 from app.schemas import IdeaUpdateRequest
 from app.schemas import ProjectCreateRequest
 from app.services.economy import spend_coins
-from app.services.entitlement_service import USAGE_IDEA_VIEW
-from app.services.entitlement_service import record_usage
 from app.services.s3_upload import get_s3_service
 
 router = APIRouter()
+IDEA_VIEW_ACCESS_TTL = timedelta(days=1)
 
 
 def _get_optional_user_id(authorization: str | None) -> int | None:
@@ -43,6 +44,10 @@ def _get_optional_user_id(authorization: str | None) -> int | None:
 
 def _normalize_skill_name(skill_name: str) -> str:
     return re.sub(r"\s+", " ", skill_name.strip()).lower()
+
+
+def _normalize_interest_name(interest_name: str) -> str:
+    return re.sub(r"\s+", " ", interest_name.strip()).lower()
 
 
 def _sync_project_skills_from_idea(db: Session, project_id: int, tech_stack: list[str]) -> None:
@@ -61,6 +66,28 @@ def _sync_project_skills_from_idea(db: Session, project_id: int, tech_stack: lis
         if skill.id not in existing_skill_ids:
             db.add(ProjectSkill(project_id=project_id, skill_id=skill.id))
             existing_skill_ids.add(skill.id)
+
+
+def _sync_project_interests_from_names(db: Session, project_id: int, interests: list[str]) -> None:
+    existing_interest_ids = {
+        interest_id
+        for (interest_id,) in db.query(ProjectInterest.interest_id).filter(ProjectInterest.project_id == project_id).all()
+    }
+    for interest_name in interests:
+        interest_name = interest_name.strip()
+        if not interest_name:
+            continue
+
+        normalized_name = _normalize_interest_name(interest_name)
+        interest = db.query(Interest).filter(Interest.normalized_name == normalized_name).first()
+        if interest is None:
+            interest = Interest(name=interest_name, normalized_name=normalized_name)
+            db.add(interest)
+            db.flush()
+
+        if interest.id not in existing_interest_ids:
+            db.add(ProjectInterest(project_id=project_id, interest_id=interest.id))
+            existing_interest_ids.add(interest.id)
 
 
 def _project_notification_data(project_id: int) -> dict:
@@ -100,7 +127,55 @@ def _notify_project_registered(db: Session, project: Project) -> None:
     )
 
 
-def _create_project_from_idea(db: Session, idea: Idea, current_user_id: int) -> Project:
+def _as_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _get_recent_idea_view_transaction(
+    db: Session,
+    *,
+    user_id: int,
+    idea_id: int,
+    now: datetime | None = None,
+) -> CoinTransaction | None:
+    now = now or datetime.now(timezone.utc)
+    cutoff = now - IDEA_VIEW_ACCESS_TTL
+
+    return (
+        db.query(CoinTransaction)
+        .filter(
+            CoinTransaction.user_id == user_id,
+            CoinTransaction.event_type == "waterdrop.idea.view",
+            CoinTransaction.source_type == "idea",
+            CoinTransaction.source_id == idea_id,
+            CoinTransaction.created_at >= cutoff,
+        )
+        .order_by(CoinTransaction.created_at.desc())
+        .first()
+    )
+
+
+def _idea_view_access_payload(transaction: CoinTransaction | None) -> dict:
+    viewed_at = _as_utc(transaction.created_at) if transaction else None
+    expires_at = viewed_at + IDEA_VIEW_ACCESS_TTL if viewed_at else None
+
+    return {
+        "has_view_access": transaction is not None,
+        "viewed_at": viewed_at,
+        "view_access_expires_at": expires_at,
+    }
+
+
+def _create_project_from_idea(
+    db: Session,
+    idea: Idea,
+    current_user_id: int,
+    interests: list[str] | None = None,
+) -> Project:
     project = Project(
         idea_id=idea.id,
         leader_id=current_user_id,
@@ -118,6 +193,7 @@ def _create_project_from_idea(db: Session, idea: Idea, current_user_id: int) -> 
     db.flush()
     db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
     _sync_project_skills_from_idea(db, project.id, list(idea.tech_stack or []))
+    _sync_project_interests_from_names(db, project.id, interests or [])
     idea.converted_to_project_id = project.id
     spend_coins(
         db,
@@ -164,7 +240,7 @@ async def create_idea(
     db.add(idea)
     db.flush()
 
-    project = _create_project_from_idea(db, idea, current_user_id)
+    project = _create_project_from_idea(db, idea, current_user_id, payload.interests)
 
     db.commit()
     db.refresh(idea)
@@ -226,6 +302,7 @@ async def list_ideas(
     current_user_id = _get_optional_user_id(authorization)
     liked_idea_ids: set[int] = set()
     bookmarked_idea_ids: set[int] = set()
+    recent_view_transactions: dict[int, CoinTransaction] = {}
     if current_user_id and idea_ids:
         liked_idea_ids = {
             idea_id
@@ -239,6 +316,22 @@ async def list_ideas(
             .filter(IdeaBookmark.user_id == current_user_id, IdeaBookmark.idea_id.in_(idea_ids))
             .all()
         }
+        view_cutoff = datetime.now(timezone.utc) - IDEA_VIEW_ACCESS_TTL
+        view_transactions = (
+            db.query(CoinTransaction)
+            .filter(
+                CoinTransaction.user_id == current_user_id,
+                CoinTransaction.event_type == "waterdrop.idea.view",
+                CoinTransaction.source_type == "idea",
+                CoinTransaction.source_id.in_(idea_ids),
+                CoinTransaction.created_at >= view_cutoff,
+            )
+            .order_by(CoinTransaction.created_at.desc())
+            .all()
+        )
+        for transaction in view_transactions:
+            if transaction.source_id not in recent_view_transactions:
+                recent_view_transactions[transaction.source_id] = transaction
 
     return success_response(
         data=[
@@ -258,6 +351,7 @@ async def list_ideas(
             "bookmark_count": int(bookmark_counts.get(idea.id, 0)),
             "is_liked": idea.id in liked_idea_ids,
             "is_bookmarked": idea.id in bookmarked_idea_ids,
+            **_idea_view_access_payload(recent_view_transactions.get(idea.id)),
             "created_at": idea.created_at,
         }
             for idea in ideas
@@ -267,7 +361,11 @@ async def list_ideas(
 
 
 @router.get("/{idea_id}", summary="아이디어 상세", description="아이디어 상세 정보를 조회합니다.")
-async def get_idea(idea_id: int, db: Session = Depends(get_db)) -> dict:
+async def get_idea(
+    idea_id: int,
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> dict:
     """아이디어 상세 조회 API.
 
     Swagger 테스트 방법:
@@ -279,6 +377,30 @@ async def get_idea(idea_id: int, db: Session = Depends(get_db)) -> dict:
     idea = db.get(Idea, idea_id)
     if idea is None or idea.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Idea not found")
+    current_user_id = _get_optional_user_id(authorization)
+    like_count = db.query(func.count(IdeaLike.id)).filter(IdeaLike.idea_id == idea.id).scalar() or 0
+    bookmark_count = db.query(func.count(IdeaBookmark.id)).filter(IdeaBookmark.idea_id == idea.id).scalar() or 0
+    is_liked = False
+    is_bookmarked = False
+    recent_view_transaction = None
+    if current_user_id:
+        is_liked = (
+            db.query(IdeaLike.id)
+            .filter(IdeaLike.user_id == current_user_id, IdeaLike.idea_id == idea.id)
+            .first()
+            is not None
+        )
+        is_bookmarked = (
+            db.query(IdeaBookmark.id)
+            .filter(IdeaBookmark.user_id == current_user_id, IdeaBookmark.idea_id == idea.id)
+            .first()
+            is not None
+        )
+        recent_view_transaction = _get_recent_idea_view_transaction(
+            db,
+            user_id=current_user_id,
+            idea_id=idea.id,
+        )
     return success_response(
         data={
             "id": idea.id,
@@ -292,6 +414,11 @@ async def get_idea(idea_id: int, db: Session = Depends(get_db)) -> dict:
             "difficulty": idea.difficulty,
             "required_members": idea.required_members,
             "is_open": idea.is_open,
+            "like_count": int(like_count),
+            "bookmark_count": int(bookmark_count),
+            "is_liked": is_liked,
+            "is_bookmarked": is_bookmarked,
+            **_idea_view_access_payload(recent_view_transaction),
         },
     )
 
@@ -306,48 +433,50 @@ async def spend_for_idea_view(
     if idea is None or idea.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Idea not found")
 
-    already_used_entitlement = (
-        db.query(UserUsageLog)
-        .filter(
-            UserUsageLog.user_id == current_user_id,
-            UserUsageLog.usage_type == USAGE_IDEA_VIEW,
-            UserUsageLog.target_type == "idea",
-            UserUsageLog.target_id == idea.id,
-        )
-        .first()
-    )
-    already_spent_coin = (
-        db.query(CoinTransaction)
-        .filter(
-            CoinTransaction.user_id == current_user_id,
-            CoinTransaction.event_type == "waterdrop.idea.view",
-            CoinTransaction.source_type == "idea",
-            CoinTransaction.source_id == idea.id,
-        )
-        .first()
-    )
-    if already_used_entitlement is not None or already_spent_coin is not None:
-        return success_response(data={"idea_id": idea.id, "already_viewed": True})
-
-    try:
-        record_usage(db, current_user_id, USAGE_IDEA_VIEW, target_type="idea", target_id=idea.id)
-        db.commit()
-        return success_response(data={"idea_id": idea.id, "view_method": "entitlement"})
-    except HTTPException:
-        db.rollback()
-
-    balance = spend_coins(
+    recent_view_transaction = _get_recent_idea_view_transaction(
         db,
         user_id=current_user_id,
-        amount=1,
+        idea_id=idea.id,
+    )
+    if recent_view_transaction is not None:
+        return success_response(
+            data={
+                "idea_id": idea.id,
+                "already_viewed": True,
+                **_idea_view_access_payload(recent_view_transaction),
+            }
+        )
+
+    user = db.get(User, current_user_id)
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    balance_before = int(user.coin_balance or 0)
+    if balance_before < 1:
+        raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Not enough waterdrops")
+
+    user.coin_balance = balance_before - 1
+    transaction = CoinTransaction(
+        user_id=current_user_id,
+        amount=-1,
+        balance_after=user.coin_balance,
         event_type="waterdrop.idea.view",
         source_type="idea",
         source_id=idea.id,
         note=f"Idea view waterdrop for {idea.title}",
     )
+    db.add(transaction)
     db.commit()
+    db.refresh(transaction)
 
-    return success_response(data={"idea_id": idea.id, "waterdrop_balance": balance, "coin_balance": balance})
+    return success_response(
+        data={
+            "idea_id": idea.id,
+            "waterdrop_balance": user.coin_balance,
+            "coin_balance": user.coin_balance,
+            **_idea_view_access_payload(transaction),
+        }
+    )
 
 
 @router.patch("/{idea_id}", summary="아이디어 수정", description="작성자 본인이 아이디어 필드를 부분 수정합니다.")
@@ -557,6 +686,7 @@ async def convert_idea_to_project(
     db.flush()
     db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
     _sync_project_skills_from_idea(db, project.id, list(idea.tech_stack or []))
+    _sync_project_interests_from_names(db, project.id, payload.interests)
     idea.converted_to_project_id = project.id
     spend_coins(
         db,
@@ -624,6 +754,21 @@ async def pickup_discarded_idea(
 
     project = _create_project_from_idea(db, idea, current_user_id)
     idea.is_discarded = False
+    picker = db.get(User, current_user_id)
+    db.add(
+        Notification(
+            user_id=idea.author_id,
+            type="idea_adopted",
+            title="생각의 뜰 아이디어가 프로젝트로 이어졌어요",
+            body=f"'{idea.title}' 아이디어를 {picker.nickname if picker else '다른 사용자'}님이 프로젝트로 전환했습니다.",
+            data={
+                "idea_id": idea.id,
+                "project_id": project.id,
+                "url": f"/projects/{project.id}",
+                "picked_by_user_id": current_user_id,
+            },
+        )
+    )
 
     db.commit()
     db.refresh(project)

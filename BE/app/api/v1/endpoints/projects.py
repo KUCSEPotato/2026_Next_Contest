@@ -28,8 +28,10 @@ from app.models import ChatRoomMember
 from app.models import FailureStory
 from app.models import Idea
 from app.models import Invitation
+from app.models import Interest
 from app.models import Notification
 from app.models import Project
+from app.models import ProjectInterest
 from app.models import ProjectMember
 from app.models import ProjectMilestone
 from app.models import ProjectRecruitment
@@ -54,15 +56,16 @@ from app.schemas import TodoCreateRequest
 from app.schemas import TodoUpdateRequest
 from app.schemas import MemoirCreateRequest
 from app.schemas import MemoirRefineRequest
+from app.services.economy import spend_coins
 from app.services.economy import reward_project_completed
 from app.services.economy import reward_project_recycled
 from app.services.economy import reward_project_started
 from app.services.entitlement_service import USAGE_PROJECT_APPLY
 from app.services.entitlement_service import USAGE_PROJECT_BOOST
-from app.services.entitlement_service import USAGE_PROJECT_CREATE
 from app.services.entitlement_service import USAGE_PROJECT_DISCARD
 from app.services.entitlement_service import check_usage_allowed
 from app.services.entitlement_service import record_usage
+from app.services.entitlement_service import serialize_effective_plan
 from app.core.realtime import project_todo_channel
 from app.core.realtime import chat_room_channel
 from app.core.realtime import realtime_hub
@@ -80,6 +83,10 @@ IDEA_DESCRIPTION_SECTION_LABELS = (
 
 def _normalize_skill_name(skill_name: str) -> str:
     return re.sub(r"\s+", " ", skill_name.strip()).lower()
+
+
+def _normalize_interest_name(interest_name: str) -> str:
+    return re.sub(r"\s+", " ", interest_name.strip()).lower()
 
 
 def _extract_idea_description_parts(description: str | None) -> dict[str, str]:
@@ -133,6 +140,29 @@ def _sync_project_skills(db: Session, project_id: int, tech_stack: list[str]) ->
 
         db.add(ProjectSkill(project_id=project_id, skill_id=skill.id))
         seen_skill_ids.add(skill.id)
+
+
+def _sync_project_interests(db: Session, project_id: int, interests: list[str]) -> None:
+    db.query(ProjectInterest).filter(ProjectInterest.project_id == project_id).delete()
+    seen_interest_ids: set[int] = set()
+
+    for interest_name in interests:
+        interest_name = interest_name.strip()
+        if not interest_name:
+            continue
+
+        normalized_name = _normalize_interest_name(interest_name)
+        interest = db.query(Interest).filter(Interest.normalized_name == normalized_name).first()
+        if interest is None:
+            interest = Interest(name=interest_name, normalized_name=normalized_name)
+            db.add(interest)
+            db.flush()
+
+        if interest.id in seen_interest_ids:
+            continue
+
+        db.add(ProjectInterest(project_id=project_id, interest_id=interest.id))
+        seen_interest_ids.add(interest.id)
 
 
 def _calculate_days_left(deadline: date | None) -> int | None:
@@ -622,7 +652,6 @@ async def create_project(
     - Authorization 헤더를 설정하고 ProjectCreateRequest body를 전달합니다.
     - 생성 성공 시 프로젝트와 리더 멤버 매핑이 함께 생성됩니다.
     """
-    check_usage_allowed(db, current_user_id, USAGE_PROJECT_CREATE)
     project = Project(
         idea_id=payload.idea_id,
         leader_id=current_user_id,
@@ -640,8 +669,17 @@ async def create_project(
     db.add(project)
     db.flush()
 
+    _sync_project_interests(db, project.id, payload.interests)
     db.add(ProjectMember(project_id=project.id, user_id=current_user_id, role_in_project="leader"))
-    record_usage(db, current_user_id, USAGE_PROJECT_CREATE, target_type="project", target_id=project.id)
+    spend_coins(
+        db,
+        user_id=current_user_id,
+        amount=1,
+        event_type="waterdrop.project.create",
+        source_type="project",
+        source_id=project.id,
+        note=f"Project creation waterdrop for {project.title}",
+    )
     db.add(
         Notification(
             user_id=current_user_id,
@@ -677,10 +715,12 @@ async def list_projects(
     total = query.count()
     now = datetime.now(timezone.utc)
     boosted_rank = case((Project.boosted_until > now, 1), else_=0)
+    active_boost_score = case((Project.boosted_until > now, Project.boost_score), else_=0)
     projects = (
         query.order_by(
             boosted_rank.desc(),
-            Project.boost_score.desc(),
+            active_boost_score.desc(),
+            Project.boosted_until.desc(),
             Project.created_at.desc(),
         )
         .offset((page - 1) * size)
@@ -699,6 +739,10 @@ async def list_projects(
             ProjectSkill, ProjectSkill.skill_id == Skill.id
         ).filter(ProjectSkill.project_id == p.id).all()
         tech_stack_list = [s[0] for s in tech_stack]
+        interests = db.query(Interest.name).join(
+            ProjectInterest, ProjectInterest.interest_id == Interest.id
+        ).filter(ProjectInterest.project_id == p.id).all()
+        interest_list = [interest[0] for interest in interests]
         source_idea = db.get(Idea, p.idea_id) if p.idea_id else None
 
         applicant_count = db.query(func.count(Application.id)).filter(
@@ -738,6 +782,7 @@ async def list_projects(
             "currentMembers": current_members,
             "maxMembers": p.max_members,
             "techStack": tech_stack_list,
+            "interests": interest_list,
             "hashtags": source_idea.hashtags if source_idea else [],
             "applicantCount": applicant_count,
             "remainingSeats": remaining_seats,
@@ -748,6 +793,8 @@ async def list_projects(
             "boosted_until": p.boosted_until.isoformat() if p.boosted_until else None,
             "boost_score": p.boost_score,
             "created_at": p.created_at.isoformat() if p.created_at else None,
+            "ended_at": p.ended_at.isoformat() if p.ended_at else None,
+            "completed_at": p.completed_at.isoformat() if p.completed_at else None,
         })
     
     return success_response(
@@ -812,6 +859,10 @@ async def get_project(project_id: int, db: Session = Depends(get_db)) -> dict:
         ProjectSkill, ProjectSkill.skill_id == Skill.id
     ).filter(ProjectSkill.project_id == project_id).all()
     tech_stack_list = [s[0] for s in tech_stack]
+    interests = db.query(Interest.name).join(
+        ProjectInterest, ProjectInterest.interest_id == Interest.id
+    ).filter(ProjectInterest.project_id == project_id).all()
+    interest_list = [interest[0] for interest in interests]
     source_idea = db.get(Idea, project.idea_id) if project.idea_id else None
     idea_parts = _extract_idea_description_parts(source_idea.description if source_idea else "")
     project_parts = _extract_idea_description_parts(project.description)
@@ -831,11 +882,15 @@ async def get_project(project_id: int, db: Session = Depends(get_db)) -> dict:
             "leader_id": project.leader_id,
             "boosted_until": project.boosted_until.isoformat() if project.boosted_until else None,
             "boost_score": project.boost_score,
+            "created_at": project.created_at.isoformat() if project.created_at else None,
+            "ended_at": project.ended_at.isoformat() if project.ended_at else None,
+            "completed_at": project.completed_at.isoformat() if project.completed_at else None,
             "currentMembers": len(members),
             "maxMembers": project.max_members,
             "max_members": project.max_members,
             "techStack": tech_stack_list,
             "tech_stack": tech_stack_list,
+            "interests": interest_list,
             "hashtags": source_idea.hashtags if source_idea else [],
             "expected_period": idea_parts["expected_period"] or project_parts["expected_period"],
             "preferred_members": idea_parts["preferred_members"] or project_parts["preferred_members"],
@@ -861,11 +916,13 @@ async def boost_project(
     project.boost_score = int(project.boost_score or 0) + 1
     db.commit()
     db.refresh(project)
+    entitlement = serialize_effective_plan(db, current_user_id)
     return success_response(
         data={
             "id": project.id,
             "boosted_until": project.boosted_until,
             "boost_score": project.boost_score,
+            "project_boost_remaining": entitlement.get("benefits", {}).get("project_boost_remaining", 0),
         }
     )
 
@@ -898,7 +955,15 @@ async def apply_project(
     )
     db.add(app_obj)
     db.flush()
-    record_usage(db, current_user_id, USAGE_PROJECT_APPLY, target_type="application", target_id=app_obj.id)
+    spend_coins(
+        db,
+        user_id=current_user_id,
+        amount=1,
+        event_type="waterdrop.project.apply",
+        source_type="application",
+        source_id=app_obj.id,
+        note=f"Project application waterdrop for project {project.id}",
+    )
     if project.leader_id != current_user_id:
         applicant = db.get(User, current_user_id)
         applicant_name = applicant.nickname if applicant else "새 지원자"
@@ -1069,6 +1134,7 @@ async def update_project(
 
     payload_data = payload.model_dump(exclude_none=True)
     tech_stack = payload_data.pop("tech_stack", None)
+    interests = payload_data.pop("interests", None)
     hashtags = payload_data.pop("hashtags", None)
     expected_period = payload_data.pop("expected_period", None)
     preferred_members = payload_data.pop("preferred_members", None)
@@ -1099,6 +1165,8 @@ async def update_project(
 
     if tech_stack is not None:
         _sync_project_skills(db, project_id, tech_stack)
+    if interests is not None:
+        _sync_project_interests(db, project_id, interests)
 
     source_idea = db.get(Idea, project.idea_id) if project.idea_id else None
     if source_idea is not None:
@@ -1212,6 +1280,7 @@ async def revert_project_to_idea(
     
     # 원본 Idea 복원 (있으면)
     idea_reverted = False
+    reverted_idea: Idea | None = None
     if project.idea_id is not None:
         idea = db.get(Idea, project.idea_id)
         if idea is not None and idea.deleted_at is None:
@@ -1219,6 +1288,7 @@ async def revert_project_to_idea(
             idea.converted_to_project_id = None
             idea.is_discarded = True
             idea_reverted = True
+            reverted_idea = idea
 
     if project.idea_id is not None:
         reward_project_recycled(db, project)
@@ -1226,6 +1296,20 @@ async def revert_project_to_idea(
     
     # 프로젝트 soft delete
     project.deleted_at = datetime.now(timezone.utc)
+    if reverted_idea is not None:
+        db.add(
+            Notification(
+                user_id=current_user_id,
+                type="idea_sent_to_yard",
+                title="아이디어가 생각의 뜰로 이동했어요",
+                body=f"'{reverted_idea.title}' 아이디어가 생각의 뜰에 놓였습니다.",
+                data={
+                    "idea_id": reverted_idea.id,
+                    "project_id": project.id,
+                    "url": f"/ideas/pickup/{reverted_idea.id}",
+                },
+            )
+        )
     db.commit()
     
     return success_response(
@@ -1364,6 +1448,11 @@ async def create_recruitment(
     """
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
+    if project.status == "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Completed projects cannot be recruited again",
+        )
 
     recruitment = ProjectRecruitment(
         project_id=project_id,
@@ -1393,6 +1482,11 @@ async def update_recruitment(
     """재모집 포지션 수정 API(리더 전용)."""
     project = _get_project_or_404(db, project_id)
     _ensure_project_leader(project, current_user_id)
+    if project.status == "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Completed projects cannot be recruited again",
+        )
 
     recruitment = db.get(ProjectRecruitment, recruitment_id)
     if recruitment is None or recruitment.project_id != project_id:
