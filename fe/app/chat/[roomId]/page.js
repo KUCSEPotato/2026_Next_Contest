@@ -92,6 +92,9 @@ export default function ChatRoomPage() {
   const [editingTodoTitle, setEditingTodoTitle] = useState("");
   const [editingTodoDescription, setEditingTodoDescription] = useState("");
   const [expandedTodoIds, setExpandedTodoIds] = useState([]);
+  const [draggedTodoId, setDraggedTodoId] = useState(null);
+  const [dragOverTodoId, setDragOverTodoId] = useState(null);
+  const [reorderingTodos, setReorderingTodos] = useState(false);
 
   const loadMessages = useCallback(async () => {
     try {
@@ -454,6 +457,83 @@ export default function ChatRoomPage() {
     }
   };
 
+  const handleTodoDragStart = (todoId) => {
+    if (isTodoFinalized || editingTodoId) return;
+    setDraggedTodoId(todoId);
+  };
+
+  const handleTodoDragEnd = () => {
+    setDraggedTodoId(null);
+    setDragOverTodoId(null);
+  };
+
+  const handleTodoDrop = async (targetTodo) => {
+    if (!projectId || isTodoFinalized || editingTodoId || !draggedTodoId) {
+      handleTodoDragEnd();
+      return;
+    }
+
+    if (draggedTodoId === targetTodo.id) {
+      handleTodoDragEnd();
+      return;
+    }
+
+    const draggedTodo = todos.find((todo) => todo.id === draggedTodoId);
+    if (!draggedTodo) {
+      handleTodoDragEnd();
+      return;
+    }
+
+    const currentTodos = groupTodosByStage(todos).flatMap((group) =>
+      group.items.map(({ todo }) => todo)
+    );
+    const fromIndex = currentTodos.findIndex((todo) => todo.id === draggedTodoId);
+    const toIndex = currentTodos.findIndex((todo) => todo.id === targetTodo.id);
+
+    if (fromIndex < 0 || toIndex < 0) {
+      handleTodoDragEnd();
+      return;
+    }
+
+    const reorderedTodos = [...currentTodos];
+    const [movedTodo] = reorderedTodos.splice(fromIndex, 1);
+    reorderedTodos.splice(toIndex, 0, {
+      ...movedTodo,
+      stage: targetTodo.stage,
+    });
+
+    const normalizedTodos = reorderedTodos.map((todo, index) => ({
+      ...todo,
+      priority: index + 1,
+    }));
+    const changedTodos = normalizedTodos.filter((nextTodo) => {
+      const prevTodo = currentTodos.find((todo) => todo.id === nextTodo.id);
+      return prevTodo?.priority !== nextTodo.priority || prevTodo?.stage !== nextTodo.stage;
+    });
+
+    setTodos(normalizedTodos);
+    handleTodoDragEnd();
+
+    try {
+      setReorderingTodos(true);
+      await Promise.all(
+        changedTodos.map((todo) =>
+          updateTodoApi(projectId, todo.id, {
+            priority: todo.priority,
+            stage: todo.stage,
+          })
+        )
+      );
+      await loadProjectTodos();
+    } catch (error) {
+      console.error(error);
+      setTodos(currentTodos);
+      alert("Todo 순서 변경에 실패했습니다.");
+    } finally {
+      setReorderingTodos(false);
+    }
+  };
+
   const toggleTodoDetail = (todoId) => {
     setExpandedTodoIds((prev) =>
       prev.includes(todoId)
@@ -714,6 +794,12 @@ export default function ChatRoomPage() {
           )}
 
           <section className="flex-1 space-y-3 overflow-y-auto px-4 pb-4">
+            {!isTodoFinalized && todos.length > 1 && (
+              <p className="pt-3 text-xs text-slate-400">
+                Todo 카드를 드래그해서 순서를 바꿀 수 있습니다.
+                {reorderingTodos ? " 저장 중..." : ""}
+              </p>
+            )}
             {todoLoading ? (
               <p className="pt-4 text-sm text-slate-500">Todo를 불러오는 중...</p>
             ) : todos.length === 0 ? (
@@ -739,7 +825,40 @@ export default function ChatRoomPage() {
                     return (
                       <div
                         key={todo.id}
-                        className="rounded-xl border border-slate-200 px-3 py-2 transition hover:border-red-200 hover:bg-red-50"
+                        draggable={!isTodoFinalized && !isEditing && !reorderingTodos}
+                        onDragStart={(event) => {
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData("text/plain", String(todo.id));
+                          handleTodoDragStart(todo.id);
+                        }}
+                        onDragEnter={() => {
+                          if (draggedTodoId && draggedTodoId !== todo.id) {
+                            setDragOverTodoId(todo.id);
+                          }
+                        }}
+                        onDragOver={(event) => {
+                          if (draggedTodoId && draggedTodoId !== todo.id) {
+                            event.preventDefault();
+                            event.dataTransfer.dropEffect = "move";
+                          }
+                        }}
+                        onDragLeave={() => {
+                          setDragOverTodoId((currentId) =>
+                            currentId === todo.id ? null : currentId
+                          );
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          handleTodoDrop(todo);
+                        }}
+                        onDragEnd={handleTodoDragEnd}
+                        className={`rounded-xl border px-3 py-2 transition ${
+                          draggedTodoId === todo.id
+                            ? "border-red-300 bg-red-50 opacity-60"
+                            : dragOverTodoId === todo.id
+                              ? "border-red-300 bg-red-50 shadow-sm"
+                              : "border-slate-200 hover:border-red-200 hover:bg-red-50"
+                        } ${!isTodoFinalized && !isEditing ? "cursor-grab active:cursor-grabbing" : ""}`}
                       >
                         <div className="flex gap-2">
                           <div className="min-w-0 flex-1">
