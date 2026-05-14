@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PostFile, PostSummary, User, ReactionType } from "../_types";
+import { PostSummary, User, ReactionType } from "../_types";
 import { timeAgo } from "../_lib/utils";
 import Avatar from "./Avatar";
 import { ThumbDownIcon, ThumbUpIcon } from "./ReactionThumbIcons";
@@ -37,78 +37,25 @@ const REACTIONS: {
   },
 ];
 
-function isImageFile(file: PostFile) {
-  return file.file_type.startsWith("image/");
-}
-
-function isVideoFile(file: PostFile) {
-  return file.file_type.startsWith("video/");
-}
-
-function formatFileSize(size: number) {
-  return `${(size / 1024 / 1024).toFixed(2)}MB`;
-}
-
-function AttachmentPreview({ files }: { files?: PostFile[] }) {
-  if (!files?.length) return null;
-
-  const mediaFiles = files.filter((file) => isImageFile(file) || isVideoFile(file));
-  const otherFiles = files.filter((file) => !isImageFile(file) && !isVideoFile(file));
+function AttachmentIndicator({ count }: { count: number }) {
+  if (count <= 0) return null;
 
   return (
-    <div className="mt-3 space-y-2">
-      {mediaFiles.length > 0 && (
-        <div
-          className={`grid gap-2 ${
-            mediaFiles.length === 1 ? "grid-cols-1" : "grid-cols-2"
-          }`}
-        >
-          {mediaFiles.map((file) => (
-            <div
-              key={file.id}
-              className="overflow-hidden rounded-xl border border-gray-100 bg-gray-100"
-            >
-              {isImageFile(file) ? (
-                <img
-                  src={file.s3_url}
-                  alt={file.filename}
-                  className="h-40 w-full object-cover"
-                />
-              ) : (
-                <video
-                  src={file.s3_url}
-                  controls
-                  className="h-40 w-full bg-black object-cover"
-                />
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {otherFiles.length > 0 && (
-        <div className="space-y-2">
-          {otherFiles.map((file) => (
-            <div
-              key={file.id}
-              className="flex min-h-14 items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2"
-            >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[10px] font-bold text-gray-500 shadow-sm">
-                FILE
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-xs font-semibold text-gray-800">
-                  {file.filename}
-                </p>
-                <p className="mt-0.5 text-[11px] text-gray-400">
-                  {formatFileSize(file.file_size)}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500">
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        className="h-3 w-3"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+      >
+        <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+      </svg>
+      첨부파일 {count}
+    </span>
   );
 }
 
@@ -135,6 +82,7 @@ export default function PostCard({
 
   const isOwn = currentUser?.id === post.author_id;
   const goToDetail = () => router.push(`/community/${post.id}`);
+  const attachmentCount = post.files?.length ?? 0;
 
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
@@ -203,16 +151,16 @@ export default function PostCard({
         <p className="mb-2 line-clamp-3 text-sm leading-relaxed text-gray-700">
           {post.content}
         </p>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {post.category && (
+            <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500">
+              {post.category}
+            </span>
+          )}
+          <AttachmentIndicator count={attachmentCount} />
+        </div>
       </div>
-
-      {/* Category */}
-      {post.category && (
-        <span className="mb-2 inline-block rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500">
-          {post.category}
-        </span>
-      )}
-
-      <AttachmentPreview files={post.files} />
 
       {/* Actions */}
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-50 pt-3 dark:border-slate-800/70">
