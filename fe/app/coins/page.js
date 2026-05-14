@@ -388,7 +388,7 @@ function StoreSectionCard({ section, active, onClick }) {
           : "border-gray-200 bg-white hover:border-sky-200 dark:border-slate-700 dark:bg-slate-900/80 dark:hover:border-sky-500/40"
       }`}
     >
-      <div className="mb-3 flex items-start justify-between gap-3">
+      <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-2xl dark:bg-sky-500/10">
             {section.emoji}
@@ -410,7 +410,7 @@ function StoreSectionCard({ section, active, onClick }) {
         )}
       </div>
 
-      <p className="whitespace-pre-line text-center text-sm leading-relaxed text-gray-500 dark:text-slate-400">
+      <p className="text-center whitespace-pre-line text-sm leading-relaxed text-gray-500 dark:text-slate-400">
         {section.description}
       </p>
     </button>
