@@ -21,11 +21,16 @@ from app.models import ProjectInterest
 from app.models import ProjectMember
 from app.models import ProjectSkill
 from app.models import Skill
+from app.models import UserUsageLog
 from app.models import User
 from app.schemas import IdeaCreateRequest
 from app.schemas import IdeaUpdateRequest
 from app.schemas import ProjectCreateRequest
 from app.services.economy import spend_coins
+from app.services.entitlement_service import USAGE_IDEA_VIEW
+from app.services.entitlement_service import check_usage_allowed
+from app.services.entitlement_service import get_effective_plan
+from app.services.entitlement_service import record_usage
 from app.services.s3_upload import get_s3_service
 
 router = APIRouter()
@@ -159,15 +164,83 @@ def _get_recent_idea_view_transaction(
     )
 
 
-def _idea_view_access_payload(transaction: CoinTransaction | None) -> dict:
-    viewed_at = _as_utc(transaction.created_at) if transaction else None
+def _get_recent_idea_view_usage_log(
+    db: Session,
+    *,
+    user_id: int,
+    idea_id: int,
+    now: datetime | None = None,
+) -> UserUsageLog | None:
+    now = now or datetime.now(timezone.utc)
+    cutoff = now - IDEA_VIEW_ACCESS_TTL
+
+    return (
+        db.query(UserUsageLog)
+        .filter(
+            UserUsageLog.user_id == user_id,
+            UserUsageLog.usage_type == USAGE_IDEA_VIEW,
+            UserUsageLog.target_type == "idea",
+            UserUsageLog.target_id == idea_id,
+            UserUsageLog.used_at >= cutoff,
+        )
+        .order_by(UserUsageLog.used_at.desc())
+        .first()
+    )
+
+
+def _idea_view_access_payload(
+    viewed_at: datetime | None,
+    *,
+    source: str | None = None,
+    waterdrop_spent: bool | None = None,
+) -> dict:
     expires_at = viewed_at + IDEA_VIEW_ACCESS_TTL if viewed_at else None
 
-    return {
-        "has_view_access": transaction is not None,
+    payload = {
+        "has_view_access": viewed_at is not None,
         "viewed_at": viewed_at,
         "view_access_expires_at": expires_at,
     }
+    if source is not None:
+        payload["view_access_source"] = source
+    if waterdrop_spent is not None:
+        payload["waterdrop_spent"] = waterdrop_spent
+    return payload
+
+
+def _get_idea_view_access_payload(
+    db: Session,
+    *,
+    user_id: int,
+    idea_id: int,
+    now: datetime | None = None,
+) -> dict:
+    now = now or datetime.now(timezone.utc)
+    recent_view_transaction = _get_recent_idea_view_transaction(
+        db,
+        user_id=user_id,
+        idea_id=idea_id,
+        now=now,
+    )
+    recent_usage_log = _get_recent_idea_view_usage_log(
+        db,
+        user_id=user_id,
+        idea_id=idea_id,
+        now=now,
+    )
+
+    candidates: list[tuple[datetime, str, bool]] = []
+    if recent_view_transaction is not None:
+        candidates.append((_as_utc(recent_view_transaction.created_at), "waterdrop", True))
+    if recent_usage_log is not None:
+        candidates.append((_as_utc(recent_usage_log.used_at), "subscription", False))
+
+    candidates = [candidate for candidate in candidates if candidate[0] is not None]
+    if not candidates:
+        return _idea_view_access_payload(None)
+
+    viewed_at, source, waterdrop_spent = max(candidates, key=lambda item: item[0])
+    return _idea_view_access_payload(viewed_at, source=source, waterdrop_spent=waterdrop_spent)
 
 
 def _create_project_from_idea(
@@ -302,7 +375,7 @@ async def list_ideas(
     current_user_id = _get_optional_user_id(authorization)
     liked_idea_ids: set[int] = set()
     bookmarked_idea_ids: set[int] = set()
-    recent_view_transactions: dict[int, CoinTransaction] = {}
+    recent_view_transactions: dict[int, tuple[datetime, str, bool]] = {}
     if current_user_id and idea_ids:
         liked_idea_ids = {
             idea_id
@@ -330,8 +403,34 @@ async def list_ideas(
             .all()
         )
         for transaction in view_transactions:
-            if transaction.source_id not in recent_view_transactions:
-                recent_view_transactions[transaction.source_id] = transaction
+            viewed_at = _as_utc(transaction.created_at)
+            if viewed_at is None:
+                continue
+            current = recent_view_transactions.get(transaction.source_id)
+            candidate = (viewed_at, "waterdrop", True)
+            if current is None or candidate[0] > current[0]:
+                recent_view_transactions[transaction.source_id] = candidate
+
+        usage_logs = (
+            db.query(UserUsageLog)
+            .filter(
+                UserUsageLog.user_id == current_user_id,
+                UserUsageLog.usage_type == USAGE_IDEA_VIEW,
+                UserUsageLog.target_type == "idea",
+                UserUsageLog.target_id.in_(idea_ids),
+                UserUsageLog.used_at >= view_cutoff,
+            )
+            .order_by(UserUsageLog.used_at.desc())
+            .all()
+        )
+        for usage_log in usage_logs:
+            viewed_at = _as_utc(usage_log.used_at)
+            if viewed_at is None:
+                continue
+            current = recent_view_transactions.get(usage_log.target_id)
+            candidate = (viewed_at, "subscription", False)
+            if current is None or candidate[0] > current[0]:
+                recent_view_transactions[usage_log.target_id] = candidate
 
     return success_response(
         data=[
@@ -351,7 +450,11 @@ async def list_ideas(
             "bookmark_count": int(bookmark_counts.get(idea.id, 0)),
             "is_liked": idea.id in liked_idea_ids,
             "is_bookmarked": idea.id in bookmarked_idea_ids,
-            **_idea_view_access_payload(recent_view_transactions.get(idea.id)),
+            **(
+                _idea_view_access_payload(*recent_view_transactions[idea.id])
+                if idea.id in recent_view_transactions
+                else _idea_view_access_payload(None)
+            ),
             "created_at": idea.created_at,
         }
             for idea in ideas
@@ -382,7 +485,7 @@ async def get_idea(
     bookmark_count = db.query(func.count(IdeaBookmark.id)).filter(IdeaBookmark.idea_id == idea.id).scalar() or 0
     is_liked = False
     is_bookmarked = False
-    recent_view_transaction = None
+    recent_view_payload = _idea_view_access_payload(None)
     if current_user_id:
         is_liked = (
             db.query(IdeaLike.id)
@@ -396,7 +499,7 @@ async def get_idea(
             .first()
             is not None
         )
-        recent_view_transaction = _get_recent_idea_view_transaction(
+        recent_view_payload = _get_idea_view_access_payload(
             db,
             user_id=current_user_id,
             idea_id=idea.id,
@@ -418,7 +521,7 @@ async def get_idea(
             "bookmark_count": int(bookmark_count),
             "is_liked": is_liked,
             "is_bookmarked": is_bookmarked,
-            **_idea_view_access_payload(recent_view_transaction),
+            **recent_view_payload,
         },
     )
 
@@ -438,18 +541,85 @@ async def spend_for_idea_view(
         user_id=current_user_id,
         idea_id=idea.id,
     )
-    if recent_view_transaction is not None:
+    recent_view_usage_log = _get_recent_idea_view_usage_log(
+        db,
+        user_id=current_user_id,
+        idea_id=idea.id,
+    )
+    if recent_view_transaction is not None or recent_view_usage_log is not None:
+        if recent_view_transaction is not None and (
+            recent_view_usage_log is None or _as_utc(recent_view_transaction.created_at) >= _as_utc(recent_view_usage_log.used_at)
+        ):
+            recent_payload = _idea_view_access_payload(
+                _as_utc(recent_view_transaction.created_at),
+                source="waterdrop",
+                waterdrop_spent=True,
+            )
+        else:
+            recent_payload = _idea_view_access_payload(
+                _as_utc(recent_view_usage_log.used_at) if recent_view_usage_log is not None else None,
+                source="subscription",
+                waterdrop_spent=False,
+            )
         return success_response(
             data={
                 "idea_id": idea.id,
                 "already_viewed": True,
-                **_idea_view_access_payload(recent_view_transaction),
+                **recent_payload,
             }
         )
 
     user = db.get(User, current_user_id)
     if user is None or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    plan = get_effective_plan(db, current_user_id)
+    free_view_allowed = False
+    if plan.product is not None:
+        if plan.product.product_code == "PRO_MONTHLY":
+            free_view_allowed = True
+        else:
+            try:
+                check_usage_allowed(db, current_user_id, USAGE_IDEA_VIEW)
+                free_view_allowed = True
+            except HTTPException as exc:
+                if exc.status_code not in {status.HTTP_429_TOO_MANY_REQUESTS, status.HTTP_403_FORBIDDEN}:
+                    raise
+
+    if free_view_allowed:
+        usage_log = record_usage(
+            db,
+            user_id=current_user_id,
+            usage_type=USAGE_IDEA_VIEW,
+            target_type="idea",
+            target_id=idea.id,
+        )
+        db.commit()
+        db.refresh(usage_log)
+        updated_plan = get_effective_plan(db, current_user_id)
+        idea_view_limit = int(updated_plan.product.idea_view_daily_limit or 0) if updated_plan.product else 0
+        idea_view_used = int(updated_plan.entitlement.idea_view_used if updated_plan.entitlement else 0)
+        idea_view_remaining = (
+            None
+            if updated_plan.product and updated_plan.product.product_code == "PRO_MONTHLY"
+            else max(idea_view_limit - idea_view_used, 0) if idea_view_limit else 0
+        )
+        return success_response(
+            data={
+                "idea_id": idea.id,
+                "waterdrop_spent": False,
+                "free_view_used": True,
+                "free_view_date": usage_log.usage_date,
+                "idea_view_used": idea_view_used,
+                "idea_view_daily_limit": idea_view_limit or None,
+                "idea_view_remaining": idea_view_remaining,
+                **_idea_view_access_payload(
+                    _as_utc(usage_log.used_at),
+                    source="subscription",
+                    waterdrop_spent=False,
+                ),
+            }
+        )
 
     balance_before = int(user.coin_balance or 0)
     if balance_before < 1:
@@ -472,9 +642,16 @@ async def spend_for_idea_view(
     return success_response(
         data={
             "idea_id": idea.id,
+            "waterdrop_spent": True,
             "waterdrop_balance": user.coin_balance,
             "coin_balance": user.coin_balance,
-            **_idea_view_access_payload(transaction),
+            "idea_view_used": int(plan.entitlement.idea_view_used if plan.entitlement else 0),
+            "idea_view_daily_limit": int(plan.product.idea_view_daily_limit or 0) if plan.product else None,
+            **_idea_view_access_payload(
+                _as_utc(transaction.created_at),
+                source="waterdrop",
+                waterdrop_spent=True,
+            ),
         }
     )
 
