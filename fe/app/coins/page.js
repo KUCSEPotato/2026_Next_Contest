@@ -18,30 +18,30 @@ import TopActionButtons from "../../components/TopActionButtons";
 // ── 상수 ──────────────────────────────────────────────────────────────────────
 
 const STATUS_LABELS = {
-  pending:  "확인 대기",
+  pending: "확인 대기",
   approved: "승인됨",
   rejected: "거절됨",
 };
 
 const STATUS_COLORS = {
-  pending:  "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-200",
+  pending: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-200",
   approved: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200",
   rejected: "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-200",
 };
 
 // 백엔드 package id → 일러스트 타입
 const PACKAGE_ILLUS_TYPE = {
-  drop:   "drop",
+  drop: "drop",
   waterdrop: "drop",
-  cup:    "glass",
-  glass:  "glass",
+  cup: "glass",
+  glass: "glass",
   bottle: "bottle",
 };
 
 const DEFAULT_COIN_PACKAGES = [
-  { id: "drop", coin_amount: 1, price_krw: 300, label: "\uD55C \uBC29\uC6B8" },
-  { id: "cup", coin_amount: 10, price_krw: 2000, label: "\uD55C \uC794" },
-  { id: "bottle", coin_amount: 100, price_krw: 15000, label: "\uD55C \uBCD1" },
+  { id: "drop", coin_amount: 1, price_krw: 300, label: "한 방울" },
+  { id: "cup", coin_amount: 10, price_krw: 2000, label: "한 잔" },
+  { id: "bottle", coin_amount: 100, price_krw: 15000, label: "한 병" },
 ];
 
 function normalizeCoinPackages(packages = []) {
@@ -64,8 +64,11 @@ function formatDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleString("ko-KR", {
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -102,54 +105,54 @@ async function getMyTransactionsApi({ page = 1, pageSize = 50 } = {}) {
 // ── 히어로 물방울 일러스트 ────────────────────────────────────────────────────
 
 function WaterdropHeroIcon() {
-   return (
-     <svg
-       viewBox="0 0 96 96"
-       className="h-24 w-24"
-       aria-hidden
-       style={{ animation: "floatWaterdrop 3s ease-in-out infinite" }}
-     >
-       <defs>
-         <linearGradient id="wdHeroGrad" x1="20" y1="4" x2="76" y2="92" gradientUnits="userSpaceOnUse">
-           <stop offset="0%" stopColor="#bae6fd" />
-           <stop offset="55%" stopColor="#38bdf8" />
-           <stop offset="100%" stopColor="#0284c7" />
-         </linearGradient>
-       </defs>
-       <ellipse cx="48" cy="90" rx="26" ry="5.5" fill="#bae6fd" opacity="0.4" />
-       <path
-         d="M48 4C35 21 20 40 20 59c0 20 13 33 28 33s28-13 28-33C76 40 61 21 48 4Z"
-         fill="url(#wdHeroGrad)"
-       />
-       <ellipse cx="36" cy="30" rx="10" ry="16" fill="white" opacity="0.28" transform="rotate(-18 36 30)" />
-       <ellipse cx="59" cy="52" rx="3.5" ry="6" fill="white" opacity="0.14" transform="rotate(-10 59 52)" />
-       <path
-         d="M26 23c-5 10-7 20-7 29 0 11 4 20 13 26"
-         stroke="white"
-         strokeWidth="4"
-         strokeLinecap="round"
-         opacity="0.18"
-         fill="none"
-       />
-       <style jsx>{`
-         @keyframes floatWaterdrop {
-           0%, 100% { transform: translateY(0) scale(1); }
-           50% { transform: translateY(-8px) scale(1.03); }
-         }
-       `}</style>
-     </svg>
-   );
- }
+  return (
+    <svg
+      viewBox="0 0 96 96"
+      className="h-24 w-24"
+      aria-hidden
+      style={{ animation: "floatWaterdrop 3s ease-in-out infinite" }}
+    >
+      <defs>
+        <linearGradient id="wdHeroGrad" x1="20" y1="4" x2="76" y2="92" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#bae6fd" />
+          <stop offset="55%" stopColor="#38bdf8" />
+          <stop offset="100%" stopColor="#0284c7" />
+        </linearGradient>
+      </defs>
+      <ellipse cx="48" cy="90" rx="26" ry="5.5" fill="#bae6fd" opacity="0.4" />
+      <path
+        d="M48 4C35 21 20 40 20 59c0 20 13 33 28 33s28-13 28-33C76 40 61 21 48 4Z"
+        fill="url(#wdHeroGrad)"
+      />
+      <ellipse cx="36" cy="30" rx="10" ry="16" fill="white" opacity="0.28" transform="rotate(-18 36 30)" />
+      <ellipse cx="59" cy="52" rx="3.5" ry="6" fill="white" opacity="0.14" transform="rotate(-10 59 52)" />
+      <path
+        d="M26 23c-5 10-7 20-7 29 0 11 4 20 13 26"
+        stroke="white"
+        strokeWidth="4"
+        strokeLinecap="round"
+        opacity="0.18"
+        fill="none"
+      />
+      <style jsx>{`
+        @keyframes floatWaterdrop {
+          0%, 100% { transform: translateY(0) scale(1); }
+          50% { transform: translateY(-8px) scale(1.03); }
+        }
+      `}</style>
+    </svg>
+  );
+}
 
- function getProjectCreateText(product) {
-   if (product?.benefits?.project_create_daily_limit) {
-     return `일 ${product.benefits.project_create_daily_limit}회`;
-   }
-   if (product?.benefits?.project_create_total_limit) {
-     return `총 ${product.benefits.project_create_total_limit}회`;
-   }
-   return "불가";
- }
+function getProjectCreateText(product) {
+  if (product?.benefits?.project_create_daily_limit) {
+    return `일 ${product.benefits.project_create_daily_limit}회`;
+  }
+  if (product?.benefits?.project_create_total_limit) {
+    return `총 ${product.benefits.project_create_total_limit}회`;
+  }
+  return "불가";
+}
 
 function getProjectApplyText(product) {
   if (product?.benefits?.project_apply_unlimited) return "무제한";
@@ -181,53 +184,86 @@ function getProjectBoostText(product) {
   return null;
 }
 
+function getCommunityText(product) {
+  if (product?.benefits?.community_write_unlimited) return "무제한";
+  if (product?.benefits?.community_write_daily_limit) {
+    return `글쓰기 일 ${product.benefits.community_write_daily_limit}회, 댓글 무제한`;
+  }
+  return "댓글 무제한";
+}
+
+function BenefitGroup({ title, children }) {
+  return (
+    <div className="rounded-xl bg-slate-50 px-3 py-3 dark:bg-slate-800/70">
+      <p className="mb-2 text-xs font-black text-slate-900 dark:text-slate-100">{title}</p>
+      <ul className="space-y-1 text-[13px] leading-5 text-slate-600 dark:text-slate-300">
+        {children}
+      </ul>
+    </div>
+  );
+}
+
+function ProductBenefits({ product }) {
+  const projectBoostText = getProjectBoostText(product);
+
+  return (
+    <div className="mt-4 space-y-2">
+      <BenefitGroup title="개발의 땅">
+        <li>프로젝트 생성: {getProjectCreateText(product)}</li>
+        <li>프로젝트 지원: {getProjectApplyText(product)}</li>
+        <li>프로젝트 버리기: {product.benefits?.project_discard_unlimited ? "무제한" : "불가"}</li>
+        {product.benefits?.project_apply_priority && (
+          <li>지원자 노출: 목록 상단 노출</li>
+        )}
+        {projectBoostText && (
+          <li>프로젝트 상단 노출: {projectBoostText}</li>
+        )}
+      </BenefitGroup>
+
+      <BenefitGroup title="생각의 뜰">
+        <li>아이디어 열람: {getIdeaViewText(product)}</li>
+      </BenefitGroup>
+
+      <BenefitGroup title="모닥불">
+        <li>자유게시판: {getCommunityText(product)}</li>
+      </BenefitGroup>
+    </div>
+  );
+}
+
 function PlanCard({ eyebrow, product, isCurrent, onError, onManualPurchase, manualLoading, children }) {
   return (
     <article
-      className={`rounded-2xl border bg-white p-5 shadow-sm transition ${
+      className={`rounded-2xl border bg-white p-5 shadow-sm transition dark:bg-slate-900/80 ${
         isCurrent
-          ? "border-red-300 ring-2 ring-red-100"
-          : "border-slate-200 hover:border-red-200 hover:shadow-md"
+          ? "border-red-300 ring-2 ring-red-100 dark:border-red-400/50 dark:ring-red-500/20"
+          : "border-slate-200 hover:border-red-200 hover:shadow-md dark:border-slate-700 dark:hover:border-red-500/30"
       }`}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-bold text-red-600">{eyebrow}</p>
-          <h3 className="mt-2 text-2xl font-black text-slate-950">{product.name}</h3>
-          <p className="mt-1 text-lg font-bold text-slate-800">
+          <p className="text-sm font-bold text-red-600 dark:text-red-400">{eyebrow}</p>
+          <h3 className="mt-2 text-2xl font-black text-slate-950 dark:text-slate-50">{product.name}</h3>
+          <p className="mt-1 text-lg font-bold text-slate-800 dark:text-slate-200">
             {product.price_krw ? formatKrw(product.price_krw) : "무료"}
           </p>
         </div>
         {isCurrent && (
-          <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-700">
+          <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-700 dark:bg-red-500/10 dark:text-red-300">
             현재 사용 중
           </span>
         )}
       </div>
-      <p className="mt-2 text-sm text-slate-500">{children}</p>
-      <ul className="mt-4 space-y-1 text-sm text-slate-600">
-        <li>아이디어 열람: {getIdeaViewText(product)}</li>
-        <li>프로젝트 생성: {getProjectCreateText(product)}</li>
-        <li>프로젝트 버리기: {product.benefits?.project_discard_unlimited ? "무제한" : "불가"}</li>
-        <li>프로젝트 지원: {getProjectApplyText(product)}</li>
-        {product.benefits?.project_apply_priority && (
-          <li>지원자 노출: 지원자 목록 상단 노출</li>
-        )}
-        {getProjectBoostText(product) ? <li>프로젝트 상단 노출: {getProjectBoostText(product)}</li> : null}
-        <li>
-          자유게시판:{" "}
-          {product.benefits?.community_write_unlimited
-            ? "무제한"
-            : product.benefits?.community_write_daily_limit
-              ? `글쓰기 일 ${product.benefits.community_write_daily_limit}회, 댓글 무제한`
-              : "댓글 무제한"}
-        </li>
-      </ul>
+
+      <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">{children}</p>
+
+      <ProductBenefits product={product} />
+
       {isCurrent || product.product_code === "FREE" ? (
         <button
           type="button"
           disabled
-          className="mt-5 w-full rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700"
+          className="mt-5 w-full rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700 dark:bg-red-500/10 dark:text-red-300"
         >
           {isCurrent ? "현재 사용 중" : "기본 제공"}
         </button>
@@ -238,13 +274,13 @@ function PlanCard({ eyebrow, product, isCurrent, onError, onManualPurchase, manu
             productCode={product.product_code}
             label="카드 결제"
             onError={onError}
-            className="w-full rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="w-full rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
           />
           <button
             type="button"
             onClick={() => onManualPurchase(product)}
             disabled={manualLoading}
-            className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+            className="w-full whitespace-nowrap rounded-xl border border-slate-200 px-3 py-3 text-[13px] font-bold leading-none text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             {manualLoading ? "요청 중" : "수동 구매 요청"}
           </button>
@@ -275,13 +311,19 @@ function WaterdropMascot({ className = "h-28 w-28" }) {
         fill="url(#wdHeroGrad)"
       />
       <ellipse cx="36" cy="30" rx="10" ry="16" fill="white" opacity="0.28" transform="rotate(-18 36 30)" />
-      <ellipse cx="59" cy="52" rx="3.5" ry="6"  fill="white" opacity="0.14" transform="rotate(-10 59 52)" />
-      <path d="M26 23c-5 10-7 20-7 29 0 11 4 20 13 26"
-        stroke="white" strokeWidth="4" strokeLinecap="round" opacity="0.18" fill="none" />
+      <ellipse cx="59" cy="52" rx="3.5" ry="6" fill="white" opacity="0.14" transform="rotate(-10 59 52)" />
+      <path
+        d="M26 23c-5 10-7 20-7 29 0 11 4 20 13 26"
+        stroke="white"
+        strokeWidth="4"
+        strokeLinecap="round"
+        opacity="0.18"
+        fill="none"
+      />
       <style jsx>{`
         @keyframes floatWaterdrop {
           0%, 100% { transform: translateY(0) scale(1); }
-          50%       { transform: translateY(-8px) scale(1.03); }
+          50% { transform: translateY(-8px) scale(1.03); }
         }
       `}</style>
     </svg>
@@ -297,7 +339,8 @@ function PackageIllustration({ type }) {
         <svg viewBox="0 0 60 72" fill="none" className="h-12 w-12" aria-hidden>
           <defs>
             <linearGradient id="pkgDrop" x1="12" y1="4" x2="48" y2="68" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#bae6fd" /><stop offset="100%" stopColor="#0ea5e9" />
+              <stop offset="0%" stopColor="#bae6fd" />
+              <stop offset="100%" stopColor="#0ea5e9" />
             </linearGradient>
           </defs>
           <ellipse cx="30" cy="68" rx="16" ry="3.5" fill="#bae6fd" opacity="0.35" />
@@ -315,12 +358,13 @@ function PackageIllustration({ type }) {
         <svg viewBox="0 0 60 72" fill="none" className="h-12 w-12" aria-hidden>
           <defs>
             <linearGradient id="pkgGlass" x1="10" y1="8" x2="50" y2="62" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#bae6fd" /><stop offset="100%" stopColor="#0ea5e9" />
+              <stop offset="0%" stopColor="#bae6fd" />
+              <stop offset="100%" stopColor="#0ea5e9" />
             </linearGradient>
           </defs>
           <ellipse cx="30" cy="69" rx="16" ry="3" fill="#bae6fd" opacity="0.3" />
           <rect x="22" y="62" width="16" height="3.5" rx="1.5" fill="#7dd3fc" />
-          <rect x="28" y="46" width="4"  height="17"  rx="2"   fill="#7dd3fc" />
+          <rect x="28" y="46" width="4" height="17" rx="2" fill="#7dd3fc" />
           <path d="M14 10 Q12 30 20 40 Q25 46 30 46 Q35 46 40 40 Q48 30 46 10 Z" fill="url(#pkgGlass)" />
           <path d="M17 28 Q16 36 20 40 Q25 46 30 46 Q35 46 40 40 Q44 36 43 28 Q36 32 24 32 Z" fill="#0284c7" opacity="0.32" />
           <path d="M18 13 Q17 22 19 30" stroke="white" strokeWidth="3" strokeLinecap="round" opacity="0.32" fill="none" />
@@ -335,12 +379,13 @@ function PackageIllustration({ type }) {
       <svg viewBox="0 0 60 72" fill="none" className="h-12 w-12" aria-hidden>
         <defs>
           <linearGradient id="pkgBottle" x1="10" y1="8" x2="50" y2="68" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#93c5fd" /><stop offset="100%" stopColor="#0369a1" />
+            <stop offset="0%" stopColor="#93c5fd" />
+            <stop offset="100%" stopColor="#0369a1" />
           </linearGradient>
         </defs>
         <ellipse cx="30" cy="68" rx="18" ry="3.5" fill="#bae6fd" opacity="0.3" />
-        <rect x="23" y="5"  width="14" height="8" rx="3.5" fill="#0369a1" />
-        <rect x="21" y="12" width="18" height="6" rx="3"   fill="#93c5fd" />
+        <rect x="23" y="5" width="14" height="8" rx="3.5" fill="#0369a1" />
+        <rect x="21" y="12" width="18" height="6" rx="3" fill="#93c5fd" />
         <path d="M13 18 Q11 23 11 29 L11 56 Q11 66 30 66 Q49 66 49 56 L49 29 Q49 23 47 18 Z" fill="url(#pkgBottle)" />
         <path d="M11 40 L11 56 Q11 66 30 66 Q49 66 49 56 L49 40 Q38 45 22 45 Z" fill="#0369a1" opacity="0.28" />
         <rect x="11" y="36" width="38" height="8" fill="#38bdf8" opacity="0.3" />
@@ -366,7 +411,9 @@ function HistoryModal({ onClose }) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
 
@@ -405,11 +452,13 @@ function HistoryModal({ onClose }) {
                     <td className="px-3 py-2.5 text-gray-700 dark:text-slate-300">
                       {t.note || t.event_type || (t.direction === "earned" ? "충전" : "사용")}
                     </td>
-                    <td className={`px-3 py-2.5 font-semibold ${
-                      t.amount > 0
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : "text-rose-500 dark:text-rose-400"
-                    }`}>
+                    <td
+                      className={`px-3 py-2.5 font-semibold ${
+                        t.amount > 0
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-rose-500 dark:text-rose-400"
+                      }`}
+                    >
                       {t.amount > 0 ? `+${t.amount}` : t.amount}방울
                     </td>
                     <td className="px-3 py-2.5 text-gray-600 dark:text-slate-300">
@@ -430,7 +479,7 @@ function HistoryModal({ onClose }) {
 
 export default function CoinsPage() {
   const router = useRouter();
-  const toast  = useToast();
+  const toast = useToast();
   const { confirm, prompt } = useDialog();
   const [balance, setBalance] = useState(0);
   const [packages, setPackages] = useState([]);
@@ -440,10 +489,12 @@ export default function CoinsPage() {
   const [loading, setLoading] = useState(true);
   const [processingPackage, setProcessingPackage] = useState("");
   const [showHistory, setShowHistory] = useState(false);
+
   const pendingRequests = useMemo(
     () => requests.filter((r) => r.status === "pending"),
-    [requests],
+    [requests]
   );
+
   const freeProduct = useMemo(
     () =>
       paymentProducts.find((product) => product.product_code === "FREE") || {
@@ -457,16 +508,19 @@ export default function CoinsPage() {
           community_write_daily_limit: 1,
         },
       },
-    [paymentProducts],
+    [paymentProducts]
   );
+
   const subscriptionProducts = useMemo(
     () => paymentProducts.filter((product) => product.product_type === "SUBSCRIPTION"),
-    [paymentProducts],
+    [paymentProducts]
   );
+
   const passProducts = useMemo(
     () => paymentProducts.filter((product) => product.product_type === "PASS"),
-    [paymentProducts],
+    [paymentProducts]
   );
+
   const currentPlanCode = entitlement?.plan || entitlement?.product_code || "FREE";
 
   const loadCoins = useCallback(async () => {
@@ -499,9 +553,12 @@ export default function CoinsPage() {
     queueMicrotask(loadCoins);
   }, [loadCoins, router]);
 
-  const handlePaymentError = useCallback((err) => {
-    toast.error(err instanceof Error ? err.message : "결제를 시작하지 못했습니다.");
-  }, [toast]);
+  const handlePaymentError = useCallback(
+    (err) => {
+      toast.error(err instanceof Error ? err.message : "결제를 시작하지 못했습니다.");
+    },
+    [toast]
+  );
 
   async function handleRequestProductPurchase(product) {
     const ok = await confirm({
@@ -542,17 +599,17 @@ export default function CoinsPage() {
       title: "물방울 구매 요청",
       message: `${formatWaterdrops(pkg.coin_amount)} 구매 요청을 만들까요?\n금액: ${formatKrw(pkg.price_krw)}\n\n관리자가 결제 확인 후 물방울을 지급합니다.`,
       confirmText: "요청하기",
-      cancelText:  "돌아가기",
+      cancelText: "돌아가기",
     });
     if (!ok) return;
 
     const noteInput = await prompt({
-      title:       "구매 요청 메모",
-      message:     "입금자명이나 확인에 필요한 메모가 있으면 남겨주세요.",
+      title: "구매 요청 메모",
+      message: "입금자명이나 확인에 필요한 메모가 있으면 남겨주세요.",
       placeholder: "예: 입금자명 감자",
       confirmText: "제출",
-      cancelText:  "건너뛰기",
-      multiline:   true,
+      cancelText: "건너뛰기",
+      multiline: true,
     });
     if (noteInput === null) return;
 
@@ -576,7 +633,6 @@ export default function CoinsPage() {
       <TopActionButtons />
 
       <main className="mx-auto max-w-4xl px-4 pb-16">
-
         {/* ── 히어로 ── */}
         <section className="pb-10 pt-6 text-center">
           <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center">
@@ -588,7 +644,8 @@ export default function CoinsPage() {
           </h1>
 
           <p className="mx-auto mb-6 max-w-md text-sm leading-7 text-gray-500 dark:text-slate-400 sm:text-base">
-            아이디어 씨앗을 무럭무럭 자라게 해줄<br />
+            아이디어 씨앗을 무럭무럭 자라게 해줄
+            <br />
             영양 가득한 물이에요.
           </p>
 
@@ -747,24 +804,24 @@ export default function CoinsPage() {
                       <PackageIllustration type={PACKAGE_ILLUS_TYPE[pkg.id] ?? "drop"} />
                     </div>
 
-                  <TossPaymentButton
-                    productId={pkg.id}
-                    label="카드 결제"
-                    onError={(err) =>
-                      toast.error(err instanceof Error ? err.message : "결제를 시작하지 못했습니다.")
-                    }
-                    className="mt-4 w-full rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleRequestPurchase(pkg)}
-                    disabled={processingPackage === pkg.id}
-                    className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-bold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 whitespace-nowrap"
-                  >
-                    {processingPackage === pkg.id ? "요청 중…" : "수동 구매 요청"}
-                  </button>
-                </article>
-              ))}
+                    <TossPaymentButton
+                      productId={pkg.id}
+                      label="카드 결제"
+                      onError={(err) =>
+                        toast.error(err instanceof Error ? err.message : "결제를 시작하지 못했습니다.")
+                      }
+                      className="mt-4 w-full rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRequestPurchase(pkg)}
+                      disabled={processingPackage === pkg.id}
+                      className="mt-2 w-full whitespace-nowrap rounded-xl border border-gray-200 px-4 py-2.5 text-[13px] font-bold leading-none text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                    >
+                      {processingPackage === pkg.id ? "요청 중…" : "수동 구매 요청"}
+                    </button>
+                  </article>
+                ))}
               </div>
             </section>
 
