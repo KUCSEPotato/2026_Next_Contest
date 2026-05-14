@@ -91,6 +91,10 @@ function shortJson(value) {
   }
 }
 
+function formatWaterdrops(amount) {
+  return `물방울 ${Number(amount || 0).toLocaleString("ko-KR")}방울`;
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const toast = useToast();
@@ -385,7 +389,7 @@ export default function AdminPage() {
     const isEntitlement = request.request_type === "ENTITLEMENT";
     const requestLabel = isEntitlement
       ? request.product_name || request.product_code || "이용권"
-      : `${request.coin_amount}코인`;
+      : formatWaterdrops(request.coin_amount);
     const noteInput = await prompt({
       title: isApprove ? "구매 요청 승인" : "구매 요청 거절",
       message: isApprove
@@ -442,9 +446,9 @@ export default function AdminPage() {
           : prev
       );
 
-      toast.success(isApprove ? "코인을 지급하고 사용자에게 알림을 보냈습니다." : "구매 요청을 거절하고 사용자에게 알림을 보냈습니다.");
+      toast.success(isApprove ? "물방울을 지급하고 사용자에게 알림을 보냈습니다." : "구매 요청을 거절하고 사용자에게 알림을 보냈습니다.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "코인 구매 요청 처리에 실패했습니다.");
+      toast.error(err instanceof Error ? err.message : "물방울 구매 요청 처리에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
@@ -619,8 +623,8 @@ export default function AdminPage() {
   async function handleGrantCoins(userId) {
     const targetUser = users.find((user) => user.id === userId);
     const amountInput = await prompt({
-      title: "코인 지급",
-      message: `${targetUser?.nickname || `User #${userId}`}에게 지급할 코인 수를 입력하세요.`,
+      title: "물방울 지급",
+      message: `${targetUser?.nickname || `User #${userId}`}에게 지급할 물방울 수를 입력하세요.`,
       defaultValue: "100",
       inputType: "number",
       required: true,
@@ -630,12 +634,12 @@ export default function AdminPage() {
 
     const amount = Number(amountInput);
     if (!Number.isFinite(amount) || amount <= 0) {
-      toast.warning("코인 수는 1 이상의 숫자여야 합니다.");
+      toast.warning("물방울 수는 1 이상의 숫자여야 합니다.");
       return;
     }
 
     const noteInput = await prompt({
-      title: "코인 지급 사유",
+      title: "물방울 지급 사유",
       message: "사용자에게 알림으로 전달됩니다.",
       placeholder: "지급 사유를 입력하세요.",
       required: true,
@@ -644,7 +648,7 @@ export default function AdminPage() {
     if (noteInput === null) return;
     const note = noteInput.trim();
     if (!note) {
-      toast.warning("코인 지급 사유를 입력해주세요.");
+      toast.warning("물방울 지급 사유를 입력해주세요.");
       return;
     }
 
@@ -663,9 +667,9 @@ export default function AdminPage() {
         )
       );
 
-      toast.success("코인을 지급했고 사용자에게 알림을 보냈습니다.");
+      toast.success("물방울을 지급했고 사용자에게 알림을 보냈습니다.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "코인 지급에 실패했습니다.");
+      toast.error(err instanceof Error ? err.message : "물방울 지급에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
@@ -674,8 +678,8 @@ export default function AdminPage() {
   async function handleRevokeCoins(userId) {
     const targetUser = users.find((user) => user.id === userId);
     const amountInput = await prompt({
-      title: "코인 환수",
-      message: `${targetUser?.nickname || `User #${userId}`}으로부터 환수할 코인 수를 입력하세요.`,
+      title: "물방울 환수",
+      message: `${targetUser?.nickname || `User #${userId}`}으로부터 환수할 물방울 수를 입력하세요.`,
       defaultValue: "100",
       inputType: "number",
       required: true,
@@ -685,12 +689,12 @@ export default function AdminPage() {
 
     const amount = Number(amountInput);
     if (!Number.isFinite(amount) || amount <= 0) {
-      toast.warning("환수할 코인 수는 1 이상의 숫자여야 합니다.");
+      toast.warning("환수할 물방울 수는 1 이상의 숫자여야 합니다.");
       return;
     }
 
     const noteInput = await prompt({
-      title: "코인 환수 사유",
+      title: "물방울 환수 사유",
       message: "사용자에게 알림으로 전달됩니다.",
       placeholder: "환수 사유를 입력하세요.",
       required: true,
@@ -699,7 +703,7 @@ export default function AdminPage() {
     if (noteInput === null) return;
     const note = noteInput.trim();
     if (!note) {
-      toast.warning("코인 환수 사유를 입력해주세요.");
+      toast.warning("물방울 환수 사유를 입력해주세요.");
       return;
     }
 
@@ -718,9 +722,9 @@ export default function AdminPage() {
         )
       );
 
-      toast.success("코인을 환수했고 사용자에게 알림을 보냈습니다.");
+      toast.success("물방울을 환수했고 사용자에게 알림을 보냈습니다.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "코인 환수에 실패했습니다.");
+      toast.error(err instanceof Error ? err.message : "물방울 환수에 실패했습니다.");
     } finally {
       setProcessingKey("");
     }
@@ -931,7 +935,7 @@ export default function AdminPage() {
           <Metric label="프로젝트" value={overview?.projects_total} sub={`${overview?.projects_active ?? 0} active`} />
           <Metric label="미처리 신고" value={overview?.reports_open} sub={`${overview?.reports_total ?? 0} total`} tone="danger" />
           <Metric label="결제 이벤트" value={overview?.payment_events_total} sub={`${overview?.payment_events_pending ?? 0} pending`} tone="warning" />
-          <Metric label="코인 구매" value={overview?.coin_purchase_requests_total} sub={`${overview?.coin_purchase_requests_pending ?? 0} pending`} tone="warning" />
+          <Metric label="물방울 구매" value={overview?.coin_purchase_requests_total} sub={`${overview?.coin_purchase_requests_pending ?? 0} pending`} tone="warning" />
         </section>
 
         <section className="mt-6 grid gap-4 lg:grid-cols-2">
@@ -960,7 +964,7 @@ export default function AdminPage() {
             </div>
           </Panel>
 
-          <Panel title="처리 대기 코인 구매" description={`${pendingCoinRequests.length}건`}>
+          <Panel title="처리 대기 물방울 구매" description={`${pendingCoinRequests.length}건`}>
             <div className="divide-y divide-slate-100">
               {pendingCoinRequests.slice(0, 5).map((request) => (
                 <div key={request.id} className="flex items-start justify-between gap-3 py-3">
@@ -971,7 +975,7 @@ export default function AdminPage() {
                     <p className="mt-1 truncate text-xs text-slate-500">
                       {request.request_type === "ENTITLEMENT"
                         ? request.product_name || request.product_code
-                        : `${request.coin_amount?.toLocaleString("ko-KR")}코인`}{" "}
+                        : formatWaterdrops(request.coin_amount)}{" "}
                       · {Number(request.price_krw || 0).toLocaleString("ko-KR")}원
                     </p>
                   </div>
@@ -984,7 +988,7 @@ export default function AdminPage() {
                   </button>
                 </div>
               ))}
-              {pendingCoinRequests.length === 0 && <EmptyLine text="대기 중인 코인 구매 요청이 없습니다." />}
+              {pendingCoinRequests.length === 0 && <EmptyLine text="대기 중인 물방울 구매 요청이 없습니다." />}
             </div>
           </Panel>
         </section>
@@ -1154,7 +1158,7 @@ export default function AdminPage() {
                           <Td>
                             {request.request_type === "ENTITLEMENT"
                               ? request.product_name || request.product_code
-                              : `${request.coin_amount?.toLocaleString("ko-KR")}개`}
+                              : formatWaterdrops(request.coin_amount)}
                           </Td>
                           <Td>{Number(request.price_krw || 0).toLocaleString("ko-KR")}원</Td>
                           <Td>{COIN_REQUEST_STATUSES[request.status] || request.status}</Td>
@@ -1280,7 +1284,7 @@ export default function AdminPage() {
                     <Th>연동</Th>
                     <Th>Role</Th>
                     <Th>Plan</Th>
-                    <Th>Coin</Th>
+                    <Th>물방울</Th>
                     <Th>Status</Th>
                     <Th>처리</Th>
                   </tr>
@@ -1381,14 +1385,14 @@ export default function AdminPage() {
 	                            disabled={Boolean(user.deleted_at) || processingKey === `coin-${user.id}`}
 	                            className="rounded-md bg-amber-500 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
 	                          >
-                            코인 지급
+                            물방울 지급
                           </button>
 	                          <button
 	                            onClick={() => handleRevokeCoins(user.id)}
 	                            disabled={Boolean(user.deleted_at) || processingKey === `revoke-coin-${user.id}`}
 	                            className="rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
 	                          >
-                            코인 환수
+                            물방울 환수
                           </button>
                         </div>
                       </Td>
