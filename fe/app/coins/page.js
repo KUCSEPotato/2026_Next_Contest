@@ -663,22 +663,22 @@ export default function CoinsPage() {
             물방울 상점
           </h1>
 
-          <p className="mx-auto mb-6 max-w-md text-sm leading-7 text-gray-500 dark:text-slate-400 sm:text-base">
+          <p className="mx-auto mb-8 max-w-md text-sm leading-7 text-gray-500 dark:text-slate-400 sm:text-base">
             아이디어 씨앗을 무럭무럭 자라게 해줄
             <br />
             영양 가득한 물이에요.
           </p>
-        </section>
 
-        <section className="mx-auto mb-8 grid max-w-5xl grid-cols-1 gap-4 sm:grid-cols-3">
-          {STORE_SECTIONS.map((section) => (
-            <StoreSectionCard
-              key={section.key}
-              section={section}
-              active={activeSection === section.key}
-              onClick={() => setActiveSection(section.key)}
-            />
-          ))}
+          <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 text-left sm:grid-cols-3">
+            {STORE_SECTIONS.map((section) => (
+              <StoreSectionCard
+                key={section.key}
+                section={section}
+                active={activeSection === section.key}
+                onClick={() => setActiveSection(section.key)}
+              />
+            ))}
+          </div>
         </section>
 
         {/* ── 컨텐츠 ── */}
