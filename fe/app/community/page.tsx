@@ -124,6 +124,9 @@ export default function CommunityPage() {
   const [hotPosts, setHotPosts] = useState<HotPostsState | null>(null);
   const [loadingHot, setLoadingHot] = useState(false);
   const reactingPostIds = useRef(new Set<number>());
+  const boardFilterRef = useRef<HTMLElement>(null);
+  const filterScrollPending = useRef(false);
+  const lastFilterKey = useRef("");
 
   useEffect(() => {
     window.setTimeout(() => {
@@ -141,14 +144,26 @@ export default function CommunityPage() {
     }, 0);
   }, []);
 
+  const stabilizeFilterScroll = useCallback(() => {
+    const filterElement = boardFilterRef.current;
+    if (!filterElement) return;
+
+    const targetTop = filterElement.getBoundingClientRect().top + window.scrollY - 16;
+    if (window.scrollY > targetTop) {
+      window.scrollTo({ top: targetTop, behavior: "auto" });
+    }
+  }, []);
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setAppliedSearchQuery(searchQuery.trim());
       setPage(1);
+      filterScrollPending.current = true;
+      stabilizeFilterScroll();
     }, 250);
 
     return () => window.clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, stabilizeFilterScroll]);
 
   const loadPosts = useCallback(async () => {
     setLoading(true);
@@ -179,6 +194,29 @@ export default function CommunityPage() {
 
     return () => window.clearTimeout(timer);
   }, [loadPosts]);
+
+  useEffect(() => {
+    if (!hasLoadedPosts) return;
+
+    const filterKey = `${selectedCategory ?? "all"}:${appliedSearchQuery}`;
+    if (lastFilterKey.current === "") {
+      lastFilterKey.current = filterKey;
+      return;
+    }
+
+    if (lastFilterKey.current !== filterKey) {
+      lastFilterKey.current = filterKey;
+      filterScrollPending.current = true;
+      window.requestAnimationFrame(stabilizeFilterScroll);
+    }
+  }, [appliedSearchQuery, hasLoadedPosts, selectedCategory, stabilizeFilterScroll]);
+
+  useEffect(() => {
+    if (loading || !filterScrollPending.current) return;
+
+    filterScrollPending.current = false;
+    window.requestAnimationFrame(stabilizeFilterScroll);
+  }, [loading, posts.length, stabilizeFilterScroll, totalPages]);
 
   const loadHotPosts = useCallback(async () => {
     setLoadingHot(true);
@@ -342,7 +380,7 @@ export default function CommunityPage() {
         {/* 모닥불 탭 */}
         {tab === "board" && (
           <>
-            <section className="mb-8 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+            <section ref={boardFilterRef} className="mb-8 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-lg font-bold text-gray-900">모닥불</p>
@@ -369,7 +407,12 @@ export default function CommunityPage() {
                 {CATEGORIES.map((cat) => (
                   <button
                     key={cat.label}
-                    onClick={() => { setSelectedCategory(cat.value); setPage(1); }}
+                    onClick={() => {
+                      filterScrollPending.current = true;
+                      stabilizeFilterScroll();
+                      setSelectedCategory(cat.value);
+                      setPage(1);
+                    }}
                     className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                       selectedCategory === cat.value
                         ? "border-orange-600 bg-orange-600 text-white dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
