@@ -114,10 +114,12 @@ export default function CommunityPage() {
   const [loadError, setLoadError] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState("");
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [tab, setTab] = useState<Tab>("board");
+  const [hasLoadedPosts, setHasLoadedPosts] = useState(false);
 
   const [hotPosts, setHotPosts] = useState<HotPostsState | null>(null);
   const [loadingHot, setLoadingHot] = useState(false);
@@ -139,26 +141,36 @@ export default function CommunityPage() {
     }, 0);
   }, []);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setAppliedSearchQuery(searchQuery.trim());
+      setPage(1);
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
+
   const loadPosts = useCallback(async () => {
     setLoading(true);
     setLoadError("");
     try {
       const res = await getPosts({
         category: selectedCategory,
-        q: searchQuery.trim() || undefined,
+        q: appliedSearchQuery || undefined,
         page,
         page_size: POSTS_PER_PAGE,
         exclude_admin_categories: !selectedCategory,
       });
       setPosts((res.posts || []).filter(isCampfirePost));
       setTotalPages(res.total_pages);
+      setHasLoadedPosts(true);
     } catch (e) {
       console.error(e);
       setLoadError("게시물을 불러오지 못했어요.");
     } finally {
       setLoading(false);
     }
-  }, [selectedCategory, searchQuery, page]);
+  }, [selectedCategory, appliedSearchQuery, page]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -349,7 +361,6 @@ export default function CommunityPage() {
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
-                  setPage(1);
                 }}
                 placeholder="제목이나 내용으로 검색해보세요"
                 className="mb-4 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-orange-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-orange-400/60"
@@ -371,7 +382,7 @@ export default function CommunityPage() {
               </div>
             </section>
 
-            {loading ? (
+            {loading && !hasLoadedPosts ? (
               <div className="py-16 text-center text-sm text-gray-500">게시물을 불러오는 중...</div>
             ) : loadError ? (
               <div className="py-16 text-center text-sm text-red-500">{loadError}</div>
@@ -379,14 +390,14 @@ export default function CommunityPage() {
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <p className="mb-3 text-3xl">📭</p>
                 <p className="mb-1 text-sm font-medium text-gray-600">
-                  {searchQuery.trim() ? "검색 결과가 없어요" : "게시물이 없어요"}
+                  {appliedSearchQuery ? "검색 결과가 없어요" : "게시물이 없어요"}
                 </p>
                 <p className="text-xs text-gray-400">
-                  {searchQuery.trim()
+                  {appliedSearchQuery
                     ? "다른 키워드로 다시 검색해보세요."
                     : "모닥불의 첫 이야기를 남겨보세요"}
                 </p>
-                {isLoggedIn && !searchQuery.trim() && (
+                {isLoggedIn && !appliedSearchQuery && (
                   <button
                     onClick={() => router.push("/community/new")}
                     className="mt-4 rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-700 dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-600 dark:hover:bg-slate-700"
@@ -399,9 +410,11 @@ export default function CommunityPage() {
               <section className="mb-10">
                 <div className="mb-4 flex items-center justify-between">
                   <span className="text-base font-bold text-gray-900">
-                    {searchQuery.trim() ? `"${searchQuery.trim()}" 검색 결과` : "전체 게시글"}
+                    {appliedSearchQuery ? `"${appliedSearchQuery}" 검색 결과` : "전체 게시글"}
                   </span>
-                  <span className="text-xs text-gray-400">{posts.length}개의 글</span>
+                  <span className="text-xs text-gray-400">
+                    {loading ? "갱신 중..." : `${posts.length}개의 글`}
+                  </span>
                 </div>
                 <div className="grid grid-cols-1 gap-4">
                   {posts.map((post) => (
