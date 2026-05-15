@@ -106,7 +106,12 @@ Table users {
   github_id varchar(100) [unique]
   google_id varchar(100) [unique]
   nickname varchar(50) [unique, not null]
+  name varchar(100)
+  phone_number varchar(20)
+  nickname varchar(50) [unique, not null]
   bio text
+  onboarding_step varchar(20) [not null, default: 'profile_pending']
+  onboarding_completed_at timestamp
   avatar_url text
   avatar_s3_key varchar(500)
   is_active boolean [not null, default: true]
