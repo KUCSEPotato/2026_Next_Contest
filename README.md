@@ -3,10 +3,9 @@
 > **Idea Is Power!**  
 > Devory는 아이디어를 가진 사람들이 팀을 찾고, 프로젝트를 시작하고, 중단된 아이디어까지 다시 이어갈 수 있도록 돕는 프로젝트 협업 플랫폼입니다.
 
-<div align="center">
-
-<img src="IMG/logo_colored_white.svg" alt="Devory logo" width="220" />
-
+<div style="display:flex; justify-content:space-between; align-items:center;">
+	<img src="IMG/logo_colored.svg" alt="Devory logo colored" width="220" />
+	<img src="IMG/logo_colored_white.svg" alt="Devory logo white" width="220" />
 </div>
 
 ## 🌐 서비스 주소
