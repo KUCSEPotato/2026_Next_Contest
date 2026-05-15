@@ -580,15 +580,15 @@ export default function MyPage() {
               </div>
             </div>
 
-            <div className="self-start rounded-2xl border border-red-100 bg-red-50/80 px-5 py-4">
+            <div className="self-start rounded-2xl border border-red-100 bg-red-50/80 px-5 py-4 dark:border-slate-700 dark:bg-slate-900/70">
               <div className="flex flex-wrap items-center gap-3">
-                <p className="text-lg font-black text-red-800">현재 플랜: {planName}</p>
-                <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-sky-800">
+                <p className="text-lg font-black text-red-800 dark:text-red-300">현재 플랜: {planName}</p>
+                <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-sky-800 dark:bg-slate-800 dark:text-sky-200">
                   남은 물방울: {formatWaterdrops(waterdropBalance)}
                 </span>
               </div>
 
-              <div className="mt-3 space-y-2 text-sm font-semibold text-slate-700">
+              <div className="mt-3 space-y-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
                 <p>
                   남은 기간:{" "}
                   {entitlement?.days_remaining === null ||
