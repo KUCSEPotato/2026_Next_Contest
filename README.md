@@ -228,7 +228,7 @@ Devory는 Toss Payments를 활용하여 결제 기능을 제공합니다.
 
 <div align="center">
 
-<img src="IMG/billing.png" alt="Devory billing flow" width="860" />
+<img src="IMG/pay_system.png" alt="Devory billing flow" width="860" />
 
 </div>
 
