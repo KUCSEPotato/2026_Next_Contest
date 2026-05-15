@@ -626,7 +626,10 @@ class CommunityPost(Base):
     author_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     title: Mapped[str] = mapped_column(String(300), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    category: Mapped[str] = mapped_column(String(50), default="general")
+    category: Mapped[str] = mapped_column(
+        Enum("general", "question", "idea", "showcase", "event", "announcement", name="post_category"),
+        default="general",
+    )
     is_pinned: Mapped[bool] = mapped_column(Boolean, default=False)
     view_count: Mapped[int] = mapped_column(BigInteger, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -655,7 +658,10 @@ class CommunityPostReaction(Base):
     id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
     post_id: Mapped[int] = mapped_column(ForeignKey("community_posts.id", ondelete="CASCADE"), nullable=False)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    reaction_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    reaction_type: Mapped[str] = mapped_column(
+        Enum("recommend", "not_recommend", name="reaction_type"),
+        nullable=False,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -666,7 +672,10 @@ class CommunityCommentReaction(Base):
     id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
     comment_id: Mapped[int] = mapped_column(ForeignKey("community_post_comments.id", ondelete="CASCADE"), nullable=False)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    reaction_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    reaction_type: Mapped[str] = mapped_column(
+        Enum("recommend", "not_recommend", name="reaction_type"),
+        nullable=False,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
