@@ -1118,7 +1118,7 @@ function MemoirContent() {
                   <div
                     key={label}
                     style={{
-                      background: "rgba(255,255,255,0.72)",
+                      background: "var(--memoir-card-bg)",
                       border: "1px solid var(--memoir-border)",
                       borderRadius: 16,
                       padding: "16px 18px",
