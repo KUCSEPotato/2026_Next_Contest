@@ -26,7 +26,7 @@ from app.models import User
 from app.schemas import IdeaCreateRequest
 from app.schemas import IdeaUpdateRequest
 from app.schemas import ProjectCreateRequest
-from app.services.economy import spend_coins
+from app.services.economy import spend_coins, award_coins, notify_user
 from app.services.entitlement_service import USAGE_IDEA_VIEW
 from app.services.entitlement_service import USAGE_PROJECT_CREATE
 from app.services.entitlement_service import check_usage_allowed
@@ -974,6 +974,35 @@ async def pickup_discarded_idea(
             },
         )
     )
+
+    # 보상: 원작성자에게 아이디어가 타인에 의해 프로젝트로 전환될 때 물방울 1개를 지급합니다.
+    try:
+        award_coins(
+            db,
+            user_id=idea.author_id,
+            amount=1,
+            event_type="waterdrop.idea.picked_up",
+            source_type="idea",
+            source_id=idea.id,
+            note=f"Idea pickup refund for {idea.title}",
+        )
+        notify_user(
+            db,
+            user_id=idea.author_id,
+            notification_type="system",
+            title="당신의 아이디어가 프로젝트로 이어졌습니다 — 물방울 1개 지급",
+            body=f"'{idea.title}' 아이디어를 {picker.nickname if picker else '다른 사용자'}님이 프로젝트로 전환하여 물방울 1개를 받으셨어요.",
+            data={
+                "notification_kind": "idea_pickup_refund",
+                "idea_id": idea.id,
+                "project_id": project.id,
+                "coin_change": 1,
+                "url": f"/projects/{project.id}",
+            },
+        )
+    except Exception:
+        # 보상 실패로 전체 흐름이 중단되어서는 안 되므로 예외는 무시하고 넘어갑니다.
+        pass
 
     db.commit()
     db.refresh(project)
