@@ -115,14 +115,6 @@ async def list_user_reviews(user_id: int, db: Session = Depends(get_db)) -> dict
     - path의 `user_id`를 전달합니다.
     - 해당 사용자가 reviewee인 리뷰를 최신순으로 반환합니다.
     """
-@router.get("/users/{user_id}", summary="사용자 리뷰 목록", description="특정 사용자가 받은 리뷰 목록을 조회합니다.")
-async def list_user_reviews(user_id: int, db: Session = Depends(get_db)) -> dict:
-    """사용자 수신 리뷰 목록 API.
-
-    Swagger 테스트 방법:
-    - path의 `user_id`를 전달합니다.
-    - 해당 사용자가 reviewee인 리뷰를 최신순으로 반환합니다.
-    """
     reviews = db.query(Review).filter(Review.reviewee_id == user_id).order_by(Review.created_at.desc()).all()
     result = []
     for review in reviews:
