@@ -95,6 +95,19 @@ function ThemeIcon({ isDarkTheme }) {
   );
 }
 
+function MenuIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+      <path
+        d="M5 7h14M5 12h14M5 17h14"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
@@ -103,6 +116,7 @@ export default function Navbar() {
   const [user, setUser] = useState(null);
   const [authStatus, setAuthStatus] = useState("checking");
   const [theme, setTheme] = useState(getCurrentTheme);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => {
@@ -113,6 +127,10 @@ export default function Navbar() {
       window.cancelAnimationFrame(frameId);
     };
   }, []);
+
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     let cancelled = false;
@@ -213,6 +231,7 @@ export default function Navbar() {
     setToken(null);
     setUser(null);
     setAuthStatus("anonymous");
+    setIsMobileMenuOpen(false);
     router.push("/login");
   };
 
@@ -223,6 +242,11 @@ export default function Navbar() {
     setTheme(nextTheme);
   };
 
+  const handleMove = (path) => {
+    setIsMobileMenuOpen(false);
+    router.push(path);
+  };
+
   const isAuthenticated = authStatus === "authenticated" && token;
   const isDarkTheme = theme === "dark";
 
@@ -230,36 +254,36 @@ export default function Navbar() {
     "inline-flex h-11 items-center justify-center rounded-lg px-4 text-sm font-bold transition";
 
   const iconButtonClass =
-    "inline-flex h-11 w-11 items-center justify-center rounded-xl bg-transparent transition hover:bg-slate-100 active:scale-95 dark:hover:bg-slate-800";
+    "inline-flex h-11 w-11 items-center justify-center rounded-xl bg-transparent text-slate-700 transition hover:bg-slate-100 active:scale-95 dark:text-slate-200 dark:hover:bg-slate-800";
 
   const authButtonClass = `${navPillClass} bg-red-600 text-white hover:bg-red-700`;
 
   return (
     <nav className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-        <button onClick={() => router.push("/mainpage")}>
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 md:h-16 md:px-6">
+        <button onClick={() => handleMove("/mainpage")} aria-label="메인페이지로 이동">
           <Image
             src={isDarkTheme ? "/logo_colored_white.svg" : "/logo_colored.svg"}
             alt="Devory 로고"
             width={120}
             height={60}
-            className="h-12 w-auto object-contain"
+            className="h-10 w-auto object-contain md:h-12"
             priority
           />
         </button>
 
-        <div className="flex items-center gap-3 text-sm font-semibold">
+        <div className="hidden items-center gap-3 text-sm font-semibold md:flex">
           {isAuthenticated && (
             <>
               <button
-                onClick={() => router.push("/mypage")}
+                onClick={() => handleMove("/mypage")}
                 className="text-slate-700 transition hover:text-red-600 dark:text-slate-200 dark:hover:text-red-400"
               >
                 마이페이지
               </button>
 
               <button
-                onClick={() => router.push("/memoir?view=list")}
+                onClick={() => handleMove("/memoir?view=list")}
                 className="text-slate-700 transition hover:text-red-600 dark:text-slate-200 dark:hover:text-red-400"
               >
                 나의 회고
@@ -269,7 +293,7 @@ export default function Navbar() {
 
           {user?.role === "admin" && (
             <button
-              onClick={() => router.push("/admin")}
+              onClick={() => handleMove("/admin")}
               className="text-slate-700 transition hover:text-red-600 dark:text-slate-200 dark:hover:text-red-400"
             >
               관리자
@@ -290,7 +314,7 @@ export default function Navbar() {
             <>
               {isAuthenticated && (
                 <button
-                  onClick={() => router.push("/coins")}
+                  onClick={() => handleMove("/coins")}
                   className={iconButtonClass}
                   aria-label="상점"
                   title="상점"
@@ -314,14 +338,104 @@ export default function Navbar() {
                   로그아웃
                 </button>
               ) : (
-                <button onClick={() => router.push("/login")} className={authButtonClass}>
+                <button onClick={() => handleMove("/login")} className={authButtonClass}>
                   로그인
                 </button>
               )}
             </>
           )}
         </div>
+
+        <div className="flex items-center gap-1 md:hidden">
+          {authStatus === "checking" ? (
+            <span className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500 dark:border-slate-700 dark:text-slate-400">
+              확인 중
+            </span>
+          ) : (
+            <>
+              {isAuthenticated && (
+                <button
+                  onClick={() => handleMove("/coins")}
+                  className={iconButtonClass}
+                  aria-label="상점"
+                  title="상점"
+                >
+                  <ShopIcon />
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleThemeToggle}
+                className={iconButtonClass}
+                aria-label={isDarkTheme ? "라이트 모드로 전환" : "다크 모드로 전환"}
+                title={isDarkTheme ? "라이트 모드" : "다크 모드"}
+              >
+                <ThemeIcon isDarkTheme={isDarkTheme} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+                className={iconButtonClass}
+                aria-label={isMobileMenuOpen ? "메뉴 닫기" : "메뉴 열기"}
+                aria-expanded={isMobileMenuOpen}
+              >
+                <MenuIcon />
+              </button>
+            </>
+          )}
+        </div>
       </div>
+
+      {isMobileMenuOpen && (
+        <div className="border-t border-slate-200 bg-white px-4 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-950 md:hidden">
+          <div className="flex flex-col gap-1 text-sm font-bold text-slate-700 dark:text-slate-200">
+            {isAuthenticated && (
+              <>
+                <button
+                  onClick={() => handleMove("/mypage")}
+                  className="rounded-xl px-3 py-3 text-left transition hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  마이페이지
+                </button>
+
+                <button
+                  onClick={() => handleMove("/memoir?view=list")}
+                  className="rounded-xl px-3 py-3 text-left transition hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  나의 회고
+                </button>
+              </>
+            )}
+
+            {user?.role === "admin" && (
+              <button
+                onClick={() => handleMove("/admin")}
+                className="rounded-xl px-3 py-3 text-left transition hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                관리자
+              </button>
+            )}
+
+            {isAuthenticated ? (
+              <button
+                onClick={handleLogout}
+                className="rounded-xl px-3 py-3 text-left font-extrabold text-red-600 transition hover:bg-red-50 dark:hover:bg-red-950/30"
+              >
+                로그아웃
+              </button>
+            ) : (
+              <button
+                onClick={() => handleMove("/login")}
+                className="rounded-xl px-3 py-3 text-left font-extrabold text-red-600 transition hover:bg-red-50 dark:hover:bg-red-950/30"
+              >
+                로그인
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </nav>
   );
 }
